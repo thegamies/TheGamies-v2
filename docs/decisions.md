@@ -1,0 +1,32 @@
+# Decision log
+
+Record product and architecture decisions here. Do not invent answers to open items while implementing.
+
+## Locked
+
+| Date | Decision | Choice |
+|---|---|---|
+| 2026-08-09 | New repository | `thegamies/thegamies-v2` (same GitHub org); old repo is archive/reference |
+| 2026-08-09 | Hosting | Vercel (Cloudflare/OpenNext later only if needed; keep app logic portable) |
+| 2026-08-09 | Database + Auth | Neon Postgres + Neon Auth (branching for previews) |
+| 2026-08-09 | Application | Next.js App Router + TypeScript |
+| 2026-08-09 | Styling | Tailwind CSS + project-owned design tokens |
+| 2026-08-09 | Visual direction | Editorial Standings + editorial minimalism + soft brutalism |
+| 2026-08-09 | v1 center | Community Official Vote (traffic driver) |
+| 2026-08-09 | Library / played status | Out of v1 |
+| 2026-08-09 | Always-live aggregate mode | Later; design Official Vote states first |
+| 2026-08-09 | Initial implementation order | Docs → scaffold/deploy → static results design proof → ballot UI → schema/auth → IGDB worker |
+
+## Open (block dependent work until decided)
+
+- Exact scoring formula for Combined (Community + Voice)
+- Whether Voices equal the whole Community aggregate or a configured percentage
+- Category voting modes in first release (single / multi / ranked)
+- Community membership and ballot eligibility rules
+- Whether submitted ballots can be edited before the deadline
+- Tie-breaking rules
+- Result publication timing
+- Moderation and ballot invalidation workflow
+- Initial user/profile scope for the restart
+- Final font selection
+- Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)

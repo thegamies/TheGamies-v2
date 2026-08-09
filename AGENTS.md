@@ -1,0 +1,52 @@
+# The Gamies (v2)
+
+Consumer gaming platform for personal Game of the Year lists and community-run awards.
+
+## Identity
+
+Feel like an independent gaming publication crossed with a personal record collection and premium sports standings.
+
+Do **not** feel like a SaaS dashboard, admin panel, generic shadcn app, crypto/esports site, card grid, or neon gaming landing page.
+
+Visual system: **Editorial Standings** with editorial minimalism and soft brutalism. See `docs/design-system.md`.
+
+## Stack (locked)
+
+- Next.js App Router + TypeScript
+- Tailwind CSS + project-owned design tokens
+- Hosting: Vercel
+- Database + Auth: Neon (Postgres + Neon Auth)
+- Game catalog: IGDB via a separate ingestion worker
+- Validation: Zod
+- Client data: TanStack Query only where it clearly helps
+
+## Product priorities (v1)
+
+**In:** communities, Official Vote events, Voices, ballots, results, personal ranked lists, crawlable public pages.  
+**Out:** library/played status, native mobile, messaging, GraphQL, microservices, real-time recalculation of everything, elaborate admin inside public pages.
+
+## Docs
+
+| Topic | Doc |
+|---|---|
+| Product | `docs/product.md` |
+| Terms | `docs/terminology.md` |
+| Architecture | `docs/architecture.md` |
+| Design | `docs/design-system.md` |
+| Decisions | `docs/decisions.md` |
+| Community / ballot / results | `docs/features/` |
+
+## Workflow
+
+1. Clarify scope; list in/out for the session.
+2. Get explicit approval before implementing a phase or multi-step feature.
+3. Implement only the approved step.
+4. Do not invent answers to open decisions in `docs/decisions.md`.
+
+## Verification
+
+After visual changes: lint, typecheck, relevant tests, desktop + mobile screenshots against references, check difficult fixtures.
+
+## Completion
+
+A task is done when behavior matches the docs, visual rules are preserved, and intentional deviations are documented.
