@@ -34,6 +34,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` |
+| Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | Community / ballot / results | `docs/features/` |
 
@@ -46,6 +47,7 @@ Full rules: `docs/engineering.md`. Short form:
 3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
 5. Test by risk: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI.
+6. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification
 
@@ -54,3 +56,7 @@ After visual changes: lint, typecheck, relevant tests, desktop + mobile screensh
 ## Completion
 
 A task is done when behavior matches the docs, engineering checks pass, visual rules are preserved, and intentional deviations are documented.
+
+## End of turn
+
+After finishing a task or substantive reply, always end with a short **What’s next** — concrete options or the recommended next step — so day-to-day work keeps a clear follow-up.

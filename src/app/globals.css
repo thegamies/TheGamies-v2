@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  /* Editorial Standings — soft brutal (mined from goty look, owned here) */
+  --paper: #0d0d0e;
+  --panel: #151516;
+  --ink: #f4f0e8;
+  --muted: #aaa69e;
+  --line: #2b2a28;
+  --accent: #ff5a1f;
+
+  --radius-control: 2px;
+  --radius-artwork: 0px;
+  --cover-ratio: 3 / 4;
+
+  --page-max: 72rem;
+  --gutter: 1.5rem;
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-panel: var(--panel);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-archivo);
+  --font-display: var(--font-bebas);
+  --font-serif: var(--font-source-serif);
+  --font-mono: var(--font-archivo);
+
+  --radius-control: var(--radius-control);
+  --radius-artwork: var(--radius-artwork);
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-archivo), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--accent);
+  color: #fff;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.skeleton-pulse {
+  animation: skeleton-pulse 1.4s var(--ease-standard) infinite;
+}
