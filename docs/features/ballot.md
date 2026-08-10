@@ -1,20 +1,23 @@
 # Ballot
 
-## Game of the Year
+Ballots belong to **editions** only (not live rankings).
 
-- Ranked top ten
+## Game of the Year (edition ballot)
+
+- Ranked list aligned with personal GOTY capacity (up to 100 on personal lists)
+- Edition **scoring defaults to top 10**; full-list degrading scores are a configurable future/scoring-engine option
 - Artwork-forward layout; one editorial ranking composition (not ten dashboard cards)
 - Reordering must feel direct and stable
-- States: empty, partial, review, submitted, locked
-- Show rank clearly without covering excessive artwork
+- States: empty, partial, review, submitted, locked (after deadline / close)
 
 ## Categories
 
-- Live alongside the main ballot; remain conceptually separate
+- Live alongside the main GOTY ballot; remain conceptually separate
+- Site-wide category definitions **and** per-community categories (both in v1)
 - Each category shows its voting rule clearly
-- Support single-choice, multi-choice, or ranked (which modes ship in v1 is an open decision)
+- Support single-choice, multi-choice, or ranked (exact modes per category still open)
 - Avoid a long generic form; use artwork and clear selection states
 
-## Open decisions that block full behavior
+## Open decisions that still block full behavior
 
-See `docs/decisions.md`: eligibility, edit-before-deadline, category modes for v1.
+See `docs/decisions.md`: Combined Voice weight, edit-before-deadline, exact category modes, tie-break, eligibility.
