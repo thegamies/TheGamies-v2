@@ -32,6 +32,7 @@ pnpm dev:secrets
 pnpm sync:igdb:secrets import --year 2026
 pnpm lint
 pnpm typecheck
+pnpm test
 pnpm build
 ```
 

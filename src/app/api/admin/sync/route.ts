@@ -11,37 +11,10 @@ import {
   type EnrichEntity,
 } from "@thegamies/igdb";
 import { isAdminAuthorized } from "@/lib/admin-auth";
-import { z } from "zod";
+import { adminSyncBodySchema } from "@/lib/admin-sync-schema";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
-
-const bodySchema = z.object({
-  action: z.enum([
-    "backfill",
-    "incremental",
-    "enrich",
-    "import",
-    "status",
-  ]),
-  year: z.number().int().optional(),
-  afterId: z.number().int().optional(),
-  maxPages: z.number().int().positive().optional(),
-  entity: z
-    .enum([
-      "covers",
-      "platforms",
-      "genres",
-      "themes",
-      "keywords",
-      "game_types",
-      "involved_companies",
-      "companies",
-      "ttb",
-      "all",
-    ])
-    .optional(),
-});
 
 export async function POST(request: Request) {
   if (!(await isAdminAuthorized(request))) {
@@ -49,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   const json = await request.json().catch(() => null);
-  const parsed = bodySchema.safeParse(json);
+  const parsed = adminSyncBodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid body", details: parsed.error.flatten() },

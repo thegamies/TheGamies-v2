@@ -121,17 +121,16 @@ Use Playwright screenshots compared to approved references under `design-referen
 | Community ballot or results UI | Lint + typecheck + desktop/mobile visual check |
 | Infra / CI only | Pipeline proves itself on the PR |
 
-### Local commands (to be wired at scaffold)
-
-Exact scripts will land with the Next.js app. Expect at least:
+### Local commands
 
 - `lint`
 - `typecheck`
-- `test` (unit)
+- `test` (unit — Vitest)
+- `test:watch`
 - `test:integration` (when present)
 - `test:visual` (when present)
 
-**Known gap:** catalog / IGDB sync (`feat/catalog-igdb-sync`) landed before a test runner existed — add Vitest + mapping/resume/upsert coverage in a follow-up before treating that feature as done.
+Catalog / IGDB sync unit coverage lives under `packages/igdb/src/*.test.ts` and `src/lib/admin-sync-schema.test.ts`. Integration tests against Neon remain a follow-up.
 
 ## Day-to-day workflow
 

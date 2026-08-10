@@ -25,6 +25,7 @@ import {
   mapIgdbGame,
   resolveAdultFilters,
 } from "./client";
+import { evaluateBackfillResume } from "./backfill-resume";
 import { INSERT_CHUNK, insertChunked } from "./chunk";
 import {
   finishSyncRun,
@@ -32,11 +33,18 @@ import {
   startSyncRun,
   updateSyncRun,
 } from "./sync-runs";
+import {
+  DEFAULT_LOOKBACK_SECONDS,
+  MAX_PAGES_PER_RUN,
+  OVERHANG_SECONDS,
+} from "./sync-constants";
 import { upsertGamesWithLinks } from "./upsert-games";
 
-export const OVERHANG_SECONDS = 15 * 60;
-export const DEFAULT_LOOKBACK_SECONDS = 26 * 60 * 60;
-export const MAX_PAGES_PER_RUN = 100;
+export {
+  DEFAULT_LOOKBACK_SECONDS,
+  MAX_PAGES_PER_RUN,
+  OVERHANG_SECONDS,
+} from "./sync-constants";
 
 export type SyncChunkResult = {
   synced: number;
@@ -220,24 +228,21 @@ export async function getBackfillResumeInfo(
     .limit(1);
 
   if (!row?.lastIgdbId) {
-    return { afterId: 0, canContinue: false, year };
+    return evaluateBackfillResume(null, { year });
   }
 
-  const scope = row.scope as {
-    maxPages?: number;
-    truncated?: boolean;
-  } | null;
-  const pageCap =
-    typeof scope?.maxPages === "number" ? scope.maxPages : MAX_PAGES_PER_RUN;
-  const hitCap = row.pages >= pageCap || scope?.truncated === true;
-  const unfinished =
-    row.status === "error" || row.status === "running" || hitCap;
-
-  if (!unfinished) {
-    return { afterId: 0, canContinue: false, year };
-  }
-
-  return { afterId: row.lastIgdbId, canContinue: true, year };
+  return evaluateBackfillResume(
+    {
+      status: row.status,
+      pages: row.pages,
+      lastIgdbId: row.lastIgdbId,
+      scope: row.scope as {
+        maxPages?: number;
+        truncated?: boolean;
+      } | null,
+    },
+    { year },
+  );
 }
 
 export type EnrichEntity =

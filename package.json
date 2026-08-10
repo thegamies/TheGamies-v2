@@ -9,6 +9,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:generate": "pnpm --filter @thegamies/db generate",
     "db:migrate": "pnpm --filter @thegamies/db migrate",
     "db:migrate:secrets": "doppler run -- pnpm db:migrate",
@@ -45,10 +47,15 @@
     "tsx": "^4.20.3",
     "typescript": "^5",
     "vercel": "^48.0.0",
+    "vitest": "^4.1.10",
     "wrangler": "^4.0.0"
   },
   "packageManager": "pnpm@10.6.3",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "workerd", "sharp"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
   }
 }
