@@ -39,3 +39,4 @@ yarn-error.log*
 # Local-only reference checkouts (not part of this repo)
 /references/**
 !/references/.gitkeep
+.vercel
