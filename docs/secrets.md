@@ -6,40 +6,52 @@
 
 ## Project layout
 
-Create one Doppler project:
+Use Doppler’s default shape — don’t invent parallel names.
 
 ```text
 Project: thegamies-v2
+
+Development
+  ├─ dev              → shared local/dev defaults
+  └─ dev_personal     → your overrides (keep enabled)
+
+Staging
+  ├─ stg              → develop / staging hosts
+  └─ stg_personal     → off
+
+Production
+  ├─ prd              → main / production hosts
+  └─ prd_personal     → off forever
+
+(Optional 4th env) Preview
+  └─ preview          → static PR-preview secrets only (no long-lived PR DB URLs)
 ```
 
-Use **four configs** (maps cleanly to Doppler’s free-tier environment limit):
+| Config | Used for | Personal configs | `DATABASE_URL` |
+|---|---|---|---|
+| `dev` | Shared laptop defaults | base for `dev_personal` | Neon **dev** branch (shared) |
+| `dev_personal` | Your machine overrides | **on** | Override only if you need a private Neon branch / flags |
+| `stg` | Staging from git `develop` | **off** | Neon develop/staging |
+| `prd` | Production (`main`) | **off** | Neon production |
+| `preview` | Static secrets for PR previews | **off** | Empty — CI injects ephemeral Neon URL |
 
-| Config | Used for | `DATABASE_URL` source |
-|---|---|---|
-| `local` | Laptop `pnpm dev` | Your Neon **dev** branch connection string |
-| `develop` | Staging deploys from `develop` | Neon non-prod / develop branch |
-| `preview` | Static secrets shared by PR previews | **Not** the PR DB — CI injects ephemeral Neon URL on top |
-| `production` | `main` on Vercel + Cloudflare | Neon production branch |
+### How `dev` + `dev_personal` work
 
-```text
-Doppler: thegamies-v2
-  ├─ local        → developers
-  ├─ develop      → staging hosts
-  ├─ preview      → shared preview app secrets (no long-lived PR DB URLs)
-  └─ production   → production hosts
-```
+1. Put shared values on **`dev`** (`NEXT_PUBLIC_APP_URL=http://localhost:3000`, shared Neon dev URL, etc.).
+2. Put only *your* differences on **`dev_personal`** (or leave it empty so it inherits `dev`).
+3. `doppler run` uses **`dev_personal`** when personal configs are enabled for Development — you get `dev` ∪ your overrides.
+
+That is the intended Doppler workflow.
 
 ## What goes in Doppler (app secrets)
 
-Put these in each config (values differ per config):
-
-| Key | `local` | `develop` | `preview` | `production` |
+| Key | `dev` | `stg` | `preview` | `prd` |
 |---|---|---|---|---|
-| `DATABASE_URL` | Neon dev | Neon develop/staging | *(leave empty or placeholder)* | Neon prod |
-| `NEON_AUTH_BASE_URL` | Auth URL for that branch | same | *(CI may override from Neon branch)* | prod Auth URL |
-| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | staging URL | preview placeholder | production URL |
+| `DATABASE_URL` | Neon dev | Neon staging | *(CI overrides per PR)* | Neon prod |
+| `NEON_AUTH_BASE_URL` | Auth for that branch | same | *(CI may override)* | prod Auth URL |
+| `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | staging URL | placeholder | production URL |
 
-Add future secrets here too (IGDB, storage keys, etc.) so you are not copying into three dashboards.
+Add future secrets (IGDB, storage, etc.) the same way.
 
 ### What does *not* go in Doppler app configs
 
@@ -49,83 +61,63 @@ Add future secrets here too (IGDB, storage keys, etc.) so you are not copying in
 | `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | CI deploys to Vercel |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | CI deploys to Cloudflare |
 
-Optional later: store those in a Doppler **service config** and sync into GitHub — only worth it once the checklist is boring.
+## PR previews
 
-## PR previews (important)
+Ephemeral Neon URLs are **not** stored in Doppler.
 
-Ephemeral Neon URLs must **not** be hand-maintained in Doppler.
-
-Flow:
-
-1. CI creates Neon `preview/pr-<n>` → gets `DATABASE_URL` (+ auth URL).
+1. CI creates Neon `preview/pr-<n>` → `DATABASE_URL`.
 2. CI deploys Vercel + Cloudflare with that URL.
-3. Doppler `preview` config only holds **static** shared preview secrets (feature flags, non-DB keys).
-
-So: Doppler for stable secrets; Neon Action for per-PR database.
+3. Doppler `preview` (if you create it) only holds **static** shared preview secrets.
 
 ## One-time setup
 
-1. Create a Doppler account (Developer free tier).
-2. Create project `thegamies-v2`.
-3. Rename/create configs: `local`, `develop`, `preview`, `production`.
-4. Install CLI: https://docs.doppler.com/docs/install-cli  
+1. Create Doppler project `thegamies-v2` (keep default Development / Staging / Production).
+2. Leave **`dev` + `dev_personal`** as-is; enable personal configs on Development only.
+3. Turn **off** personal configs on Staging and Production (`stg_personal` / `prd_personal`).
+4. Optionally add a Preview environment with config `preview`.
+5. Install CLI: https://docs.doppler.com/docs/install-cli
    ```bash
    doppler login
    cd C:\Users\ecdm9\Documents\thegamies-v2
    doppler setup
-   # select project thegamies-v2, config local
+   # project: thegamies-v2
+   # config: dev  (CLI will use dev_personal when personal configs are on)
    ```
-5. Fill secrets (dashboard or CLI):
+6. Set shared secrets on `dev`:
    ```bash
-   doppler secrets set DATABASE_URL="postgresql://..." --config local
-   doppler secrets set NEXT_PUBLIC_APP_URL="http://localhost:3000" --config local
+   doppler secrets set DATABASE_URL="postgresql://..." --config dev
+   doppler secrets set NEXT_PUBLIC_APP_URL="http://localhost:3000" --config dev
    ```
-6. Repo already has [`doppler.yaml`](../doppler.yaml) pinning default project/config for setup.
+7. Only set `dev_personal` keys when you need a private override.
+
+Repo [`doppler.yaml`](../doppler.yaml) pins project + `dev`.
 
 ## Day-to-day local use
 
 ```bash
-pnpm dev:secrets          # doppler run --config local -- next dev
-pnpm preview:cf:secrets   # same injection for Cloudflare local preview (WSL/Linux)
+pnpm dev:secrets          # doppler run -- next dev  (uses dev_personal → inherits dev)
+pnpm preview:cf:secrets   # same for Cloudflare local preview (WSL/Linux)
 ```
 
-Without Doppler (fallback): copy from `.env.example` into `.env` / `.dev.vars` manually — discouraged once Doppler is set up.
-
-Generate a local `.env` file if a tool requires a real file:
+Generate a file only if a tool requires it:
 
 ```bash
-doppler secrets download --config local --no-file --format env > .env
+doppler secrets download --no-file --format env > .env
 ```
 
 Never commit `.env`.
 
-## Syncing to hosts (recommended order)
+## Syncing to hosts
 
-1. **Local** — `doppler run` (above). Done.
-2. **Vercel** — Doppler → Integrations → Vercel → sync `develop` and `production` configs to the matching Vercel environments.  
-   Or skip sync and let GitHub Actions pass env at deploy time.
-3. **Cloudflare** — sync Worker secrets from Doppler, or set via CI/`wrangler secret` from Doppler in the workflow later.
-4. **GitHub** — keep deploy tokens as repo secrets; optionally add `DOPPLER_TOKEN` (service token) later so Actions can `doppler secrets download --config develop`.
-
-Minimal path that removes copy-paste pain: **Doppler for local + Vercel sync for develop/production**. Cloudflare can follow once the Worker exists.
-
-## Service token for CI (optional next step)
-
-When you want Actions to pull app secrets from Doppler:
-
-1. Doppler → Project → Access → Service Account / token with read on `develop` / `production` / `preview`.
-2. GitHub secret: `DOPPLER_TOKEN`
-3. Workflow step:
-   ```bash
-   doppler secrets download --no-file --format env --config develop > .env
-   ```
-
-Not required for the current static scaffold.
+1. **Local** — `pnpm dev:secrets`.
+2. **Vercel** — sync Doppler `stg` → Vercel Preview/Staging, `prd` → Production.
+3. **Cloudflare** — sync Worker secrets from `stg` / `prd`, or inject via CI later.
+4. **GitHub** — deploy tokens only; optional `DOPPLER_TOKEN` later for Actions downloads.
 
 ## Rules
 
-1. App secrets live in Doppler; do not duplicate into Slack/docs.
-2. Deploy tokens live in GitHub (or a dedicated Doppler CI config later).
-3. Never commit Doppler tokens, `.env`, or `.dev.vars`.
-4. Production `DATABASE_URL` never used for local or preview.
+1. Shared local defaults → `dev`. Personal overrides → `dev_personal`.
+2. Never enable personal configs on `prd`.
+3. Deploy tokens stay in GitHub Actions.
+4. Production `DATABASE_URL` never used for local or PR previews.
 5. PR databases are ephemeral — CI-owned, not Doppler-owned.

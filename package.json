@@ -4,18 +4,18 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:secrets": "doppler run --config local -- next dev",
+    "dev:secrets": "doppler run -- next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "preview:cf:secrets": "doppler run --config local -- pnpm preview:cf",
+    "preview:cf:secrets": "doppler run -- pnpm preview:cf",
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "upload:cf": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "deploy:vercel": "vercel deploy --yes",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "secrets:local": "doppler secrets"
+    "secrets": "doppler secrets"
   },
   "dependencies": {
     "next": "16.3.0",

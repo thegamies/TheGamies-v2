@@ -5,19 +5,22 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 ## 0. Doppler (app secrets — do this first)
 
 - [ ] Create Doppler account (Developer free tier is fine)
-- [ ] Create project `thegamies-v2`
-- [ ] Create configs: `local`, `develop`, `preview`, `production`
-- [ ] Install CLI and log in: https://docs.doppler.com/docs/install-cli
+- [ ] Create project `thegamies-v2` (keep default Development / Staging / Production)
+- [ ] Development: keep **`dev`** + **`dev_personal`** (personal configs **on**)
+- [ ] Staging / Production: personal configs **off** (`stg`, `prd` only)
+- [ ] Optional: add Preview env with config `preview` for static PR secrets
+- [ ] Install CLI: https://docs.doppler.com/docs/install-cli
   ```bash
   doppler login
   cd C:\Users\ecdm9\Documents\thegamies-v2
-  doppler setup   # project thegamies-v2, config local
+  doppler setup   # project thegamies-v2, config dev
   ```
-- [ ] Set at least local secrets (after Neon exists):
+- [ ] Set shared secrets on **`dev`** (after Neon exists):
   ```bash
-  doppler secrets set DATABASE_URL="postgresql://..." --config local
-  doppler secrets set NEXT_PUBLIC_APP_URL="http://localhost:3000" --config local
+  doppler secrets set DATABASE_URL="postgresql://..." --config dev
+  doppler secrets set NEXT_PUBLIC_APP_URL="http://localhost:3000" --config dev
   ```
+- [ ] Use `dev_personal` only for private overrides (or leave empty to inherit `dev`)
 - [ ] Day-to-day: `pnpm dev:secrets`  
   Full layout: [secrets.md](./secrets.md)
 
@@ -26,8 +29,8 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 - [ ] Create Neon project for The Gamies v2
 - [ ] Copy project id → GitHub secret `NEON_PROJECT_ID`
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
-- [ ] Put the **dev** branch connection string into Doppler `local` as `DATABASE_URL`
-- [ ] Put develop/staging and production URLs into Doppler `develop` / `production`
+- [ ] Put the **dev** branch connection string into Doppler **`dev`** as `DATABASE_URL`
+- [ ] Put staging and production URLs into Doppler `stg` / `prd`
 - [ ] (Later) Enable Neon Auth; CI already requests `auth_url` when available
 
 ## 2. Vercel
@@ -41,7 +44,7 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec vercel login
   pnpm exec vercel link
   ```
-- [ ] (Recommended) Doppler → Integrations → Vercel: sync `develop` + `production`
+- [ ] (Recommended) Doppler → Integrations → Vercel: sync `stg` + `prd`
 
 ## 3. Cloudflare
 
@@ -53,7 +56,7 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec wrangler login
   pnpm deploy:cf
   ```
-- [ ] (Later) Sync Worker secrets from Doppler or via CI
+- [ ] (Later) Sync Worker secrets from Doppler `stg` / `prd` or via CI
 
 ## 4. GitHub
 
@@ -64,7 +67,7 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 
 ## 5. Verify
 
-- [ ] `pnpm dev:secrets` loads the app with Doppler-injected env
+- [ ] `pnpm dev:secrets` loads the app (`dev_personal` inherits `dev`)
 - [ ] `pnpm lint && pnpm typecheck && pnpm build` locally
 - [ ] Vercel preview URL loads `/` and `/design-system`
 - [ ] Cloudflare preview URL loads the same
