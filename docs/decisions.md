@@ -8,7 +8,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 |---|---|---|
 | 2026-08-09 | New repository | `thegamies/thegamies-v2` (same GitHub org); old repo is archive/reference |
 | 2026-08-09 | Hosting | Vercel (Cloudflare/OpenNext later only if needed; keep app logic portable) |
-| 2026-08-10 | Dual hosting | **Vercel and Cloudflare Workers (OpenNext) both first-class**; PR previews on both; shared Neon branch per PR |
+| 2026-08-10 | Staging on develop | Push to `develop` deploys lasting staging: Vercel + Cloudflare Worker `thegamies-v2-develop` |
 | 2026-08-10 | Secrets management | **Doppler** as source of truth; use default `dev` + `dev_personal`, `stg`, `prd` (personal configs on Development only); deploy tokens in GitHub Actions |
 | 2026-08-09 | Database + Auth | Neon Postgres + Neon Auth (branching for previews) |
 | 2026-08-09 | Application | Next.js App Router + TypeScript |
