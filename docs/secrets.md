@@ -50,8 +50,11 @@ That is the intended Doppler workflow.
 | `DATABASE_URL` | Neon dev | Neon staging | *(CI overrides per PR)* | Neon prod |
 | `NEON_AUTH_BASE_URL` | Auth for that branch | same | *(CI may override)* | prod Auth URL |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:3000` | staging URL | placeholder | production URL |
+| `IGDB_CLIENT_ID` | Twitch/IGDB app | same | same | same |
+| `IGDB_CLIENT_SECRET` | Twitch/IGDB app | same | same | same |
+| `ADMIN_SYNC_SECRET` | Unlock `/admin/sync` | same | optional | same |
 
-Add future secrets (IGDB, storage, etc.) the same way.
+`dev_personal` may override `DATABASE_URL` to a lasting `local/<you>` Neon branch. See [igdb-sync.md](./igdb-sync.md).
 
 ### What does *not* go in Doppler app configs
 
@@ -66,8 +69,9 @@ Add future secrets (IGDB, storage, etc.) the same way.
 Ephemeral Neon URLs are **not** stored in Doppler.
 
 1. CI creates Neon `preview/pr-<n>` → `DATABASE_URL`.
-2. CI deploys Vercel + Cloudflare with that URL.
-3. Doppler `preview` (if you create it) only holds **static** shared preview secrets.
+2. CI runs `pnpm db:migrate` against that branch.
+3. CI deploys Vercel + Cloudflare with that URL.
+4. Doppler `preview` (if you create it) only holds **static** shared preview secrets.
 
 ## One-time setup
 

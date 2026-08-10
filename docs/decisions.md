@@ -27,6 +27,10 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-10 | Categories | **Both** site-wide and per-community |
 | 2026-08-10 | Live lock authority | Community live → community admin; site live → site admin |
 | 2026-08-10 | v1 product surface | Catalog browse/detail, GOTY+custom lists, anon create + editorial list view, user pages, site live aggregate, communities with live toggle + editions |
+| 2026-08-10 | Catalog ORM | **Drizzle** + Neon serverless |
+| 2026-08-10 | IGDB sync model | Core-first games + junction links by igdb id; enrich missing lookups only; no entity stubs; covers/themes/keywords/game_types included |
+| 2026-08-10 | IGDB ops | Node CLI + `/admin/sync` (ADMIN_SYNC_SECRET); webhooks deferred |
+| 2026-08-10 | Local DB | Doppler `dev` + `dev_personal`; lasting personal Neon branch recommended |
 
 ## Open (block dependent work until decided)
 

@@ -19,7 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@thegamies/db": ["./packages/db/src/index.ts"],
+      "@thegamies/db/schema": ["./packages/db/src/schema.ts"],
+      "@thegamies/igdb": ["./packages/igdb/src/index.ts"]
     }
   },
   "include": [

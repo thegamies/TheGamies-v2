@@ -6,41 +6,37 @@ This repository is the clean rebuild. The previous monorepo (`thegamies/TheGamie
 
 ## Current status
 
-Next.js App Router scaffold with Editorial Standings tokens, `/design-system` gallery, and **dual-host deploy** (Vercel + Cloudflare Workers via OpenNext). Neon is the shared DB/Auth target.
+Next.js App Router with Editorial Standings tokens, catalog browse/detail, IGDB sync (CLI + `/admin/sync`), and **dual-host deploy** (Vercel + Cloudflare Workers via OpenNext). Neon is the shared DB.
 
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind
 - Hosts: Vercel **and** Cloudflare Workers (OpenNext)
 - Neon (Postgres + Auth)
-- IGDB catalog via separate worker — later
+- Drizzle + `@thegamies/db` / `@thegamies/igdb` packages
 
 ## Develop
 
 ```bash
 pnpm install
-pnpm dev
+doppler run -- pnpm db:migrate
+pnpm dev:secrets
 ```
 
 - App: http://localhost:3000
+- Games: http://localhost:3000/games
+- Admin sync: http://localhost:3000/admin/sync
 - Design system: http://localhost:3000/design-system
 
 ```bash
+pnpm sync:igdb:secrets import --year 2026
 pnpm lint
 pnpm typecheck
 pnpm build
 ```
 
-Cloudflare runtime preview (Linux/WSL/CI recommended):
+See [docs/igdb-sync.md](docs/igdb-sync.md) for catalog sync details.
 
-```bash
-pnpm preview:cf
-pnpm deploy:cf
-```
+## Docs
 
-Deploy docs and required GitHub secrets: [`docs/deployment.md`](docs/deployment.md).  
-App secrets (Doppler): [`docs/secrets.md`](docs/secrets.md). Setup order: [`docs/setup-checklist.md`](docs/setup-checklist.md).
-
-```bash
-pnpm dev:secrets   # requires Doppler CLI + project setup
-```
+Start with [AGENTS.md](./AGENTS.md) and [docs/](./docs/).
