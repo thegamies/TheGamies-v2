@@ -38,4 +38,9 @@ pnpm preview:cf
 pnpm deploy:cf
 ```
 
-Deploy docs and required GitHub secrets: [`docs/deployment.md`](docs/deployment.md).
+Deploy docs and required GitHub secrets: [`docs/deployment.md`](docs/deployment.md).  
+App secrets (Doppler): [`docs/secrets.md`](docs/secrets.md). Setup order: [`docs/setup-checklist.md`](docs/setup-checklist.md).
+
+```bash
+pnpm dev:secrets   # requires Doppler CLI + project setup
+```
