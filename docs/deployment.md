@@ -6,8 +6,9 @@ Dual-host deployment: **Vercel** and **Cloudflare Workers (OpenNext)**. Both are
 
 1. One Next.js codebase; host adapters stay thin.
 2. Every PR into `develop` gets **both** preview URLs when CI secrets are configured.
-3. One **Neon branch per PR**; both previews use that connection string.
-4. Never point previews at the production database.
+3. Every push to `develop` deploys a lasting **staging** site on both hosts.
+4. One **Neon branch per PR**; both previews use that connection string.
+5. Never point previews/staging at the production database.
 
 ## Local commands
 
@@ -30,6 +31,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
 | `.github/workflows/ci.yml` | Lint, typecheck, build on PR/push |
 | `.github/workflows/preview.yml` | Neon branch + Vercel + Cloudflare PR previews |
+| `.github/workflows/staging.yml` | Push to `develop` → lasting staging on both hosts |
+| `.github/workflows/production.yml` | Push to `main` → production on both hosts |
 
 ## Cloudflare notes
 
@@ -73,8 +76,24 @@ Configure on the repo:
 | `VERCEL_PROJECT_ID` | Vercel project |
 | `CLOUDFLARE_API_TOKEN` | Workers deploy |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
+| `STAGING_DATABASE_URL` | Optional lasting Neon URL for `develop` staging |
+| `STAGING_NEON_AUTH_BASE_URL` | Optional staging Auth URL |
+| `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname (e.g. `thegamies-staging.vercel.app`) |
 
-Until secrets exist, `ci.yml` still runs quality checks; `preview.yml` skips host deploys that lack credentials.
+Until secrets exist, `ci.yml` still runs quality checks; deploy workflows skip hosts that lack credentials.
+
+## Staging flow (`develop`)
+
+```text
+Push / merge to develop
+  → ci: lint + typecheck + build
+  → staging: deploy Vercel preview deployment (+ optional VERCEL_STAGING_ALIAS)
+  → staging: deploy Cloudflare worker thegamies-v2-develop (stable name, overwritten each push)
+  → optional STAGING_DATABASE_URL injected on both hosts
+```
+
+Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers.dev`).
+Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`.
 
 ## PR preview flow
 

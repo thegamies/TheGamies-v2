@@ -1,0 +1,167 @@
+name: Staging dual deploy
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+jobs:
+  vercel:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Vercel secrets missing; skipping staging Vercel deploy."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          VERCEL_STAGING_ALIAS: ${{ secrets.VERCEL_STAGING_ALIAS }}
+        run: |
+          mkdir -p .vercel
+          printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
+          pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
+          if [ -n "$DATABASE_URL" ]; then
+            ARGS+=(--env "DATABASE_URL=$DATABASE_URL")
+          fi
+          if [ -n "$NEON_AUTH_BASE_URL" ]; then
+            ARGS+=(--env "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL")
+          fi
+          ARGS+=(--env "NEXT_PUBLIC_APP_URL=https://thegamies-v2-develop.workers.dev")
+          DEPLOY_OUT=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr)
+          URL=$(echo "$DEPLOY_OUT" | grep -oE 'https://[^ ]+\.vercel\.app' | tail -n1)
+          if [ -z "$URL" ]; then
+            URL=$(echo "$DEPLOY_OUT" | tail -n1)
+          fi
+          if [ -n "$VERCEL_STAGING_ALIAS" ] && [ -n "$URL" ]; then
+            pnpm exec vercel alias set "$URL" "$VERCEL_STAGING_ALIAS" --token="$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" || true
+            echo "Aliased to $VERCEL_STAGING_ALIAS"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### Vercel staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deployment: $URL" >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$VERCEL_STAGING_ALIAS" ]; then
+            echo "- Alias: https://$VERCEL_STAGING_ALIAS" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  cloudflare:
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare secrets missing; skipping staging Cloudflare deploy."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+        run: |
+          WORKER="thegamies-v2-develop"
+          node -e "
+            const fs=require('fs');
+            const worker='thegamies-v2-develop';
+            let s=fs.readFileSync('wrangler.jsonc','utf8');
+            s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
+            fs.writeFileSync('wrangler.jsonc', s);
+          "
+          {
+            echo "NEXTJS_ENV=production"
+            echo "NEXT_PUBLIC_APP_URL=https://thegamies-v2-develop.workers.dev"
+            if [ -n "$DATABASE_URL" ]; then echo "DATABASE_URL=$DATABASE_URL"; fi
+            if [ -n "$NEON_AUTH_BASE_URL" ]; then echo "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL"; fi
+          } > .dev.vars
+          pnpm exec opennextjs-cloudflare build
+          DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
+          URL=$(echo "$DEPLOY_LOG" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -n1)
+          if [ -z "$URL" ]; then
+            URL="https://${WORKER}.workers.dev"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "### Cloudflare staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Worker: \`$WORKER\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
+
+  summary:
+    needs: [vercel, cloudflare]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Write combined summary
+        env:
+          VERCEL_URL: ${{ needs.vercel.outputs.url }}
+          VERCEL_SKIPPED: ${{ needs.vercel.outputs.skipped }}
+          CF_URL: ${{ needs.cloudflare.outputs.url }}
+          CF_SKIPPED: ${{ needs.cloudflare.outputs.skipped }}
+        run: |
+          {
+            echo "## Staging deploy (develop)"
+            echo ""
+            echo "| Host | Status | URL |"
+            echo "| --- | --- | --- |"
+            if [ "$VERCEL_SKIPPED" = "true" ]; then
+              echo "| Vercel | skipped | |"
+            else
+              echo "| Vercel | deployed | $VERCEL_URL |"
+            fi
+            if [ "$CF_SKIPPED" = "true" ]; then
+              echo "| Cloudflare | skipped | |"
+            else
+              echo "| Cloudflare | deployed | $CF_URL |"
+            fi
+            echo ""
+            echo "Stable Cloudflare worker name: \`thegamies-v2-develop\` (overwritten each push)."
+            echo "Optional secrets: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`VERCEL_STAGING_ALIAS\`."
+          } >> "$GITHUB_STEP_SUMMARY"
