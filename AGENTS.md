@@ -22,8 +22,10 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 
 ## Product priorities (v1)
 
-**In:** communities, Official Vote events, Voices, ballots, results, personal ranked lists, crawlable public pages.  
-**Out:** library/played status, native mobile, messaging, GraphQL, microservices, real-time recalculation of everything, elaborate admin inside public pages.
+**In:** games browse/detail, GOTY + custom lists (anon create + soft save prompt + editorial list view), user pages, site live GOTY aggregate (signed-in lists, admin lock), communities with optional live rankings + year **editions** (hidden ballots → frozen Combined/Community/Voices + categories + voters).  
+**Out:** library/played status, native mobile, messaging, GraphQL, microservices, recalculating frozen edition results, Remotion/video export.
+
+Editions ≠ live rankings — see `docs/product.md`.
 
 ## Docs
 
