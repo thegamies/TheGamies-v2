@@ -33,15 +33,19 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 | Terms | `docs/terminology.md` |
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
+| Engineering / day-to-day | `docs/engineering.md` |
 | Decisions | `docs/decisions.md` |
 | Community / ballot / results | `docs/features/` |
 
 ## Workflow
 
+Full rules: `docs/engineering.md`. Short form:
+
 1. Clarify scope; list in/out for the session.
 2. Get explicit approval before implementing a phase or multi-step feature.
-3. Implement only the approved step.
+3. Branch → implement one approved step → PR (even solo) → preview → squash merge to `main`.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
+5. Test by risk: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI.
 
 ## Verification
 
@@ -49,4 +53,4 @@ After visual changes: lint, typecheck, relevant tests, desktop + mobile screensh
 
 ## Completion
 
-A task is done when behavior matches the docs, visual rules are preserved, and intentional deviations are documented.
+A task is done when behavior matches the docs, engineering checks pass, visual rules are preserved, and intentional deviations are documented.

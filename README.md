@@ -8,7 +8,7 @@ This repository is the clean rebuild. The previous monorepo (`thegamies/TheGamie
 
 Docs-only foundation. Stack and design direction are locked; app scaffold is next.
 
-See `AGENTS.md` and `docs/`.
+See `AGENTS.md` and `docs/`. Day-to-day process (branches, PRs, tests, deploy): `docs/engineering.md`.
 
 ## Stack
 

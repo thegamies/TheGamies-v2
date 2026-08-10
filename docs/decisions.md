@@ -16,6 +16,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-09 | Library / played status | Out of v1 |
 | 2026-08-09 | Always-live aggregate mode | Later; design Official Vote states first |
 | 2026-08-09 | Initial implementation order | Docs → scaffold/deploy → static results design proof → ballot UI → schema/auth → IGDB worker |
+| 2026-08-10 | Engineering operating system | `docs/engineering.md`: PR-required flow, preview/prod envs, risk-based unit/integration/visual tests, squash to `main`, `pnpm` + Node LTS defaults |
 
 ## Open (block dependent work until decided)
 
