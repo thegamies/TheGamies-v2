@@ -83,17 +83,19 @@ Branch from `main` → PR into `main` → preview if possible → merge, then ba
 
 ## Testing
 
-We optimize for **risk coverage**, not percentage theater.
+**Every feature ships with tests in the same PR** (or an immediately linked follow-up only when scaffolding is still missing — call that out explicitly). Risk still chooses *which* tests, not *whether* to test.
+
+We optimize for **risk coverage**, not percentage theater — but “no tests” is not an acceptable default for feature work.
 
 ### Unit tests
 
-**Required for:** pure domain logic — scoring, eligibility, validators, status derivation from dates, ranking math, Zod schemas that encode rules.
+**Required for:** pure domain logic — scoring, eligibility, validators, status derivation from dates, ranking math, Zod schemas that encode rules, and feature helpers that map/transform data (e.g. IGDB mapping, resume rules).
 
 **Location:** next to the module or under a clear `__tests__` / `*.test.ts` convention once the app is scaffolded.
 
 ### Integration tests
 
-**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, RLS/permission assumptions.
+**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, RLS/permission assumptions, catalog upsert/enrich, admin-protected sync routes.
 
 Run against a Neon branch or ephemeral test database — never against production.
 
@@ -113,6 +115,7 @@ Use Playwright screenshots compared to approved references under `design-referen
 | Change type | Minimum bar |
 |---|---|
 | Docs / tokens comments only | Review |
+| Feature / product behavior | Unit and/or integration tests for the new paths (same PR) |
 | Pure logic (scoring, rules) | Unit tests |
 | API / DB behavior | Integration check on branch DB |
 | Community ballot or results UI | Lint + typecheck + desktop/mobile visual check |
@@ -128,6 +131,8 @@ Exact scripts will land with the Next.js app. Expect at least:
 - `test:integration` (when present)
 - `test:visual` (when present)
 
+**Known gap:** catalog / IGDB sync (`feat/catalog-igdb-sync`) landed before a test runner existed — add Vitest + mapping/resume/upsert coverage in a follow-up before treating that feature as done.
+
 ## Day-to-day workflow
 
 ### Humans and AI
@@ -136,7 +141,7 @@ Exact scripts will land with the Next.js app. Expect at least:
 2. Confirm open decisions are already answered or explicitly deferred.
 3. Create a branch from `develop`.
 4. Implement one vertical slice.
-5. Add tests for the risky part.
+5. Add tests for the feature in the same PR (unit and/or integration by risk). “No tests” needs an explicit documented exception.
 6. Open PR into `develop` → exercise preview.
 7. Squash merge to `develop`.
 8. Periodically promote `develop` → `main` for production.
@@ -179,7 +184,7 @@ A PR is done when:
 
 1. Scope matches what was approved.
 2. CI passes.
-3. Required tests for the change type exist and pass.
+3. Feature work includes tests in the same PR (unit/integration/visual by risk) and they pass. Docs-only / infra-only changes follow the “tested enough” table.
 4. Preview checked for user-facing UI.
 5. Docs/decisions updated when needed.
 6. No known secret or production-data risk introduced.

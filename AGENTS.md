@@ -52,7 +52,7 @@ Full rules: `docs/engineering.md`. Short form:
 2. Get explicit approval before implementing a phase or multi-step feature.
 3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
-5. Test by risk: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI.
+5. **Features ship with tests** in the same PR: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI. See `docs/engineering.md`.
 6. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification
@@ -61,7 +61,7 @@ After visual changes: lint, typecheck, relevant tests, desktop + mobile screensh
 
 ## Completion
 
-A task is done when behavior matches the docs, engineering checks pass, visual rules are preserved, and intentional deviations are documented.
+A task is done when behavior matches the docs, **tests for the feature exist and pass**, engineering checks pass, visual rules are preserved, and intentional deviations are documented.
 
 ## End of turn
 
