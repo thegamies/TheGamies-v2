@@ -6,17 +6,26 @@ Dark neo-editorial design with sports-standings and awards-broadcast influence, 
 
 Personality comes from composition, typography, game artwork, and rank treatment — not chrome.
 
+Visual cues were mined from the local `goty` prototype (`references/visual-prototype`) — especially CSS tokens and border language. Do **not** import that project's product scope (export video, sync dashboard, etc.).
+
+## Gallery
+
+Internal catalog: [`/design-system`](/design-system)
+
+Shows tokens, type, controls, covers, rank markers, skeletons, and empty/loading/error patterns as they are approved.
+
 ## Characteristics
 
-- Near-black background
-- Warm off-white primary text
-- Restrained orange accent (`#ff5a1f` reference)
-- Oversized display typography
-- Serif supporting/deck copy used sparingly
-- Hard dividers and visible structural borders
-- Square or lightly rounded utility controls (not pill-everything)
+- Near-black background (`--paper`)
+- Warm off-white primary text (`--ink`)
+- Restrained orange accent (`#ff5a1f`)
+- Oversized display typography (Bebas Neue)
+- Serif supporting/deck copy used sparingly (Source Serif 4)
+- Body UI text: Archivo
+- Hard dividers and visible structural borders (`--line`)
+- Square or lightly rounded utility controls (`--radius-control: 2px`)
 - Dense, readable tables
-- Large artwork-led moments
+- Large artwork-led moments (cover ratio `3 / 4`)
 - Strong numerical hierarchy
 - Minimal shadows and interface gradients
 - Flat surfaces; elevation is rare
@@ -41,6 +50,7 @@ Personality comes from composition, typography, game artwork, and rank treatment
 - Generic empty-state illustrations
 - Title/subtitle/icon patterns on every section
 - A universal visible `Card` abstraction used everywhere
+- Lone spinners that collapse layout while data loads
 
 ## Component library policy
 
@@ -48,13 +58,27 @@ Use Radix, React Aria, or Headless UI for behavior and accessibility only. Resty
 
 ## Bespoke identity components
 
-`CommunityHeader`, `EventNavigation`, `RankedBallot`, `BallotGameRow`, `GameCover`, `RankMarker`, `WinnerReveal`, `WinnerPodium`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `BallotMatrix`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
+Shipped stubs: `GameCover`, `RankMarker`, `Button`, skeleton family.
+
+Planned: `CommunityHeader`, `EventNavigation`, `RankedBallot`, `BallotGameRow`, `WinnerReveal`, `WinnerPodium`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `BallotMatrix`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 
 ## Tokens
 
-Define and reuse tokens; no arbitrary one-off values.
+Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 
-Minimum categories: page background, raised surface, primary/secondary text, subtle/strong borders, accent, page max width, gutters, type scale, control radius, artwork radius, spacing, motion.
+| Token | Role | Value |
+|---|---|---|
+| `--paper` | Page background | `#0d0d0e` |
+| `--panel` | Raised / inset surface | `#151516` |
+| `--ink` | Primary text | `#f4f0e8` |
+| `--muted` | Secondary text | `#aaa69e` |
+| `--line` | Borders / dividers | `#2b2a28` |
+| `--accent` | Rank, selection, status | `#ff5a1f` |
+| `--radius-control` | Buttons / inputs | `2px` |
+| `--radius-artwork` | Covers | `0px` |
+| `--cover-ratio` | Game art | `3 / 4` |
+| `--page-max` | Content width | `72rem` |
+| `--gutter` | Page padding | `1.5rem` |
 
 Rules:
 
@@ -62,6 +86,12 @@ Rules:
 - Artwork uses a consistent cover ratio
 - Data sections prefer dividers and spacing over visible containers
 - New colors, radii, shadows, and spacing require a deliberate system change
+
+## Skeletons
+
+Any client-loaded block with a known final shape must ship a matching skeleton. Prefer `Skeleton`, `SkeletonText`, `SkeletonCover`, `SkeletonBallotRow`, and `SkeletonStandingsRow` over spinners.
+
+Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimmer gradients that feel like SaaS dashboards.
 
 ## Responsive
 

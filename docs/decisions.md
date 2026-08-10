@@ -18,6 +18,8 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-09 | Initial implementation order | Docs → scaffold/deploy → static results design proof → ballot UI → schema/auth → IGDB worker |
 | 2026-08-10 | Engineering operating system | `docs/engineering.md`: PR-required flow, preview/prod envs, risk-based unit/integration/visual tests, squash merges, `pnpm` + Node LTS defaults |
 | 2026-08-10 | Integration branch | Day-to-day work targets `develop`; `main` remains production-only via promote PRs |
+| 2026-08-10 | Fonts | Display: Bebas Neue; body: Archivo; deck/serif: Source Serif 4 |
+| 2026-08-10 | Design gallery | Internal `/design-system` route for approved primitives and skeletons |
 
 ## Open (block dependent work until decided)
 
@@ -30,5 +32,4 @@ Record product and architecture decisions here. Do not invent answers to open it
 - Result publication timing
 - Moderation and ballot invalidation workflow
 - Initial user/profile scope for the restart
-- Final font selection
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
