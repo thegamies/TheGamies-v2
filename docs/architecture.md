@@ -2,16 +2,17 @@
 
 ## Overview
 
-One coherent Next.js application on Vercel. Neon provides Postgres and Auth. IGDB ingestion runs as a separate TypeScript worker, not inside normal web requests.
+One coherent Next.js application, deployable to **both Vercel and Cloudflare Workers** (OpenNext). Neon provides Postgres and Auth. IGDB ingestion runs as a separate TypeScript worker, not inside normal web requests.
 
 ```text
-Browser → Vercel (Next.js App Router)
-            ├─ Server-rendered public pages
-            ├─ Route handlers / server actions (thin)
-            └─ Neon (Postgres + Auth + RLS)
+Browser → Vercel (Next.js)  ─┐
+         Cloudflare Workers ─┼→ Neon (Postgres + Auth + RLS)
+         (OpenNext)          ┘
 
 Separate: IGDB ingestion worker → Neon catalog tables
 ```
+
+Product logic stays host-agnostic. Host-specific code lives only in thin adapters and deploy config.
 
 ## Locked stack
 
@@ -19,11 +20,18 @@ Separate: IGDB ingestion worker → Neon catalog tables
 |---|---|
 | App | Next.js App Router, TypeScript |
 | Styles | Tailwind + design tokens |
-| Host | Vercel (preview + production) |
+| Hosts | **Vercel and Cloudflare Workers (OpenNext)** — both first-class |
 | DB | Neon Postgres |
 | Auth | Neon Auth |
 | Catalog | IGDB via separate worker |
 | Validation | Zod |
+
+## Hosting rules
+
+- Do not call Vercel-only or Cloudflare-only APIs from domain/feature modules.
+- Prefer portable storage (R2 or S3) over Vercel Blob when object storage is added.
+- Local day-to-day: `pnpm dev` (Node). Cloudflare runtime parity: `pnpm preview:cf`.
+- PR previews deploy to **both** hosts and share one Neon branch per PR.
 
 ## Boundaries
 
@@ -32,7 +40,6 @@ Separate: IGDB ingestion worker → Neon catalog tables
 - Use Postgres for product and aggregate data.
 - Do not start with GraphQL, Redis, microservices, or a web/mobile monorepo.
 - Add infrastructure only after demonstrated need.
-- Prefer portable domain logic (plain TS modules) so a later Cloudflare move is a port, not a rewrite.
 
 ## Rendering
 
@@ -41,15 +48,18 @@ Separate: IGDB ingestion worker → Neon catalog tables
 - Search: server endpoint or Postgres function
 - Social cards: generated Open Graph images
 - Ranking pages: read from precomputed aggregate tables (not live recalculation of everything)
+- Do not use `export const runtime = "edge"` — unsupported with OpenNext Cloudflare
 
 ## Environments
 
-Target workflow:
+| Env | Trigger | App | Data |
+|---|---|---|---|
+| Local | Developer machine | `next dev` | Neon dev branch |
+| Preview | PR into `develop` | Vercel preview **and** Cloudflare Workers preview | Shared Neon branch for that PR |
+| Staging | `develop` | Both hosts (staging projects/workers) | Neon non-prod branch |
+| Production | Merge to `main` | Both hosts (production) | Neon production branch |
 
-- `main` → production (Vercel + Neon production branch)
-- PR → Vercel preview + Neon database branch (auth branches with DB)
-
-Exact wiring lands with the scaffold/deploy step.
+See [deployment.md](./deployment.md) for wiring, secrets, and CLI setup.
 
 ## Future mobile
 

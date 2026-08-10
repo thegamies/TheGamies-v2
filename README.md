@@ -6,15 +6,13 @@ This repository is the clean rebuild. The previous monorepo (`thegamies/TheGamie
 
 ## Current status
 
-Next.js App Router scaffold with Editorial Standings tokens, skeleton primitives, and `/design-system` gallery.
-
-See `AGENTS.md` and `docs/`. Day-to-day process: `docs/engineering.md`. Local reference junctions: `docs/references.md`.
+Next.js App Router scaffold with Editorial Standings tokens, `/design-system` gallery, and **dual-host deploy** (Vercel + Cloudflare Workers via OpenNext). Neon is the shared DB/Auth target.
 
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind
-- Vercel
-- Neon (Postgres + Auth) — not wired yet
+- Hosts: Vercel **and** Cloudflare Workers (OpenNext)
+- Neon (Postgres + Auth)
 - IGDB catalog via separate worker — later
 
 ## Develop
@@ -32,3 +30,12 @@ pnpm lint
 pnpm typecheck
 pnpm build
 ```
+
+Cloudflare runtime preview (Linux/WSL/CI recommended):
+
+```bash
+pnpm preview:cf
+pnpm deploy:cf
+```
+
+Deploy docs and required GitHub secrets: [`docs/deployment.md`](docs/deployment.md).

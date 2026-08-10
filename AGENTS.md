@@ -14,7 +14,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 
 - Next.js App Router + TypeScript
 - Tailwind CSS + project-owned design tokens
-- Hosting: Vercel
+- Hosting: Vercel **and** Cloudflare Workers (OpenNext) — portable app, dual PR previews
 - Database + Auth: Neon (Postgres + Neon Auth)
 - Game catalog: IGDB via a separate ingestion worker
 - Validation: Zod
@@ -34,6 +34,8 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` |
+| Deployment (dual host) | `docs/deployment.md` |
+| Account wiring checklist | `docs/setup-checklist.md` |
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | Community / ballot / results | `docs/features/` |
