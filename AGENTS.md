@@ -43,7 +43,7 @@ Full rules: `docs/engineering.md`. Short form:
 
 1. Clarify scope; list in/out for the session.
 2. Get explicit approval before implementing a phase or multi-step feature.
-3. Branch → implement one approved step → PR (even solo) → preview → squash merge to `main`.
+3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
 5. Test by risk: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI.
 
