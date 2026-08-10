@@ -24,7 +24,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 | File | Role |
 |---|---|
-| `vercel.json` | Vercel build/framework hints |
+| `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys |
 | `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
