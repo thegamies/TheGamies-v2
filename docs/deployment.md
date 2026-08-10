@@ -97,10 +97,18 @@ PR opened/updated
 
 ## Environment variables
 
-See `.env.example`. Shared across hosts:
+App secrets are managed in **Doppler** — see [secrets.md](./secrets.md).
+
+Runtime keys (also listed in `.env.example`):
 
 - `DATABASE_URL`
 - `NEON_AUTH_BASE_URL` (when Auth is enabled)
 - `NEXT_PUBLIC_APP_URL` (host-specific per deployment)
 
 Do not commit `.env`, `.dev.vars`, or `.vercel`.
+
+Local with Doppler:
+
+```bash
+pnpm dev:secrets
+```

@@ -35,6 +35,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` |
 | Deployment (dual host) | `docs/deployment.md` |
+| Secrets (Doppler) | `docs/secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
