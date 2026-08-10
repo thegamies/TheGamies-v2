@@ -48,25 +48,26 @@ Keep feature branches short-lived. Prefer many small PRs over long-lived feature
 
 | Env | Trigger | App | Data |
 |---|---|---|---|
-| Local | Developer machine | `next dev` | Neon dev branch or local connection string |
-| Preview | PR into `develop` | Vercel preview URL | Neon database branch for that PR |
-| Staging (optional) | `develop` | Vercel staging deploy when configured | Neon non-prod branch |
-| Production | Merge to `main` | Vercel production | Neon production branch |
+| Local | Developer machine | `next dev` (Node); `pnpm preview:cf` for Workers parity | Neon dev branch or local connection string |
+| Preview | PR into `develop` | **Vercel preview and Cloudflare Workers preview** | Shared Neon database branch for that PR |
+| Staging | `develop` | Both hosts (staging) | Neon non-prod branch |
+| Production | Merge to `main` | Both hosts (production) | Neon production branch |
 
 Rules:
 
 - Never point a preview deploy at the production database.
 - Never run exploratory migrations against production.
-- `.env.example` documents required variables; real secrets stay in Vercel / local env only.
+- `.env.example` documents required variables; real secrets stay in host dashboards / GitHub Actions / local env only.
+- Dual-host setup details: [deployment.md](./deployment.md).
 
 ## Deployment
 
 1. Branch from `develop` → open PR **into `develop`**.
-2. Vercel builds a **preview** deploy; Neon branch DB is wired when that integration exists.
-3. CI must pass (lint, typecheck, required tests).
-4. Human checks the preview URL for user-facing work.
+2. CI runs lint/typecheck/build.
+3. Preview workflow creates a Neon branch and deploys **both** Vercel and Cloudflare previews (when secrets are configured).
+4. Human checks **both** preview URLs for user-facing work when both are live.
 5. Squash merge to `develop`.
-6. When ready to ship: PR **`develop` → `main`** → **production** deploy.
+6. When ready to ship: PR **`develop` → `main`** → **production** on both hosts.
 
 ### Migrations
 
@@ -167,8 +168,8 @@ Vercel handles app build/deploy separately; CI is the quality gate, Vercel is th
 | Package manager | `pnpm` |
 | Node | Active LTS |
 | PR merge | Squash |
-| Host | Vercel |
-| DB branches | Neon |
+| Hosts | Vercel **and** Cloudflare Workers (OpenNext); dual PR previews |
+| DB branches | Neon (one branch per PR, shared by both hosts) |
 
 If we change a default, log it in `docs/decisions.md`.
 

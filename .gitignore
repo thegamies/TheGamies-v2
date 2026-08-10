@@ -24,6 +24,9 @@ coverage/
 
 # Hosting / misc
 .vercel/
+.open-next/
+.wrangler/
+.dev.vars
 .DS_Store
 Thumbs.db
 *.pem
