@@ -96,7 +96,9 @@ We optimize for **risk coverage**, not percentage theater — but “no tests”
 
 ### Integration tests
 
-**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, RLS/permission assumptions, catalog upsert/enrich, admin-protected sync routes.
+**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, catalog upsert/enrich, admin-protected sync routes, profile ownership helpers.
+
+Until Postgres **RLS** is adopted (open: Auth JWT → DB role), permission tests target **app-layer** session checks and ownership helpers — not SQL policies. When RLS lands, add integration coverage for those policies.
 
 Run against a Neon branch or ephemeral test database — never against production.
 

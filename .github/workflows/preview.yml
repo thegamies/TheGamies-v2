@@ -106,6 +106,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           DATABASE_URL: ${{ needs.neon.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
@@ -114,7 +115,7 @@ jobs:
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -160,6 +161,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ needs.neon.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
@@ -178,6 +180,7 @@ jobs:
           const keys = [
             "DATABASE_URL",
             "NEON_AUTH_BASE_URL",
+            "NEON_AUTH_COOKIE_SECRET",
             "ADMIN_SYNC_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",

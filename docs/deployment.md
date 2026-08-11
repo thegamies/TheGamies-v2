@@ -78,6 +78,7 @@ Configure on the repo:
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
 | `STAGING_DATABASE_URL` | Neon URL for `develop` staging (`DATABASE_URL`) |
 | `STAGING_NEON_AUTH_BASE_URL` | Auth URL for develop staging |
+| `NEON_AUTH_COOKIE_SECRET` | Neon Auth cookie signing (32+ chars; staging + previews) |
 | `STAGING_VERCEL_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Vercel staging |
 | `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
 | `ADMIN_SYNC_SECRET` | Unlock `/admin/sync` (staging + PR previews) |

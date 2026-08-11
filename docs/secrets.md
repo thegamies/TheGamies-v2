@@ -39,6 +39,7 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 |---|---|---|
 | `STAGING_DATABASE_URL` | `DATABASE_URL` | develop staging (both hosts) |
 | `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging |
+| `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
 | `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging only (or use `VERCEL_STAGING_ALIAS`) |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging only |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |

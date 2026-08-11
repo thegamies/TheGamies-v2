@@ -23,8 +23,10 @@ Work top to bottom.
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
 - [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local)
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
-- [ ] `doppler run -- pnpm db:migrate` locally
-- [ ] (Later) Enable Neon Auth
+- [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
+- [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
+- [ ] Add trusted domains in Neon Auth for local + staging hosts
+- [ ] `doppler run -- pnpm db:migrate` locally (includes `profiles`)
 
 ## 2. Vercel
 
@@ -54,7 +56,7 @@ Work top to bottom.
 ## 4. GitHub (app secrets for deploys)
 
 - [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
-- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
+- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
 - [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
 - [ ] Re-run **Staging dual deploy** on `develop` after importing or changing secrets
 - [ ] Confirm Cloudflare Worker `thegamies-v2-develop` → Settings → Variables and Secrets

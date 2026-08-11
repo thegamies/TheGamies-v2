@@ -6,8 +6,9 @@ One coherent Next.js application, deployable to **both Vercel and Cloudflare Wor
 
 ```text
 Browser → Vercel (Next.js)  ─┐
-         Cloudflare Workers ─┼→ Neon (Postgres + Auth + RLS)
+         Cloudflare Workers ─┼→ Neon (Postgres + Auth)
          (OpenNext)          ┘
+                              └→ RLS: future (Auth JWT → DB role); today app-layer session/ownership
 
 Separate: IGDB ingestion (`packages/igdb` CLI + `/admin/sync`) → Neon catalog tables
 ```
@@ -21,8 +22,9 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 | App | Next.js App Router, TypeScript |
 | Styles | Tailwind + design tokens |
 | Hosts | **Vercel and Cloudflare Workers (OpenNext)** — both first-class |
-| DB | Neon Postgres |
-| Auth | Neon Auth |
+| DB | Neon Postgres (server `DATABASE_URL` owner role; **no RLS policies yet**) |
+| Auth | Neon Auth (Managed Better Auth); profiles in app `profiles` table |
+| Access control | **App-layer** session + ownership until Auth JWT → DB role for RLS is defined |
 | Catalog | IGDB via separate worker |
 | Validation | Zod |
 

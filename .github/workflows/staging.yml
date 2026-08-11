@@ -45,6 +45,7 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
@@ -65,7 +66,7 @@ jobs:
           fi
 
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -125,6 +126,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
@@ -147,6 +149,7 @@ jobs:
           const keys = [
             "DATABASE_URL",
             "NEON_AUTH_BASE_URL",
+            "NEON_AUTH_COOKIE_SECRET",
             "ADMIN_SYNC_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
@@ -222,7 +225,7 @@ jobs:
             fi
             echo ""
             echo "Stable Cloudflare worker: \`thegamies-v2-develop\`."
-            echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`ADMIN_SYNC_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`."
+            echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`NEON_AUTH_COOKIE_SECRET\`, \`ADMIN_SYNC_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`."
             echo "Per-host public URL: \`STAGING_VERCEL_APP_URL\` (or \`VERCEL_STAGING_ALIAS\`) and \`STAGING_CF_APP_URL\`."
             echo "Optional: \`VERCEL_STAGING_ALIAS\`."
           } >> "$GITHUB_STEP_SUMMARY"
