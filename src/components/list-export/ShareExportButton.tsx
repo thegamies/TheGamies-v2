@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ListExportDialog } from "./ListExportDialog";
 import type { ExportGame } from "./listExportTypes";
+import { Button } from "@/components/ui/Button";
 
 export function ShareExportButton({
   games,
@@ -19,14 +20,15 @@ export function ShareExportButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
+        variant="bordered"
+        size="sm"
         onClick={() => setOpen(true)}
         disabled={games.length === 0}
-        className="border border-[var(--line)] px-4 py-2 text-[var(--ink)] transition-colors hover:border-[var(--accent)] disabled:opacity-40"
       >
         Export image
-      </button>
+      </Button>
       <ListExportDialog
         open={open}
         onOpenChange={setOpen}

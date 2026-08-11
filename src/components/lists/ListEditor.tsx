@@ -29,7 +29,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   publishListAction,
-  resetDraftAction,
   saveListItemsAction,
 } from "@/app/create/actions";
 import {
@@ -44,6 +43,15 @@ import {
 } from "@/components/list-export/rankChrome";
 import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { Button } from "@/components/ui/Button";
+import {
+  controlGroupClass,
+  controlLabelClass,
+  fieldInputClass,
+  iconControlClass,
+  segmentBtnClass,
+  stepperBtnClass,
+  stepperValueClass,
+} from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
@@ -70,22 +78,6 @@ type ListEditorProps = {
   initialItems: EditorItem[];
   error?: string | null;
 };
-
-function segmentBtnCls(active: boolean) {
-  return `px-2.5 py-1.5 text-[11px] font-extrabold tracking-[0.14em] uppercase transition-colors ${
-    active
-      ? "bg-accent text-white"
-      : "bg-transparent text-muted hover:text-ink"
-  }`;
-}
-
-function toggleCls(active: boolean) {
-  return `border px-2.5 py-1.5 text-[11px] font-extrabold tracking-[0.14em] uppercase transition-colors ${
-    active
-      ? "border-accent text-accent"
-      : "border-line text-muted hover:text-ink"
-  }`;
-}
 
 function withRanks(items: EditorItem[]): EditorItem[] {
   return items.map((item, i) => ({ ...item, rank: i + 1 }));
@@ -422,7 +414,7 @@ export function ListEditor({
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
-        <label className="min-w-[12rem] flex-1 text-sm tracking-wide text-muted">
+        <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
           Title
           <input
             value={title}
@@ -439,15 +431,15 @@ export function ListEditor({
           />
         </label>
 
-        <div className="text-sm tracking-wide text-muted">
+        <div className={controlLabelClass}>
           Size
-          <div className="mt-1 flex items-center overflow-hidden border border-line">
+          <div className={controlGroupClass}>
             <button
               type="button"
               onClick={() => changeSlotCount(slotCount - 1)}
               disabled={slotCount <= 1}
               aria-label="Fewer slots"
-              className="grid h-8 w-8 place-items-center text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+              className={stepperBtnClass}
             >
               −
             </button>
@@ -456,7 +448,7 @@ export function ListEditor({
               onClick={() => setSlotPickerOpen(true)}
               aria-haspopup="dialog"
               aria-label={`List size: ${slotCount}. Tap to pick.`}
-              className="flex h-8 w-14 items-center justify-center gap-1 border-x border-line text-sm font-semibold text-ink transition-colors hover:text-accent"
+              className={stepperValueClass}
             >
               {slotCount}
               <span className="text-muted">▾</span>
@@ -466,25 +458,25 @@ export function ListEditor({
               onClick={() => changeSlotCount(slotCount + 1)}
               disabled={slotCount >= LIST_MAX_ITEMS}
               aria-label="More slots"
-              className="grid h-8 w-8 place-items-center text-muted transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-30"
+              className={stepperBtnClass}
             >
               +
             </button>
           </div>
         </div>
 
-        <div className="text-sm tracking-wide text-muted">
+        <div className={controlLabelClass}>
           Format
           <div
             role="group"
             aria-label="List format"
-            className="mt-1 flex overflow-hidden border border-line"
+            className={controlGroupClass}
           >
             <button
               type="button"
               onClick={() => setListFormat("poster")}
               aria-pressed={listFormat === "poster"}
-              className={segmentBtnCls(listFormat === "poster")}
+              className={segmentBtnClass(listFormat === "poster")}
             >
               Poster
             </button>
@@ -492,7 +484,7 @@ export function ListEditor({
               type="button"
               onClick={() => setListFormat("list")}
               aria-pressed={listFormat === "list"}
-              className={segmentBtnCls(listFormat === "list")}
+              className={segmentBtnClass(listFormat === "list")}
             >
               List
             </button>
@@ -509,11 +501,7 @@ export function ListEditor({
             aria-expanded={settingsOpen}
             aria-haspopup="dialog"
             aria-label="List settings"
-            className={`grid h-8 w-8 place-items-center border text-sm transition-colors ${
-              settingsOpen
-                ? "border-accent text-accent"
-                : "border-line text-muted hover:text-ink"
-            }`}
+            className={iconControlClass(settingsOpen)}
           >
             ⚙
           </button>
@@ -524,19 +512,17 @@ export function ListEditor({
               className="absolute top-full left-0 z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-4 border border-line bg-panel p-3"
             >
               <div className="space-y-1.5">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
-                  List type
-                </p>
+                <p className={controlLabelClass}>List type</p>
                 <div
                   role="group"
                   aria-label="List type"
-                  className="flex overflow-hidden border border-line"
+                  className={controlGroupClass}
                 >
                   <button
                     type="button"
                     onClick={() => setListTypeChoice("goty")}
                     aria-pressed={listType === "goty"}
-                    className={`flex-1 ${segmentBtnCls(listType === "goty")}`}
+                    className={segmentBtnClass(listType === "goty")}
                   >
                     GOTY
                   </button>
@@ -544,34 +530,32 @@ export function ListEditor({
                     type="button"
                     onClick={() => setListTypeChoice("custom")}
                     aria-pressed={listType === "custom"}
-                    className={`flex-1 ${segmentBtnCls(listType === "custom")}`}
+                    className={segmentBtnClass(listType === "custom")}
                   >
                     Custom
                   </button>
                 </div>
                 {listType === "goty" ? (
-                  <label className="mt-2 block text-sm tracking-wide text-muted">
+                  <label className={`mt-2 block ${controlLabelClass}`}>
                     Year
                     <input
                       type="number"
                       value={Number.isFinite(draftYear) ? draftYear : ""}
                       onChange={(e) => setDraftYear(Number(e.target.value))}
                       onBlur={() => requestYearTrim(draftYear, "goty")}
-                      className="mt-1 block w-full border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
+                      className={fieldInputClass}
                     />
                   </label>
                 ) : null}
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
-                  Rank style
-                </p>
+                <p className={controlLabelClass}>Rank style</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <div
                     role="group"
                     aria-label="Rank style"
-                    className="flex overflow-hidden border border-line"
+                    className={controlGroupClass}
                   >
                     {EXPORT_RANK_STYLES.map((style) => (
                       <button
@@ -579,22 +563,24 @@ export function ListEditor({
                         type="button"
                         onClick={() => setRankStyle(style.id)}
                         aria-pressed={rankStyle === style.id}
-                        className={segmentBtnCls(rankStyle === style.id)}
+                        className={segmentBtnClass(rankStyle === style.id)}
                       >
                         {style.label}
                       </button>
                     ))}
                   </div>
                   {rankStyle !== "off" ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowSuffix((s) => !s)}
-                      aria-pressed={showSuffix}
-                      title="Toggle ordinal suffix (1st vs 1)"
-                      className={toggleCls(showSuffix)}
-                    >
-                      {showSuffix ? "Suffix on" : "Suffix off"}
-                    </button>
+                    <div className={controlGroupClass}>
+                      <button
+                        type="button"
+                        onClick={() => setShowSuffix((s) => !s)}
+                        aria-pressed={showSuffix}
+                        title="Toggle ordinal suffix (1st vs 1)"
+                        className={segmentBtnClass(showSuffix)}
+                      >
+                        {showSuffix ? "Suffix on" : "Suffix off"}
+                      </button>
+                    </div>
                   ) : null}
                 </div>
               </div>
@@ -606,6 +592,7 @@ export function ListEditor({
           <Button
             type="button"
             variant="bordered"
+            size="sm"
             onClick={save}
             disabled={pending}
           >
@@ -614,6 +601,7 @@ export function ListEditor({
           <Button
             type="button"
             variant="bordered"
+            size="sm"
             onClick={() => setExportOpen(true)}
             disabled={items.length === 0}
           >
@@ -625,15 +613,8 @@ export function ListEditor({
             <input type="hidden" name="itemsJson" value={itemsJson()} />
             <input type="hidden" name="title" value={title} />
             {year ? <input type="hidden" name="year" value={year} /> : null}
-            <Button type="submit" disabled={items.length === 0}>
+            <Button type="submit" size="sm" disabled={items.length === 0}>
               Publish
-            </Button>
-          </form>
-          <form action={resetDraftAction}>
-            <input type="hidden" name="publicId" value={publicId} />
-            <input type="hidden" name="listType" value={listType} />
-            <Button type="submit" variant="quiet">
-              Reset
             </Button>
           </form>
         </div>
@@ -897,7 +878,7 @@ function SearchGamesPanelBody({
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Search games…"
         aria-label="Search games"
-        className="min-w-0 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
+        className="min-w-0 w-full border border-line bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)]"
       />
       {isFull ? (
         <p className="shrink-0 text-xs text-accent">{fullMessage}</p>
@@ -1068,7 +1049,7 @@ function SlotPickerDialog({
                   onPick(n);
                   onClose();
                 }}
-                className={`h-10 border text-sm font-semibold ${
+                className={`inline-flex h-9 items-center justify-center border rounded-[var(--radius-control)] text-xs font-semibold tracking-wide transition-colors ${
                   n === value
                     ? "border-accent bg-accent text-white"
                     : "border-line text-ink hover:border-accent"
@@ -1133,10 +1114,10 @@ function ConfirmDialog({
         <p className="font-display text-2xl tracking-wide text-ink">{title}</p>
         <p className="mt-3 text-sm text-muted">{message}</p>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="quiet" onClick={onCancel}>
+          <Button type="button" variant="bordered" size="sm" onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="button" onClick={onConfirm}>
+          <Button type="button" size="sm" onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </div>
