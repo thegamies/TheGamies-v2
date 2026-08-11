@@ -40,7 +40,7 @@ export default async function CreateChooserPage() {
         </div>
       ) : null}
 
-      <div className="mx-auto grid w-full max-w-xl gap-3">
+      <div className="grid w-full gap-3">
         <Link
           href="/create/goty"
           className="block w-full border border-line bg-panel px-5 py-6 text-left transition-colors hover:border-accent"
