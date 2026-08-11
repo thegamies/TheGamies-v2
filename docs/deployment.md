@@ -69,6 +69,7 @@ Configure on the repo:
 
 | Secret | Purpose |
 |---|---|
+| `DOPPLER_TOKEN` | Doppler service token for config `dev` — injects app secrets into develop staging (Vercel + Cloudflare) |
 | `NEON_API_KEY` | Create/delete PR database branches |
 | `NEON_PROJECT_ID` | Neon project |
 | `VERCEL_TOKEN` | Preview + production deploys |
@@ -76,20 +77,23 @@ Configure on the repo:
 | `VERCEL_PROJECT_ID` | Vercel project |
 | `CLOUDFLARE_API_TOKEN` | Workers deploy |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
-| `STAGING_DATABASE_URL` | Optional lasting Neon URL for `develop` staging |
-| `STAGING_NEON_AUTH_BASE_URL` | Optional staging Auth URL |
+| `STAGING_DATABASE_URL` | Fallback Neon URL if `DOPPLER_TOKEN` is missing |
+| `STAGING_NEON_AUTH_BASE_URL` | Fallback Auth URL if `DOPPLER_TOKEN` is missing |
 | `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname (e.g. `thegamies-staging.vercel.app`) |
 
 Until secrets exist, `ci.yml` still runs quality checks; deploy workflows skip hosts that lack credentials.
 
+App runtime secrets (`DATABASE_URL`, `ADMIN_SYNC_SECRET`, IGDB keys, …) live in **Doppler** `dev` for the develop branch — see [secrets.md](./secrets.md).
+
 ## Staging flow (`develop`)
 
 ```text
-Push / merge to develop
+Push / merge to develop (or workflow_dispatch)
   → ci: lint + typecheck + build
-  → staging: deploy Vercel preview deployment (+ optional VERCEL_STAGING_ALIAS)
-  → staging: deploy Cloudflare worker thegamies-v2-develop (stable name, overwritten each push)
-  → optional STAGING_DATABASE_URL injected on both hosts
+  → staging: fetch Doppler `dev` via DOPPLER_TOKEN
+  → staging: deploy Vercel with those env vars (+ optional VERCEL_STAGING_ALIAS)
+  → staging: deploy Cloudflare worker thegamies-v2-develop (.dev.vars + wrangler secret bulk)
+  → if no DOPPLER_TOKEN: fall back to STAGING_DATABASE_URL / STAGING_NEON_AUTH_BASE_URL
 ```
 
 Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers.dev`).

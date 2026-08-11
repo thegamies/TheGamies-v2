@@ -5,22 +5,18 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 ## 0. Doppler (app secrets — do this first)
 
 - [ ] Create Doppler account (Developer free tier is fine)
-- [ ] Create project `thegamies-v2` (keep default Development / Staging / Production)
-- [ ] Development: keep **`dev`** + **`dev_personal`** (personal configs **on**)
-- [ ] Staging / Production: personal configs **off** (`stg`, `prd` only)
-- [ ] Optional: add Preview env with config `preview` for static PR secrets
+- [ ] Project matches [`doppler.yaml`](../doppler.yaml) (`thegamies`): Development / Preview / Production
+- [ ] Development: **`dev`** + **`dev_personal`** (personal configs **on**) — `dev` = develop branch hosts
+- [ ] Production: personal configs **off**
+- [ ] Preview: static PR secrets only (optional)
 - [ ] Install CLI: https://docs.doppler.com/docs/install-cli
   ```bash
   doppler login
-  cd C:\Users\ecdm9\Documents\thegamies-v2
-  doppler setup   # project thegamies-v2, config dev
+  doppler setup   # project thegamies, config dev
   ```
-- [ ] Set shared secrets on **`dev`** (after Neon exists):
-  ```bash
-  doppler secrets set DATABASE_URL="postgresql://..." --config dev
-  doppler secrets set NEXT_PUBLIC_APP_URL="http://localhost:3000" --config dev
-  ```
-- [ ] Use `dev_personal` only for private overrides (or leave empty to inherit `dev`)
+- [ ] Set develop-host secrets on **`dev`** (after Neon exists): `DATABASE_URL`, `ADMIN_SYNC_SECRET`, IGDB keys, develop `NEXT_PUBLIC_APP_URL`, …
+- [ ] Put local overrides on **`dev_personal`** (e.g. `NEXT_PUBLIC_APP_URL=http://localhost:3000`)
+- [ ] Create Doppler service token for config **`dev`** → GitHub secret `DOPPLER_TOKEN`
 - [ ] Day-to-day: `pnpm dev:secrets`  
   Full layout: [secrets.md](./secrets.md)
 
@@ -31,8 +27,8 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
 - [ ] Put the **dev** branch connection string into Doppler **`dev`** as `DATABASE_URL`
 - [ ] (Recommended) Create lasting Neon branch `local/<you>`; set its URL on **`dev_personal`** as `DATABASE_URL`
-- [ ] Put staging and production URLs into Doppler `stg` / `prd`
-- [ ] Set `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `ADMIN_SYNC_SECRET` on Doppler `dev` (and stg/prd)
+- [ ] Put production URL into Doppler `prd`
+- [ ] Set `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `ADMIN_SYNC_SECRET` on Doppler `dev` (and `prd`)
 - [ ] `doppler run -- pnpm db:migrate`
 - [ ] (Later) Enable Neon Auth; CI already requests `auth_url` when available
 
@@ -47,7 +43,7 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec vercel login
   pnpm exec vercel link
   ```
-- [ ] (Recommended) Doppler → Integrations → Vercel: sync `stg` + `prd`
+- [ ] (Recommended) Doppler → Integrations → Vercel for Production (`prd`); develop staging is injected by CI via `DOPPLER_TOKEN`
 
 ## 3. Cloudflare
 
@@ -59,12 +55,13 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec wrangler login
   pnpm deploy:cf
   ```
-- [ ] (Later) Sync Worker secrets from Doppler `stg` / `prd` or via CI
+- [ ] Staging deploys sync Worker secrets from Doppler `dev` via CI (`wrangler secret bulk`)
 
 ## 4. GitHub
 
 - [ ] Add **deploy** secrets listed in [deployment.md](./deployment.md)  
-  (`NEON_*`, `VERCEL_*`, `CLOUDFLARE_*` — not your everyday app secrets)
+  (`DOPPLER_TOKEN`, `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*` — not everyday app secrets in GitHub)
+- [ ] Re-run **Staging dual deploy** on `develop` so both hosts pick up Doppler `dev`
 - [ ] Open a PR into `develop` and confirm the **Dual-host previews** comment
 - [ ] Until secrets exist, CI quality checks still run; host deploys skip with a comment
 
