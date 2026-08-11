@@ -36,6 +36,20 @@
       "when": 1786470000000,
       "tag": "0004_drop_list_status",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786477294552,
+      "tag": "0005_sweet_multiple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786480000000,
+      "tag": "0006_live_goty_scores_year_score_idx",
+      "breakpoints": true
     }
   ]
 }

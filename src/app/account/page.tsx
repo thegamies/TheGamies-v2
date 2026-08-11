@@ -1,12 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { SiteHeader } from "@/components/SiteHeader";
-import { auth } from "@/lib/auth/server";
 import {
-  ensureProfileForAuthUser,
-  getProfileByAuthUserId,
-} from "@/lib/profile/service";
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
+import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { AccountProfileForm } from "./AccountProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -17,13 +16,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AccountPage() {
-  const { data: session } = await auth.getSession();
-  const user = session?.user;
+  const user = await getRequestSessionUser();
   if (!user?.id) {
     redirect("/auth/sign-in");
   }
 
-  let profile = await getProfileByAuthUserId(user.id);
+  let profile = await getRequestProfileByAuthUserId(user.id);
   if (!profile) {
     const base =
       user.name?.trim() ||
@@ -48,36 +46,33 @@ export default async function AccountPage() {
   }
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Account</p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-          Your profile
-        </h1>
-        <p className="mt-3 max-w-xl text-muted">
-          This is how you appear across The Gamies.
-        </p>
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted">Account</p>
+      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
+        Your profile
+      </h1>
+      <p className="mt-3 max-w-xl text-muted">
+        This is how you appear across The Gamies.
+      </p>
 
-        {!profile ? (
-          <p className="mt-8 text-accent">
-            Could not load your profile. Try signing out and back in.
+      {!profile ? (
+        <p className="mt-8 text-accent">
+          Could not load your profile. Try signing out and back in.
+        </p>
+      ) : (
+        <>
+          <p className="mt-4 text-sm text-muted">
+            Public page:{" "}
+            <Link
+              href={`/u/${profile.username}`}
+              className="text-ink underline"
+            >
+              /u/{profile.username}
+            </Link>
           </p>
-        ) : (
-          <>
-            <p className="mt-4 text-sm text-muted">
-              Public page:{" "}
-              <Link
-                href={`/u/${profile.username}`}
-                className="text-ink underline"
-              >
-                /u/{profile.username}
-              </Link>
-            </p>
-            <AccountProfileForm profile={profile} />
-          </>
-        )}
-      </main>
-    </>
+          <AccountProfileForm profile={profile} />
+        </>
+      )}
+    </main>
   );
 }

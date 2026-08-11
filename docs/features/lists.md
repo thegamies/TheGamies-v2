@@ -51,8 +51,9 @@ Create UI mirrors the Social Gamer Card prototype:
 - Up to **100** ranked games; ranks are contiguous 1..n.
 - GOTY: year required; games should match year / be released (enforced in domain rules).
 - One **owned** GOTY list per profile per year (create opens the existing list; claim/save fail clearly otherwise).
-- Default aggregate scoring uses **top 10 only** (`pointsForRank`); live boards are a later phase.
+- Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)).
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
+- Owned GOTY lists may include **one game per site award category** (signed-in only).
 
 ## URLs
 
@@ -60,9 +61,10 @@ Create UI mirrors the Social Gamer Card prototype:
 - Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`)
 - Anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
 - Profile lists link to the owned slug URL
+- Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`
 
 ## Non-goals (this feature)
 
-- Live site/community aggregates
+- Live site/community aggregate **UI** beyond wiring owned GOTY into contrib (standings live under live-aggregate)
 - Video / Remotion export
 - Editing an anonymous list from another browser without the edit cookie

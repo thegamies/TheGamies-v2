@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SiteHeader } from "@/components/SiteHeader";
 import { GameCover } from "@/components/ui/GameCover";
 import { getGameBySlug } from "@/lib/catalog";
 
@@ -45,7 +44,6 @@ export default async function GameDetailPage({ params }: { params: Params }) {
 
   return (
     <>
-      <SiteHeader />
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">
           <Link href="/games" className="hover:text-ink">

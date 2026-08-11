@@ -15,16 +15,16 @@ export default function HomePage() {
       </p>
       <div className="mt-10 flex flex-wrap gap-3">
         <Link
-          href="/games"
+          href="/game-of-the-year"
           className="rounded-[var(--radius-control)] bg-accent px-5 py-3 text-sm font-semibold tracking-wide text-white transition-opacity hover:opacity-90"
         >
-          Browse games
+          Live standings
         </Link>
         <Link
-          href="/design-system"
+          href="/games"
           className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
         >
-          Design system
+          Browse games
         </Link>
       </div>
     </main>

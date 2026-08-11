@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  index,
   integer,
   jsonb,
   pgTable,
@@ -233,4 +234,178 @@ export const listItems = pgTable(
     uniqueIndex("list_items_list_rank_uidx").on(t.listId, t.rank),
     uniqueIndex("list_items_list_game_uidx").on(t.listId, t.gameId),
   ],
+);
+
+/** Site-wide award category definitions (live GOTY category picks). */
+export const awardCategories = pgTable("award_categories", {
+  id: text("id").primaryKey(),
+  label: text("label").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  active: boolean("active").notNull().default(true),
+});
+
+/** One game pick per category on an owned GOTY list. */
+export const listCategoryVotes = pgTable(
+  "list_category_votes",
+  {
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.listId, t.categoryId] })],
+);
+
+/**
+ * Scored top-10 facts for owned GOTY lists (scoring source of truth).
+ * Site rollups and future community SUM both read from here.
+ */
+export const liveGotyContrib = pgTable(
+  "live_goty_contrib",
+  {
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    rank: integer("rank").notNull(),
+    points: integer("points").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.listId, t.gameId] }),
+    index("live_goty_contrib_year_game_idx").on(t.year, t.gameId),
+    index("live_goty_contrib_year_profile_idx").on(t.year, t.profileId),
+  ],
+);
+
+/** Category pick facts for owned GOTY lists. */
+export const liveCategoryContrib = pgTable(
+  "live_category_contrib",
+  {
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.listId, t.categoryId] }),
+    index("live_category_contrib_year_cat_game_idx").on(
+      t.year,
+      t.categoryId,
+      t.gameId,
+    ),
+  ],
+);
+
+/** Disposable site GOTY rollup cache (absolute SUM from live_goty_contrib). */
+export const liveGotyScores = pgTable(
+  "live_goty_scores",
+  {
+    year: integer("year").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    score: integer("score").notNull().default(0),
+    listMentions: integer("list_mentions").notNull().default(0),
+    rank1Count: integer("rank_1_count").notNull().default(0),
+    rank2Count: integer("rank_2_count").notNull().default(0),
+    rank3Count: integer("rank_3_count").notNull().default(0),
+    rank4Count: integer("rank_4_count").notNull().default(0),
+    rank5Count: integer("rank_5_count").notNull().default(0),
+    rank6Count: integer("rank_6_count").notNull().default(0),
+    rank7Count: integer("rank_7_count").notNull().default(0),
+    rank8Count: integer("rank_8_count").notNull().default(0),
+    rank9Count: integer("rank_9_count").notNull().default(0),
+    rank10Count: integer("rank_10_count").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.year, t.gameId] }),
+    index("live_goty_scores_year_score_idx").on(
+      t.year,
+      t.score.desc(),
+      t.gameId,
+    ),
+  ],
+);
+
+/** Disposable site category rollup cache. */
+export const liveCategoryScores = pgTable(
+  "live_category_scores",
+  {
+    year: integer("year").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    voteCount: integer("vote_count").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.year, t.categoryId, t.gameId] })],
+);
+
+/** Per-year meta: reveal gate, generations, list count, refresh lock. */
+export const liveGotyYearStats = pgTable("live_goty_year_stats", {
+  year: integer("year").primaryKey(),
+  listCount: integer("list_count").notNull().default(0),
+  detailedStatsRevealed: boolean("detailed_stats_revealed")
+    .notNull()
+    .default(false),
+  /** Bumped when contrib changes; scores catch up asynchronously. */
+  contribGeneration: integer("contrib_generation").notNull().default(0),
+  /** Set equal to contribGeneration when score refresh finishes successfully. */
+  scoresGeneration: integer("scores_generation").notNull().default(0),
+  /** Bumped only after a successful score refresh (cache key). */
+  standingsVersion: integer("standings_version").notNull().default(0),
+  refreshing: boolean("refreshing").notNull().default(false),
+  refreshStartedAt: timestamp("refresh_started_at", { mode: "date" }),
+});
+
+/**
+ * Durable dirty keys so saves can return before score refresh.
+ * Enables absolute per-game SUM without contending on the save path.
+ */
+export const liveGotyDirtyGames = pgTable(
+  "live_goty_dirty_games",
+  {
+    year: integer("year").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.year, t.gameId] })],
+);
+
+export const liveCategoryDirty = pgTable(
+  "live_category_dirty",
+  {
+    year: integer("year").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.year, t.categoryId, t.gameId] })],
 );

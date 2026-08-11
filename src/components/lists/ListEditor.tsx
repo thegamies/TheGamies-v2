@@ -65,6 +65,11 @@ import {
   readListDraftClient,
   writeListDraftCookieClient,
 } from "@/lib/lists/draft-cookie";
+import {
+  CategoryVotesEditor,
+  type AwardCategoryOption,
+  type CategoryVoteSelection,
+} from "@/components/lists/CategoryVotesEditor";
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
@@ -95,6 +100,8 @@ type ListEditorProps = {
   initialShowSuffix?: boolean;
   signedIn?: boolean;
   error?: string | null;
+  awardCategories?: AwardCategoryOption[];
+  initialCategoryVotes?: CategoryVoteSelection[];
 };
 
 function withRanks(items: EditorItem[]): EditorItem[] {
@@ -137,6 +144,8 @@ export function ListEditor({
   initialShowSuffix = false,
   signedIn = false,
   error = null,
+  awardCategories = [],
+  initialCategoryVotes = [],
 }: ListEditorProps) {
   const pathname = usePathname();
   const currentYear = new Date().getUTCFullYear();
@@ -166,6 +175,8 @@ export function ListEditor({
     (initialYear ?? currentYear).toString(),
   );
   const [draftYear, setDraftYear] = useState(initialYear ?? currentYear);
+  const [categoryVotes, setCategoryVotes] =
+    useState<CategoryVoteSelection[]>(initialCategoryVotes);
   const [items, setItems] = useState<EditorItem[]>(() =>
     withRanks(
       initialItems.map((item) => ({
@@ -640,6 +651,17 @@ export function ListEditor({
     startTransition(async () => {
       const fd = new FormData();
       fd.set("draftJson", draftJson(true));
+      if (listType === "goty" && signedIn) {
+        fd.set(
+          "categoryVotesJson",
+          JSON.stringify(
+            categoryVotes.map((v) => ({
+              categoryId: v.categoryId,
+              gameId: v.gameId,
+            })),
+          ),
+        );
+      }
       const result = await saveOwnedListAction(null, fd);
       if (result.error) {
         setSaveError(result.error);
@@ -1049,6 +1071,18 @@ export function ListEditor({
           )}
         </section>
       </div>
+
+      {signedIn && listType === "goty" && awardCategories.length > 0 ? (
+        <div className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-24">
+          <CategoryVotesEditor
+            key={yearNum}
+            categories={awardCategories}
+            value={categoryVotes}
+            onChange={setCategoryVotes}
+            year={yearNum}
+          />
+        </div>
+      ) : null}
 
       {panelOpen ? (
         <aside className="fixed inset-x-0 top-0 bottom-14 z-40 flex flex-col bg-paper lg:hidden">

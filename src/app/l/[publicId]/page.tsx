@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { SiteHeader } from "@/components/SiteHeader";
 import { SharedListView } from "@/components/lists/SharedListView";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListEditCookie } from "@/lib/lists/cookies";
@@ -92,7 +91,6 @@ export default async function SharedListByPublicIdPage({
 
   return (
     <>
-      <SiteHeader />
       <SharedListView
         data={data}
         canEdit={canEdit}

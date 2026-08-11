@@ -37,7 +37,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Terms | `docs/terminology.md` |
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
-| Engineering / day-to-day | `docs/engineering.md` |
+| Engineering / day-to-day | `docs/engineering.md` (includes App Router layout + `cache()` rules) |
 | Deployment (dual host) | `docs/deployment.md` |
 | Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |

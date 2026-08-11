@@ -15,6 +15,10 @@ import {
   getEditableList,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
+import {
+  getCategoryVotesForList,
+  listActiveAwardCategories,
+} from "@/lib/live-aggregate/categories";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 export const metadata: Metadata = {
@@ -55,6 +59,9 @@ export default async function CreateGotyPage({
   const error = first(params.error) ?? null;
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
+  const awardCategories = signedIn
+    ? await listActiveAwardCategories().catch(() => [])
+    : [];
 
   let editor: {
     publicId: string | null;
@@ -73,6 +80,12 @@ export default async function CreateGotyPage({
       coverUrl: string | null;
       rank: number;
       blurb: string;
+    }[];
+    categoryVotes?: {
+      categoryId: string;
+      gameId: string;
+      title: string;
+      coverUrl: string | null;
     }[];
   } | null = null;
   let loadError: string | null = error;
@@ -105,6 +118,10 @@ export default async function CreateGotyPage({
           rank: item.rank,
           blurb: signedIn ? (item.blurb ?? "") : "",
         })),
+        categoryVotes:
+          signedIn && result.list.profileId
+            ? await getCategoryVotesForList(result.list.id).catch(() => [])
+            : [],
       };
 
       // Prefer the device draft when it matches — anon edits land in the
@@ -262,6 +279,8 @@ export default async function CreateGotyPage({
           initialShowSuffix={editor.showSuffix}
           signedIn={signedIn}
           error={error}
+          awardCategories={awardCategories}
+          initialCategoryVotes={editor.categoryVotes ?? []}
         />
       ) : (
         <form action={startGotyDraftAction} className="max-w-sm space-y-4">

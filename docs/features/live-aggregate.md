@@ -1,0 +1,88 @@
+# Live aggregate
+
+Site-wide live Game of the Year standings and category rollups from **owned signed-in GOTY lists**. Separate from edition ballots.
+
+## Layers
+
+```text
+list_items                 editor truth
+    ↓
+live_goty_contrib          scoring truth (≤10 scored rows / owned GOTY list)
+live_category_contrib      category pick facts
+    ↓  absolute SUM dirty keys (async / lazy, locked)
+live_goty_scores           disposable site read cache
+live_category_scores
+```
+
+Later community live boards should `SUM(live_goty_contrib)` for member profiles — **not** filter `live_goty_scores`, and **not** fan out writes on list save.
+
+## Eligibility
+
+- `lists.profileId IS NOT NULL` and `listType = 'goty'`
+- Adult games excluded from contrib
+- Default scoring: top 10 only (`pointsForRank` → 11 − rank)
+
+## Write path
+
+1. Owned GOTY save / claim / category vote update → replace that list’s contrib rows.
+2. Mark durable dirty keys (`live_goty_dirty_games` / `live_category_dirty`) = old ∪ new keys (year-change dirties both years’ keys).
+3. Bump `contribGeneration` on `live_goty_year_stats`.
+4. **Return** — saves do not wait on score row updates (avoids write contention on popular games).
+5. Schedule `tryRefreshYear` (Next `after` when available). Standings reads do **not** lazy-refresh by default (avoids extra Neon round-trips); pass `ensureFresh: true` or use admin refresh/rebuild when needed.
+
+## Standings reads
+
+**One** Neon HTTP round-trip loads the public board (like old `rankings_page_bundle`):
+
+- year stats + GOTY total + paginated scores (joined to games/covers)
+- all active category tallies (top 10 each via `LATERAL`)
+
+Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisfy the sort.
+
+## Refresh (single-flight)
+
+- CAS lock via `refreshing` / `refreshStartedAt` on year stats (stale lock reclaim after 60s).
+- Absolute `SUM` from contrib for each dirty key → overwrite or delete score rows.
+- When dirty is empty and `contribGeneration > scoresGeneration`: set `scoresGeneration = contribGeneration` and bump **`standingsVersion` only then**.
+- `rebuildYear`: delete year’s score caches + dirty rows, insert full `GROUP BY` from contrib, then bump version.
+
+## Reveal gate
+
+- Ranks always public.
+- Scores, list mentions, rank histograms, and category vote counts hidden until `detailedStatsRevealed`.
+- Admin: `/admin/rankings` (same unlock as catalog sync).
+
+## Categories
+
+- Site defs in `award_categories` (seeded).
+- Owned GOTY lists: **one game per category** (`list_category_votes`).
+- **Server validation** matches GOTY list rules: same year, released, not edition/version, not adult; category must be an active site def.
+- Plurality tallies in `live_category_scores`.
+- Contrib sync only counts eligible picks (stale ineligible votes are ignored for scoring until cleared).
+
+## URLs
+
+- `/game-of-the-year` → current year
+- `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`)
+- `/admin` — ops index (sync, rankings, seed)
+- `/admin/rankings`
+
+## Non-goals
+
+- Journal / cron drain as primary path
+- Pause-updates lock
+- Community live UI (indexes + contrib ready)
+- Multi / ranked category modes
+
+## Ops: standings seed
+
+`/admin/seed` (same unlock as other admin tools) creates synthetic profiles
+(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
+
+- Up to **1000** seed indices; UI batches of 50
+- **Reseed** rewrites rankings for existing seed voters in range
+- **Keep adding until stopped** continues from max index
+- Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
+- Ends with one year score rebuild (or after Stop)
+
+Seed voters cannot sign in. Use Clear year / Clear all to remove them.
