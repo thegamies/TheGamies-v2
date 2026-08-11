@@ -87,7 +87,7 @@ Configure on the repo:
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.
 
-App secrets are stored in **GitHub** and pushed onto Vercel/Cloudflare by CI — see [secrets.md](./secrets.md). Doppler remains for local `pnpm dev:secrets` only (no Teams service token required).
+App secrets are stored in **GitHub** (manually imported) and pushed onto Vercel/Cloudflare by CI — see [secrets.md](./secrets.md). Doppler remains for local `pnpm dev:secrets` only.
 
 ## Staging flow (`develop`)
 

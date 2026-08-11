@@ -9,7 +9,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-09 | New repository | `thegamies/thegamies-v2` (same GitHub org); old repo is archive/reference |
 | 2026-08-09 | Hosting | Dual-host: Vercel + Cloudflare Workers (OpenNext) |
 | 2026-08-10 | Staging on develop | Push to `develop` deploys lasting staging: Vercel + Cloudflare Worker `thegamies-v2-develop` |
-| 2026-08-10 | Secrets management | **Doppler** as source of truth; `dev` + `dev_personal`, `stg`, `prd`, `preview`; deploy tokens in GitHub Actions |
+| 2026-08-10 | Secrets management | **Doppler** for local (`dev` / `dev_personal`). **GitHub Actions secrets** for deploy — manually imported; CI pushes them to Vercel/Cloudflare on staging & preview deploys (no Doppler service token / Teams) |
 | 2026-08-09 | Database + Auth | Neon Postgres + Neon Auth (branching for previews) |
 | 2026-08-09 | Application | Next.js App Router + TypeScript |
 | 2026-08-09 | Styling | Tailwind CSS + project-owned design tokens |

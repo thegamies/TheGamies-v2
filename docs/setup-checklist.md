@@ -54,10 +54,11 @@ Work top to bottom.
 ## 4. GitHub (app secrets for deploys)
 
 - [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
-- [ ] Add app secrets: `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
+- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
 - [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
-- [ ] Re-run **Staging dual deploy** on `develop` after setting secrets
+- [ ] Re-run **Staging dual deploy** on `develop` after importing or changing secrets
 - [ ] Confirm Cloudflare Worker `thegamies-v2-develop` → Settings → Variables and Secrets
+- [ ] When secrets change later: update GitHub manually, then redeploy — CI does not sync from Doppler
 - [ ] Until secrets exist, CI quality checks still run; host deploys skip with a comment
 
 ## 5. Verify

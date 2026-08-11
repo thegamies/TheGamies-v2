@@ -3,6 +3,8 @@
 **Local:** [Doppler](https://www.doppler.com/) (Developer free plan) via `pnpm dev:secrets`.  
 **Deployed hosts (Vercel / Cloudflare):** GitHub Actions secrets, pushed onto each deploy by CI. No Doppler service token required (Teams-only).
 
+**CI does not read Doppler.** When app secrets change, **manually import / update them in GitHub Actions secrets**, then re-run the staging (or preview) deploy so hosts pick them up.
+
 Deploy credentials (`VERCEL_*`, `CLOUDFLARE_*`, `NEON_*` API keys) also stay in GitHub Actions.
 
 ## Doppler (local only)
@@ -62,6 +64,7 @@ Keep Doppler `dev` and GitHub in sync manually (copy values when they change), o
 ## Rules
 
 1. Doppler = laptop. GitHub = what CI pushes to hosts.
-2. Production DB URL never used for local or PR previews.
-3. PR databases are ephemeral — CI-owned.
-4. After changing GitHub app secrets, re-run **Staging dual deploy** (or push to `develop`) so Workers pick them up via `secret bulk`.
+2. **Manually import** app secrets into GitHub when they change — CI never pulls Doppler.
+3. Production DB URL never used for local or PR previews.
+4. PR databases are ephemeral — CI-owned.
+5. After changing GitHub app secrets, re-run **Staging dual deploy** (or push to `develop`) so Workers pick them up via `secret bulk`.
