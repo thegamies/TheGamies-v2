@@ -88,6 +88,12 @@ export async function createDraft(
     if (message.includes("lists_owned_goty_year_uidx")) {
       return { error: "You already have a Game of the Year list for that year." };
     }
+    if (
+      message.includes('relation "lists" does not exist') ||
+      message.includes("Failed query")
+    ) {
+      return { error: "Couldn't start this list. Try again." };
+    }
     throw err;
   }
 }
