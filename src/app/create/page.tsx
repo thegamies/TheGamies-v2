@@ -14,9 +14,9 @@ export default async function CreateChooserPage() {
   const draft = await peekDraftFromCookie(cookie).catch(() => null);
 
   return (
-    <div className="mx-auto w-full max-w-xl">
+    <div className="w-full">
       {draft ? (
-        <div className="mb-8 border border-line bg-panel p-5">
+        <div className="mb-8 w-full border border-line bg-panel p-5">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
             Unfinished draft
           </p>
