@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { startCustomDraftAction } from "@/app/create/actions";
+import Link from "next/link";
+import {
+  discardAnonDraftAction,
+  startCustomDraftAction,
+} from "@/app/create/actions";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
@@ -43,6 +47,7 @@ export default async function CreateCustomPage({
   const publicId = first(params.id);
   const titleParam = first(params.title);
   const yearParam = first(params.year);
+  const resume = first(params.resume) === "1";
   const error = first(params.error) ?? null;
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
@@ -95,50 +100,11 @@ export default async function CreateCustomPage({
         })),
       };
     }
-  } else if (titleParam) {
-    const year =
-      yearParam && Number.isFinite(Number(yearParam))
-        ? Math.floor(Number(yearParam))
-        : null;
+  } else if (!signedIn && resume) {
     const draft = await readListDraftCookie();
-    const resume =
-      draft &&
-      draft.listType === "custom" &&
-      draft.title === titleParam.trim()
-        ? draft
-        : null;
-    const games = resume
-      ? await hydrateGamesByIgdbIds(resume.igdbIds)
-      : [];
-    const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
-    editor = {
-      publicId: resume?.publicId ?? null,
-      title: resume?.title || titleParam.trim(),
-      year: resume?.year ?? year,
-      slotCount: resume?.slotCount ?? 10,
-      listFormat: resume?.listFormat,
-      rankStyle: resume?.rankStyle,
-      showSuffix: resume?.showSuffix,
-      items: (resume?.igdbIds ?? [])
-        .map((id, index) => {
-          const game = byIgdb.get(id);
-          if (!game) return null;
-          return {
-            gameId: game.gameId,
-            igdbId: game.igdbId,
-            slug: game.slug,
-            title: game.title,
-            year: game.year,
-            coverUrl: game.coverUrl,
-            rank: index + 1,
-            blurb: "",
-          };
-        })
-        .filter((item): item is NonNullable<typeof item> => Boolean(item)),
-    };
-  } else {
-    const draft = await readListDraftCookie();
-    if (draft?.listType === "custom") {
+    if (!draft || draft.listType !== "custom") {
+      loadError = "No unfinished custom ranking on this device.";
+    } else {
       const games = await hydrateGamesByIgdbIds(draft.igdbIds);
       const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
       editor = {
@@ -167,6 +133,60 @@ export default async function CreateCustomPage({
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
+  } else if (!signedIn && titleParam) {
+    const year =
+      yearParam && Number.isFinite(Number(yearParam))
+        ? Math.floor(Number(yearParam))
+        : null;
+    const existingDraft = await readListDraftCookie();
+    if (existingDraft) {
+      const params = new URLSearchParams({ title: titleParam.trim() });
+      if (year != null) params.set("year", String(year));
+      return (
+        <div>
+          <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+            Custom list
+          </p>
+          <div className="border border-line bg-panel p-5">
+            <p className="font-display text-2xl tracking-wide text-ink">
+              Unfinished ranking on this device
+            </p>
+            <p className="mt-2 text-sm text-muted">
+              You already have “{existingDraft.title}” saved here. Continue
+              editing it, or start a new list and lose that ranking.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Link
+                href={
+                  existingDraft.listType === "goty"
+                    ? "/create/goty?resume=1"
+                    : "/create/custom?resume=1"
+                }
+              >
+                <Button type="button">Continue editing</Button>
+              </Link>
+              <form action={discardAnonDraftAction}>
+                <input
+                  type="hidden"
+                  name="next"
+                  value={`/create/custom?${params.toString()}`}
+                />
+                <Button type="submit" variant="bordered">
+                  Start a new list
+                </Button>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    editor = {
+      publicId: null,
+      title: titleParam.trim(),
+      year,
+      slotCount: 10,
+      items: [],
+    };
   }
 
   return (

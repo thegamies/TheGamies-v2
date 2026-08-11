@@ -33,7 +33,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-10 | Local DB | Doppler `dev` + `dev_personal`; lasting personal Neon branch recommended |
 | 2026-08-10 | Feature testing | **Every feature ships with tests in the same PR** (risk chooses unit vs integration vs visual; “no tests” is not the default) |
 | 2026-08-11 | Profile access control | **App-layer** session checks (`auth.getSession`) + ownership on profile writes. **Postgres RLS deferred** until Auth JWT → DB role is defined — do not invent policies yet |
-| 2026-08-11 | List drafts / Save / Share | **No DB on create-start.** Draft cookie (`tg_list_draft`) auto-updates with ordered IGDB ids + meta. **Save** = signed-in account upsert only (notify anon). **Share** = create/update published list + httpOnly edit cookie for anon → `/l/[publicId]`. **Export** = client image. Notes require sign-in. **Claim** attaches `profileId`, slug, clears edit secret. |
+| 2026-08-11 | List drafts / Save / Share | **Signed-in:** create owned DB draft immediately; no draft cookie; GOTY year uniqueness opens the existing list. **Anon:** draft cookie of IGDB ids auto-updates; Create prompts Continue vs Start new (warns loss); first Share creates published row + edit cookie. **Save** signed-in only. Notes require sign-in. Share URL: `/l/[publicId]`. |
 
 ## Open (block dependent work until decided)
 

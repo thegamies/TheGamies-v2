@@ -6,22 +6,30 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 
 | Term | Meaning |
 |---|---|
-| Draft cookie | Client-writable cookie (`tg_list_draft`) with ordered IGDB ids + meta; auto-updated while building |
+| Draft cookie | Anon-only client cookie (`tg_list_draft`) with ordered IGDB ids + meta; auto-updated while building |
 | Edit cookie | httpOnly `tg_list_edit` (`publicId.secret`) set after Share for anonymous edit access |
 | Published | Public at `/l/[publicId]`; crawlable share page |
 | Claim | Attach an anonymous shared list to a signed-in profile |
 
 ## Flow
 
-1. `/create` → pick GOTY or custom → builder opens **without** a database row.
-2. Ranking auto-persists to the draft cookie (device-local). Resume from `/create`.
-3. Toolbar:
-   - **Save** — signed-in only; upserts an owned list on the account. Anonymous users are told to sign in (cookie already keeps the draft).
-   - **Share** — creates/updates a published Postgres list, sets the edit cookie for anon, opens `/l/[publicId]`.
+### Signed in
+
+1. Start GOTY or custom → **creates a DB draft immediately** (owned).
+2. GOTY: if the profile already has that year, open the existing list instead of creating a second one.
+3. Cookie drafts are not used. Save / Share / Export update the account list or open the share page.
+
+### Signed out
+
+1. Start GOTY or custom → builder opens **without** a database row.
+2. Ranking auto-persists to the draft cookie (this device only).
+3. Visiting Create with an unfinished cookie asks: **Continue editing** or **Start a new list** (warns the unfinished ranking will be lost). Type chooser is hidden until they decide.
+4. Toolbar:
+   - **Save** — prompts to sign in (cookie already keeps the draft).
+   - **Share** — creates/updates a published Postgres list, sets the edit cookie, opens `/l/[publicId]`.
    - **Export** — JPEG poster from current client state (no DB required).
-4. Soft prompt on the share page: sign in to save; **Don’t prompt again** uses `localStorage`.
-5. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret.
-6. **Reset** clears the draft cookie (and deletes a DB draft if an edit cookie still points at one).
+5. Soft prompt on the share page: sign in to save; **Don’t prompt again** uses `localStorage`.
+6. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret.
 
 ## Builder
 
@@ -39,7 +47,7 @@ Create UI mirrors the Social Gamer Card prototype:
 
 - Up to **100** ranked games; ranks are contiguous 1..n.
 - GOTY: year required; games should match year / be released (enforced in domain rules).
-- One **owned** GOTY list per profile per year (save/claim fails clearly if one already exists).
+- One **owned** GOTY list per profile per year (create opens the existing list; claim/save fail clearly otherwise).
 - Default aggregate scoring uses **top 10 only** (`pointsForRank`); live boards are a later phase.
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
 

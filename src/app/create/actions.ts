@@ -15,7 +15,9 @@ import {
 } from "@/lib/lists/draft-cookie";
 import {
   claimList,
+  createDraft,
   getEditableList,
+  getOwnedGotyForYear,
   hydrateGamesByIgdbIds,
   resetDraft,
   saveOwnedListFromClientDraft,
@@ -50,7 +52,28 @@ export async function startGotyDraftAction(formData: FormData) {
   if (!Number.isFinite(year) || year < 1970 || year > 2100) {
     redirect(`/create/goty?error=${encodeURIComponent("Pick a valid year.")}`);
   }
-  redirect(`/create/goty?year=${Math.floor(year)}`);
+  const y = Math.floor(year);
+  const profileId = await currentProfileId();
+
+  if (profileId) {
+    await clearListDraftCookie();
+    const existing = await getOwnedGotyForYear(profileId, y);
+    if (existing) {
+      redirect(
+        `/create/goty?id=${existing.publicId}&existing=1`,
+      );
+    }
+    const result = await createDraft(
+      { listType: "goty", year: y },
+      { profileId },
+    );
+    if ("error" in result) {
+      redirect(`/create/goty?error=${encodeURIComponent(result.error)}`);
+    }
+    redirect(`/create/goty?id=${result.list.publicId}`);
+  }
+
+  redirect(`/create/goty?year=${y}`);
 }
 
 export async function startCustomDraftAction(formData: FormData) {
@@ -61,12 +84,52 @@ export async function startCustomDraftAction(formData: FormData) {
       `/create/custom?error=${encodeURIComponent("Give your list a title.")}`,
     );
   }
-  const params = new URLSearchParams({ title });
-  if (yearRaw) {
-    const year = Number(yearRaw);
-    if (Number.isFinite(year)) params.set("year", String(Math.floor(year)));
+  const year = yearRaw ? Number(yearRaw) : undefined;
+  if (yearRaw && !Number.isFinite(year)) {
+    redirect(
+      `/create/custom?error=${encodeURIComponent("Pick a valid year.")}`,
+    );
   }
+  const profileId = await currentProfileId();
+
+  if (profileId) {
+    await clearListDraftCookie();
+    const result = await createDraft(
+      {
+        listType: "custom",
+        title,
+        year: year && Number.isFinite(year) ? Math.floor(year) : undefined,
+      },
+      { profileId },
+    );
+    if ("error" in result) {
+      redirect(`/create/custom?error=${encodeURIComponent(result.error)}`);
+    }
+    redirect(`/create/custom?id=${result.list.publicId}`);
+  }
+
+  const params = new URLSearchParams({ title });
+  if (year && Number.isFinite(year)) params.set("year", String(Math.floor(year)));
   redirect(`/create/custom?${params.toString()}`);
+}
+
+export async function discardAnonDraftAction(formData?: FormData) {
+  await clearListDraftCookie();
+  const cookie = await readListEditCookie();
+  if (cookie) {
+    const access = await accessFor(cookie.publicId);
+    // Only wipe anonymous edit-cookie drafts, not owned account lists.
+    if (!access.profileId) {
+      await resetDraft(cookie.publicId, access).catch(() => null);
+    }
+    await clearListEditCookie();
+  }
+  const nextRaw = formData ? String(formData.get("next") ?? "/create") : "/create";
+  const next =
+    nextRaw.startsWith("/create") && !nextRaw.startsWith("//")
+      ? nextRaw
+      : "/create";
+  redirect(next);
 }
 
 function parseClientDraftPayload(formData: FormData): unknown {
@@ -107,22 +170,7 @@ export async function saveOwnedListAction(
   });
   if ("error" in result) return { error: result.error };
 
-  const d = draft as {
-    listType?: "goty" | "custom";
-    title?: string;
-    year?: number | null;
-    items?: { igdbId: number }[];
-  };
-  await setListDraftCookie(
-    buildListDraftPayload({
-      listType: d.listType === "custom" ? "custom" : "goty",
-      title: d.title ?? result.list.title,
-      year: d.year ?? result.list.year,
-      igdbIds: (d.items ?? []).map((item) => item.igdbId),
-      slotCount: Math.max(10, (d.items ?? []).length),
-      publicId: result.list.publicId,
-    }),
-  );
+  await clearListDraftCookie();
 
   revalidatePath(`/create/goty`);
   revalidatePath(`/create/custom`);
@@ -168,36 +216,33 @@ export async function shareListAction(formData: FormData) {
     });
   }
 
-  const d = draft as {
-    listType?: "goty" | "custom";
-    title?: string;
-    year?: number | null;
-    items?: { igdbId: number }[];
-  };
-  await setListDraftCookie(
-    buildListDraftPayload({
-      listType: d.listType === "custom" ? "custom" : "goty",
-      title: d.title ?? result.list.title,
-      year: d.year ?? result.list.year,
-      igdbIds: (d.items ?? []).map((item) => item.igdbId),
-      slotCount: Math.max(10, (d.items ?? []).length),
-      publicId: result.list.publicId,
-    }),
-  );
+  if (!profileId) {
+    const d = draft as {
+      listType?: "goty" | "custom";
+      title?: string;
+      year?: number | null;
+      items?: { igdbId: number }[];
+    };
+    await setListDraftCookie(
+      buildListDraftPayload({
+        listType: d.listType === "custom" ? "custom" : "goty",
+        title: d.title ?? result.list.title,
+        year: d.year ?? result.list.year,
+        igdbIds: (d.items ?? []).map((item) => item.igdbId),
+        slotCount: Math.max(10, (d.items ?? []).length),
+        publicId: result.list.publicId,
+      }),
+    );
+  } else {
+    await clearListDraftCookie();
+  }
 
   revalidatePath(`/l/${result.list.publicId}`);
   redirect(`/l/${result.list.publicId}`);
 }
 
 export async function resetActiveDraftAction() {
-  const cookie = await readListEditCookie();
-  if (cookie) {
-    const access = await accessFor(cookie.publicId);
-    await resetDraft(cookie.publicId, access);
-    await clearListEditCookie();
-  }
-  await clearListDraftCookie();
-  redirect("/create");
+  return discardAnonDraftAction();
 }
 
 export async function claimListAction(formData: FormData) {
@@ -227,6 +272,7 @@ export async function claimListAction(formData: FormData) {
     redirect(`/l/${publicId}?error=${encodeURIComponent(result.error)}`);
   }
   await clearListEditCookie();
+  await clearListDraftCookie();
   revalidatePath(`/l/${publicId}`);
   revalidatePath(`/u/${profile.username}`);
   redirect(`/l/${publicId}?saved=1`);
@@ -239,11 +285,4 @@ export async function loadEditorState(publicId: string) {
 
 export async function hydrateDraftGamesAction(igdbIds: number[]) {
   return hydrateGamesByIgdbIds(igdbIds);
-}
-
-export async function getCreateSessionAction(): Promise<{
-  signedIn: boolean;
-}> {
-  const profileId = await currentProfileId();
-  return { signedIn: Boolean(profileId) };
 }

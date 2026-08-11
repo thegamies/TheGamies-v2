@@ -57,6 +57,15 @@ export async function createDraft(
   }
 
   const data = parsed.data;
+  if (data.listType === "goty" && opts.profileId) {
+    const existing = await getOwnedGotyForYear(opts.profileId, data.year, db);
+    if (existing) {
+      return {
+        error: "You already have a Game of the Year list for that year.",
+      };
+    }
+  }
+
   const publicId = generatePublicId();
   const editSecret = generateEditSecret();
   const editSecretHash = hashEditSecret(editSecret);
@@ -79,7 +88,10 @@ export async function createDraft(
         title,
         year,
         status: "draft",
-        slug: null,
+        slug:
+          opts.profileId && data.listType === "goty"
+            ? gotySlugForYear(data.year)
+            : null,
       })
       .returning();
 
@@ -97,6 +109,25 @@ export async function createDraft(
     }
     throw err;
   }
+}
+
+export async function getOwnedGotyForYear(
+  profileId: string,
+  year: number,
+  db: Db = getDb(),
+): Promise<ListRow | null> {
+  const [row] = await db
+    .select()
+    .from(lists)
+    .where(
+      and(
+        eq(lists.profileId, profileId),
+        eq(lists.listType, "goty"),
+        eq(lists.year, year),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
 }
 
 export async function getListByPublicId(

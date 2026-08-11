@@ -185,6 +185,7 @@ export function ListEditor({
   }, [query, yearNum, listType]);
 
   useEffect(() => {
+    if (signedIn) return;
     const handle = window.setTimeout(() => {
       const payload = buildListDraftPayload({
         listType,
@@ -201,6 +202,7 @@ export function ListEditor({
     }, 300);
     return () => window.clearTimeout(handle);
   }, [
+    signedIn,
     listType,
     year,
     yearNum,

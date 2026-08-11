@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { startGotyDraftAction } from "@/app/create/actions";
+import Link from "next/link";
+import {
+  discardAnonDraftAction,
+  startGotyDraftAction,
+} from "@/app/create/actions";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
@@ -44,6 +48,8 @@ export default async function CreateGotyPage({
   const params = await searchParams;
   const publicId = first(params.id);
   const yearParam = first(params.year);
+  const resume = first(params.resume) === "1";
+  const existingNotice = first(params.existing) === "1";
   const error = first(params.error) ?? null;
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
@@ -68,6 +74,9 @@ export default async function CreateGotyPage({
     }[];
   } | null = null;
   let loadError: string | null = error;
+  const info: string | null = existingNotice
+    ? "You already have a Game of the Year list for this year. Continue editing it here."
+    : null;
 
   if (publicId) {
     const cookie = await readListEditCookie();
@@ -96,51 +105,11 @@ export default async function CreateGotyPage({
         })),
       };
     }
-  } else if (yearParam) {
-    const year = Number(yearParam);
-    if (!Number.isFinite(year)) {
-      loadError = "Pick a valid year.";
-    } else {
-      const draft = await readListDraftCookie();
-      const resume =
-        draft &&
-        draft.listType === "goty" &&
-        draft.year === Math.floor(year)
-          ? draft
-          : null;
-      const games = resume
-        ? await hydrateGamesByIgdbIds(resume.igdbIds)
-        : [];
-      const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
-      editor = {
-        publicId: resume?.publicId ?? null,
-        title: resume?.title || `${Math.floor(year)} Game of the Year`,
-        year: Math.floor(year),
-        slotCount: resume?.slotCount ?? 10,
-        listFormat: resume?.listFormat,
-        rankStyle: resume?.rankStyle,
-        showSuffix: resume?.showSuffix,
-        items: (resume?.igdbIds ?? [])
-          .map((id, index) => {
-            const game = byIgdb.get(id);
-            if (!game) return null;
-            return {
-              gameId: game.gameId,
-              igdbId: game.igdbId,
-              slug: game.slug,
-              title: game.title,
-              year: game.year,
-              coverUrl: game.coverUrl,
-              rank: index + 1,
-              blurb: "",
-            };
-          })
-          .filter((item): item is NonNullable<typeof item> => Boolean(item)),
-      };
-    }
-  } else {
+  } else if (!signedIn && resume) {
     const draft = await readListDraftCookie();
-    if (draft?.listType === "goty" && draft.year != null) {
+    if (!draft || draft.listType !== "goty" || draft.year == null) {
+      loadError = "No unfinished Game of the Year ranking on this device.";
+    } else {
       const games = await hydrateGamesByIgdbIds(draft.igdbIds);
       const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
       editor = {
@@ -169,6 +138,60 @@ export default async function CreateGotyPage({
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
+  } else if (!signedIn && yearParam) {
+    const year = Number(yearParam);
+    if (!Number.isFinite(year)) {
+      loadError = "Pick a valid year.";
+    } else {
+      const existingDraft = await readListDraftCookie();
+      if (existingDraft) {
+        const nextYear = Math.floor(year);
+        return (
+          <div>
+            <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+              Game of the Year
+            </p>
+            <div className="border border-line bg-panel p-5">
+              <p className="font-display text-2xl tracking-wide text-ink">
+                Unfinished ranking on this device
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                You already have “{existingDraft.title}” saved here. Continue
+                editing it, or start a new list and lose that ranking.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href={
+                    existingDraft.listType === "goty"
+                      ? "/create/goty?resume=1"
+                      : "/create/custom?resume=1"
+                  }
+                >
+                  <Button type="button">Continue editing</Button>
+                </Link>
+                <form action={discardAnonDraftAction}>
+                  <input
+                    type="hidden"
+                    name="next"
+                    value={`/create/goty?year=${nextYear}`}
+                  />
+                  <Button type="submit" variant="bordered">
+                    Start a new list
+                  </Button>
+                </form>
+              </div>
+            </div>
+          </div>
+        );
+      }
+      editor = {
+        publicId: null,
+        title: `${Math.floor(year)} Game of the Year`,
+        year: Math.floor(year),
+        slotCount: 10,
+        items: [],
+      };
+    }
   }
 
   return (
@@ -180,6 +203,12 @@ export default async function CreateGotyPage({
       {loadError ? (
         <p className="mb-6 text-sm text-accent" role="alert">
           {loadError}
+        </p>
+      ) : null}
+
+      {info ? (
+        <p className="mb-6 text-sm text-muted" role="status">
+          {info}
         </p>
       ) : null}
 
