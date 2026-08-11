@@ -22,10 +22,34 @@ Preview / Production configs are optional for local reference; CI does not read 
 | Config | Used for |
 |---|---|
 | `dev` | Shared defaults you copy into GitHub for deploys |
-| `dev_personal` | Local overrides (`NEXT_PUBLIC_APP_URL=http://localhost:3000`, private Neon branch) |
+| `dev_personal` | Local overrides (private Neon branch, localhost URL, etc.) |
+
+[`doppler.yaml`](../doppler.yaml) pins **`config: dev`** — do **not** change it to `dev_personal` (that config is per-developer and must not be committed as the repo default).
+
+### Personal Neon branch (`dev_personal`)
+
+Put your private branch URL (e.g. Neon **rapid-snow**) on **`dev_personal`** as `DATABASE_URL`. Shared `dev` may point at a different branch (e.g. **plain-sound**).
+
+If `doppler run` reports `DOPPLER_CONFIG=dev` (personal configs not applied), **force** `dev_personal`:
 
 ```bash
-pnpm dev:secrets          # doppler run -- next dev
+# Check which DB host you will hit (no password printed)
+doppler run --config dev_personal -- node -e "console.log((process.env.DATABASE_URL||'').match(/@([^/?]+)/)?.[1])"
+
+# Migrate / dev / sync against your personal branch
+doppler run --config dev_personal -- pnpm db:migrate
+doppler run --config dev_personal -- pnpm dev
+doppler run --config dev_personal -- pnpm sync:igdb import --year 2026
+```
+
+`pnpm db:migrate:secrets` and `pnpm dev:secrets` only use `dev_personal` automatically when Doppler Development **personal configs are enabled** and the CLI is set up for them. Verify:
+
+```bash
+doppler run -- node -e "console.log(process.env.DOPPLER_CONFIG)"
+# expect: dev_personal   (or enable personal configs / use --config dev_personal)
+```
+
+```bash
 pnpm preview:cf:secrets   # Cloudflare local preview (WSL/Linux)
 ```
 
@@ -38,7 +62,7 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | GitHub secret | Becomes | Used by |
 |---|---|---|
 | `STAGING_DATABASE_URL` | `DATABASE_URL` | develop staging (both hosts) |
-| `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging |
+| `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging (alias: GitHub `NEON_AUTH_BASE_URL` also accepted) |
 | `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
 | `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging only (or use `VERCEL_STAGING_ALIAS`) |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging only |

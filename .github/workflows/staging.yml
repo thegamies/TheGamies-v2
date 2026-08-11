@@ -44,7 +44,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL || secrets.NEON_AUTH_BASE_URL }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -55,6 +55,13 @@ jobs:
           mkdir -p .vercel
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+
+          if [ -z "$NEON_AUTH_BASE_URL" ]; then
+            echo "::warning::NEON_AUTH_BASE_URL empty — set GitHub secret STAGING_NEON_AUTH_BASE_URL (or NEON_AUTH_BASE_URL)"
+          fi
+          if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
+            echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set GitHub secret NEON_AUTH_COOKIE_SECRET"
+          fi
 
           # Host-specific public URL (dual deploy ? not a shared STAGING_APP_URL)
           if [ -n "$STAGING_VERCEL_APP_URL" ]; then
@@ -125,7 +132,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL || secrets.NEON_AUTH_BASE_URL }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -133,6 +140,12 @@ jobs:
           NEXT_PUBLIC_APP_URL: ${{ secrets.STAGING_CF_APP_URL }}
         run: |
           WORKER="thegamies-v2-develop"
+          if [ -z "$NEON_AUTH_BASE_URL" ]; then
+            echo "::warning::NEON_AUTH_BASE_URL empty — set GitHub secret STAGING_NEON_AUTH_BASE_URL (or NEON_AUTH_BASE_URL)"
+          fi
+          if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
+            echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set GitHub secret NEON_AUTH_COOKIE_SECRET"
+          fi
           node -e "
             const fs=require('fs');
             const worker='thegamies-v2-develop';

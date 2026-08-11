@@ -28,10 +28,14 @@ function createAuthOrNull(): NeonAuth | null {
 
 /** Auth instance when env is set; otherwise null (pages can still render). */
 export function getAuthOrNull(): NeonAuth | null {
-  if (cached === undefined) {
-    cached = createAuthOrNull();
+  // Only cache a successful instance. On Cloudflare, process.env may populate
+  // after the first module evaluation — permanently caching null breaks auth.
+  if (cached) return cached;
+  const created = createAuthOrNull();
+  if (created) {
+    cached = created;
   }
-  return cached;
+  return created;
 }
 
 /** Auth instance for sign-in/up/account — throws a clear error if env is missing. */

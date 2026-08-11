@@ -12,9 +12,9 @@ Work top to bottom.
   doppler login
   doppler setup   # project thegamies, config dev
   ```
-- [ ] Set shared local defaults on **`dev`**; laptop overrides on **`dev_personal`**
-- [ ] Day-to-day: `pnpm dev:secrets`  
-  Full layout: [secrets.md](./secrets.md)
+- [ ] Set shared local defaults on **`dev`**; laptop overrides on **`dev_personal`** (personal Neon branch URL)
+- [ ] Day-to-day: `doppler run --config dev_personal -- pnpm dev` (or `pnpm dev:secrets` only if personal configs auto-apply — see [secrets.md](./secrets.md))
+- [ ] Confirm config: `doppler run -- node -e "console.log(process.env.DOPPLER_CONFIG)"` → expect `dev_personal` for laptop work
 
 ## 1. Neon
 
@@ -26,7 +26,7 @@ Work top to bottom.
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
 - [ ] Add trusted domains in Neon Auth for local + staging hosts
-- [ ] `doppler run -- pnpm db:migrate` locally (includes `profiles`)
+- [ ] `doppler run --config dev_personal -- pnpm db:migrate` (includes `profiles`; hits your personal Neon branch)
 
 ## 2. Vercel
 
