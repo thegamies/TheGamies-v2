@@ -5,6 +5,7 @@ import {
   usernameSchema,
 } from "./username";
 import { ownsProfile } from "./ownership";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 describe("username", () => {
   it("normalizes case and trim", () => {
@@ -33,5 +34,14 @@ describe("ownsProfile", () => {
     expect(ownsProfile(profile, "other")).toBe(false);
     expect(ownsProfile(profile, null)).toBe(false);
     expect(ownsProfile(profile, undefined)).toBe(false);
+  });
+});
+
+describe("safeNextPath", () => {
+  it("allows relative paths only", () => {
+    expect(safeNextPath("/l/abc")).toBe("/l/abc");
+    expect(safeNextPath("//evil")).toBeNull();
+    expect(safeNextPath("https://evil")).toBeNull();
+    expect(safeNextPath(null)).toBeNull();
   });
 });

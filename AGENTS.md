@@ -44,7 +44,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | IGDB catalog sync | `docs/igdb-sync.md` |
-| Community / ballot / results | `docs/features/` |
+| Community / ballot / results / lists | `docs/features/` |
 
 ## Workflow
 
@@ -68,3 +68,13 @@ A task is done when behavior matches the docs, **tests for the feature exist and
 ## End of turn
 
 After finishing a task or substantive reply, always end with a short **What’s next** — concrete options or the recommended next step — so day-to-day work keeps a clear follow-up.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

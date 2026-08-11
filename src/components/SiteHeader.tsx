@@ -34,6 +34,9 @@ export async function SiteHeader() {
           <Link href="/games" className="hover:text-ink">
             Games
           </Link>
+          <Link href="/create" className="hover:text-ink">
+            Create
+          </Link>
           {user ? (
             <>
               <Link

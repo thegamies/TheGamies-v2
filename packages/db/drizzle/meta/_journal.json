@@ -15,6 +15,27 @@
       "when": 1786417845234,
       "tag": "0001_cool_thundra",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786460465551,
+      "tag": "0002_silly_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786462739876,
+      "tag": "0003_first_dormammu",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786470000000,
+      "tag": "0004_drop_list_status",
+      "breakpoints": true
     }
   ]
 }

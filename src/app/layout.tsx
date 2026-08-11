@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
+import { AppProviders } from "@/components/AppProviders";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -41,7 +42,7 @@ export default function RootLayout({
       className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable} h-full`}
     >
       <body className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
-        {children}
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

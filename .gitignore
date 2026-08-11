@@ -40,3 +40,9 @@ yarn-error.log*
 /references/**
 !/references/.gitkeep
 .vercel
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

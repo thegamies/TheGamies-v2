@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -6,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -185,3 +187,50 @@ export const profiles = pgTable("profiles", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
+export const lists = pgTable(
+  "lists",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    publicId: text("public_id").notNull().unique(),
+    editSecretHash: text("edit_secret_hash"),
+    profileId: uuid("profile_id").references(() => profiles.id, {
+      onDelete: "set null",
+    }),
+    listType: text("list_type").notNull(),
+    title: text("title").notNull(),
+    year: integer("year"),
+    slug: text("slug"),
+    publishedAt: timestamp("published_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("lists_owned_goty_year_uidx")
+      .on(t.profileId, t.year)
+      .where(sql`${t.listType} = 'goty' AND ${t.profileId} IS NOT NULL`),
+    uniqueIndex("lists_profile_slug_uidx")
+      .on(t.profileId, t.slug)
+      .where(sql`${t.profileId} IS NOT NULL AND ${t.slug} IS NOT NULL`),
+  ],
+);
+
+export const listItems = pgTable(
+  "list_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    listId: uuid("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    blurb: text("blurb"),
+  },
+  (t) => [
+    uniqueIndex("list_items_list_rank_uidx").on(t.listId, t.rank),
+    uniqueIndex("list_items_list_game_uidx").on(t.listId, t.gameId),
+  ],
+);

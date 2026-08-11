@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { safeNextPath } from "@/lib/auth/safe-next";
 
 export async function signInWithEmail(
   _prevState: { error: string } | null,
@@ -9,6 +10,7 @@ export async function signInWithEmail(
 ) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const next = safeNextPath(String(formData.get("next") ?? "")) ?? "/account";
 
   if (!email || !password) {
     return { error: "Enter your email and password." };
@@ -23,5 +25,5 @@ export async function signInWithEmail(
     return { error: error.message || "Could not sign in." };
   }
 
-  redirect("/account");
+  redirect(next);
 }
