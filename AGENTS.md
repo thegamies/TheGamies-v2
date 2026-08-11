@@ -8,6 +8,8 @@ Feel like an independent gaming publication crossed with a personal record colle
 
 Do **not** feel like a SaaS dashboard, admin panel, generic shadcn app, crypto/esports site, card grid, or neon gaming landing page.
 
+**User-facing copy only** in the product UI — no CLI commands, env var names, or setup instructions. Put those in `docs/` / README. See `.cursor/rules/user-facing-copy.mdc`.
+
 Visual system: **Editorial Standings** with editorial minimalism and soft brutalism. See `docs/design-system.md`.
 
 ## Stack (locked)

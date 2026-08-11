@@ -220,13 +220,9 @@ export function AdminSyncClient({
           Enrich all years (ignore year; full catalog lookups)
         </label>
         <p className="max-w-2xl text-sm text-muted">
-          Hosted admin sync is capped by the platform (often ~60s on Vercel
-          Hobby, up to{" "}
-          <code className="text-ink">maxDuration</code> on Pro). Enrich all
-          runs <em>one entity per request</em>; re-run if a step times out —
-          missing-only enrich is idempotent. Prefer{" "}
-          <code className="text-ink">pnpm sync:igdb enrich …</code> locally for
-          huge full-catalog jobs.
+          Large enrich jobs may time out on hosted requests. Enrich all runs
+          one entity type per request — re-run if a step stops early; already
+          completed lookups are skipped.
         </p>
         {resume?.canContinue ? (
           <p className="text-sm text-muted">

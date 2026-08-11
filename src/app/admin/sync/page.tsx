@@ -40,8 +40,7 @@ export default async function AdminSyncPage() {
           Catalog sync
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
-          Core games backfill and lookup enrich. Same pipeline as{" "}
-          <code className="text-ink">pnpm sync:igdb</code>.
+          Import and enrich the game catalog from IGDB.
         </p>
         <div className="mt-10">
           <AdminSyncClient

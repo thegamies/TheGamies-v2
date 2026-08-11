@@ -9,6 +9,7 @@ Day-to-day rules for The Gamies v2. Product and design live elsewhere; this doc 
 3. Preview before merging to `develop`; production only via `main`.
 4. Test the risk, not the theater.
 5. Do not invent product decisions while coding — see `docs/decisions.md`.
+6. **User-facing copy only** in the product UI — no `pnpm`/CLI commands, env var names, or developer setup text in pages (including empty states). Ops details belong in `docs/`. See `.cursor/rules/user-facing-copy.mdc`.
 
 ## Version control
 
