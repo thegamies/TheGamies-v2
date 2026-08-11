@@ -50,7 +50,7 @@ PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static key
 **Cloudflare:** CI runs `wrangler secret bulk` so secrets appear under Worker → Settings → Variables and Secrets.  
 **Vercel:** CI passes `--env` on each deployment.
 
-Keep Doppler `dev` and GitHub in sync manually (copy values when they change), or use Doppler’s free **GitHub sync** integration (counts toward the 5 sync limit) to push `dev` into GitHub secrets automatically.
+**Manual import (required):** Copy values into the GitHub secrets above when they change. Free-plan Doppler has no service-token CI path; do not rely on auto-sync for this deploy process.
 
 ## Deploy credentials (GitHub only)
 
