@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useId,
   useRef,
@@ -10,6 +10,23 @@ import {
   useTransition,
   type RefObject,
 } from "react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   publishListAction,
   resetDraftAction,
@@ -19,6 +36,13 @@ import {
   searchGamesForList,
   type GameSearchHit,
 } from "@/app/create/search-actions";
+import { ListExportDialog } from "@/components/list-export/ListExportDialog";
+import {
+  EXPORT_RANK_STYLES,
+  type ExportRankFormat,
+  type ExportRankStyle,
+} from "@/components/list-export/rankChrome";
+import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
@@ -33,7 +57,10 @@ export type EditorItem = {
   year: number | null;
   coverUrl: string | null;
   rank: number;
+  blurb: string;
 };
+
+type ListFormat = "poster" | "list";
 
 type ListEditorProps = {
   publicId: string;
@@ -45,30 +72,64 @@ type ListEditorProps = {
 };
 
 function segmentBtnCls(active: boolean) {
-  return `px-3 h-8 text-xs font-extrabold tracking-[0.12em] uppercase transition-colors ${
+  return `px-2.5 py-1.5 text-[11px] font-extrabold tracking-[0.14em] uppercase transition-colors ${
     active
       ? "bg-accent text-white"
       : "bg-transparent text-muted hover:text-ink"
   }`;
 }
 
+function toggleCls(active: boolean) {
+  return `border px-2.5 py-1.5 text-[11px] font-extrabold tracking-[0.14em] uppercase transition-colors ${
+    active
+      ? "border-accent text-accent"
+      : "border-line text-muted hover:text-ink"
+  }`;
+}
+
+function withRanks(items: EditorItem[]): EditorItem[] {
+  return items.map((item, i) => ({ ...item, rank: i + 1 }));
+}
+
+function formatTitleList(names: string[]): string {
+  if (names.length <= 3) return names.join(", ");
+  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
+}
+
 export function ListEditor({
   publicId,
-  listType,
+  listType: initialListType,
   initialTitle,
   initialYear,
   initialItems,
   error = null,
 }: ListEditorProps) {
   const router = useRouter();
+  const currentYear = new Date().getUTCFullYear();
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const committedYearRef = useRef(initialYear ?? currentYear);
+
+  const [listType, setListType] = useState<"goty" | "custom">(initialListType);
   const [title, setTitle] = useState(initialTitle);
-  const [year, setYear] = useState(initialYear?.toString() ?? "");
-  const [items, setItems] = useState<EditorItem[]>(initialItems);
-  const [slotCount, setSlotCount] = useState(() =>
-    Math.max(10, initialItems.length || 10),
+  const [year, setYear] = useState(
+    (initialYear ?? currentYear).toString(),
   );
+  const [draftYear, setDraftYear] = useState(initialYear ?? currentYear);
+  const [items, setItems] = useState<EditorItem[]>(() =>
+    withRanks(
+      initialItems.map((item) => ({
+        ...item,
+        blurb: item.blurb ?? "",
+      })),
+    ),
+  );
+  const [slotCount, setSlotCount] = useState(() =>
+    Math.max(10, initialItems.length),
+  );
+  const [listFormat, setListFormat] = useState<ListFormat>("poster");
+  const [rankStyle, setRankStyle] = useState<ExportRankStyle>("chip");
+  const [showSuffix, setShowSuffix] = useState(false);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<GameSearchHit[]>([]);
   const [saveError, setSaveError] = useState<string | null>(error);
@@ -77,16 +138,25 @@ export function ListEditor({
   const [panelOpen, setPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [pendingTrim, setPendingTrim] = useState<number | null>(null);
+  const [pendingYearTrim, setPendingYearTrim] = useState<{
+    year: number;
+    listType: "goty" | "custom";
+  } | null>(null);
 
+  const yearNum = Number(year) || currentYear;
+  const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
+  const showYearBadge = listType === "goty";
+  const showTopCount = listType === "custom";
   const isFull = items.length >= slotCount;
   const selectedIds = new Set(items.map((i) => i.gameId));
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
+  const emptySlots = Math.max(0, slotCount - items.length);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
       startSearch(async () => {
-        const yearNum = year ? Number(year) : undefined;
         const next = await searchGamesForList({
           q: query,
           year: listType === "goty" ? yearNum : undefined,
@@ -96,7 +166,39 @@ export function ListEditor({
       });
     }, 200);
     return () => window.clearTimeout(handle);
-  }, [query, year, listType]);
+  }, [query, yearNum, listType]);
+
+  const requestYearTrim = useCallback(
+    (targetYear: number, nextListType: "goty" | "custom") => {
+      if (!Number.isFinite(targetYear)) return;
+      const y = Math.floor(targetYear);
+
+      if (nextListType !== "goty") {
+        setYear(String(y));
+        setDraftYear(y);
+        setListType(nextListType);
+        committedYearRef.current = y;
+        setPendingYearTrim(null);
+        return;
+      }
+
+      setItems((prev) => {
+        const disallowed = prev.filter((item) => item.year !== y);
+        if (disallowed.length === 0) {
+          setYear(String(y));
+          setDraftYear(y);
+          setListType(nextListType);
+          committedYearRef.current = y;
+          setTitle(`${y} Game of the Year`);
+          setPendingYearTrim(null);
+          return prev;
+        }
+        setPendingYearTrim({ year: y, listType: nextListType });
+        return prev;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -106,6 +208,9 @@ export function ListEditor({
         !settingsRef.current.contains(e.target as Node)
       ) {
         setSettingsOpen(false);
+        if (listType === "goty") {
+          requestYearTrim(draftYear, "goty");
+        }
       }
     }
     function onKey(e: KeyboardEvent) {
@@ -113,6 +218,9 @@ export function ListEditor({
         setSettingsOpen(false);
         setSlotPickerOpen(false);
         setPanelOpen(false);
+        if (listType === "goty") {
+          requestYearTrim(draftYear, "goty");
+        }
       }
     }
     window.addEventListener("mousedown", onPointer);
@@ -121,7 +229,7 @@ export function ListEditor({
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [settingsOpen]);
+  }, [settingsOpen, listType, draftYear, requestYearTrim]);
 
   function focusSearch() {
     setPanelOpen(true);
@@ -133,6 +241,7 @@ export function ListEditor({
       items.map((item, index) => ({
         gameId: item.gameId,
         rank: index + 1,
+        blurb: item.blurb,
       })),
     );
   }
@@ -140,9 +249,7 @@ export function ListEditor({
   function applySlotCount(next: number) {
     const clamped = Math.min(LIST_MAX_ITEMS, Math.max(1, next));
     if (clamped < items.length) {
-      setItems((prev) =>
-        prev.slice(0, clamped).map((item, i) => ({ ...item, rank: i + 1 })),
-      );
+      setItems((prev) => withRanks(prev.slice(0, clamped)));
     }
     setSlotCount(clamped);
     setPendingTrim(null);
@@ -158,18 +265,57 @@ export function ListEditor({
     applySlotCount(clamped);
   }
 
+  function applyYearTrim(targetYear: number, nextListType: "goty" | "custom") {
+    setYear(String(targetYear));
+    setDraftYear(targetYear);
+    setListType(nextListType);
+    committedYearRef.current = targetYear;
+    if (nextListType === "goty") {
+      setTitle(`${targetYear} Game of the Year`);
+      setItems((prev) =>
+        withRanks(prev.filter((item) => item.year === targetYear)),
+      );
+    }
+    setPendingYearTrim(null);
+  }
+
+  function openSettings() {
+    setDraftYear(Number(year) || currentYear);
+    setSettingsOpen(true);
+  }
+
+  function closeSettings() {
+    setSettingsOpen(false);
+    if (listType === "goty") {
+      requestYearTrim(draftYear, "goty");
+    }
+  }
+
+  function setListTypeChoice(next: "goty" | "custom") {
+    if (next === listType) return;
+    if (next === "custom") {
+      setListType("custom");
+      setPendingYearTrim(null);
+      return;
+    }
+    requestYearTrim(draftYear || yearNum, "goty");
+  }
+
   function addGame(hit: GameSearchHit) {
     if (items.some((i) => i.gameId === hit.id)) return;
+    if (listType === "goty" && hit.year !== yearNum) return;
     if (items.length >= slotCount) {
       if (slotCount >= LIST_MAX_ITEMS) {
         setSaveError(`Lists can hold at most ${LIST_MAX_ITEMS} games.`);
         return;
       }
-      setSlotCount((n) => Math.min(LIST_MAX_ITEMS, Math.max(n, items.length + 1)));
+      setSlotCount((n) =>
+        Math.min(LIST_MAX_ITEMS, Math.max(n, items.length + 1)),
+      );
     }
     setItems((prev) => {
       if (prev.length >= LIST_MAX_ITEMS) return prev;
-      return [
+      return withRanks([
         ...prev,
         {
           gameId: hit.id,
@@ -178,31 +324,51 @@ export function ListEditor({
           year: hit.year,
           coverUrl: hit.coverUrl,
           rank: prev.length + 1,
+          blurb: "",
         },
-      ];
+      ]);
     });
     setQuery("");
     setSaveError(null);
     setPanelOpen(false);
   }
 
-  function removeAt(index: number) {
+  function removeGame(id: string) {
+    setItems((prev) => withRanks(prev.filter((item) => item.gameId !== id)));
+  }
+
+  function setBlurb(id: string, blurb: string) {
     setItems((prev) =>
-      prev
-        .filter((_, i) => i !== index)
-        .map((item, i) => ({ ...item, rank: i + 1 })),
+      prev.map((item) => (item.gameId === id ? { ...item, blurb } : item)),
     );
   }
 
-  function move(index: number, dir: -1 | 1) {
-    const next = index + dir;
-    if (next < 0 || next >= items.length) return;
+  function reorder(ids: string[]) {
     setItems((prev) => {
-      const copy = [...prev];
-      const tmp = copy[index]!;
-      copy[index] = copy[next]!;
-      copy[next] = tmp;
-      return copy.map((item, i) => ({ ...item, rank: i + 1 }));
+      const byId = new Map(prev.map((item) => [item.gameId, item]));
+      return withRanks(
+        ids
+          .map((id) => byId.get(id))
+          .filter((item): item is EditorItem => Boolean(item)),
+      );
+    });
+  }
+
+  const notesSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  function onNotesDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setItems((prev) => {
+      const oldIndex = prev.findIndex((item) => item.gameId === active.id);
+      const newIndex = prev.findIndex((item) => item.gameId === over.id);
+      if (oldIndex < 0 || newIndex < 0) return prev;
+      return withRanks(arrayMove(prev, oldIndex, newIndex));
     });
   }
 
@@ -212,6 +378,7 @@ export function ListEditor({
       fd.set("publicId", publicId);
       fd.set("itemsJson", itemsJson());
       fd.set("title", title);
+      fd.set("listType", listType);
       if (year) fd.set("year", year);
       const result = await saveListItemsAction(null, fd);
       if (result?.error) {
@@ -219,14 +386,41 @@ export function ListEditor({
         return;
       }
       setSaveError(null);
+      router.replace(`/create/${listType}?id=${publicId}`);
       router.refresh();
     });
   }
 
-  const emptySlots = Math.max(0, slotCount - items.length);
+  const trimMessage = (() => {
+    if (pendingTrim == null) return "";
+    const removed = items.slice(pendingTrim);
+    const noted = removed.filter((item) => item.blurb.trim().length > 0);
+    const count = removed.length;
+    const base = `Shrinking to ${pendingTrim} removes ${count} ${
+      count === 1 ? "game" : "games"
+    } from the bottom of your ranking.`;
+    if (noted.length === 0) return base;
+    return `${base} Notes on ${formatTitleList(noted.map((n) => n.title))} will be lost.`;
+  })();
+
+  const yearTrimMessage = (() => {
+    if (pendingYearTrim == null) return "";
+    const dropped = items.filter((item) => item.year !== pendingYearTrim.year);
+    const noted = dropped.filter((item) => item.blurb.trim().length > 0);
+    const names = formatTitleList(dropped.map((d) => d.title));
+    const typeSwitch = pendingYearTrim.listType !== listType;
+    const lead = typeSwitch
+      ? `Switching to GOTY ${pendingYearTrim.year}`
+      : `Changing the year to ${pendingYearTrim.year}`;
+    const base = `${lead} removes ${
+      dropped.length === 1 ? "a game" : `${dropped.length} games`
+    } (${names}).`;
+    if (noted.length === 0) return base;
+    return `${base} Notes on those games will be lost.`;
+  })();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 lg:pb-0">
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
         <label className="min-w-[12rem] flex-1 text-sm tracking-wide text-muted">
           Title
@@ -279,10 +473,39 @@ export function ListEditor({
           </div>
         </div>
 
+        <div className="text-sm tracking-wide text-muted">
+          Format
+          <div
+            role="group"
+            aria-label="List format"
+            className="mt-1 flex overflow-hidden border border-line"
+          >
+            <button
+              type="button"
+              onClick={() => setListFormat("poster")}
+              aria-pressed={listFormat === "poster"}
+              className={segmentBtnCls(listFormat === "poster")}
+            >
+              Poster
+            </button>
+            <button
+              type="button"
+              onClick={() => setListFormat("list")}
+              aria-pressed={listFormat === "list"}
+              className={segmentBtnCls(listFormat === "list")}
+            >
+              List
+            </button>
+          </div>
+        </div>
+
         <div ref={settingsRef} className="relative self-end">
           <button
             type="button"
-            onClick={() => setSettingsOpen((o) => !o)}
+            onClick={() => {
+              if (settingsOpen) closeSettings();
+              else openSettings();
+            }}
             aria-expanded={settingsOpen}
             aria-haspopup="dialog"
             aria-label="List settings"
@@ -309,30 +532,71 @@ export function ListEditor({
                   aria-label="List type"
                   className="flex overflow-hidden border border-line"
                 >
-                  <Link
-                    href={`/create/goty?id=${publicId}`}
-                    className={`flex-1 text-center ${segmentBtnCls(listType === "goty")}`}
+                  <button
+                    type="button"
+                    onClick={() => setListTypeChoice("goty")}
+                    aria-pressed={listType === "goty"}
+                    className={`flex-1 ${segmentBtnCls(listType === "goty")}`}
                   >
                     GOTY
-                  </Link>
-                  <Link
-                    href={`/create/custom?id=${publicId}`}
-                    className={`flex-1 text-center ${segmentBtnCls(listType === "custom")}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setListTypeChoice("custom")}
+                    aria-pressed={listType === "custom"}
+                    className={`flex-1 ${segmentBtnCls(listType === "custom")}`}
                   >
                     Custom
-                  </Link>
+                  </button>
                 </div>
                 {listType === "goty" ? (
                   <label className="mt-2 block text-sm tracking-wide text-muted">
                     Year
                     <input
                       type="number"
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
+                      value={Number.isFinite(draftYear) ? draftYear : ""}
+                      onChange={(e) => setDraftYear(Number(e.target.value))}
+                      onBlur={() => requestYearTrim(draftYear, "goty")}
                       className="mt-1 block w-full border border-line bg-paper px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                     />
                   </label>
                 ) : null}
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+                  Rank style
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    role="group"
+                    aria-label="Rank style"
+                    className="flex overflow-hidden border border-line"
+                  >
+                    {EXPORT_RANK_STYLES.map((style) => (
+                      <button
+                        key={style.id}
+                        type="button"
+                        onClick={() => setRankStyle(style.id)}
+                        aria-pressed={rankStyle === style.id}
+                        className={segmentBtnCls(rankStyle === style.id)}
+                      >
+                        {style.label}
+                      </button>
+                    ))}
+                  </div>
+                  {rankStyle !== "off" ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowSuffix((s) => !s)}
+                      aria-pressed={showSuffix}
+                      title="Toggle ordinal suffix (1st vs 1)"
+                      className={toggleCls(showSuffix)}
+                    >
+                      {showSuffix ? "Suffix on" : "Suffix off"}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </div>
           ) : null}
@@ -346,6 +610,14 @@ export function ListEditor({
             disabled={pending}
           >
             {pending ? "Saving…" : "Save"}
+          </Button>
+          <Button
+            type="button"
+            variant="bordered"
+            onClick={() => setExportOpen(true)}
+            disabled={items.length === 0}
+          >
+            Export image
           </Button>
           <form action={publishListAction}>
             <input type="hidden" name="publicId" value={publicId} />
@@ -389,110 +661,109 @@ export function ListEditor({
         </aside>
 
         <section className="min-w-0">
-          {items.length === 0 ? (
-            <button
-              type="button"
-              onClick={focusSearch}
-              className="w-full border border-dashed border-line px-4 py-10 text-left text-muted transition-colors hover:border-accent hover:text-ink"
-            >
-              Search and add games to build your ranking.
-            </button>
+          {listFormat === "poster" ? (
+            <>
+              <PosterBuilder
+                items={items.map((item) => ({
+                  id: item.gameId,
+                  title: item.title,
+                  coverUrl: item.coverUrl,
+                }))}
+                slotCount={slotCount}
+                year={yearNum}
+                title={title}
+                listType={listType}
+                rankStyle={rankStyle}
+                rankFormat={rankFormat}
+                showYearBadge={showYearBadge}
+                showTopCount={showTopCount}
+                onReorder={reorder}
+                onRemove={removeGame}
+                onPickEmpty={focusSearch}
+              />
+              <p className="mt-2 text-center text-xs text-muted">
+                {items.length === 0
+                  ? "Tap an empty slot or search to add games."
+                  : "Drag cards to reorder. Tap an empty slot to add more."}
+              </p>
+            </>
           ) : (
-            <ol className="space-y-3">
-              {items.map((item, index) => (
-                <li
-                  key={item.gameId}
-                  className="flex items-stretch border border-line bg-panel"
-                >
-                  <div className="flex w-10 shrink-0 items-start justify-center pt-2">
-                    <RankMarker rank={index + 1} size="sm" />
-                  </div>
-                  <div className="h-28 w-[5.25rem] shrink-0 self-start">
-                    <GameCover title={item.title} imageUrl={item.coverUrl} />
-                  </div>
-                  <div className="flex min-h-28 min-w-0 flex-1 flex-col justify-between gap-2 p-2 pr-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium leading-tight text-ink">
-                          {item.title}
-                        </p>
-                        <p className="text-xs text-muted">
-                          {item.year ?? "TBA"}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => removeAt(index)}
-                        className="shrink-0 px-1.5 py-0.5 text-xs text-muted transition-colors hover:text-accent"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => move(index, -1)}
-                        disabled={index === 0}
-                        aria-label="Move up"
-                        className="px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30"
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => move(index, 1)}
-                        disabled={index === items.length - 1}
-                        aria-label="Move down"
-                        className="px-2 py-1 text-xs text-muted hover:text-ink disabled:opacity-30"
-                      >
-                        ↓
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          )}
-
-          {emptySlots > 0 ? (
-            <div className="mt-3 space-y-2">
-              {Array.from({ length: Math.min(emptySlots, 3) }).map((_, i) => (
+            <>
+              {items.length === 0 ? (
                 <button
-                  key={`empty-${i}`}
                   type="button"
                   onClick={focusSearch}
-                  className="flex w-full items-center gap-3 border border-dashed border-line px-3 py-4 text-left text-sm text-muted transition-colors hover:border-accent hover:text-ink"
+                  className="w-full border border-dashed border-line px-4 py-10 text-left text-muted transition-colors hover:border-accent hover:text-ink"
                 >
-                  <span className="font-display text-lg text-accent/50">
-                    {items.length + i + 1}
-                  </span>
-                  Empty slot — add a game
+                  Search and add games to build your ranking. Notes show on the
+                  share page.
                 </button>
-              ))}
-              {emptySlots > 3 ? (
-                <p className="text-xs text-muted">
-                  +{emptySlots - 3} more empty slots
-                </p>
+              ) : (
+                <DndContext
+                  sensors={notesSensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={onNotesDragEnd}
+                >
+                  <SortableContext
+                    items={items.map((item) => item.gameId)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <ol className="space-y-3">
+                      {items.map((item, index) => (
+                        <NotesCard
+                          key={item.gameId}
+                          item={item}
+                          rank={index + 1}
+                          onBlurbChange={setBlurb}
+                          onRemove={removeGame}
+                        />
+                      ))}
+                    </ol>
+                  </SortableContext>
+                </DndContext>
+              )}
+
+              {emptySlots > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {Array.from({ length: Math.min(emptySlots, 3) }).map((_, i) => (
+                    <button
+                      key={`empty-${i}`}
+                      type="button"
+                      onClick={focusSearch}
+                      className="flex w-full items-center gap-3 border border-dashed border-line px-3 py-4 text-left text-sm text-muted transition-colors hover:border-accent hover:text-ink"
+                    >
+                      <span className="font-display text-lg text-accent/50">
+                        {items.length + i + 1}
+                      </span>
+                      Empty slot — add a game
+                    </button>
+                  ))}
+                  {emptySlots > 3 ? (
+                    <p className="text-xs text-muted">
+                      +{emptySlots - 3} more empty slots
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-          ) : null}
 
-          {!isFull ? (
-            <button
-              type="button"
-              onClick={focusSearch}
-              className="mt-3 text-xs font-extrabold uppercase tracking-[0.14em] text-accent transition-opacity hover:opacity-80"
-            >
-              + Add game
-            </button>
-          ) : null}
+              {!isFull ? (
+                <button
+                  type="button"
+                  onClick={focusSearch}
+                  className="mt-3 text-xs font-extrabold uppercase tracking-[0.14em] text-accent transition-opacity hover:opacity-80"
+                >
+                  + Add game
+                </button>
+              ) : null}
 
-          <p className="mt-4 text-xs text-muted">
-            {items.length} of {slotCount} slots
-            {slotCount < LIST_MAX_ITEMS
-              ? ` · capacity up to ${LIST_MAX_ITEMS}`
-              : null}
-          </p>
+              <p className="mt-4 text-xs text-muted">
+                {items.length} of {slotCount} slots
+                {slotCount < LIST_MAX_ITEMS
+                  ? ` · capacity up to ${LIST_MAX_ITEMS}`
+                  : null}
+              </p>
+            </>
+          )}
         </section>
       </div>
 
@@ -540,6 +811,23 @@ export function ListEditor({
         </button>
       </nav>
 
+      <ListExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        games={items.map((item) => ({
+          id: item.gameId,
+          title: item.title,
+          imageUrl: item.coverUrl,
+        }))}
+        year={yearNum}
+        title={title}
+        listType={listType}
+        rankStyle={rankStyle}
+        rankFormat={rankFormat}
+        showYearBadge={showYearBadge}
+        showTopCount={showTopCount}
+      />
+
       <SlotPickerDialog
         open={slotPickerOpen}
         value={slotCount}
@@ -553,12 +841,27 @@ export function ListEditor({
         <ConfirmDialog
           open
           title="Shrink list?"
-          message={`Shrinking to ${pendingTrim} removes ${items.length - pendingTrim} ${
-            items.length - pendingTrim === 1 ? "game" : "games"
-          } from the bottom of your ranking.`}
+          message={trimMessage}
           confirmLabel="Shrink anyway"
           onCancel={() => setPendingTrim(null)}
           onConfirm={() => applySlotCount(pendingTrim)}
+        />
+      ) : null}
+
+      {pendingYearTrim != null ? (
+        <ConfirmDialog
+          open
+          title="Remove games?"
+          message={yearTrimMessage}
+          confirmLabel="Remove anyway"
+          onCancel={() => {
+            setYear(String(committedYearRef.current));
+            setDraftYear(committedYearRef.current);
+            setPendingYearTrim(null);
+          }}
+          onConfirm={() => {
+            applyYearTrim(pendingYearTrim.year, pendingYearTrim.listType);
+          }}
         />
       ) : null}
     </div>
@@ -631,6 +934,82 @@ function SearchGamesPanelBody({
         )}
       </div>
     </div>
+  );
+}
+
+function NotesCard({
+  item,
+  rank,
+  onBlurbChange,
+  onRemove,
+}: {
+  item: EditorItem;
+  rank: number;
+  onBlurbChange: (id: string, blurb: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.gameId });
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`flex items-stretch border border-line bg-panel ${
+        isDragging ? "z-10 opacity-90 shadow-lg" : ""
+      }`}
+    >
+      <div className="flex w-10 shrink-0 items-start justify-center pt-2">
+        <RankMarker rank={rank} size="sm" />
+      </div>
+      <div className="h-28 w-[5.25rem] shrink-0 self-start">
+        <GameCover title={item.title} imageUrl={item.coverUrl} />
+      </div>
+      <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2 pr-1">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight text-ink">
+              {item.title}
+            </p>
+            <p className="text-xs text-muted">{item.year ?? "TBA"}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onRemove(item.gameId)}
+            className="shrink-0 px-1.5 py-0.5 text-xs text-muted transition-colors hover:text-accent"
+          >
+            Remove
+          </button>
+        </div>
+        <textarea
+          value={item.blurb}
+          onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
+          placeholder="Optional note / review"
+          rows={2}
+          className="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-2 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus:border-accent"
+        />
+      </div>
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${item.title}`}
+        className="flex w-8 shrink-0 cursor-grab touch-none items-center justify-center border-l border-line text-muted transition-colors hover:bg-paper hover:text-ink active:cursor-grabbing"
+      >
+        ⠿
+      </button>
+    </li>
   );
 }
 

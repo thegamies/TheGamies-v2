@@ -131,6 +131,7 @@ async function loadListItems(listId: string, db: Db) {
     .select({
       id: listItems.id,
       rank: listItems.rank,
+      blurb: listItems.blurb,
       gameId: games.id,
       slug: games.slug,
       title: games.title,
@@ -146,6 +147,7 @@ async function loadListItems(listId: string, db: Db) {
   return rows.map((r) => ({
     id: r.id,
     rank: r.rank,
+    blurb: r.blurb,
     gameId: r.gameId,
     slug: r.slug,
     title: r.title,
@@ -169,11 +171,24 @@ export async function updateListMeta(
 
   const patch: Partial<ListRow> = { updatedAt: new Date() };
   if (parsed.data.title != null) patch.title = parsed.data.title;
+  if (parsed.data.listType != null) {
+    patch.listType = parsed.data.listType;
+    if (parsed.data.listType === "goty" && parsed.data.year == null && list.year == null) {
+      return { error: "GOTY lists need a year." };
+    }
+    if (parsed.data.listType === "goty" && !parsed.data.title && list.listType !== "goty") {
+      const y = parsed.data.year ?? list.year;
+      if (y != null) patch.title = defaultGotyTitle(y);
+    }
+  }
   if (parsed.data.year != null) {
-    if (list.listType === "goty") {
+    if ((parsed.data.listType ?? list.listType) === "goty") {
       patch.year = parsed.data.year;
       if (list.profileId) {
         patch.slug = gotySlugForYear(parsed.data.year);
+      }
+      if ((parsed.data.listType ?? list.listType) === "goty" && !parsed.data.title) {
+        patch.title = defaultGotyTitle(parsed.data.year);
       }
     } else {
       patch.year = parsed.data.year;
@@ -259,6 +274,7 @@ export async function replaceItems(
       listId: list.id,
       gameId: item.gameId,
       rank: item.rank,
+      blurb: item.blurb?.trim() ? item.blurb.trim() : null,
     })),
   );
   await db

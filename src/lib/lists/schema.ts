@@ -31,6 +31,7 @@ export const createDraftSchema = z.discriminatedUnion("listType", [
 export const listItemInputSchema = z.object({
   gameId: z.string().uuid(),
   rank: z.number().int().min(1).max(LIST_MAX_ITEMS),
+  blurb: z.string().trim().max(500).optional().nullable(),
 });
 
 export const replaceItemsSchema = z
@@ -62,4 +63,5 @@ export const replaceItemsSchema = z
 export const updateListMetaSchema = z.object({
   title: listTitleSchema.optional(),
   year: listYearSchema.optional(),
+  listType: listTypeSchema.optional(),
 });

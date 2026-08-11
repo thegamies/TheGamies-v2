@@ -32,12 +32,12 @@ describe("normalizeRanks", () => {
   it("makes ranks contiguous by sort order", () => {
     expect(
       normalizeRanks([
-        { gameId: "b", rank: 5 },
+        { gameId: "b", rank: 5, blurb: "note" },
         { gameId: "a", rank: 2 },
       ]),
     ).toEqual([
       { gameId: "a", rank: 1 },
-      { gameId: "b", rank: 2 },
+      { gameId: "b", rank: 2, blurb: "note" },
     ]);
   });
 });

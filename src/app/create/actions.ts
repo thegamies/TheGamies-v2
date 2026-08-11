@@ -96,13 +96,19 @@ export async function saveListItemsAction(
   const access = await accessFor(publicId);
   const title = String(formData.get("title") ?? "").trim();
   const yearRaw = String(formData.get("year") ?? "").trim();
+  const listTypeRaw = String(formData.get("listType") ?? "").trim();
+  const listType =
+    listTypeRaw === "goty" || listTypeRaw === "custom"
+      ? listTypeRaw
+      : undefined;
 
-  if (title || yearRaw) {
+  if (title || yearRaw || listType) {
     const meta = await updateListMeta(
       publicId,
       {
         title: title || undefined,
         year: yearRaw ? Number(yearRaw) : undefined,
+        listType,
       },
       access,
     );
@@ -134,12 +140,18 @@ export async function publishListAction(formData: FormData) {
     }
     const title = String(formData.get("title") ?? "").trim();
     const yearRaw = String(formData.get("year") ?? "").trim();
-    if (title || yearRaw) {
+    const listTypeRaw = String(formData.get("listType") ?? "").trim();
+    const listType =
+      listTypeRaw === "goty" || listTypeRaw === "custom"
+        ? listTypeRaw
+        : undefined;
+    if (title || yearRaw || listType) {
       const meta = await updateListMeta(
         publicId,
         {
           title: title || undefined,
           year: yearRaw ? Number(yearRaw) : undefined,
+          listType,
         },
         access,
       );

@@ -228,6 +228,7 @@ export const listItems = pgTable(
       .notNull()
       .references(() => games.id, { onDelete: "cascade" }),
     rank: integer("rank").notNull(),
+    blurb: text("blurb"),
   },
   (t) => [
     uniqueIndex("list_items_list_rank_uidx").on(t.listId, t.rank),

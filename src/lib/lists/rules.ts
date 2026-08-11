@@ -1,6 +1,10 @@
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
 
-export type RankedGameRef = { gameId: string; rank: number };
+export type RankedGameRef = {
+  gameId: string;
+  rank: number;
+  blurb?: string | null;
+};
 
 export type GotyGameCandidate = {
   id: string;
@@ -10,11 +14,13 @@ export type GotyGameCandidate = {
   isAdult: boolean;
 };
 
-/** Sort by rank and reassign contiguous 1..n. */
-export function normalizeRanks(items: RankedGameRef[]): RankedGameRef[] {
+/** Sort by rank and reassign contiguous 1..n (preserves blurb and other fields). */
+export function normalizeRanks<T extends RankedGameRef>(
+  items: T[],
+): Array<T & { rank: number }> {
   return [...items]
     .sort((a, b) => a.rank - b.rank)
-    .map((item, index) => ({ gameId: item.gameId, rank: index + 1 }));
+    .map((item, index) => ({ ...item, rank: index + 1 }));
 }
 
 export function assertWithinMaxItems(count: number): string | null {
@@ -46,6 +52,17 @@ export function gotyEligibilityError(
     return "Upcoming titles cannot be added to GOTY lists.";
   }
   return null;
+}
+
+/** Client-side GOTY filter (year match + already released when date known). */
+export function isAllowedOnGotyList(
+  game: { year: number | null; firstReleaseDate?: Date | null },
+  gotyYear: number,
+  now: Date = new Date(),
+): boolean {
+  if (game.year != null && game.year !== gotyYear) return false;
+  if (game.firstReleaseDate && game.firstReleaseDate > now) return false;
+  return true;
 }
 
 /** Slug for owned custom lists. */

@@ -39,6 +39,7 @@ export default async function CreateGotyPage({
       year: number | null;
       coverUrl: string | null;
       rank: number;
+      blurb: string;
     }[];
   } | null = null;
   let loadError: string | null = error;
@@ -77,6 +78,7 @@ export default async function CreateGotyPage({
           year: item.year,
           coverUrl: item.coverUrl,
           rank: item.rank,
+          blurb: item.blurb ?? "",
         })),
       };
     }

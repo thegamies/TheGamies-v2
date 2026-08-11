@@ -19,6 +19,18 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 5. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret.
 6. **Reset** deletes the draft (and items), clears the cookie, starts fresh.
 
+## Builder
+
+Create UI mirrors the Social Gamer Card prototype:
+
+- Poster or List format
+- Size presets (5 / 10 / 20 / 50, max 100)
+- Rank chrome: Banner / Chip / Off (+ ordinal suffix)
+- Optional per-game notes (blurbs) on List format and the share page
+- Drag-and-drop reorder
+- Image export (JPEG poster)
+- Warnings when shrinking size or switching year/GOTY would drop games (and notes)
+
 ## Rules
 
 - Up to **100** ranked games; ranks are contiguous 1..n.

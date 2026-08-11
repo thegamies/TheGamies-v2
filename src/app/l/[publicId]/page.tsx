@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { CopyLinkButton } from "@/components/lists/CopyLinkButton";
 import { SoftSavePrompt } from "@/components/lists/SoftSavePrompt";
+import { ShareExportButton } from "@/components/list-export/ShareExportButton";
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
@@ -142,6 +143,18 @@ export default async function SharedListPage({
               <Button type="button">Make your own</Button>
             </Link>
             <CopyLinkButton />
+            <ShareExportButton
+              games={data.items.map((item) => ({
+                id: item.gameId,
+                title: item.title,
+                imageUrl: item.coverUrl,
+              }))}
+              year={data.list.year ?? new Date().getUTCFullYear()}
+              title={data.list.title}
+              listType={
+                data.list.listType === "custom" ? "custom" : "goty"
+              }
+            />
             {canEdit ? (
               <Link href={editHref}>
                 <Button type="button" variant="bordered">
@@ -158,7 +171,7 @@ export default async function SharedListPage({
                 <div className="w-16 shrink-0 sm:w-20">
                   <GameCover title={item.title} imageUrl={item.coverUrl} />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <Link
                     href={`/games/${item.slug}`}
                     className="block truncate text-lg text-ink hover:text-accent"
@@ -167,6 +180,11 @@ export default async function SharedListPage({
                   </Link>
                   {item.year ? (
                     <p className="text-sm text-muted">{item.year}</p>
+                  ) : null}
+                  {item.blurb ? (
+                    <p className="mt-2 max-w-2xl font-serif text-muted">
+                      {item.blurb}
+                    </p>
                   ) : null}
                 </div>
               </li>
