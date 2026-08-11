@@ -28,6 +28,7 @@ import {
   normalizeRanks,
   slugifyListTitle,
 } from "@/lib/lists/rules";
+import { listSharePath } from "@/lib/lists/urls";
 import { z } from "zod";
 
 export type ListRow = typeof lists.$inferSelect;
@@ -106,9 +107,8 @@ export async function createDraft(
         listType: data.listType,
         title,
         year,
-        // Signed-in create attaches to the account immediately.
-        status: owned ? "published" : "draft",
-        publishedAt: owned ? now : null,
+        // Every DB list is shareable from creation.
+        publishedAt: now,
         slug,
       })
       .returning();
@@ -383,35 +383,20 @@ export async function replaceItems(
   return { items: await loadListItems(list.id, db) };
 }
 
-export async function publishList(
-  publicId: string,
-  access: { profileId?: string | null; editSecret?: string | null },
-  db: Db = getDb(),
-): Promise<{ list: ListRow } | { error: string }> {
-  const list = await getListByPublicId(publicId, db);
-  if (!list) return { error: "List not found." };
-  if (!canEditList(list, access)) return { error: "You cannot edit this list." };
-
-  const items = await db
-    .select({ id: listItems.id })
-    .from(listItems)
-    .where(eq(listItems.listId, list.id))
-    .limit(1);
-  if (items.length === 0) {
-    return { error: "Add at least one game before publishing." };
-  }
-
+async function ensurePublishedAt(
+  list: ListRow,
+  db: Db,
+): Promise<ListRow> {
+  if (list.publishedAt) return list;
   const [updated] = await db
     .update(lists)
     .set({
-      status: "published",
-      publishedAt: list.publishedAt ?? new Date(),
+      publishedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(lists.id, list.id))
     .returning();
-
-  return { list: updated };
+  return updated;
 }
 
 export async function claimList(
@@ -510,20 +495,26 @@ export async function resetDraft(
   const list = await getListByPublicId(publicId, db);
   if (!list) return { error: "List not found." };
   if (!canEditList(list, access)) return { error: "You cannot reset this list." };
-  if (list.status !== "draft") {
-    return { error: "Only drafts can be reset." };
+  if (list.profileId != null) {
+    return { error: "Only anonymous lists can be reset." };
   }
 
   await db.delete(lists).where(eq(lists.id, list.id));
   return { ok: true };
 }
 
-export async function getPublishedByPublicId(
+export type ShareListPayload = {
+  list: ListRow;
+  items: Awaited<ReturnType<typeof loadListItems>>;
+  owner: { username: string; displayName: string } | null;
+};
+
+export async function getShareListByPublicId(
   publicId: string,
   db: Db = getDb(),
-) {
+): Promise<ShareListPayload | null> {
   const list = await getListByPublicId(publicId, db);
-  if (!list || list.status !== "published") return null;
+  if (!list) return null;
 
   const items = await loadListItems(list.id, db);
   let owner: { username: string; displayName: string } | null = null;
@@ -547,7 +538,36 @@ export async function getPublishedByPublicId(
   return { list, items, owner };
 }
 
-export async function listPublishedForProfile(
+export async function getShareListByUsernameSlug(
+  username: string,
+  slug: string,
+  db: Db = getDb(),
+): Promise<ShareListPayload | null> {
+  const [row] = await db
+    .select({
+      list: lists,
+      username: profiles.username,
+      displayName: profiles.displayName,
+    })
+    .from(lists)
+    .innerJoin(profiles, eq(profiles.id, lists.profileId))
+    .where(and(eq(profiles.username, username), eq(lists.slug, slug)))
+    .limit(1);
+
+  if (!row) return null;
+
+  const items = await loadListItems(row.list.id, db);
+  return {
+    list: row.list,
+    items,
+    owner: {
+      username: row.username,
+      displayName: row.displayName,
+    },
+  };
+}
+
+export async function listOwnedForProfile(
   profileId: string,
   db: Db = getDb(),
 ) {
@@ -561,24 +581,31 @@ export async function listPublishedForProfile(
       publishedAt: lists.publishedAt,
     })
     .from(lists)
-    .where(
-      and(
-        eq(lists.profileId, profileId),
-        eq(lists.status, "published"),
-      ),
-    )
+    .where(eq(lists.profileId, profileId))
     .orderBy(asc(lists.year), asc(lists.title));
 }
 
-export async function peekDraftFromCookie(
-  cookie: { publicId: string; secret: string } | null,
+export async function getListShareTarget(
+  list: Pick<ListRow, "publicId" | "slug" | "profileId">,
   db: Db = getDb(),
-): Promise<ListRow | null> {
-  if (!cookie) return null;
-  const list = await getListByPublicId(cookie.publicId, db);
-  if (!list || list.status !== "draft") return null;
-  if (!canEditList(list, { editSecret: cookie.secret })) return null;
-  return list;
+): Promise<{ path: string }> {
+  if (list.profileId && list.slug) {
+    const [profile] = await db
+      .select({ username: profiles.username })
+      .from(profiles)
+      .where(eq(profiles.id, list.profileId))
+      .limit(1);
+    if (profile?.username) {
+      return {
+        path: listSharePath({
+          publicId: list.publicId,
+          slug: list.slug,
+          username: profile.username,
+        }),
+      };
+    }
+  }
+  return { path: listSharePath({ publicId: list.publicId }) };
 }
 
 type ClientDraftItem = {
@@ -781,13 +808,9 @@ export async function shareListFromClientDraft(
   );
   if ("error" in written) return written;
 
-  const published = await publishList(list.publicId, {
-    profileId: access.profileId,
-    editSecret: editSecret ?? access.editSecret,
-  }, db);
-  if ("error" in published) return published;
+  list = await ensurePublishedAt(list, db);
 
-  return { list: published.list, editSecret };
+  return { list, editSecret };
 }
 
 export async function saveOwnedListFromClientDraft(
@@ -893,16 +916,7 @@ export async function saveOwnedListFromClientDraft(
     if (!("error" in claimed)) list = claimed.list;
   }
 
-  if (data.items.length === 0) {
-    return { list };
-  }
+  list = await ensurePublishedAt(list, db);
 
-  const published = await publishList(
-    list.publicId,
-    { profileId: access.profileId },
-    db,
-  );
-  if ("error" in published) return published;
-
-  return { list: published.list };
+  return { list };
 }

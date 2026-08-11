@@ -2,10 +2,8 @@ import { z } from "zod";
 
 export const LIST_MAX_ITEMS = 100;
 export const LIST_TYPES = ["goty", "custom"] as const;
-export const LIST_STATUSES = ["draft", "published"] as const;
 
 export const listTypeSchema = z.enum(LIST_TYPES);
-export const listStatusSchema = z.enum(LIST_STATUSES);
 
 export const listTitleSchema = z.string().trim().min(1).max(120);
 

@@ -17,6 +17,7 @@ import {
   claimList,
   createDraft,
   getEditableList,
+  getListShareTarget,
   getOwnedGotyForYear,
   hydrateGamesByIgdbIds,
   resetDraft,
@@ -237,8 +238,9 @@ export async function shareListAction(formData: FormData) {
     await clearListDraftCookie();
   }
 
-  revalidatePath(`/l/${result.list.publicId}`);
-  redirect(`/l/${result.list.publicId}`);
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  redirect(share.path);
 }
 
 export async function resetActiveDraftAction() {
@@ -273,9 +275,10 @@ export async function claimListAction(formData: FormData) {
   }
   await clearListEditCookie();
   await clearListDraftCookie();
-  revalidatePath(`/l/${publicId}`);
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
   revalidatePath(`/u/${profile.username}`);
-  redirect(`/l/${publicId}?saved=1`);
+  redirect(`${share.path}?saved=1`);
 }
 
 export async function loadEditorState(publicId: string) {

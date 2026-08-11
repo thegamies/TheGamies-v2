@@ -188,7 +188,7 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-/** Personal GOTY or custom ranked list. Drafts are private; published share via publicId. */
+/** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
 export const lists = pgTable(
   "lists",
   {
@@ -202,7 +202,6 @@ export const lists = pgTable(
     title: text("title").notNull(),
     year: integer("year"),
     slug: text("slug"),
-    status: text("status").notNull().default("draft"),
     publishedAt: timestamp("published_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
