@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  discardAnonDraftAction,
-  startCustomDraftAction,
-} from "@/app/create/actions";
+import { startCustomDraftAction } from "@/app/create/actions";
+import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  draftMatchesCustom,
+  editorSeedFromDraft,
+} from "@/lib/lists/anon-editor-seed";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import {
@@ -99,6 +101,45 @@ export default async function CreateCustomPage({
           blurb: signedIn ? (item.blurb ?? "") : "",
         })),
       };
+
+      if (!signedIn) {
+        const draft = await readListDraftCookie();
+        if (
+          draft &&
+          draft.publicId === publicId &&
+          draft.listType === "custom"
+        ) {
+          const games = await hydrateGamesByIgdbIds(draft.igdbIds);
+          const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
+          editor = {
+            publicId,
+            title: draft.title || editor.title,
+            year: draft.year ?? editor.year,
+            slotCount: draft.slotCount,
+            listFormat: draft.listFormat,
+            rankStyle: draft.rankStyle,
+            showSuffix: draft.showSuffix,
+            items: draft.igdbIds
+              .map((id, index) => {
+                const game = byIgdb.get(id);
+                if (!game) return null;
+                return {
+                  gameId: game.gameId,
+                  igdbId: game.igdbId,
+                  slug: game.slug,
+                  title: game.title,
+                  year: game.year,
+                  coverUrl: game.coverUrl,
+                  rank: index + 1,
+                  blurb: "",
+                };
+              })
+              .filter(
+                (item): item is NonNullable<typeof item> => Boolean(item),
+              ),
+          };
+        }
+      }
     }
   } else if (!signedIn && resume) {
     const draft = await readListDraftCookie();
@@ -138,9 +179,12 @@ export default async function CreateCustomPage({
       yearParam && Number.isFinite(Number(yearParam))
         ? Math.floor(Number(yearParam))
         : null;
+    const title = titleParam.trim();
     const existingDraft = await readListDraftCookie();
-    if (existingDraft) {
-      const params = new URLSearchParams({ title: titleParam.trim() });
+    if (existingDraft && draftMatchesCustom(existingDraft, title)) {
+      editor = await editorSeedFromDraft(existingDraft);
+    } else if (existingDraft) {
+      const params = new URLSearchParams({ title });
       if (year != null) params.set("year", String(year));
       return (
         <div>
@@ -165,28 +209,22 @@ export default async function CreateCustomPage({
               >
                 <Button type="button">Continue editing</Button>
               </Link>
-              <form action={discardAnonDraftAction}>
-                <input
-                  type="hidden"
-                  name="next"
-                  value={`/create/custom?${params.toString()}`}
-                />
-                <Button type="submit" variant="bordered">
-                  Start a new list
-                </Button>
-              </form>
+              <DiscardAnonDraftButton
+                next={`/create/custom?${params.toString()}`}
+              />
             </div>
           </div>
         </div>
       );
+    } else {
+      editor = {
+        publicId: null,
+        title,
+        year,
+        slotCount: 10,
+        items: [],
+      };
     }
-    editor = {
-      publicId: null,
-      title: titleParam.trim(),
-      year,
-      slotCount: 10,
-      items: [],
-    };
   }
 
   return (

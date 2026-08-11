@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/lists/CopyLinkButton";
+import { RefreshOnBfcache } from "@/components/lists/RefreshOnBfcache";
 import { SoftSavePrompt } from "@/components/lists/SoftSavePrompt";
 import { ShareExportButton } from "@/components/list-export/ShareExportButton";
 import { Button } from "@/components/ui/Button";
@@ -30,6 +31,7 @@ export function SharedListView({
 }: SharedListViewProps) {
   return (
     <main className="relative mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+      <RefreshOnBfcache />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,90,31,0.12),_transparent_55%)]" />
       <div className="relative">
         {data.list.year ? (

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { discardAnonDraftAction } from "@/app/create/actions";
+import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
@@ -54,11 +54,7 @@ export default async function CreateChooserPage() {
             <Link href={resumeHref(draft)}>
               <Button type="button">Continue editing</Button>
             </Link>
-            <form action={discardAnonDraftAction}>
-              <Button type="submit" variant="bordered">
-                Start a new list
-              </Button>
-            </form>
+            <DiscardAnonDraftButton />
           </div>
         </div>
       ) : (

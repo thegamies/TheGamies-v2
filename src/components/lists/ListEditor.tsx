@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -31,6 +32,8 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   saveOwnedListAction,
   shareListAction,
+  syncSharedListAction,
+  hydrateDraftGamesAction,
 } from "@/app/create/actions";
 import {
   searchGamesForList,
@@ -58,9 +61,12 @@ import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import {
   buildListDraftPayload,
+  draftMatchesEditor,
+  readListDraftClient,
   writeListDraftCookieClient,
 } from "@/lib/lists/draft-cookie";
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 const SLOT_PRESETS = [5, 10, 20, 50] as const;
 
@@ -100,6 +106,25 @@ function formatTitleList(names: string[]): string {
   return `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
 }
 
+function persistSnapshot(input: {
+  listType: "goty" | "custom";
+  title: string;
+  year: string;
+  items: EditorItem[];
+}): string {
+  return JSON.stringify({
+    listType: input.listType,
+    title: input.title,
+    year: input.year,
+    items: input.items.map((item, index) => ({
+      igdbId: item.igdbId,
+      gameId: item.gameId,
+      rank: index + 1,
+      blurb: item.blurb,
+    })),
+  });
+}
+
 export function ListEditor({
   publicId: initialPublicId = null,
   listType: initialListType,
@@ -118,6 +143,19 @@ export function ListEditor({
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const committedYearRef = useRef(initialYear ?? currentYear);
+  const [savedSnapshot, setSavedSnapshot] = useState(() =>
+    persistSnapshot({
+      listType: initialListType,
+      title: initialTitle,
+      year: (initialYear ?? new Date().getUTCFullYear()).toString(),
+      items: withRanks(
+        initialItems.map((item) => ({
+          ...item,
+          blurb: item.blurb ?? "",
+        })),
+      ),
+    }),
+  );
 
   const [publicId, setPublicId] = useState<string | null>(
     initialPublicId ?? null,
@@ -148,6 +186,7 @@ export function ListEditor({
   const [saveError, setSaveError] = useState<string | null>(error);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [draftReady, setDraftReady] = useState(() => signedIn);
   const [pending, startTransition] = useTransition();
   const [searchPending, startSearch] = useTransition();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -169,6 +208,10 @@ export function ListEditor({
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
   const emptySlots = Math.max(0, slotCount - items.length);
   const signInHref = `/auth/sign-in?next=${encodeURIComponent(pathname)}`;
+  const dirty =
+    signedIn &&
+    persistSnapshot({ listType, title, year, items }) !== savedSnapshot;
+  const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -184,25 +227,147 @@ export function ListEditor({
     return () => window.clearTimeout(handle);
   }, [query, yearNum, listType]);
 
+  // Restore anon draft BEFORE any cookie write — remounting an empty editor
+  // used to wipe the saved draft on back/forward.
+  useLayoutEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- sync restore from device storage before paint */
+    if (signedIn) {
+      setDraftReady(true);
+      return;
+    }
+
+    const draft = readListDraftClient();
+    if (!draft || !draftMatchesEditor(draft, { listType, yearNum })) {
+      setDraftReady(true);
+      return;
+    }
+    if (draft.igdbIds.length === 0) {
+      setDraftReady(true);
+      return;
+    }
+
+    const draftIds = draft.igdbIds.join(",");
+    const currentIds = items.map((item) => item.igdbId).join(",");
+    if (currentIds === draftIds) {
+      setDraftReady(true);
+      return;
+    }
+
+    if (draft.games && draft.games.length > 0) {
+      const byIgdb = new Map(draft.games.map((g) => [g.igdbId, g]));
+      const nextItems = draft.igdbIds
+        .map((id, index) => {
+          const game = byIgdb.get(id);
+          if (!game) return null;
+          return {
+            gameId: game.gameId,
+            igdbId: game.igdbId,
+            slug: game.slug,
+            title: game.title,
+            year: game.year,
+            coverUrl: game.coverUrl,
+            rank: index + 1,
+            blurb: "",
+          } satisfies EditorItem;
+        })
+        .filter((item): item is EditorItem => Boolean(item));
+      if (nextItems.length > 0) {
+        setItems(withRanks(nextItems));
+        setSlotCount(Math.max(draft.slotCount, nextItems.length));
+        setTitle(draft.title);
+        if (draft.year != null) setYear(String(draft.year));
+        if (draft.listFormat) setListFormat(draft.listFormat);
+        if (draft.rankStyle) setRankStyle(draft.rankStyle);
+        if (typeof draft.showSuffix === "boolean") {
+          setShowSuffix(draft.showSuffix);
+        }
+        if (draft.publicId) setPublicId(draft.publicId);
+      }
+      setDraftReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    void hydrateDraftGamesAction(draft.igdbIds).then((games) => {
+      if (cancelled) return;
+      const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
+      const nextItems = draft.igdbIds
+        .map((id, index) => {
+          const game = byIgdb.get(id);
+          if (!game) return null;
+          return {
+            gameId: game.gameId,
+            igdbId: game.igdbId,
+            slug: game.slug,
+            title: game.title,
+            year: game.year,
+            coverUrl: game.coverUrl,
+            rank: index + 1,
+            blurb: "",
+          } satisfies EditorItem;
+        })
+        .filter((item): item is EditorItem => Boolean(item));
+      if (nextItems.length === 0) {
+        setDraftReady(true);
+        return;
+      }
+      setItems(withRanks(nextItems));
+      setSlotCount(Math.max(draft.slotCount, nextItems.length));
+      setTitle(draft.title);
+      if (draft.year != null) setYear(String(draft.year));
+      if (draft.listFormat) setListFormat(draft.listFormat);
+      if (draft.rankStyle) setRankStyle(draft.rankStyle);
+      if (typeof draft.showSuffix === "boolean") setShowSuffix(draft.showSuffix);
+      if (draft.publicId) setPublicId(draft.publicId);
+      setDraftReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    /* eslint-enable react-hooks/set-state-in-effect */
+    // Only on mount / list identity change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signedIn, listType, yearNum]);
+
   useEffect(() => {
-    if (signedIn) return;
-    const handle = window.setTimeout(() => {
-      const payload = buildListDraftPayload({
-        listType,
-        year: listType === "goty" ? yearNum : year ? yearNum : null,
-        title,
-        igdbIds: items.map((item) => item.igdbId),
-        slotCount,
-        listFormat,
-        rankStyle,
-        showSuffix,
-        publicId,
-      });
-      writeListDraftCookieClient(payload);
-    }, 300);
-    return () => window.clearTimeout(handle);
+    if (signedIn || !draftReady) return;
+
+    // Never clobber a richer saved draft with an empty remount.
+    if (items.length === 0) {
+      const existing = readListDraftClient();
+      if (
+        existing &&
+        existing.igdbIds.length > 0 &&
+        draftMatchesEditor(existing, { listType, yearNum })
+      ) {
+        return;
+      }
+    }
+
+    const payload = buildListDraftPayload({
+      listType,
+      year: listType === "goty" ? yearNum : year ? yearNum : null,
+      title,
+      igdbIds: items.map((item) => item.igdbId),
+      slotCount,
+      listFormat,
+      rankStyle,
+      showSuffix,
+      publicId,
+      games: items.map((item) => ({
+        gameId: item.gameId,
+        igdbId: item.igdbId,
+        slug: item.slug,
+        title: item.title,
+        year: item.year,
+        coverUrl: item.coverUrl,
+      })),
+    });
+    writeListDraftCookieClient(payload);
   }, [
     signedIn,
+    draftReady,
     listType,
     year,
     yearNum,
@@ -214,6 +379,45 @@ export function ListEditor({
     showSuffix,
     publicId,
   ]);
+
+  // Anon edits on an already-shared list must hit Postgres too — the share
+  // page loads from the DB, not the draft cookie.
+  useEffect(() => {
+    if (signedIn || !publicId) return;
+
+    function payloadJson() {
+      return JSON.stringify({
+        publicId,
+        listType,
+        title,
+        year: listType === "goty" ? yearNum : year ? yearNum : null,
+        items: items.map((item, index) => ({
+          igdbId: item.igdbId,
+          rank: index + 1,
+          blurb: null,
+        })),
+      });
+    }
+
+    const handle = window.setTimeout(() => {
+      void syncSharedListAction(payloadJson());
+    }, 600);
+
+    function flush() {
+      void syncSharedListAction(payloadJson());
+    }
+    function onVisibility() {
+      if (document.visibilityState === "hidden") flush();
+    }
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.clearTimeout(handle);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [signedIn, publicId, listType, title, year, yearNum, items]);
 
   const requestYearTrim = useCallback(
     (targetYear: number, nextListType: "goty" | "custom") => {
@@ -443,6 +647,14 @@ export function ListEditor({
         return;
       }
       if (result.publicId) setPublicId(result.publicId);
+      setSavedSnapshot(
+        persistSnapshot({
+          listType,
+          title,
+          year,
+          items,
+        }),
+      );
       setSaveError(null);
       setSaveNotice(null);
       setSavedFlash(true);
@@ -665,7 +877,12 @@ export function ListEditor({
           >
             {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
           </Button>
-          <form action={shareListAction}>
+          <form
+            action={shareListAction}
+            onSubmit={() => {
+              allowLeave();
+            }}
+          >
             <input
               type="hidden"
               name="draftJson"
@@ -685,6 +902,16 @@ export function ListEditor({
             Export
           </Button>
         </div>
+
+        {signedIn && dirty ? (
+          <p
+            className="w-full text-sm text-muted"
+            role="status"
+            data-testid="unsaved-changes"
+          >
+            Unsaved changes
+          </p>
+        ) : null}
 
         {saveNotice ? (
           <p className="w-full text-sm text-muted" role="status">
@@ -786,7 +1013,7 @@ export function ListEditor({
 
               {emptySlots > 0 ? (
                 <div className="mt-3 space-y-2">
-                  {Array.from({ length: Math.min(emptySlots, 3) }).map((_, i) => (
+                  {Array.from({ length: emptySlots }).map((_, i) => (
                     <button
                       key={`empty-${i}`}
                       type="button"
@@ -799,11 +1026,6 @@ export function ListEditor({
                       Empty slot — add a game
                     </button>
                   ))}
-                  {emptySlots > 3 ? (
-                    <p className="text-xs text-muted">
-                      +{emptySlots - 3} more empty slots
-                    </p>
-                  ) : null}
                 </div>
               ) : null}
 
@@ -925,6 +1147,8 @@ export function ListEditor({
           }}
         />
       ) : null}
+
+      {unsavedDialog}
     </div>
   );
 }

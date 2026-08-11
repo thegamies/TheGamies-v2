@@ -23,6 +23,7 @@ import {
   resetDraft,
   saveOwnedListFromClientDraft,
   shareListFromClientDraft,
+  syncExistingSharedListFromClientDraft,
 } from "@/lib/lists/service";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
@@ -175,8 +176,49 @@ export async function saveOwnedListAction(
 
   revalidatePath(`/create/goty`);
   revalidatePath(`/create/custom`);
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
   revalidatePath(`/l/${result.list.publicId}`);
   return { saved: true, publicId: result.list.publicId };
+}
+
+/** Anon (or owner) auto-persist while editing an existing shared list. */
+export async function syncSharedListAction(
+  draftJson: string,
+): Promise<{ error?: string; ok?: boolean; publicId?: string }> {
+  let draft: unknown;
+  try {
+    draft = JSON.parse(draftJson);
+  } catch {
+    return { error: "Could not save the ranking." };
+  }
+  if (!draft || typeof draft !== "object") {
+    return { error: "Could not save the ranking." };
+  }
+
+  const publicId =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+  if (!publicId) return { error: "List not found." };
+
+  const profileId = await currentProfileId();
+  const cookie = await readListEditCookie();
+  const editSecret =
+    cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await syncExistingSharedListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/l/${result.list.publicId}`);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  return { ok: true, publicId: result.list.publicId };
 }
 
 export async function shareListAction(formData: FormData) {

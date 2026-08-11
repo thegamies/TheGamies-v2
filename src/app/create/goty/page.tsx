@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  discardAnonDraftAction,
-  startGotyDraftAction,
-} from "@/app/create/actions";
+import { startGotyDraftAction } from "@/app/create/actions";
+import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  draftMatchesGoty,
+  editorSeedFromDraft,
+} from "@/lib/lists/anon-editor-seed";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import {
@@ -104,6 +106,47 @@ export default async function CreateGotyPage({
           blurb: signedIn ? (item.blurb ?? "") : "",
         })),
       };
+
+      // Prefer the device draft when it matches — anon edits land in the
+      // cookie immediately and may be ahead of the last DB sync.
+      if (!signedIn) {
+        const draft = await readListDraftCookie();
+        if (
+          draft &&
+          draft.publicId === publicId &&
+          draft.listType === "goty"
+        ) {
+          const games = await hydrateGamesByIgdbIds(draft.igdbIds);
+          const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
+          editor = {
+            publicId,
+            title: draft.title || editor.title,
+            year: draft.year ?? editor.year,
+            slotCount: draft.slotCount,
+            listFormat: draft.listFormat,
+            rankStyle: draft.rankStyle,
+            showSuffix: draft.showSuffix,
+            items: draft.igdbIds
+              .map((id, index) => {
+                const game = byIgdb.get(id);
+                if (!game) return null;
+                return {
+                  gameId: game.gameId,
+                  igdbId: game.igdbId,
+                  slug: game.slug,
+                  title: game.title,
+                  year: game.year,
+                  coverUrl: game.coverUrl,
+                  rank: index + 1,
+                  blurb: "",
+                };
+              })
+              .filter(
+                (item): item is NonNullable<typeof item> => Boolean(item),
+              ),
+          };
+        }
+      }
     }
   } else if (!signedIn && resume) {
     const draft = await readListDraftCookie();
@@ -143,9 +186,11 @@ export default async function CreateGotyPage({
     if (!Number.isFinite(year)) {
       loadError = "Pick a valid year.";
     } else {
+      const y = Math.floor(year);
       const existingDraft = await readListDraftCookie();
-      if (existingDraft) {
-        const nextYear = Math.floor(year);
+      if (existingDraft && draftMatchesGoty(existingDraft, y)) {
+        editor = await editorSeedFromDraft(existingDraft);
+      } else if (existingDraft) {
         return (
           <div>
             <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
@@ -169,28 +214,20 @@ export default async function CreateGotyPage({
                 >
                   <Button type="button">Continue editing</Button>
                 </Link>
-                <form action={discardAnonDraftAction}>
-                  <input
-                    type="hidden"
-                    name="next"
-                    value={`/create/goty?year=${nextYear}`}
-                  />
-                  <Button type="submit" variant="bordered">
-                    Start a new list
-                  </Button>
-                </form>
+                <DiscardAnonDraftButton next={`/create/goty?year=${y}`} />
               </div>
             </div>
           </div>
         );
+      } else {
+        editor = {
+          publicId: null,
+          title: `${y} Game of the Year`,
+          year: y,
+          slotCount: 10,
+          items: [],
+        };
       }
-      editor = {
-        publicId: null,
-        title: `${Math.floor(year)} Game of the Year`,
-        year: Math.floor(year),
-        slotCount: 10,
-        items: [],
-      };
     }
   }
 

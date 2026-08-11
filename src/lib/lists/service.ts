@@ -813,6 +813,57 @@ export async function shareListFromClientDraft(
   return { list, editSecret };
 }
 
+/** Update an existing shared/owned list in place (no create, empty ranking allowed). */
+export async function syncExistingSharedListFromClientDraft(
+  raw: unknown,
+  access: { profileId?: string | null; editSecret?: string | null },
+  db: Db = getDb(),
+): Promise<{ list: ListRow } | { error: string }> {
+  const parsed = clientDraftUpsertSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "Check the ranking, title, and year." };
+  }
+  const data = parsed.data;
+  if (!data.publicId) {
+    return { error: "List not found." };
+  }
+  if (data.listType === "goty" && data.year == null) {
+    return { error: "GOTY lists need a year." };
+  }
+
+  const list = await getListByPublicId(data.publicId, db);
+  if (!list) return { error: "List not found." };
+  if (
+    !canEditList(list, {
+      profileId: access.profileId,
+      editSecret: access.editSecret,
+    })
+  ) {
+    return { error: "You cannot edit this list." };
+  }
+
+  const meta = await applyMetaPatch(
+    list,
+    {
+      title: data.title,
+      listType: data.listType,
+      year: data.year ?? null,
+    },
+    db,
+  );
+  if ("error" in meta) return meta;
+
+  const written = await writeItemsFromIgdb(
+    meta.list,
+    data.items,
+    { allowBlurbs: Boolean(access.profileId) },
+    db,
+  );
+  if ("error" in written) return written;
+
+  return { list: await ensurePublishedAt(meta.list, db) };
+}
+
 export async function saveOwnedListFromClientDraft(
   raw: unknown,
   access: { profileId: string; editSecret?: string | null },
