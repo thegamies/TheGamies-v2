@@ -4,7 +4,10 @@ export const controlLabelClass =
   "text-sm font-medium tracking-wide text-muted";
 
 export const controlGroupClass =
-  "mt-1 flex h-9 w-full overflow-hidden border border-line rounded-[var(--radius-control)]";
+  "mt-1 flex h-9 overflow-hidden border border-line rounded-[var(--radius-control)]";
+
+/** Use in stacked panels (settings) so segments span the panel width. */
+export const controlGroupFullClass = `${controlGroupClass} w-full`;
 
 export function segmentBtnClass(active: boolean): string {
   return `inline-flex h-full min-w-0 flex-1 items-center justify-center px-3 text-xs font-semibold tracking-wide transition-colors duration-[var(--motion-fast)] ${

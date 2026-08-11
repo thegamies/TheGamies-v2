@@ -45,6 +45,7 @@ import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { Button } from "@/components/ui/Button";
 import {
   controlGroupClass,
+  controlGroupFullClass,
   controlLabelClass,
   fieldInputClass,
   iconControlClass,
@@ -516,7 +517,7 @@ export function ListEditor({
                 <div
                   role="group"
                   aria-label="List type"
-                  className={controlGroupClass}
+                  className={controlGroupFullClass}
                 >
                   <button
                     type="button"
@@ -551,11 +552,11 @@ export function ListEditor({
 
               <div className="space-y-1.5">
                 <p className={controlLabelClass}>Rank style</p>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex w-full flex-col gap-2">
                   <div
                     role="group"
                     aria-label="Rank style"
-                    className={controlGroupClass}
+                    className={controlGroupFullClass}
                   >
                     {EXPORT_RANK_STYLES.map((style) => (
                       <button
@@ -570,7 +571,7 @@ export function ListEditor({
                     ))}
                   </div>
                   {rankStyle !== "off" ? (
-                    <div className={controlGroupClass}>
+                    <div className={controlGroupFullClass}>
                       <button
                         type="button"
                         onClick={() => setShowSuffix((s) => !s)}
