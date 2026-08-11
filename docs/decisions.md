@@ -33,6 +33,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-10 | Local DB | Doppler `dev` + `dev_personal`; lasting personal Neon branch recommended |
 | 2026-08-10 | Feature testing | **Every feature ships with tests in the same PR** (risk chooses unit vs integration vs visual; “no tests” is not the default) |
 | 2026-08-11 | Profile access control | **App-layer** session checks (`auth.getSession`) + ownership on profile writes. **Postgres RLS deferred** until Auth JWT → DB role is defined — do not invent policies yet |
+| 2026-08-11 | Anonymous list claim / resume | **Server draft + httpOnly edit-secret cookie** (not list payloads in cookies). Anon can edit while the cookie matches; soft prompt to sign in; **claim** attaches `profileId`, assigns slug, clears edit secret. **Reset** deletes the draft and clears the cookie. Share URL: `/l/[publicId]`. |
 
 ## Open (block dependent work until decided)
 
@@ -45,5 +46,4 @@ Record product and architecture decisions here. Do not invent answers to open it
 - Edition result publication timing (manual publish vs auto on close)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
-- Claim flow details when an anonymous list author signs in
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

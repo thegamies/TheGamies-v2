@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { SiteHeader } from "@/components/SiteHeader";
 import { auth } from "@/lib/auth/server";
+import { listPublishedForProfile } from "@/lib/lists/service";
 import {
   getProfileByUsername,
   ownsProfile,
@@ -63,7 +65,38 @@ export default async function PublicProfilePage({
         ) : (
           <p className="mt-6 text-muted">No bio yet.</p>
         )}
+
+        <ProfileLists profileId={profile.id} />
       </main>
     </>
+  );
+}
+
+async function ProfileLists({ profileId }: { profileId: string }) {
+  const lists = await listPublishedForProfile(profileId).catch(() => []);
+  return (
+    <section className="mt-12 border-t border-line pt-8">
+      <h2 className="font-display text-3xl tracking-wide text-ink">Lists</h2>
+      {lists.length === 0 ? (
+        <p className="mt-4 text-muted">No published lists yet.</p>
+      ) : (
+        <ul className="mt-6 divide-y divide-line border-y border-line">
+          {lists.map((list) => (
+            <li key={list.publicId} className="py-4">
+              <Link
+                href={`/l/${list.publicId}`}
+                className="text-lg text-ink hover:text-accent"
+              >
+                {list.title}
+              </Link>
+              <p className="text-sm text-muted">
+                {list.listType === "goty" ? "Game of the Year" : "Custom"}
+                {list.year ? ` · ${list.year}` : ""}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

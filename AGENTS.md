@@ -44,7 +44,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | IGDB catalog sync | `docs/igdb-sync.md` |
-| Community / ballot / results | `docs/features/` |
+| Community / ballot / results / lists | `docs/features/` |
 
 ## Workflow
 
