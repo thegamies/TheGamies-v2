@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { startGotyDraftAction } from "@/app/create/actions";
 import { ListEditor } from "@/components/lists/ListEditor";
-import { SiteHeader } from "@/components/SiteHeader";
 import { Button } from "@/components/ui/Button";
+import { getAuthOrNull } from "@/lib/auth/server";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { getEditableList } from "@/lib/lists/service";
-import { getAuthOrNull } from "@/lib/auth/server";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 export const metadata: Metadata = {
@@ -84,51 +83,41 @@ export default async function CreateGotyPage({
   }
 
   return (
-    <>
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">
-          Game of the Year
-        </p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-          Build your ranking
-        </h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Your draft is saved as you go. Publish when the ranking is ready to
-          share.
-        </p>
+    <div>
+      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+        Game of the Year
+      </p>
 
-        {loadError ? (
-          <p className="mt-6 text-sm text-accent" role="alert">
-            {loadError}
-          </p>
-        ) : null}
+      {loadError ? (
+        <p className="mb-6 text-sm text-accent" role="alert">
+          {loadError}
+        </p>
+      ) : null}
 
-        {editor ? (
-          <ListEditor
-            publicId={editor.publicId}
-            listType="goty"
-            initialTitle={editor.title}
-            initialYear={editor.year}
-            initialItems={editor.items}
-            error={error}
-          />
-        ) : (
-          <form action={startGotyDraftAction} className="mt-10 max-w-sm space-y-4">
-            <label className="block text-sm text-muted">
-              Year
-              <input
-                name="year"
-                type="number"
-                required
-                defaultValue={currentYear}
-                className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink"
-              />
-            </label>
-            <Button type="submit">Start GOTY list</Button>
-          </form>
-        )}
-      </main>
-    </>
+      {editor ? (
+        <ListEditor
+          publicId={editor.publicId}
+          listType="goty"
+          initialTitle={editor.title}
+          initialYear={editor.year}
+          initialItems={editor.items}
+          error={error}
+        />
+      ) : (
+        <form action={startGotyDraftAction} className="max-w-sm space-y-4">
+          <label className="block text-sm tracking-wide text-muted">
+            Year
+            <input
+              name="year"
+              type="number"
+              required
+              defaultValue={currentYear}
+              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
+            />
+          </label>
+          <Button type="submit">Start GOTY list</Button>
+        </form>
+      )}
+    </div>
   );
 }

@@ -16,16 +16,15 @@ export async function searchGamesForList(input: {
   gotyMode?: boolean;
 }): Promise<GameSearchHit[]> {
   const q = input.q.trim();
-  if (q.length < 2) return [];
 
   const rows = await browseGames({
-    q,
+    q: q.length >= 2 ? q : undefined,
     year: input.year,
     releaseStatus: input.gotyMode ? "released" : "all",
     excludeEditions: Boolean(input.gotyMode),
     sort: "popularity",
     sortDir: "desc",
-    limit: 12,
+    limit: 24,
   });
 
   return rows.map((r) => ({
