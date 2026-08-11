@@ -38,22 +38,6 @@ jobs:
       - if: steps.guard.outputs.skipped == 'false'
         run: pnpm install --frozen-lockfile
       - if: steps.guard.outputs.skipped == 'false'
-        uses: dopplerhq/cli-action@v4
-      - if: steps.guard.outputs.skipped == 'false'
-        id: doppler
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-        run: |
-          if [ -z "$DOPPLER_TOKEN" ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "No DOPPLER_TOKEN; falling back to GitHub STAGING_* secrets."
-          else
-            # Service token should be scoped to Doppler Development config `dev`
-            doppler secrets download --no-file --format env > "$RUNNER_TEMP/doppler.env"
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "Fetched Doppler secrets for Vercel staging."
-          fi
-      - if: steps.guard.outputs.skipped == 'false'
         id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
@@ -61,31 +45,34 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          STAGING_VERCEL_APP_URL: ${{ secrets.STAGING_VERCEL_APP_URL }}
           VERCEL_STAGING_ALIAS: ${{ secrets.VERCEL_STAGING_ALIAS }}
-          DOPPLER_ENABLED: ${{ steps.doppler.outputs.enabled }}
         run: |
           mkdir -p .vercel
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
-          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          if [ "$DOPPLER_ENABLED" = "true" ]; then
-            while IFS= read -r line || [ -n "$line" ]; do
-              case "$line" in
-                ''|\#*) continue ;;
-              esac
-              key="${line%%=*}"
-              case "$key" in
-                DOPPLER_*) continue ;;
-              esac
-              ARGS+=(--env "$line")
-            done < "$RUNNER_TEMP/doppler.env"
+
+          # Host-specific public URL (dual deploy ? not a shared STAGING_APP_URL)
+          if [ -n "$STAGING_VERCEL_APP_URL" ]; then
+            NEXT_PUBLIC_APP_URL="$STAGING_VERCEL_APP_URL"
+          elif [ -n "$VERCEL_STAGING_ALIAS" ]; then
+            NEXT_PUBLIC_APP_URL="https://${VERCEL_STAGING_ALIAS}"
           else
-            if [ -n "$DATABASE_URL" ]; then
-              ARGS+=(--env "DATABASE_URL=$DATABASE_URL")
+            NEXT_PUBLIC_APP_URL=""
+          fi
+
+          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
+          for key in DATABASE_URL NEON_AUTH_BASE_URL ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
+            val="${!key}"
+            if [ -n "$val" ]; then
+              ARGS+=(--env "${key}=${val}")
             fi
-            if [ -n "$NEON_AUTH_BASE_URL" ]; then
-              ARGS+=(--env "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL")
-            fi
+          done
+          if [ -n "$NEXT_PUBLIC_APP_URL" ]; then
+            ARGS+=(--env "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}")
           fi
           DEPLOY_OUT=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr)
           URL=$(echo "$DEPLOY_OUT" | grep -oE 'https://[^ ]+\.vercel\.app' | tail -n1)
@@ -99,11 +86,7 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "### Vercel staging" >> "$GITHUB_STEP_SUMMARY"
           echo "- Deployment: $URL" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$DOPPLER_ENABLED" = "true" ]; then
-            echo "- Secrets: Doppler \`dev\`" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- Secrets: GitHub STAGING_* fallback" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "- Secrets: GitHub Actions ? deployment env" >> "$GITHUB_STEP_SUMMARY"
           if [ -n "$VERCEL_STAGING_ALIAS" ]; then
             echo "- Alias: https://$VERCEL_STAGING_ALIAS" >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -136,29 +119,16 @@ jobs:
       - if: steps.guard.outputs.skipped == 'false'
         run: pnpm install --frozen-lockfile
       - if: steps.guard.outputs.skipped == 'false'
-        uses: dopplerhq/cli-action@v4
-      - if: steps.guard.outputs.skipped == 'false'
-        id: doppler
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
-        run: |
-          if [ -z "$DOPPLER_TOKEN" ]; then
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "No DOPPLER_TOKEN; falling back to GitHub STAGING_* secrets."
-          else
-            doppler secrets download --no-file --format env > "$RUNNER_TEMP/doppler.env"
-            doppler secrets download --no-file --format json > "$RUNNER_TEMP/doppler.json"
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "Fetched Doppler secrets for Cloudflare staging."
-          fi
-      - if: steps.guard.outputs.skipped == 'false'
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL }}
-          DOPPLER_ENABLED: ${{ steps.doppler.outputs.enabled }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.STAGING_CF_APP_URL }}
         run: |
           WORKER="thegamies-v2-develop"
           node -e "
@@ -168,40 +138,51 @@ jobs:
             s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
             fs.writeFileSync('wrangler.jsonc', s);
           "
-          {
-            echo "NEXTJS_ENV=production"
-            if [ "$DOPPLER_ENABLED" = "true" ]; then
-              while IFS= read -r line || [ -n "$line" ]; do
-                case "$line" in
-                  ''|\#*) continue ;;
-                esac
-                key="${line%%=*}"
-                case "$key" in
-                  DOPPLER_*) continue ;;
-                esac
-                printf '%s\n' "$line"
-              done < "$RUNNER_TEMP/doppler.env"
-            else
-              if [ -n "$DATABASE_URL" ]; then echo "DATABASE_URL=$DATABASE_URL"; fi
-              if [ -n "$NEON_AUTH_BASE_URL" ]; then echo "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL"; fi
-            fi
-          } > .dev.vars
+
+          # Build-time env for OpenNext + JSON for wrangler secret bulk (shows in CF dashboard)
+          : > .dev.vars
+          echo "NEXTJS_ENV=production" >> .dev.vars
+          node <<'NODE'
+          const fs = require("fs");
+          const keys = [
+            "DATABASE_URL",
+            "NEON_AUTH_BASE_URL",
+            "ADMIN_SYNC_SECRET",
+            "IGDB_CLIENT_ID",
+            "IGDB_CLIENT_SECRET",
+            "NEXT_PUBLIC_APP_URL",
+          ];
+          const secrets = {};
+          const lines = ["NEXTJS_ENV=production"];
+          for (const key of keys) {
+            const val = process.env[key];
+            if (!val) continue;
+            secrets[key] = val;
+            // Escape newlines for dotenv-style .dev.vars
+            lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
+          }
+          fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/wrangler-secrets.json",
+            JSON.stringify(secrets),
+          );
+          const names = Object.keys(secrets);
+          console.log(
+            names.length
+              ? `Prepared ${names.length} secrets: ${names.join(", ")}`
+              : "WARNING: no app secrets set in GitHub Actions",
+          );
+          NODE
+
           pnpm exec opennextjs-cloudflare build
           DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
-          if [ "$DOPPLER_ENABLED" = "true" ]; then
-            node -e "
-              const fs=require('fs');
-              const raw=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/doppler.json','utf8'));
-              const out={};
-              for (const [k,v] of Object.entries(raw)) {
-                if (k.startsWith('DOPPLER_')) continue;
-                if (v === null || v === undefined) continue;
-                out[k]=String(v);
-              }
-              fs.writeFileSync(process.env.RUNNER_TEMP + '/wrangler-secrets.json', JSON.stringify(out));
-            "
-            pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER" || true
+
+          if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
+            pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER"
+          else
+            echo "Skipping wrangler secret bulk (no secrets to upload)."
           fi
+
           URL=$(echo "$DEPLOY_LOG" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -n1)
           if [ -z "$URL" ]; then
             URL="https://${WORKER}.workers.dev"
@@ -210,11 +191,7 @@ jobs:
           echo "### Cloudflare staging" >> "$GITHUB_STEP_SUMMARY"
           echo "- Worker: \`$WORKER\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$DOPPLER_ENABLED" = "true" ]; then
-            echo "- Secrets: Doppler \`dev\` (build + wrangler secret bulk)" >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "- Secrets: GitHub STAGING_* fallback" >> "$GITHUB_STEP_SUMMARY"
-          fi
+          echo "- Secrets: GitHub Actions ? wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
 
   summary:
     needs: [vercel, cloudflare]
@@ -244,7 +221,8 @@ jobs:
               echo "| Cloudflare | deployed | $CF_URL |"
             fi
             echo ""
-            echo "Stable Cloudflare worker name: \`thegamies-v2-develop\` (overwritten each push)."
-            echo "App secrets: Doppler \`dev\` via \`DOPPLER_TOKEN\` (fallback: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`)."
+            echo "Stable Cloudflare worker: \`thegamies-v2-develop\`."
+            echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`ADMIN_SYNC_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`."
+            echo "Per-host public URL: \`STAGING_VERCEL_APP_URL\` (or \`VERCEL_STAGING_ALIAS\`) and \`STAGING_CF_APP_URL\`."
             echo "Optional: \`VERCEL_STAGING_ALIAS\`."
           } >> "$GITHUB_STEP_SUMMARY"

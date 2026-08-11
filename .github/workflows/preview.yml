@@ -106,17 +106,20 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           DATABASE_URL: ${{ needs.neon.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
         run: |
           mkdir -p .vercel
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          if [ -n "$DATABASE_URL" ]; then
-            ARGS+=(--env "DATABASE_URL=$DATABASE_URL")
-          fi
-          if [ -n "$NEON_AUTH_BASE_URL" ]; then
-            ARGS+=(--env "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL")
-          fi
+          for key in DATABASE_URL NEON_AUTH_BASE_URL ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
+            val="${!key}"
+            if [ -n "$val" ]; then
+              ARGS+=(--env "${key}=${val}")
+            fi
+          done
           URL=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr | tail -n1)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Vercel preview: $URL"
@@ -157,6 +160,9 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ needs.neon.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           WORKER="thegamies-v2-pr-${PR_NUMBER}"
@@ -167,13 +173,34 @@ jobs:
             s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
             fs.writeFileSync('wrangler.jsonc', s);
           "
-          {
-            echo "NEXTJS_ENV=production"
-            if [ -n "$DATABASE_URL" ]; then echo "DATABASE_URL=$DATABASE_URL"; fi
-            if [ -n "$NEON_AUTH_BASE_URL" ]; then echo "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL"; fi
-          } > .dev.vars
+          node <<'NODE'
+          const fs = require("fs");
+          const keys = [
+            "DATABASE_URL",
+            "NEON_AUTH_BASE_URL",
+            "ADMIN_SYNC_SECRET",
+            "IGDB_CLIENT_ID",
+            "IGDB_CLIENT_SECRET",
+          ];
+          const secrets = {};
+          const lines = ["NEXTJS_ENV=production"];
+          for (const key of keys) {
+            const val = process.env[key];
+            if (!val) continue;
+            secrets[key] = val;
+            lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
+          }
+          fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/wrangler-secrets.json",
+            JSON.stringify(secrets),
+          );
+          NODE
           pnpm exec opennextjs-cloudflare build
           DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
+          if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
+            pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER"
+          fi
           URL=$(echo "$DEPLOY_LOG" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -n1)
           if [ -z "$URL" ]; then
             URL="(see wrangler deploy logs for ${WORKER})"

@@ -69,7 +69,6 @@ Configure on the repo:
 
 | Secret | Purpose |
 |---|---|
-| `DOPPLER_TOKEN` | Doppler service token for config `dev` — injects app secrets into develop staging (Vercel + Cloudflare) |
 | `NEON_API_KEY` | Create/delete PR database branches |
 | `NEON_PROJECT_ID` | Neon project |
 | `VERCEL_TOKEN` | Preview + production deploys |
@@ -77,23 +76,27 @@ Configure on the repo:
 | `VERCEL_PROJECT_ID` | Vercel project |
 | `CLOUDFLARE_API_TOKEN` | Workers deploy |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
-| `STAGING_DATABASE_URL` | Fallback Neon URL if `DOPPLER_TOKEN` is missing |
-| `STAGING_NEON_AUTH_BASE_URL` | Fallback Auth URL if `DOPPLER_TOKEN` is missing |
-| `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname (e.g. `thegamies-staging.vercel.app`) |
+| `STAGING_DATABASE_URL` | Neon URL for `develop` staging (`DATABASE_URL`) |
+| `STAGING_NEON_AUTH_BASE_URL` | Auth URL for develop staging |
+| `STAGING_VERCEL_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Vercel staging |
+| `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
+| `ADMIN_SYNC_SECRET` | Unlock `/admin/sync` (staging + PR previews) |
+| `IGDB_CLIENT_ID` | IGDB / Twitch client id |
+| `IGDB_CLIENT_SECRET` | IGDB / Twitch client secret |
+| `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname; also used as public URL if `STAGING_VERCEL_APP_URL` unset |
 
-Until secrets exist, `ci.yml` still runs quality checks; deploy workflows skip hosts that lack credentials.
+Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.
 
-App runtime secrets (`DATABASE_URL`, `ADMIN_SYNC_SECRET`, IGDB keys, …) live in **Doppler** `dev` for the develop branch — see [secrets.md](./secrets.md).
+App secrets are stored in **GitHub** and pushed onto Vercel/Cloudflare by CI — see [secrets.md](./secrets.md). Doppler remains for local `pnpm dev:secrets` only (no Teams service token required).
 
 ## Staging flow (`develop`)
 
 ```text
 Push / merge to develop (or workflow_dispatch)
   → ci: lint + typecheck + build
-  → staging: fetch Doppler `dev` via DOPPLER_TOKEN
-  → staging: deploy Vercel with those env vars (+ optional VERCEL_STAGING_ALIAS)
-  → staging: deploy Cloudflare worker thegamies-v2-develop (.dev.vars + wrangler secret bulk)
-  → if no DOPPLER_TOKEN: fall back to STAGING_DATABASE_URL / STAGING_NEON_AUTH_BASE_URL
+  → staging: deploy Vercel with GitHub app secrets as --env
+  → staging: deploy Cloudflare worker thegamies-v2-develop
+       (.dev.vars for build + wrangler secret bulk for runtime / dashboard)
 ```
 
 Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers.dev`).
@@ -105,8 +108,7 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 PR opened/updated
   → ci: lint + typecheck + build
   → neon: create branch preview/pr-<n>
-  → vercel: deploy preview with DATABASE_URL (+ NEON_AUTH_BASE_URL when set)
-  → cloudflare: OpenNext build + deploy worker thegamies-v2-pr-<n> with same env
+  → vercel / cloudflare: deploy with Neon URL + GitHub ADMIN_SYNC_SECRET / IGDB_*
   → comment both URLs on the PR
   → on PR close: delete Neon branch + optional CF preview worker
 ```
@@ -120,7 +122,7 @@ PR opened/updated
 
 ## Environment variables
 
-App secrets are managed in **Doppler** — see [secrets.md](./secrets.md).
+App secrets are managed in **GitHub Actions** for deploys and **Doppler** for local — see [secrets.md](./secrets.md).
 
 Runtime keys (also listed in `.env.example`):
 

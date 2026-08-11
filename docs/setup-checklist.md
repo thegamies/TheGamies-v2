@@ -1,22 +1,18 @@
 # Manual wiring checklist
 
-Repo config for dual-host + Doppler is in place. Work top to bottom.
+Work top to bottom.
 
-## 0. Doppler (app secrets — do this first)
+## 0. Doppler (local only)
 
 - [ ] Create Doppler account (Developer free tier is fine)
-- [ ] Project matches [`doppler.yaml`](../doppler.yaml) (`thegamies`): Development / Preview / Production
-- [ ] Development: **`dev`** + **`dev_personal`** (personal configs **on**) — `dev` = develop branch hosts
-- [ ] Production: personal configs **off**
-- [ ] Preview: static PR secrets only (optional)
+- [ ] Project matches [`doppler.yaml`](../doppler.yaml) (`thegamies`)
+- [ ] Development: **`dev`** + **`dev_personal`** (personal configs **on**)
 - [ ] Install CLI: https://docs.doppler.com/docs/install-cli
   ```bash
   doppler login
   doppler setup   # project thegamies, config dev
   ```
-- [ ] Set develop-host secrets on **`dev`** (after Neon exists): `DATABASE_URL`, `ADMIN_SYNC_SECRET`, IGDB keys, develop `NEXT_PUBLIC_APP_URL`, …
-- [ ] Put local overrides on **`dev_personal`** (e.g. `NEXT_PUBLIC_APP_URL=http://localhost:3000`)
-- [ ] Create Doppler service token for config **`dev`** → GitHub secret `DOPPLER_TOKEN`
+- [ ] Set shared local defaults on **`dev`**; laptop overrides on **`dev_personal`**
 - [ ] Day-to-day: `pnpm dev:secrets`  
   Full layout: [secrets.md](./secrets.md)
 
@@ -25,12 +21,10 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 - [ ] Create Neon project for The Gamies v2
 - [ ] Copy project id → GitHub secret `NEON_PROJECT_ID`
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
-- [ ] Put the **dev** branch connection string into Doppler **`dev`** as `DATABASE_URL`
-- [ ] (Recommended) Create lasting Neon branch `local/<you>`; set its URL on **`dev_personal`** as `DATABASE_URL`
-- [ ] Put production URL into Doppler `prd`
-- [ ] Set `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `ADMIN_SYNC_SECRET` on Doppler `dev` (and `prd`)
-- [ ] `doppler run -- pnpm db:migrate`
-- [ ] (Later) Enable Neon Auth; CI already requests `auth_url` when available
+- [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local)
+- [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
+- [ ] `doppler run -- pnpm db:migrate` locally
+- [ ] (Later) Enable Neon Auth
 
 ## 2. Vercel
 
@@ -43,7 +37,7 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec vercel login
   pnpm exec vercel link
   ```
-- [ ] (Recommended) Doppler → Integrations → Vercel for Production (`prd`); develop staging is injected by CI via `DOPPLER_TOKEN`
+- [ ] Develop staging env is injected by CI from GitHub secrets (no Doppler Teams token)
 
 ## 3. Cloudflare
 
@@ -55,20 +49,20 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
   pnpm exec wrangler login
   pnpm deploy:cf
   ```
-- [ ] Staging deploys sync Worker secrets from Doppler `dev` via CI (`wrangler secret bulk`)
+- [ ] Staging CI runs `wrangler secret bulk` so secrets show on the Worker
 
-## 4. GitHub
+## 4. GitHub (app secrets for deploys)
 
-- [ ] Add **deploy** secrets listed in [deployment.md](./deployment.md)  
-  (`DOPPLER_TOKEN`, `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*` — not everyday app secrets in GitHub)
-- [ ] Re-run **Staging dual deploy** on `develop` so both hosts pick up Doppler `dev`
-- [ ] Open a PR into `develop` and confirm the **Dual-host previews** comment
+- [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
+- [ ] Add app secrets: `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
+- [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
+- [ ] Re-run **Staging dual deploy** on `develop` after setting secrets
+- [ ] Confirm Cloudflare Worker `thegamies-v2-develop` → Settings → Variables and Secrets
 - [ ] Until secrets exist, CI quality checks still run; host deploys skip with a comment
 
 ## 5. Verify
 
-- [ ] `pnpm dev:secrets` loads the app (`dev_personal` inherits `dev`)
+- [ ] `pnpm dev:secrets` loads the app locally
 - [ ] `pnpm lint && pnpm typecheck && pnpm build` locally
-- [ ] Vercel preview URL loads `/` and `/design-system`
-- [ ] Cloudflare preview URL loads the same
-- [ ] Both previews share the same Neon `preview/pr-<n>` branch when Neon secrets are set
+- [ ] Staging URLs load; `/admin/sync` unlocks with `ADMIN_SYNC_SECRET`
+- [ ] Vercel + Cloudflare previews share Neon `preview/pr-<n>` when Neon secrets are set
