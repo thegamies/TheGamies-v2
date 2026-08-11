@@ -8,6 +8,13 @@
       "when": 1786395170101,
       "tag": "0000_modern_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786417845234,
+      "tag": "0001_cool_thundra",
+      "breakpoints": true
     }
   ]
 }

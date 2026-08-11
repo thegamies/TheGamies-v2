@@ -39,7 +39,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` |
 | Deployment (dual host) | `docs/deployment.md` |
-| Secrets (Doppler) | `docs/secrets.md` |
+| Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |

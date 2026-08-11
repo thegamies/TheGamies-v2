@@ -172,3 +172,16 @@ export const syncRuns = pgTable("sync_runs", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   finishedAt: timestamp("finished_at", { mode: "date" }),
 });
+
+/** App profile linked to Neon Auth user id. Access is app-layer (session + ownership), not RLS. */
+export const profiles = pgTable("profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  authUserId: text("auth_user_id").notNull().unique(),
+  username: text("username").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  visibility: text("visibility").notNull().default("public"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});

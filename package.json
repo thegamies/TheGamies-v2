@@ -25,6 +25,7 @@
     "secrets": "doppler secrets"
   },
   "dependencies": {
+    "@neondatabase/auth": "0.4.2-beta",
     "@neondatabase/serverless": "^1.0.1",
     "@thegamies/db": "workspace:*",
     "@thegamies/igdb": "workspace:*",
