@@ -2,16 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { resetActiveDraftAction } from "@/app/create/actions";
 import { Button } from "@/components/ui/Button";
-import { readListEditCookie } from "@/lib/lists/cookies";
-import { peekDraftFromCookie } from "@/lib/lists/service";
+import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 
 export const metadata: Metadata = {
   title: "Create a list",
 };
 
 export default async function CreateChooserPage() {
-  const cookie = await readListEditCookie();
-  const draft = await peekDraftFromCookie(cookie).catch(() => null);
+  const draft = await readListDraftCookie();
 
   return (
     <div className="w-full">
@@ -25,8 +23,10 @@ export default async function CreateChooserPage() {
             <Link
               href={
                 draft.listType === "goty"
-                  ? `/create/goty?id=${draft.publicId}`
-                  : `/create/custom?id=${draft.publicId}`
+                  ? `/create/goty?year=${draft.year ?? ""}`
+                  : `/create/custom?title=${encodeURIComponent(draft.title)}${
+                      draft.year != null ? `&year=${draft.year}` : ""
+                    }`
               }
             >
               <Button type="button">Resume</Button>

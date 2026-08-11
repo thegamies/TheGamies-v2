@@ -1,6 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -28,8 +29,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  publishListAction,
-  saveListItemsAction,
+  saveOwnedListAction,
+  shareListAction,
 } from "@/app/create/actions";
 import {
   searchGamesForList,
@@ -55,12 +56,17 @@ import {
 } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
+import {
+  buildListDraftPayload,
+  writeListDraftCookieClient,
+} from "@/lib/lists/draft-cookie";
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
 
 const SLOT_PRESETS = [5, 10, 20, 50] as const;
 
 export type EditorItem = {
   gameId: string;
+  igdbId: number;
   slug: string;
   title: string;
   year: number | null;
@@ -72,11 +78,16 @@ export type EditorItem = {
 type ListFormat = "poster" | "list";
 
 type ListEditorProps = {
-  publicId: string;
+  publicId?: string | null;
   listType: "goty" | "custom";
   initialTitle: string;
   initialYear: number | null;
   initialItems: EditorItem[];
+  initialSlotCount?: number;
+  initialListFormat?: ListFormat;
+  initialRankStyle?: ExportRankStyle;
+  initialShowSuffix?: boolean;
+  signedIn?: boolean;
   error?: string | null;
 };
 
@@ -90,19 +101,27 @@ function formatTitleList(names: string[]): string {
 }
 
 export function ListEditor({
-  publicId,
+  publicId: initialPublicId = null,
   listType: initialListType,
   initialTitle,
   initialYear,
   initialItems,
+  initialSlotCount,
+  initialListFormat = "poster",
+  initialRankStyle = "chip",
+  initialShowSuffix = false,
+  signedIn = false,
   error = null,
 }: ListEditorProps) {
-  const router = useRouter();
+  const pathname = usePathname();
   const currentYear = new Date().getUTCFullYear();
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
   const committedYearRef = useRef(initialYear ?? currentYear);
 
+  const [publicId, setPublicId] = useState<string | null>(
+    initialPublicId ?? null,
+  );
   const [listType, setListType] = useState<"goty" | "custom">(initialListType);
   const [title, setTitle] = useState(initialTitle);
   const [year, setYear] = useState(
@@ -118,14 +137,17 @@ export function ListEditor({
     ),
   );
   const [slotCount, setSlotCount] = useState(() =>
-    Math.max(10, initialItems.length),
+    Math.max(initialSlotCount ?? 10, initialItems.length),
   );
-  const [listFormat, setListFormat] = useState<ListFormat>("poster");
-  const [rankStyle, setRankStyle] = useState<ExportRankStyle>("chip");
-  const [showSuffix, setShowSuffix] = useState(false);
+  const [listFormat, setListFormat] = useState<ListFormat>(initialListFormat);
+  const [rankStyle, setRankStyle] =
+    useState<ExportRankStyle>(initialRankStyle);
+  const [showSuffix, setShowSuffix] = useState(initialShowSuffix);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<GameSearchHit[]>([]);
   const [saveError, setSaveError] = useState<string | null>(error);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [pending, startTransition] = useTransition();
   const [searchPending, startSearch] = useTransition();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -146,6 +168,7 @@ export function ListEditor({
   const selectedIds = new Set(items.map((i) => i.gameId));
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
   const emptySlots = Math.max(0, slotCount - items.length);
+  const signInHref = `/auth/sign-in?next=${encodeURIComponent(pathname)}`;
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -160,6 +183,35 @@ export function ListEditor({
     }, 200);
     return () => window.clearTimeout(handle);
   }, [query, yearNum, listType]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const payload = buildListDraftPayload({
+        listType,
+        year: listType === "goty" ? yearNum : year ? yearNum : null,
+        title,
+        igdbIds: items.map((item) => item.igdbId),
+        slotCount,
+        listFormat,
+        rankStyle,
+        showSuffix,
+        publicId,
+      });
+      writeListDraftCookieClient(payload);
+    }, 300);
+    return () => window.clearTimeout(handle);
+  }, [
+    listType,
+    year,
+    yearNum,
+    title,
+    items,
+    slotCount,
+    listFormat,
+    rankStyle,
+    showSuffix,
+    publicId,
+  ]);
 
   const requestYearTrim = useCallback(
     (targetYear: number, nextListType: "goty" | "custom") => {
@@ -229,14 +281,18 @@ export function ListEditor({
     window.setTimeout(() => searchRef.current?.focus(), 50);
   }
 
-  function itemsJson() {
-    return JSON.stringify(
-      items.map((item, index) => ({
-        gameId: item.gameId,
+  function draftJson(includeBlurbs: boolean) {
+    return JSON.stringify({
+      publicId,
+      listType,
+      title,
+      year: listType === "goty" ? yearNum : year ? yearNum : null,
+      items: items.map((item, index) => ({
+        igdbId: item.igdbId,
         rank: index + 1,
-        blurb: item.blurb,
+        blurb: includeBlurbs ? item.blurb : null,
       })),
-    );
+    });
   }
 
   function applySlotCount(next: number) {
@@ -312,6 +368,7 @@ export function ListEditor({
         ...prev,
         {
           gameId: hit.id,
+          igdbId: hit.igdbId,
           slug: hit.slug,
           title: hit.title,
           year: hit.year,
@@ -331,6 +388,7 @@ export function ListEditor({
   }
 
   function setBlurb(id: string, blurb: string) {
+    if (!signedIn) return;
     setItems((prev) =>
       prev.map((item) => (item.gameId === id ? { ...item, blurb } : item)),
     );
@@ -366,21 +424,27 @@ export function ListEditor({
   }
 
   function save() {
+    if (!signedIn) {
+      setSaveNotice(
+        "Sign in to save this list to your account. Your ranking is already kept on this device.",
+      );
+      setSavedFlash(false);
+      return;
+    }
     startTransition(async () => {
       const fd = new FormData();
-      fd.set("publicId", publicId);
-      fd.set("itemsJson", itemsJson());
-      fd.set("title", title);
-      fd.set("listType", listType);
-      if (year) fd.set("year", year);
-      const result = await saveListItemsAction(null, fd);
-      if (result?.error) {
+      fd.set("draftJson", draftJson(true));
+      const result = await saveOwnedListAction(null, fd);
+      if (result.error) {
         setSaveError(result.error);
+        setSavedFlash(false);
         return;
       }
+      if (result.publicId) setPublicId(result.publicId);
       setSaveError(null);
-      router.replace(`/create/${listType}?id=${publicId}`);
-      router.refresh();
+      setSaveNotice(null);
+      setSavedFlash(true);
+      window.setTimeout(() => setSavedFlash(false), 2000);
     });
   }
 
@@ -597,8 +661,18 @@ export function ListEditor({
             onClick={save}
             disabled={pending}
           >
-            {pending ? "Saving…" : "Save"}
+            {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
           </Button>
+          <form action={shareListAction}>
+            <input
+              type="hidden"
+              name="draftJson"
+              value={draftJson(signedIn)}
+            />
+            <Button type="submit" size="sm" disabled={items.length === 0}>
+              Share
+            </Button>
+          </form>
           <Button
             type="button"
             variant="bordered"
@@ -606,19 +680,18 @@ export function ListEditor({
             onClick={() => setExportOpen(true)}
             disabled={items.length === 0}
           >
-            Export image
+            Export
           </Button>
-          <form action={publishListAction}>
-            <input type="hidden" name="publicId" value={publicId} />
-            <input type="hidden" name="listType" value={listType} />
-            <input type="hidden" name="itemsJson" value={itemsJson()} />
-            <input type="hidden" name="title" value={title} />
-            {year ? <input type="hidden" name="year" value={year} /> : null}
-            <Button type="submit" size="sm" disabled={items.length === 0}>
-              Publish
-            </Button>
-          </form>
         </div>
+
+        {saveNotice ? (
+          <p className="w-full text-sm text-muted" role="status">
+            {saveNotice}{" "}
+            <Link href={signInHref} className="text-accent underline">
+              Sign in
+            </Link>
+          </p>
+        ) : null}
 
         {saveError ? (
           <p className="w-full text-sm text-accent" role="alert">
@@ -677,8 +750,10 @@ export function ListEditor({
                   onClick={focusSearch}
                   className="w-full border border-dashed border-line px-4 py-10 text-left text-muted transition-colors hover:border-accent hover:text-ink"
                 >
-                  Search and add games to build your ranking. Notes show on the
-                  share page.
+                  Search and add games to build your ranking.
+                  {signedIn
+                    ? " Notes show on the share page."
+                    : " Sign in to add notes."}
                 </button>
               ) : (
                 <DndContext
@@ -696,6 +771,8 @@ export function ListEditor({
                           key={item.gameId}
                           item={item}
                           rank={index + 1}
+                          canEditNotes={signedIn}
+                          signInHref={signInHref}
                           onBlurbChange={setBlurb}
                           onRemove={removeGame}
                         />
@@ -922,11 +999,15 @@ function SearchGamesPanelBody({
 function NotesCard({
   item,
   rank,
+  canEditNotes,
+  signInHref,
   onBlurbChange,
   onRemove,
 }: {
   item: EditorItem;
   rank: number;
+  canEditNotes: boolean;
+  signInHref: string;
   onBlurbChange: (id: string, blurb: string) => void;
   onRemove: (id: string) => void;
 }) {
@@ -973,13 +1054,22 @@ function NotesCard({
             Remove
           </button>
         </div>
-        <textarea
-          value={item.blurb}
-          onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
-          placeholder="Optional note / review"
-          rows={2}
-          className="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-2 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus:border-accent"
-        />
+        {canEditNotes ? (
+          <textarea
+            value={item.blurb}
+            onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
+            placeholder="Optional note / review"
+            rows={2}
+            className="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-2 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus:border-accent"
+          />
+        ) : (
+          <p className="text-xs text-muted">
+            <Link href={signInHref} className="text-accent underline">
+              Sign in
+            </Link>{" "}
+            to add notes.
+          </p>
+        )}
       </div>
       <button
         type="button"

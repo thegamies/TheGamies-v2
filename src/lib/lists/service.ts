@@ -11,6 +11,7 @@ import {
 import { coverUrlFromImageId } from "@thegamies/igdb";
 import { canEditList } from "@/lib/lists/ownership";
 import {
+  clientDraftUpsertSchema,
   createDraftSchema,
   replaceItemsSchema,
   updateListMetaSchema,
@@ -133,6 +134,7 @@ async function loadListItems(listId: string, db: Db) {
       rank: listItems.rank,
       blurb: listItems.blurb,
       gameId: games.id,
+      igdbId: games.igdbId,
       slug: games.slug,
       title: games.title,
       year: games.year,
@@ -149,11 +151,55 @@ async function loadListItems(listId: string, db: Db) {
     rank: r.rank,
     blurb: r.blurb,
     gameId: r.gameId,
+    igdbId: r.igdbId,
     slug: r.slug,
     title: r.title,
     year: r.year,
     coverUrl: coverUrlFromImageId(r.coverImageId),
   }));
+}
+
+export type HydratedDraftGame = {
+  gameId: string;
+  igdbId: number;
+  slug: string;
+  title: string;
+  year: number | null;
+  coverUrl: string | null;
+};
+
+export async function hydrateGamesByIgdbIds(
+  igdbIds: number[],
+  db: Db = getDb(),
+): Promise<HydratedDraftGame[]> {
+  const unique = [...new Set(igdbIds.filter((id) => Number.isFinite(id) && id > 0))];
+  if (unique.length === 0) return [];
+
+  const rows = await db
+    .select({
+      gameId: games.id,
+      igdbId: games.igdbId,
+      slug: games.slug,
+      title: games.title,
+      year: games.year,
+      coverImageId: covers.imageId,
+    })
+    .from(games)
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(inArray(games.igdbId, unique));
+
+  const byIgdb = new Map(rows.map((r) => [r.igdbId, r]));
+  return unique
+    .map((id) => byIgdb.get(id))
+    .filter((r): r is (typeof rows)[number] => Boolean(r))
+    .map((r) => ({
+      gameId: r.gameId,
+      igdbId: r.igdbId,
+      slug: r.slug,
+      title: r.title,
+      year: r.year,
+      coverUrl: coverUrlFromImageId(r.coverImageId),
+    }));
 }
 
 export async function updateListMeta(
@@ -481,4 +527,330 @@ export async function peekDraftFromCookie(
   if (!list || list.status !== "draft") return null;
   if (!canEditList(list, { editSecret: cookie.secret })) return null;
   return list;
+}
+
+type ClientDraftItem = {
+  igdbId: number;
+  rank: number;
+  blurb?: string | null;
+};
+
+async function writeItemsFromIgdb(
+  list: ListRow,
+  rawItems: ClientDraftItem[],
+  opts: { allowBlurbs: boolean },
+  db: Db,
+): Promise<{ error: string } | { ok: true }> {
+  const over = assertWithinMaxItems(rawItems.length);
+  if (over) return { error: over };
+
+  const normalized = [...rawItems]
+    .sort((a, b) => a.rank - b.rank)
+    .map((item, index) => ({
+      igdbId: item.igdbId,
+      rank: index + 1,
+      blurb: opts.allowBlurbs ? item.blurb : null,
+    }));
+
+  if (normalized.length === 0) {
+    await db.delete(listItems).where(eq(listItems.listId, list.id));
+    await db
+      .update(lists)
+      .set({ updatedAt: new Date() })
+      .where(eq(lists.id, list.id));
+    return { ok: true };
+  }
+
+  const igdbIds = normalized.map((i) => i.igdbId);
+  const gameRows = await db
+    .select({
+      id: games.id,
+      igdbId: games.igdbId,
+      year: games.year,
+      firstReleaseDate: games.firstReleaseDate,
+      versionParentIgdbId: games.versionParentIgdbId,
+      isAdult: games.isAdult,
+    })
+    .from(games)
+    .where(inArray(games.igdbId, igdbIds));
+
+  if (gameRows.length !== igdbIds.length) {
+    return { error: "One or more games could not be found." };
+  }
+
+  const byIgdb = new Map(gameRows.map((g) => [g.igdbId, g]));
+
+  if (list.listType === "goty") {
+    if (list.year == null) {
+      return { error: "This GOTY list needs a year." };
+    }
+    for (const igdbId of igdbIds) {
+      const game = byIgdb.get(igdbId);
+      if (!game) return { error: "One or more games could not be found." };
+      const err = gotyEligibilityError(game, list.year);
+      if (err) return { error: err };
+    }
+  }
+
+  await db.delete(listItems).where(eq(listItems.listId, list.id));
+  await db.insert(listItems).values(
+    normalized.map((item) => {
+      const game = byIgdb.get(item.igdbId)!;
+      return {
+        listId: list.id,
+        gameId: game.id,
+        rank: item.rank,
+        blurb:
+          opts.allowBlurbs && item.blurb?.trim() ? item.blurb.trim() : null,
+      };
+    }),
+  );
+  await db
+    .update(lists)
+    .set({ updatedAt: new Date() })
+    .where(eq(lists.id, list.id));
+
+  return { ok: true };
+}
+
+async function applyMetaPatch(
+  list: ListRow,
+  input: {
+    title: string;
+    listType: "goty" | "custom";
+    year: number | null;
+  },
+  db: Db,
+): Promise<{ list: ListRow } | { error: string }> {
+  const patch: Partial<ListRow> = {
+    title: input.title,
+    listType: input.listType,
+    year: input.listType === "goty" ? input.year : input.year,
+    updatedAt: new Date(),
+  };
+  if (input.listType === "goty" && input.year == null) {
+    return { error: "GOTY lists need a year." };
+  }
+  if (list.profileId && input.listType === "goty" && input.year != null) {
+    patch.slug = gotySlugForYear(input.year);
+  }
+
+  try {
+    const [updated] = await db
+      .update(lists)
+      .set(patch)
+      .where(eq(lists.id, list.id))
+      .returning();
+    return { list: updated };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("lists_owned_goty_year_uidx")) {
+      return { error: "You already have a Game of the Year list for that year." };
+    }
+    if (message.includes("lists_profile_slug_uidx")) {
+      return { error: "You already have a list with that name." };
+    }
+    throw err;
+  }
+}
+
+export async function shareListFromClientDraft(
+  raw: unknown,
+  access: { profileId?: string | null; editSecret?: string | null },
+  db: Db = getDb(),
+): Promise<
+  | { list: ListRow; editSecret: string | null }
+  | { error: string }
+> {
+  const parsed = clientDraftUpsertSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "Check the ranking, title, and year." };
+  }
+  const data = parsed.data;
+  if (data.listType === "goty" && data.year == null) {
+    return { error: "GOTY lists need a year." };
+  }
+  if (data.items.length === 0) {
+    return { error: "Add at least one game before sharing." };
+  }
+
+  const allowBlurbs = Boolean(access.profileId);
+  let list: ListRow | null = null;
+  let editSecret: string | null = null;
+
+  if (data.publicId) {
+    list = await getListByPublicId(data.publicId, db);
+    if (!list) return { error: "List not found." };
+    if (
+      !canEditList(list, {
+        profileId: access.profileId,
+        editSecret: access.editSecret,
+      })
+    ) {
+      // Stale publicId from another device — create a fresh shared list.
+      list = null;
+    }
+  }
+
+  if (!list) {
+    const created = await createDraft(
+      data.listType === "goty"
+        ? { listType: "goty", year: data.year!, title: data.title }
+        : {
+            listType: "custom",
+            title: data.title,
+            year: data.year ?? undefined,
+          },
+      { profileId: access.profileId ?? null },
+      db,
+    );
+    if ("error" in created) return created;
+    list = created.list;
+    editSecret = created.editSecret;
+  } else {
+    const meta = await applyMetaPatch(
+      list,
+      {
+        title: data.title,
+        listType: data.listType,
+        year: data.year ?? null,
+      },
+      db,
+    );
+    if ("error" in meta) return meta;
+    list = meta.list;
+  }
+
+  const written = await writeItemsFromIgdb(
+    list,
+    data.items,
+    { allowBlurbs },
+    db,
+  );
+  if ("error" in written) return written;
+
+  const published = await publishList(list.publicId, {
+    profileId: access.profileId,
+    editSecret: editSecret ?? access.editSecret,
+  }, db);
+  if ("error" in published) return published;
+
+  return { list: published.list, editSecret };
+}
+
+export async function saveOwnedListFromClientDraft(
+  raw: unknown,
+  access: { profileId: string; editSecret?: string | null },
+  db: Db = getDb(),
+): Promise<{ list: ListRow } | { error: string }> {
+  const parsed = clientDraftUpsertSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { error: "Check the ranking, title, and year." };
+  }
+  const data = parsed.data;
+  if (data.listType === "goty" && data.year == null) {
+    return { error: "GOTY lists need a year." };
+  }
+
+  let list: ListRow | null = null;
+
+  if (data.publicId) {
+    const existing = await getListByPublicId(data.publicId, db);
+    if (
+      existing &&
+      canEditList(existing, {
+        profileId: access.profileId,
+        editSecret: access.editSecret,
+      })
+    ) {
+      list = existing;
+    }
+  }
+
+  if (!list && data.listType === "goty" && data.year != null) {
+    const [owned] = await db
+      .select()
+      .from(lists)
+      .where(
+        and(
+          eq(lists.profileId, access.profileId),
+          eq(lists.listType, "goty"),
+          eq(lists.year, data.year),
+        ),
+      )
+      .limit(1);
+    if (owned) list = owned;
+  }
+
+  if (!list) {
+    const created = await createDraft(
+      data.listType === "goty"
+        ? { listType: "goty", year: data.year!, title: data.title }
+        : {
+            listType: "custom",
+            title: data.title,
+            year: data.year ?? undefined,
+          },
+      { profileId: access.profileId },
+      db,
+    );
+    if ("error" in created) return created;
+    list = created.list;
+  } else {
+    const meta = await applyMetaPatch(
+      list,
+      {
+        title: data.title,
+        listType: data.listType,
+        year: data.year ?? null,
+      },
+      db,
+    );
+    if ("error" in meta) return meta;
+    list = meta.list;
+  }
+
+  const written = await writeItemsFromIgdb(
+    list,
+    data.items,
+    { allowBlurbs: true },
+    db,
+  );
+  if ("error" in written) return written;
+
+  if (list.profileId !== access.profileId) {
+    const claimed = await claimList(
+      list.publicId,
+      {
+        profileId: access.profileId,
+        editSecret: access.editSecret,
+      },
+      db,
+    );
+    if ("error" in claimed) return claimed;
+    list = claimed.list;
+  } else if (!list.slug) {
+    const claimed = await claimList(
+      list.publicId,
+      {
+        profileId: access.profileId,
+        editSecret: access.editSecret,
+      },
+      db,
+    );
+    if (!("error" in claimed)) list = claimed.list;
+  }
+
+  if (data.items.length === 0) {
+    return { list };
+  }
+
+  const published = await publishList(
+    list.publicId,
+    { profileId: access.profileId },
+    db,
+  );
+  if ("error" in published) return published;
+
+  return { list: published.list };
 }

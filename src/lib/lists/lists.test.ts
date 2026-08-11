@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { canEditList, ownsListByProfile } from "./ownership";
+import { parseListEditCookie, encodeListEditCookie } from "./cookies";
+import {
+  buildListDraftPayload,
+  draftCookieFits,
+  encodeListDraftCookie,
+  parseListDraftCookie,
+} from "./draft-cookie";
 import {
   createDraftSchema,
+  replaceItemsByIgdbSchema,
   replaceItemsSchema,
   LIST_MAX_ITEMS,
 } from "./schema";
@@ -17,7 +25,6 @@ import {
   slugifyListTitle,
 } from "./rules";
 import { pointsForRank } from "./scoring";
-import { parseListEditCookie, encodeListEditCookie } from "./cookies";
 
 describe("pointsForRank", () => {
   it("scores top 10 only", () => {
@@ -164,6 +171,65 @@ describe("list edit cookie encoding", () => {
       secret: "sekrit",
     });
     expect(parseListEditCookie("bad")).toBeNull();
+  });
+});
+
+describe("list draft cookie", () => {
+  it("round-trips payload and rejects bad input", () => {
+    const payload = buildListDraftPayload({
+      listType: "goty",
+      year: 2026,
+      title: "2026 Game of the Year",
+      igdbIds: [101, 202, 303],
+      slotCount: 10,
+      listFormat: "poster",
+      rankStyle: "chip",
+      showSuffix: false,
+    });
+    const encoded = encodeListDraftCookie(payload);
+    expect(parseListDraftCookie(encoded)).toEqual({
+      v: 1,
+      listType: "goty",
+      year: 2026,
+      title: "2026 Game of the Year",
+      igdbIds: [101, 202, 303],
+      slotCount: 10,
+      listFormat: "poster",
+      rankStyle: "chip",
+      showSuffix: false,
+    });
+    expect(draftCookieFits(payload)).toBe(true);
+    expect(parseListDraftCookie("not-json")).toBeNull();
+    expect(parseListDraftCookie(encodeURIComponent('{"v":2}'))).toBeNull();
+  });
+
+  it("dedupes igdb ids and caps slot count", () => {
+    const payload = buildListDraftPayload({
+      listType: "custom",
+      year: null,
+      title: "Favorites",
+      igdbIds: [1, 1, 2],
+      slotCount: 0,
+    });
+    expect(payload.igdbIds).toEqual([1, 2]);
+    expect(payload.slotCount).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("replaceItemsByIgdbSchema", () => {
+  it("accepts igdb ids and rejects duplicates", () => {
+    expect(
+      replaceItemsByIgdbSchema.safeParse([
+        { igdbId: 1, rank: 1 },
+        { igdbId: 2, rank: 2, blurb: "note" },
+      ]).success,
+    ).toBe(true);
+    expect(
+      replaceItemsByIgdbSchema.safeParse([
+        { igdbId: 1, rank: 1 },
+        { igdbId: 1, rank: 2 },
+      ]).success,
+    ).toBe(false);
   });
 });
 

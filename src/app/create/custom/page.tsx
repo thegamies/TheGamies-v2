@@ -4,7 +4,11 @@ import { ListEditor } from "@/components/lists/ListEditor";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListEditCookie } from "@/lib/lists/cookies";
-import { getEditableList } from "@/lib/lists/service";
+import { readListDraftCookie } from "@/lib/lists/draft-cookie";
+import {
+  getEditableList,
+  hydrateGamesByIgdbIds,
+} from "@/lib/lists/service";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 export const metadata: Metadata = {
@@ -17,6 +21,19 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+async function sessionProfileId(): Promise<string | null> {
+  const auth = getAuthOrNull();
+  if (!auth) return null;
+  try {
+    const { data: session } = await auth.getSession();
+    if (!session?.user?.id) return null;
+    const profile = await getProfileByAuthUserId(session.user.id);
+    return profile?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function CreateCustomPage({
   searchParams,
 }: {
@@ -24,14 +41,23 @@ export default async function CreateCustomPage({
 }) {
   const params = await searchParams;
   const publicId = first(params.id);
+  const titleParam = first(params.title);
+  const yearParam = first(params.year);
   const error = first(params.error) ?? null;
+  const profileId = await sessionProfileId();
+  const signedIn = Boolean(profileId);
 
   let editor: {
-    publicId: string;
+    publicId: string | null;
     title: string;
     year: number | null;
+    slotCount: number;
+    listFormat?: "poster" | "list";
+    rankStyle?: "banner" | "chip" | "off";
+    showSuffix?: boolean;
     items: {
       gameId: string;
+      igdbId: number;
       slug: string;
       title: string;
       year: number | null;
@@ -44,19 +70,6 @@ export default async function CreateCustomPage({
 
   if (publicId) {
     const cookie = await readListEditCookie();
-    let profileId: string | null = null;
-    const auth = getAuthOrNull();
-    if (auth) {
-      try {
-        const { data: session } = await auth.getSession();
-        if (session?.user?.id) {
-          const profile = await getProfileByAuthUserId(session.user.id);
-          profileId = profile?.id ?? null;
-        }
-      } catch {
-        profileId = null;
-      }
-    }
     const result = await getEditableList(publicId, {
       profileId,
       editSecret:
@@ -69,15 +82,89 @@ export default async function CreateCustomPage({
         publicId: result.list.publicId,
         title: result.list.title,
         year: result.list.year,
+        slotCount: Math.max(10, result.items.length),
         items: result.items.map((item) => ({
           gameId: item.gameId,
+          igdbId: item.igdbId,
           slug: item.slug,
           title: item.title,
           year: item.year,
           coverUrl: item.coverUrl,
           rank: item.rank,
-          blurb: item.blurb ?? "",
+          blurb: signedIn ? (item.blurb ?? "") : "",
         })),
+      };
+    }
+  } else if (titleParam) {
+    const year =
+      yearParam && Number.isFinite(Number(yearParam))
+        ? Math.floor(Number(yearParam))
+        : null;
+    const draft = await readListDraftCookie();
+    const resume =
+      draft &&
+      draft.listType === "custom" &&
+      draft.title === titleParam.trim()
+        ? draft
+        : null;
+    const games = resume
+      ? await hydrateGamesByIgdbIds(resume.igdbIds)
+      : [];
+    const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
+    editor = {
+      publicId: resume?.publicId ?? null,
+      title: resume?.title || titleParam.trim(),
+      year: resume?.year ?? year,
+      slotCount: resume?.slotCount ?? 10,
+      listFormat: resume?.listFormat,
+      rankStyle: resume?.rankStyle,
+      showSuffix: resume?.showSuffix,
+      items: (resume?.igdbIds ?? [])
+        .map((id, index) => {
+          const game = byIgdb.get(id);
+          if (!game) return null;
+          return {
+            gameId: game.gameId,
+            igdbId: game.igdbId,
+            slug: game.slug,
+            title: game.title,
+            year: game.year,
+            coverUrl: game.coverUrl,
+            rank: index + 1,
+            blurb: "",
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    };
+  } else {
+    const draft = await readListDraftCookie();
+    if (draft?.listType === "custom") {
+      const games = await hydrateGamesByIgdbIds(draft.igdbIds);
+      const byIgdb = new Map(games.map((g) => [g.igdbId, g]));
+      editor = {
+        publicId: draft.publicId ?? null,
+        title: draft.title,
+        year: draft.year,
+        slotCount: draft.slotCount,
+        listFormat: draft.listFormat,
+        rankStyle: draft.rankStyle,
+        showSuffix: draft.showSuffix,
+        items: draft.igdbIds
+          .map((id, index) => {
+            const game = byIgdb.get(id);
+            if (!game) return null;
+            return {
+              gameId: game.gameId,
+              igdbId: game.igdbId,
+              slug: game.slug,
+              title: game.title,
+              year: game.year,
+              coverUrl: game.coverUrl,
+              rank: index + 1,
+              blurb: "",
+            };
+          })
+          .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
   }
@@ -101,6 +188,11 @@ export default async function CreateCustomPage({
           initialTitle={editor.title}
           initialYear={editor.year}
           initialItems={editor.items}
+          initialSlotCount={editor.slotCount}
+          initialListFormat={editor.listFormat}
+          initialRankStyle={editor.rankStyle}
+          initialShowSuffix={editor.showSuffix}
+          signedIn={signedIn}
           error={error}
         />
       ) : (

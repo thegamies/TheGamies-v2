@@ -4,6 +4,7 @@ import { browseGames } from "@/lib/catalog";
 
 export type GameSearchHit = {
   id: string;
+  igdbId: number;
   slug: string;
   title: string;
   year: number | null;
@@ -29,6 +30,7 @@ export async function searchGamesForList(input: {
 
   return rows.map((r) => ({
     id: r.id,
+    igdbId: r.igdbId,
     slug: r.slug,
     title: r.title,
     year: r.year,
