@@ -48,7 +48,7 @@ export async function createDraft(
   opts: { profileId?: string | null } = {},
   db: Db = getDb(),
 ): Promise<
-  | { list: ListRow; editSecret: string }
+  | { list: ListRow; editSecret: string | null }
   | { error: string }
 > {
   const parsed = createDraftSchema.safeParse(input);
@@ -67,8 +67,9 @@ export async function createDraft(
   }
 
   const publicId = generatePublicId();
-  const editSecret = generateEditSecret();
-  const editSecretHash = hashEditSecret(editSecret);
+  const owned = Boolean(opts.profileId);
+  const editSecret = owned ? null : generateEditSecret();
+  const editSecretHash = editSecret ? hashEditSecret(editSecret) : null;
 
   const title =
     data.listType === "goty"
@@ -77,7 +78,25 @@ export async function createDraft(
 
   const year = data.listType === "goty" ? data.year : (data.year ?? null);
 
+  let slug: string | null = null;
+  if (owned && opts.profileId) {
+    if (data.listType === "goty") {
+      slug = gotySlugForYear(data.year);
+    } else {
+      slug = slugifyListTitle(title);
+      const clash = await db
+        .select({ id: lists.id })
+        .from(lists)
+        .where(and(eq(lists.profileId, opts.profileId), eq(lists.slug, slug)))
+        .limit(1);
+      if (clash[0]) {
+        slug = `${slug}-${publicId.slice(0, 4)}`;
+      }
+    }
+  }
+
   try {
+    const now = new Date();
     const [list] = await db
       .insert(lists)
       .values({
@@ -87,11 +106,10 @@ export async function createDraft(
         listType: data.listType,
         title,
         year,
-        status: "draft",
-        slug:
-          opts.profileId && data.listType === "goty"
-            ? gotySlugForYear(data.year)
-            : null,
+        // Signed-in create attaches to the account immediately.
+        status: owned ? "published" : "draft",
+        publishedAt: owned ? now : null,
+        slug,
       })
       .returning();
 
@@ -100,6 +118,9 @@ export async function createDraft(
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("lists_owned_goty_year_uidx")) {
       return { error: "You already have a Game of the Year list for that year." };
+    }
+    if (message.includes("lists_profile_slug_uidx")) {
+      return { error: "You already have a list with that name." };
     }
     if (
       message.includes('relation "lists" does not exist') ||

@@ -15,9 +15,9 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 
 ### Signed in
 
-1. Start GOTY or custom → **creates a DB draft immediately** (owned).
+1. Start GOTY or custom → **creates and attaches a published list to the account immediately** (profile slug, no anon edit secret).
 2. GOTY: if the profile already has that year, open the existing list instead of creating a second one.
-3. Cookie drafts are not used. Save / Share / Export update the account list or open the share page.
+3. Cookie drafts are not used. Save updates rankings on that owned list; Share opens `/l/[publicId]`; Export is client-side.
 
 ### Signed out
 
