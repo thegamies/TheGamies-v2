@@ -30,7 +30,10 @@ Repo config for dual-host + Doppler is in place. Work top to bottom.
 - [ ] Copy project id → GitHub secret `NEON_PROJECT_ID`
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
 - [ ] Put the **dev** branch connection string into Doppler **`dev`** as `DATABASE_URL`
+- [ ] (Recommended) Create lasting Neon branch `local/<you>`; set its URL on **`dev_personal`** as `DATABASE_URL`
 - [ ] Put staging and production URLs into Doppler `stg` / `prd`
+- [ ] Set `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `ADMIN_SYNC_SECRET` on Doppler `dev` (and stg/prd)
+- [ ] `doppler run -- pnpm db:migrate`
 - [ ] (Later) Enable Neon Auth; CI already requests `auth_url` when available
 
 ## 2. Vercel

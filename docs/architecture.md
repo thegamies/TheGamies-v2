@@ -9,7 +9,7 @@ Browser → Vercel (Next.js)  ─┐
          Cloudflare Workers ─┼→ Neon (Postgres + Auth + RLS)
          (OpenNext)          ┘
 
-Separate: IGDB ingestion worker → Neon catalog tables
+Separate: IGDB ingestion (`packages/igdb` CLI + `/admin/sync`) → Neon catalog tables
 ```
 
 Product logic stays host-agnostic. Host-specific code lives only in thin adapters and deploy config.

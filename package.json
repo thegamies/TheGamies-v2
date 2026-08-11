@@ -9,6 +9,13 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "pnpm --filter @thegamies/db generate",
+    "db:migrate": "pnpm --filter @thegamies/db migrate",
+    "db:migrate:secrets": "doppler run -- pnpm db:migrate",
+    "sync:igdb": "pnpm --filter @thegamies/igdb exec tsx src/cli.ts",
+    "sync:igdb:secrets": "doppler run -- pnpm sync:igdb",
     "preview:cf": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "preview:cf:secrets": "doppler run -- pnpm preview:cf",
     "deploy:cf": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
@@ -18,9 +25,14 @@
     "secrets": "doppler secrets"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.1",
+    "@thegamies/db": "workspace:*",
+    "@thegamies/igdb": "workspace:*",
+    "drizzle-orm": "^0.44.2",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.0.5"
   },
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.14.0",
@@ -28,15 +40,22 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.4",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
+    "tsx": "^4.20.3",
     "typescript": "^5",
     "vercel": "^48.0.0",
+    "vitest": "^4.1.10",
     "wrangler": "^4.0.0"
   },
   "packageManager": "pnpm@10.6.3",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "workerd", "sharp"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
   }
 }

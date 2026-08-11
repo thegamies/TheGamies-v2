@@ -36,9 +36,42 @@ jobs:
           role: neondb_owner
           get_auth_url: true
 
-  vercel:
+  migrate:
     if: github.event.action != 'closed'
     needs: neon
+    runs-on: ubuntu-latest
+    outputs:
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ "${{ needs.neon.outputs.skipped }}" = "true" ] || [ -z "${{ needs.neon.outputs.database_url }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "No Neon branch URL; skipping migrate."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+        run: pnpm db:migrate
+
+  vercel:
+    if: github.event.action != 'closed'
+    needs: [neon, migrate]
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -90,7 +123,7 @@ jobs:
 
   cloudflare:
     if: github.event.action != 'closed'
-    needs: neon
+    needs: [neon, migrate]
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -150,7 +183,7 @@ jobs:
 
   comment:
     if: github.event.action != 'closed'
-    needs: [neon, vercel, cloudflare]
+    needs: [neon, migrate, vercel, cloudflare]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -160,6 +193,7 @@ jobs:
         with:
           script: |
             const neonSkipped = '${{ needs.neon.outputs.skipped }}' === 'true';
+            const migrateSkipped = '${{ needs.migrate.outputs.skipped }}' === 'true';
             const vercelSkipped = '${{ needs.vercel.outputs.skipped }}' === 'true';
             const cfSkipped = '${{ needs.cloudflare.outputs.skipped }}' === 'true';
             const vercelUrl = '${{ needs.vercel.outputs.url }}' || '(not deployed)';
@@ -170,6 +204,7 @@ jobs:
               `| Host | Status | URL |`,
               `| --- | --- | --- |`,
               `| Neon branch | ${neonSkipped ? 'skipped (secrets)' : 'ready'} | \`preview/pr-${{ github.event.pull_request.number }}\` |`,
+              `| Migrate | ${migrateSkipped ? 'skipped' : 'applied'} | catalog schema |`,
               `| Vercel | ${vercelSkipped ? 'skipped (secrets)' : 'deployed'} | ${vercelUrl} |`,
               `| Cloudflare | ${cfSkipped ? 'skipped (secrets)' : 'deployed'} | ${cfUrl} |`,
               '',

@@ -1,0 +1,23 @@
+{
+  "name": "@thegamies/igdb",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "sync-igdb": "./src/cli.ts"
+  },
+  "scripts": {
+    "sync": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@thegamies/db": "workspace:*",
+    "drizzle-orm": "^0.44.2"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3",
+    "typescript": "^5"
+  }
+}
