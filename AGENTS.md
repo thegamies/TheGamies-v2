@@ -14,7 +14,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 
 - Next.js App Router + TypeScript
 - Tailwind CSS + project-owned design tokens
-- Hosting: Vercel
+- Hosting: Vercel **and** Cloudflare Workers (OpenNext) — portable app, dual PR previews
 - Database + Auth: Neon (Postgres + Neon Auth)
 - Game catalog: IGDB via a separate ingestion worker
 - Validation: Zod
@@ -22,8 +22,10 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 
 ## Product priorities (v1)
 
-**In:** communities, Official Vote events, Voices, ballots, results, personal ranked lists, crawlable public pages.  
-**Out:** library/played status, native mobile, messaging, GraphQL, microservices, real-time recalculation of everything, elaborate admin inside public pages.
+**In:** games browse/detail, GOTY + custom lists (anon create + soft save prompt + editorial list view), user pages, site live GOTY aggregate (signed-in lists, admin lock), communities with optional live rankings + year **editions** (hidden ballots → frozen Combined/Community/Voices + categories + voters).  
+**Out:** library/played status, native mobile, messaging, GraphQL, microservices, recalculating frozen edition results, Remotion/video export.
+
+Editions ≠ live rankings — see `docs/product.md`.
 
 ## Docs
 
@@ -34,7 +36,12 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` |
+| Deployment (dual host) | `docs/deployment.md` |
+| Secrets (Doppler) | `docs/secrets.md` |
+| Account wiring checklist | `docs/setup-checklist.md` |
+| Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
+| IGDB catalog sync | `docs/igdb-sync.md` |
 | Community / ballot / results | `docs/features/` |
 
 ## Workflow
@@ -43,9 +50,10 @@ Full rules: `docs/engineering.md`. Short form:
 
 1. Clarify scope; list in/out for the session.
 2. Get explicit approval before implementing a phase or multi-step feature.
-3. Branch → implement one approved step → PR (even solo) → preview → squash merge to `main`.
+3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
-5. Test by risk: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI.
+5. **Features ship with tests** in the same PR: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI. See `docs/engineering.md`.
+6. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification
 
@@ -53,4 +61,8 @@ After visual changes: lint, typecheck, relevant tests, desktop + mobile screensh
 
 ## Completion
 
-A task is done when behavior matches the docs, engineering checks pass, visual rules are preserved, and intentional deviations are documented.
+A task is done when behavior matches the docs, **tests for the feature exist and pass**, engineering checks pass, visual rules are preserved, and intentional deviations are documented.
+
+## End of turn
+
+After finishing a task or substantive reply, always end with a short **What’s next** — concrete options or the recommended next step — so day-to-day work keeps a clear follow-up.

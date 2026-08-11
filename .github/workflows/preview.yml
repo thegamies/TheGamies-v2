@@ -1,0 +1,278 @@
+name: Dual host previews
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [develop]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  neon:
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      database_url: ${{ steps.branch.outputs.db_url }}
+      auth_url: ${{ steps.branch.outputs.auth_url }}
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.NEON_API_KEY }}" ] || [ -z "${{ secrets.NEON_PROJECT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Neon secrets missing; skipping DB branch."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: neondatabase/create-branch-action@v6
+        id: branch
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: preview/pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+          role: neondb_owner
+          get_auth_url: true
+
+  migrate:
+    if: github.event.action != 'closed'
+    needs: neon
+    runs-on: ubuntu-latest
+    outputs:
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ "${{ needs.neon.outputs.skipped }}" = "true" ] || [ -z "${{ needs.neon.outputs.database_url }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "No Neon branch URL; skipping migrate."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+        run: pnpm db:migrate
+
+  vercel:
+    if: github.event.action != 'closed'
+    needs: [neon, migrate]
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Vercel secrets missing; skipping Vercel preview."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+          NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+        run: |
+          mkdir -p .vercel
+          printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
+          pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
+          if [ -n "$DATABASE_URL" ]; then
+            ARGS+=(--env "DATABASE_URL=$DATABASE_URL")
+          fi
+          if [ -n "$NEON_AUTH_BASE_URL" ]; then
+            ARGS+=(--env "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL")
+          fi
+          URL=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr | tail -n1)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Vercel preview: $URL"
+
+  cloudflare:
+    if: github.event.action != 'closed'
+    needs: [neon, migrate]
+    runs-on: ubuntu-latest
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare secrets missing; skipping Cloudflare preview."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+          NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          WORKER="thegamies-v2-pr-${PR_NUMBER}"
+          node -e "
+            const fs=require('fs');
+            const worker='thegamies-v2-pr-' + process.env.PR_NUMBER;
+            let s=fs.readFileSync('wrangler.jsonc','utf8');
+            s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
+            fs.writeFileSync('wrangler.jsonc', s);
+          "
+          {
+            echo "NEXTJS_ENV=production"
+            if [ -n "$DATABASE_URL" ]; then echo "DATABASE_URL=$DATABASE_URL"; fi
+            if [ -n "$NEON_AUTH_BASE_URL" ]; then echo "NEON_AUTH_BASE_URL=$NEON_AUTH_BASE_URL"; fi
+          } > .dev.vars
+          pnpm exec opennextjs-cloudflare build
+          DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
+          URL=$(echo "$DEPLOY_LOG" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -n1)
+          if [ -z "$URL" ]; then
+            URL="(see wrangler deploy logs for ${WORKER})"
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Cloudflare preview: $URL"
+
+  comment:
+    if: github.event.action != 'closed'
+    needs: [neon, migrate, vercel, cloudflare]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Comment preview URLs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const neonSkipped = '${{ needs.neon.outputs.skipped }}' === 'true';
+            const migrateSkipped = '${{ needs.migrate.outputs.skipped }}' === 'true';
+            const vercelSkipped = '${{ needs.vercel.outputs.skipped }}' === 'true';
+            const cfSkipped = '${{ needs.cloudflare.outputs.skipped }}' === 'true';
+            const vercelUrl = '${{ needs.vercel.outputs.url }}' || '(not deployed)';
+            const cfUrl = '${{ needs.cloudflare.outputs.url }}' || '(not deployed)';
+            const body = [
+              '## Dual-host previews',
+              '',
+              `| Host | Status | URL |`,
+              `| --- | --- | --- |`,
+              `| Neon branch | ${neonSkipped ? 'skipped (secrets)' : 'ready'} | \`preview/pr-${{ github.event.pull_request.number }}\` |`,
+              `| Migrate | ${migrateSkipped ? 'skipped' : 'applied'} | catalog schema |`,
+              `| Vercel | ${vercelSkipped ? 'skipped (secrets)' : 'deployed'} | ${vercelUrl} |`,
+              `| Cloudflare | ${cfSkipped ? 'skipped (secrets)' : 'deployed'} | ${cfUrl} |`,
+              '',
+              '_Configure secrets listed in `docs/deployment.md` to enable deploys._',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = '## Dual-host previews';
+            const existing = comments.find(c => c.user?.type === 'Bot' && c.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+  cleanup:
+    if: github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - id: neon_guard
+        run: |
+          if [ -z "${{ secrets.NEON_API_KEY }}" ] || [ -z "${{ secrets.NEON_PROJECT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.neon_guard.outputs.skipped == 'false'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: preview/pr-${{ github.event.pull_request.number }}
+          api_key: ${{ secrets.NEON_API_KEY }}
+      - id: cf_guard
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.cf_guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.cf_guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.cf_guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.cf_guard.outputs.skipped == 'false'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec wrangler delete "thegamies-v2-pr-${PR_NUMBER}" --force || true
