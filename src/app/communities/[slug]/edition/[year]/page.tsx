@@ -6,6 +6,7 @@ import { EditionBallotEditor } from "@/components/communities/EditionBallotEdito
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionResultsView } from "@/components/communities/EditionResultsView";
 import { CommunityNav } from "@/components/communities/CommunityNav";
+import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -18,11 +19,19 @@ import {
 import {
   ensurePublishedEditionResults,
   getEditionBallotMatrix,
+  getEditionCategoryPickStrips,
   getEditionCategoryResults,
   getEditionGotyPage,
   getEditionResultsMeta,
   getEditionVotersPage,
+  getEditionVoterDetailByUsername,
+  listEditionCategoryMeta,
   parseEditionResultMode,
+  parseEditionResultsView,
+  type EditionBallotMatrix,
+  type EditionCategoryMeta,
+  type EditionCategoryPickCard,
+  type EditionCategoryStandingBlock,
 } from "@/lib/communities/edition-results";
 import {
   getEditionByCommunityYear,
@@ -104,6 +113,7 @@ export default async function CommunityEditionYearPage({
       ? Math.floor(votersPageRaw)
       : 1;
   const votersQ = (first(sp.q) ?? "").trim();
+  const voterUsername = (first(sp.voter) ?? "").trim();
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -148,9 +158,19 @@ export default async function CommunityEditionYearPage({
   }
 
   const awardCategories =
-    edition.status === "open" || ballot
+    edition.status === "open" ||
+    (profile && isMember) ||
+    (edition.status === "published" && voterUsername.length > 0)
       ? await listActiveAwardCategories().catch(() => [])
       : [];
+
+  const requestedView = parseEditionResultsView(first(sp.view));
+  const view =
+    requestedView === "ballot" &&
+    !(profile && isMember) &&
+    !voterUsername
+      ? "overview"
+      : requestedView;
 
   let submitters: Awaited<ReturnType<typeof listEditionBallotSubmitters>> = [];
   if (canManage && edition.status !== "published") {
@@ -164,9 +184,31 @@ export default async function CommunityEditionYearPage({
   let resultsBundle: {
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyPage>>["rows"];
-    categories: Awaited<ReturnType<typeof getEditionCategoryResults>>;
+    categoryPodiums: EditionCategoryStandingBlock[];
+    categoryPickStrips: Record<string, EditionCategoryPickCard[]>;
+    categoryMeta: EditionCategoryMeta[];
     voters: Awaited<ReturnType<typeof getEditionVotersPage>> & { q: string };
-    matrix: Awaited<ReturnType<typeof getEditionBallotMatrix>>;
+    matrix: EditionBallotMatrix;
+    publicBallot: {
+      voter: {
+        profileId: string;
+        displayName: string;
+        username: string;
+        isVoice: boolean;
+      };
+      items: Array<{
+        gameId: string;
+        title: string;
+        coverUrl: string | null;
+        rank: number;
+      }>;
+      categoryVotes: Array<{
+        categoryId: string;
+        title: string;
+        coverUrl: string | null;
+      }>;
+      categories: Array<{ id: string; label: string }>;
+    } | null;
   } | null = null;
 
   if (edition.status === "published") {
@@ -174,26 +216,145 @@ export default async function CommunityEditionYearPage({
       await ensurePublishedEditionResults(community.id, edition.year);
       const meta = await getEditionResultsMeta(edition.id);
       if (meta) {
-        const topTenPage = await getEditionGotyPage(edition.id, mode, {
+        const emptyVoters = {
           page: 1,
-          pageSize: 10,
-        });
-        const categories = await getEditionCategoryResults(edition.id, mode);
-        const voters = await getEditionVotersPage(edition.id, {
-          page: votersPageNum,
           pageSize: STANDINGS_PAGE_SIZE,
-          q: votersQ,
-        });
-        const matrix = await getEditionBallotMatrix(edition.id, {
-          viewerProfileId: profile?.id ?? null,
-        });
-        resultsBundle = {
-          meta,
-          topTen: topTenPage.rows,
-          categories,
-          voters: { ...voters, q: votersQ },
-          matrix,
+          total: 0,
+          totalPages: 1,
+          rows: [] as Awaited<
+            ReturnType<typeof getEditionVotersPage>
+          >["rows"],
+          q: "",
         };
+        const emptyMatrix: EditionBallotMatrix = {
+          showYou: false,
+          hasGames: false,
+          voiceColumns: [],
+          rows: [],
+        };
+
+        if (view === "standings") {
+          resultsBundle = {
+            meta,
+            topTen: [],
+            categoryPodiums: [],
+            categoryPickStrips: {},
+            categoryMeta: [],
+            voters: emptyVoters,
+            matrix: emptyMatrix,
+            publicBallot: null,
+          };
+        } else if (view === "categories") {
+          const categoryMeta = await listEditionCategoryMeta(edition.id, mode);
+          resultsBundle = {
+            meta,
+            topTen: [],
+            categoryPodiums: [],
+            categoryPickStrips: {},
+            categoryMeta,
+            voters: emptyVoters,
+            matrix: emptyMatrix,
+            publicBallot: null,
+          };
+        } else if (view === "voters") {
+          const voters = await getEditionVotersPage(edition.id, {
+            page: votersPageNum,
+            pageSize: STANDINGS_PAGE_SIZE,
+            q: votersQ,
+            voicesOnly: mode === "voices",
+          });
+          resultsBundle = {
+            meta,
+            topTen: [],
+            categoryPodiums: [],
+            categoryPickStrips: {},
+            categoryMeta: [],
+            voters: { ...voters, q: votersQ },
+            matrix: emptyMatrix,
+            publicBallot: null,
+          };
+        } else if (view === "ballot") {
+          let publicBallot: {
+            voter: {
+              profileId: string;
+              displayName: string;
+              username: string;
+              isVoice: boolean;
+            };
+            items: Array<{
+              gameId: string;
+              title: string;
+              coverUrl: string | null;
+              rank: number;
+            }>;
+            categoryVotes: Array<{
+              categoryId: string;
+              title: string;
+              coverUrl: string | null;
+            }>;
+            categories: Array<{ id: string; label: string }>;
+          } | null = null;
+          if (voterUsername) {
+            const detail = await getEditionVoterDetailByUsername(
+              edition.id,
+              voterUsername,
+            );
+            if (detail) {
+              publicBallot = {
+                voter: detail.voter,
+                items: detail.ranks.map((r) => ({
+                  gameId: r.gameId,
+                  title: r.title,
+                  coverUrl: r.coverUrl,
+                  rank: r.rank,
+                })),
+                categoryVotes: detail.categoryPicks.map((p) => ({
+                  categoryId: p.categoryId,
+                  title: p.title,
+                  coverUrl: p.coverUrl,
+                })),
+                categories: awardCategories,
+              };
+            }
+          }
+          resultsBundle = {
+            meta,
+            topTen: [],
+            categoryPodiums: [],
+            categoryPickStrips: {},
+            categoryMeta: [],
+            voters: emptyVoters,
+            matrix: emptyMatrix,
+            publicBallot,
+          };
+        } else {
+          const topTenPage = await getEditionGotyPage(edition.id, mode, {
+            page: 1,
+            pageSize: 10,
+          });
+          const categoryPodiums = await getEditionCategoryResults(
+            edition.id,
+            mode,
+            { maxPlace: 3 },
+          );
+          const categoryPickStrips = await getEditionCategoryPickStrips(
+            edition.id,
+            { viewerProfileId: profile?.id ?? null },
+          );
+          const matrix = await getEditionBallotMatrix(edition.id, {
+            viewerProfileId: profile?.id ?? null,
+          });
+          resultsBundle = {
+            meta,
+            topTen: topTenPage.rows,
+            categoryPodiums,
+            categoryPickStrips,
+            categoryMeta: [],
+            voters: emptyVoters,
+            matrix,
+            publicBallot: null,
+          };
+        }
       }
     } catch {
       resultsBundle = null;
@@ -222,29 +383,18 @@ export default async function CommunityEditionYearPage({
         active="edition"
       />
 
-      {yearOptions.length > 0 ? (
-        <div className="mt-6 flex flex-wrap gap-2" aria-label="Edition years">
-          {yearOptions.map((opt) => (
-            <Link
-              key={opt}
-              href={`/communities/${community.slug}/edition/${opt}`}
-              className={`border px-3 py-1.5 text-sm tracking-wide transition-colors ${
-                opt === edition.year
-                  ? "border-accent text-accent"
-                  : "border-line text-muted hover:border-accent hover:text-ink"
-              }`}
-            >
-              {opt}
-            </Link>
-          ))}
-        </div>
-      ) : null}
-
       {edition.status === "published" && resultsBundle ? (
         <section className="mt-10 border-t border-line pt-8">
-          <h2 className="font-display text-3xl tracking-wide text-ink">
-            Results
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+            <h2 className="font-display text-3xl tracking-wide text-ink">
+              Results
+            </h2>
+            <EditionYearSelect
+              slug={community.slug}
+              year={edition.year}
+              years={yearOptions}
+            />
+          </div>
           <p className="mt-4 max-w-xl text-muted">
             {editionIntroCopy(edition.status)}
           </p>
@@ -252,32 +402,40 @@ export default async function CommunityEditionYearPage({
             slug={community.slug}
             year={edition.year}
             mode={mode}
+            view={view}
             meta={resultsBundle.meta}
             topTen={resultsBundle.topTen}
-            categories={resultsBundle.categories}
+            categoryPodiums={resultsBundle.categoryPodiums}
+            categoryPickStrips={resultsBundle.categoryPickStrips}
+            categoryMeta={resultsBundle.categoryMeta}
             voters={resultsBundle.voters}
             matrix={resultsBundle.matrix}
             yourProfileId={profile?.id ?? null}
+            yourBallot={
+              profile && isMember
+                ? {
+                    items: ballot?.items ?? [],
+                    categoryVotes: ballot?.categoryVotes ?? [],
+                    categories: awardCategories,
+                  }
+                : null
+            }
+            publicBallot={resultsBundle.publicBallot}
+            voterUsername={voterUsername || null}
           />
-          {profile && isMember ? (
-            <div className="mt-14 border-t border-line pt-8">
-              <h3 className="font-display text-2xl tracking-wide text-ink">
-                Your ballot
-              </h3>
-              <EditionBallotReadonly
-                items={ballot?.items ?? []}
-                categoryVotes={ballot?.categoryVotes ?? []}
-                categories={awardCategories}
-                emptyMessage="You did not submit a ballot for this edition."
-              />
-            </div>
-          ) : null}
         </section>
       ) : (
         <section className="mt-10 border-t border-line pt-8">
-          <h2 className="font-display text-3xl tracking-wide text-ink">
-            Game of the Year
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+            <h2 className="font-display text-3xl tracking-wide text-ink">
+              Game of the Year
+            </h2>
+            <EditionYearSelect
+              slug={community.slug}
+              year={edition.year}
+              years={yearOptions}
+            />
+          </div>
           <p className="mt-4 max-w-xl text-muted">
             {editionIntroCopy(edition.status)}
           </p>

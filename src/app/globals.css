@@ -67,3 +67,13 @@ body {
 .skeleton-pulse {
   animation: skeleton-pulse 1.4s var(--ease-standard) infinite;
 }
+
+/* Hide scrollbars on intentional horizontal strips (drag / touch / trackpad). */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}

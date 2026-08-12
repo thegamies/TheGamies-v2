@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import {
   StandingGameCard,
   StandingGameCardGrid,
@@ -20,28 +20,23 @@ export function EditionFullStandings({
   slug,
   year,
   mode,
-  beyondTopTen,
+  totalGames,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
-  beyondTopTen: number;
+  totalGames: number;
 }) {
-  const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  if (beyondTopTen <= 0) return null;
-
-  async function loadPage(nextPage: number, append: boolean) {
-    setError(null);
+  async function fetchPage(nextPage: number): Promise<StandingsPayload> {
     const params = new URLSearchParams({
       mode,
       page: String(nextPage),
-      afterPlace: "10",
     });
     const res = await fetch(
       `/api/communities/${encodeURIComponent(slug)}/edition/${year}/standings?${params}`,
@@ -49,72 +44,77 @@ export function EditionFullStandings({
     if (!res.ok) {
       throw new Error("Could not load standings.");
     }
-    const data = (await res.json()) as StandingsPayload;
-    setPage(data.page);
-    setTotalPages(data.totalPages);
-    setRows((prev) => (append ? [...prev, ...data.rows] : data.rows));
+    return (await res.json()) as StandingsPayload;
   }
 
-  function expand() {
+  useEffect(() => {
+    let cancelled = false;
+    setRows([]);
+    setPage(0);
+    setError(null);
     startTransition(async () => {
       try {
-        await loadPage(1, false);
-        setOpen(true);
+        const data = await fetchPage(1);
+        if (cancelled) return;
+        setPage(data.page);
+        setTotalPages(data.totalPages);
+        setRows(data.rows);
       } catch {
-        setError("Could not load full standings. Try again.");
+        if (!cancelled) {
+          setError("Could not load full standings. Try again.");
+        }
       }
     });
-  }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- board identity only
+  }, [slug, year, mode]);
 
   function loadMore() {
     startTransition(async () => {
       try {
-        await loadPage(page + 1, true);
+        setError(null);
+        const data = await fetchPage(page + 1);
+        setPage(data.page);
+        setTotalPages(data.totalPages);
+        setRows((prev) => [...prev, ...data.rows]);
       } catch {
         setError("Could not load more standings. Try again.");
       }
     });
   }
 
-  function collapse() {
-    setOpen(false);
+  if (totalGames <= 0) {
+    return (
+      <section>
+        <h3 className="font-display text-3xl tracking-wide text-ink">
+          Full standings
+        </h3>
+        <p className="mt-4 text-sm text-muted">
+          No Game of the Year scores for this board yet.
+        </p>
+      </section>
+    );
   }
 
   return (
-    <section className="border-t border-line pt-10">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h3 className="font-display text-3xl tracking-wide text-ink">
-            Full standings
-          </h3>
-          <p className="mt-2 text-sm text-muted">
-            {beyondTopTen} more game{beyondTopTen === 1 ? "" : "s"} beyond the
-            top 10.
-          </p>
-        </div>
-        {!open ? (
-          <button
-            type="button"
-            onClick={expand}
-            disabled={pending}
-            className="border border-line px-3 py-2 text-sm text-ink hover:border-accent disabled:opacity-60"
-          >
-            {pending ? "Loading…" : "Show full standings"}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={collapse}
-            className="border border-line px-3 py-2 text-sm text-muted hover:border-accent hover:text-ink"
-          >
-            Hide
-          </button>
-        )}
-      </div>
+    <section>
+      <h3 className="font-display text-3xl tracking-wide text-ink">
+        Full standings
+      </h3>
+      <p className="mt-2 text-sm text-muted">
+        {totalGames} game{totalGames === 1 ? "" : "s"} on the{" "}
+        {mode === "voices" ? "Voices" : "Community"} board.
+      </p>
 
       {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
 
-      {open ? (
+      {rows.length === 0 && pending ? (
+        <p className="mt-6 text-sm text-muted">Loading standings…</p>
+      ) : null}
+
+      {rows.length > 0 ? (
         <>
           <StandingGameCardGrid>
             {rows.map((row) => (

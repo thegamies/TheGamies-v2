@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { navItemClass } from "@/components/ui/navLevels";
 import {
   showEditionNav,
   type EditionStatus,
@@ -13,6 +14,7 @@ type Props = {
   active: "overview" | "live" | "edition" | "settings";
 };
 
+/** Primary community section switcher (bordered chips). */
 export function CommunityNav({
   slug,
   liveEnabled,
@@ -51,11 +53,7 @@ export function CommunityNav({
         <Link
           key={item.key}
           href={item.href}
-          className={`border px-3 py-1.5 text-sm tracking-wide transition-colors ${
-            active === item.key
-              ? "border-accent text-accent"
-              : "border-line text-muted hover:border-accent hover:text-ink"
-          }`}
+          className={navItemClass("primary", active === item.key)}
         >
           {item.label}
         </Link>

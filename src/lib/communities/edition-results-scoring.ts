@@ -5,6 +5,14 @@ export type EditionResultMode = "combined" | "community" | "voices";
 /** Public UI modes until weighted Combined exists. */
 export type EditionResultsPublicMode = "community" | "voices";
 
+/** Ceremony narrative, full GOTY board, category awards, voters, or the viewer's ballot. */
+export type EditionResultsViewId =
+  | "overview"
+  | "standings"
+  | "categories"
+  | "voters"
+  | "ballot";
+
 /** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
   mode: EditionResultMode,
@@ -18,6 +26,16 @@ export function parseEditionResultMode(
   if (raw === "voices") return "voices";
   // "combined" redirects to community until weighted Combined ships
   return "community";
+}
+
+export function parseEditionResultsView(
+  raw: string | undefined,
+): EditionResultsViewId {
+  if (raw === "standings") return "standings";
+  if (raw === "categories") return "categories";
+  if (raw === "voters") return "voters";
+  if (raw === "ballot") return "ballot";
+  return "overview";
 }
 
 export type RankedBallotLine = {

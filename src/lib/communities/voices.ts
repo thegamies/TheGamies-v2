@@ -128,6 +128,7 @@ export async function listMembersWithEditionVoiceFlags(
     profileId: string;
     username: string;
     displayName: string;
+    role: "admin" | "member";
     isVoice: boolean;
   }>
 > {
@@ -136,6 +137,7 @@ export async function listMembersWithEditionVoiceFlags(
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      role: communityMembers.role,
     })
     .from(communityMembers)
     .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
@@ -146,7 +148,10 @@ export async function listMembersWithEditionVoiceFlags(
 
   const voiceIds = await listEditionVoiceProfileIds(editionId, db);
   return members.map((m) => ({
-    ...m,
+    profileId: m.profileId,
+    username: m.username,
+    displayName: m.displayName,
+    role: m.role === "admin" ? "admin" : "member",
     isVoice: voiceIds.has(m.profileId),
   }));
 }

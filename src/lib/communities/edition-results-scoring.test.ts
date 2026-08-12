@@ -3,6 +3,7 @@ import {
   aggregateEditionCategories,
   aggregateEditionGoty,
   parseEditionResultMode,
+  parseEditionResultsView,
   storageModeFor,
   type GameMeta,
 } from "./edition-results-scoring";
@@ -38,6 +39,17 @@ describe("storageModeFor / parseEditionResultMode", () => {
     expect(parseEditionResultMode("combined")).toBe("community");
     expect(parseEditionResultMode(undefined)).toBe("community");
     expect(parseEditionResultMode("voices")).toBe("voices");
+  });
+});
+
+describe("parseEditionResultsView", () => {
+  it("defaults to overview and accepts standings, categories, voters, and ballot", () => {
+    expect(parseEditionResultsView(undefined)).toBe("overview");
+    expect(parseEditionResultsView("overview")).toBe("overview");
+    expect(parseEditionResultsView("standings")).toBe("standings");
+    expect(parseEditionResultsView("categories")).toBe("categories");
+    expect(parseEditionResultsView("voters")).toBe("voters");
+    expect(parseEditionResultsView("ballot")).toBe("ballot");
   });
 });
 

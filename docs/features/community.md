@@ -54,7 +54,7 @@ Hosts create editions and set the three times under Settings (optional “set to
 - Cover/avatar upload
 - Site-admin-only create gate
 - Per-community / multi / ranked edition category modes
-- Full all-member ballot matrix virtualization / individual public ballot deep-links beyond voter list + Voices columns
+- Full all-member ballot matrix virtualization
 
 ## Public shell
 
@@ -113,13 +113,15 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Voices (shipped)
 
-Hosts designate Voices **per edition** under Settings (`community_edition_voices`). Roster is year-specific and locks after publish.
+Hosts designate Voices **per edition** under Settings (`community_edition_voices`). The Voices list defaults to **hosts + current Voices**; hosts **search members** by name or @username to designate others. Roster is year-specific and locks after publish.
 
 ### Results (shipped)
 
 On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public mode switcher is **Community · Voices** (Combined hidden until weighted scoring). GOTY and voters are **SQL-paginated** (50). Categories load in full (small).
 
-**Ballot matrix:** published results include parallel top-10 lists in a horizontally scrollable table — sticky rank column only; You · Community · Voices · each Voice scroll with the table.
+**Ballot matrix:** Overview includes parallel top-10 lists in a horizontally scrollable table — sticky rank column only; You · Community · Voices · each Voice scroll with the table.
+
+**Views:** Highlights · Full standings · Categories · Voters · Your ballot (`?view=`; default is Highlights / `overview`) as **secondary** underline tabs; Community · Voices as **tertiary** text toggle on the same toolbar (hidden on Your ballot; Voices filters the Voters list). Your ballot is members only. Multi-year switching is a pop-open year control to the right of the Results (or Game of the Year) heading — only when 2+ public years exist. Highlights shows category podiums + links; Categories tab loads paginated cover-card tallies (10/page); Voters is SQL-paginated with search. Voice / voter **display names** open `?view=ballot&voter=username` (frozen ballot); **@username** goes to profile.
 
 **Recalc rules:** first time status becomes `published`, freeze from current ballots. While still published, schedule tweaks do **not** rebuild. If the edition leaves published (reopen voting) and publishes again, results **rebuild**. Ops `/admin/communities` “Publish / rebuild results” always rebuilds.
 

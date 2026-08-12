@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
@@ -56,7 +57,15 @@ export function EditionScheduleForm({
         <h3 className="font-display text-2xl tracking-wide text-ink">
           {year} edition
         </h3>
-        <p className="text-sm text-muted">{editionStatusLabel(status)}</p>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+          <p className="text-muted">{editionStatusLabel(status)}</p>
+          <Link
+            href={`/communities/${encodeURIComponent(slug)}/edition/${year}`}
+            className="text-ink underline-offset-4 hover:underline"
+          >
+            View edition
+          </Link>
+        </div>
       </div>
       <p className="mt-2 text-sm text-muted">
         Voting opens, voting closes, then results publish — status follows these

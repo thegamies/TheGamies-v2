@@ -1,18 +1,28 @@
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
-import type {
-  EditionBallotCategoryVoteView,
-  EditionBallotItemView,
-} from "@/lib/communities/ballots";
 
 type CategoryMeta = {
   id: string;
   label: string;
 };
 
+type BallotItem = {
+  gameId: string;
+  title: string;
+  coverUrl: string | null;
+  rank: number;
+  blurb?: string | null;
+};
+
+type CategoryVote = {
+  categoryId: string;
+  title: string;
+  coverUrl: string | null;
+};
+
 type Props = {
-  items: EditionBallotItemView[];
-  categoryVotes: EditionBallotCategoryVoteView[];
+  items: BallotItem[];
+  categoryVotes: CategoryVote[];
   categories: CategoryMeta[];
   emptyMessage: string;
 };
