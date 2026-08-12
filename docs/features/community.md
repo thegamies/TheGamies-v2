@@ -9,7 +9,30 @@
 
 Communities may turn **live rankings** on or off. Editions are the end-of-year ceremony flow.
 
-## Public shell (edition-aware)
+## Identity + membership (shipped)
+
+Signed-in users with a **profile** can **create** a community. The creator is the first internal `admin` member. Anyone signed in with a profile may **join or leave** (open membership). The last host cannot leave.
+
+Public UI never says admin / judge / expert — members are listed by display name. Internal role is `admin` | `member`.
+
+`liveRankingsEnabled` exists on the row (default false) but there is **no Live tab or toggle** yet.
+
+### URLs
+
+- `/communities` — public directory
+- `/communities/new` — signed-in create (requires profile)
+- `/communities/[slug]` — public home (identity, members, join/leave)
+- Profile `/u/[username]` lists communities the person belongs to
+
+### Non-goals (this slice)
+
+- Editions, ballots, Voices, frozen results
+- Community live rankings UI / `SUM(contrib)` board / lock
+- Invite-only or approval join, bans, extra roles
+- Settings surface, cover/avatar upload
+- Site-admin-only create gate
+
+## Public shell (edition-aware, later)
 
 ```text
 Community identity
@@ -30,6 +53,7 @@ Settings and event management live on a separate administrative surface.
 - Fed by signed-in lists only (same abuse rule as site aggregate)
 - Community admin can lock/unlock for suspense
 - Not fed by edition ballots; not written into frozen edition snapshots
+- Later boards should `SUM(live_goty_contrib)` for member profiles — not filter `live_goty_scores`
 
 ## Editions
 

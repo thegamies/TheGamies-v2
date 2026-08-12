@@ -26,6 +26,12 @@ export default function HomePage() {
         >
           Browse games
         </Link>
+        <Link
+          href="/communities"
+          className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
+        >
+          Communities
+        </Link>
       </div>
     </main>
   );

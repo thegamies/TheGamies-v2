@@ -189,6 +189,42 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/** Public community that can later host live rankings and editions. */
+export const communities = pgTable("communities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  createdByProfileId: uuid("created_by_profile_id").references(
+    () => profiles.id,
+    { onDelete: "set null" },
+  ),
+  liveRankingsEnabled: boolean("live_rankings_enabled")
+    .notNull()
+    .default(false),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** Open membership. role is internal (`admin` | `member`); public UI does not say admin. */
+export const communityMembers = pgTable(
+  "community_members",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    role: text("role").notNull().default("member"),
+    joinedAt: timestamp("joined_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.profileId] }),
+    index("community_members_profile_id_idx").on(t.profileId),
+  ],
+);
+
 /** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
 export const lists = pgTable(
   "lists",

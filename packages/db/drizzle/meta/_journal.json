@@ -50,6 +50,13 @@
       "when": 1786480000000,
       "tag": "0006_live_goty_scores_year_score_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786485000000,
+      "tag": "0007_communities",
+      "breakpoints": true
     }
   ]
 }

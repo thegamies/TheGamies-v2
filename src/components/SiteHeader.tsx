@@ -28,6 +28,9 @@ export async function SiteHeader() {
           <Link href="/game-of-the-year" className="hover:text-ink">
             Standings
           </Link>
+          <Link href="/communities" className="hover:text-ink">
+            Communities
+          </Link>
           <Link href="/create" className="hover:text-ink">
             Create
           </Link>
