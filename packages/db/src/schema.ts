@@ -229,18 +229,81 @@ export const communityMembers = pgTable(
   ],
 );
 
-/** Frozen community live board for one year while rankings are locked. */
-export const communityLiveLockSnapshots = pgTable(
-  "community_live_lock_snapshots",
+/** Frozen community live board for one year while rankings are locked.
+ * Normalized rows so page reads use SQL LIMIT — not a fat JSONB blob.
+ */
+export const communityLiveLockMeta = pgTable(
+  "community_live_lock_meta",
   {
     communityId: uuid("community_id")
       .notNull()
       .references(() => communities.id, { onDelete: "cascade" }),
     year: integer("year").notNull(),
-    payload: jsonb("payload").notNull(),
+    listCount: integer("list_count").notNull().default(0),
+    gotyTotal: integer("goty_total").notNull().default(0),
     lockedAt: timestamp("locked_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.communityId, t.year] })],
+);
+
+export const communityLiveLockGoty = pgTable(
+  "community_live_lock_goty",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    gameYear: integer("game_year"),
+    coverUrl: text("cover_url"),
+    score: integer("score").notNull(),
+    listMentions: integer("list_mentions").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.year, t.place] }),
+    index("community_live_lock_goty_page_idx").on(
+      t.communityId,
+      t.year,
+      t.place,
+    ),
+  ],
+);
+
+export const communityLiveLockCategoryRows = pgTable(
+  "community_live_lock_category_rows",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    categoryId: text("category_id").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+    voteCount: integer("vote_count").notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.communityId, t.year, t.categoryId, t.place],
+    }),
+    index("community_live_lock_category_rows_idx").on(
+      t.communityId,
+      t.year,
+      t.categoryId,
+    ),
+  ],
 );
 
 /**

@@ -19,7 +19,7 @@ Public UI never says admin / judge / expert — members are listed by display na
 
 **Reveal gate:** ranks public. Scores stay hidden until `live_scores_visible_from` (null = hidden for every year; set a date, reveal now, or clear to hide). Hosts manage this under Settings.
 
-**Lock:** hosts can freeze the public board (`live_rankings_locked`). Lock stores a snapshot (`community_live_lock_snapshots`); member list changes do not move standings until unlock. Current year is snapshotted on lock; other years snapshot lazily on first view.
+**Lock:** hosts can freeze the public board (`live_rankings_locked`). Lock stores **normalized** freeze rows (`community_live_lock_meta` / `_goty` / `_category_rows`); page reads use SQL `LIMIT`. Member list changes do not move standings until unlock. Current year is snapshotted on lock; other years snapshot lazily on first view. Unlock deletes freeze rows.
 
 ## Edition schedule shell (shipped)
 
@@ -76,7 +76,7 @@ Settings and event management live on a separate administrative surface.
 - Fed by signed-in lists only (same abuse rule as site aggregate)
 - Board is `SUM(live_*_contrib)` for current members — not `live_*_scores`
 - Ranks public; scores from host date (`live_scores_visible_from`) for every live year
-- Hosts can **lock** to freeze the public board (snapshot; unlock resumes live SUM)
+- Hosts can **lock** to freeze the public board (normalized freeze rows + SQL pagination; unlock resumes live SUM)
 - Not fed by edition ballots; not written into frozen edition snapshots
 
 ## Editions

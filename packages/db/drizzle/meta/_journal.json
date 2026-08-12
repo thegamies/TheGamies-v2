@@ -92,6 +92,13 @@
       "when": 1786500000000,
       "tag": "0012_community_edition_ballots",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786503000000,
+      "tag": "0013_community_live_lock_rows",
+      "breakpoints": true
     }
   ]
 }

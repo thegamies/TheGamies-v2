@@ -61,6 +61,21 @@ Rules:
 - `.env.example` documents required variables; real secrets stay in host dashboards / GitHub Actions / local env only.
 - Dual-host setup details: [deployment.md](./deployment.md).
 
+## Request cost (compute · egress · scale)
+
+Every hot read path should be cheap under growth—not only correct for a small fixture.
+
+Before choosing freeze/cache/list storage, walk the request:
+
+1. **DB egress** — Bytes from Neon to the app per page view. Avoid patterns that pull an entire freeze blob to serve 50 rows.
+2. **Compute** — Parse/serialize and memory on Vercel **and** Cloudflare Workers for that payload.
+3. **Scale** — Behavior at 10× ballots, games, or traffic. Prefer SQL `LIMIT`/`OFFSET` (or keyset) on normalized freeze rows over “load all, slice in memory.”
+
+**Do:** page-sized queries; small meta; client gets only what it renders.  
+**Don’t:** fat `jsonb` snapshots on the hot path for boards or voter matrices.
+
+Live lock and edition results freeze into **tables**, not one giant payload. See `.cursor/rules/request-cost.mdc`.
+
 ## Deployment
 
 1. Branch from `develop` → open PR **into `develop`**.

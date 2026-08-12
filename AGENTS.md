@@ -55,7 +55,8 @@ Full rules: `docs/engineering.md`. Short form:
 3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
 5. **Features ship with tests** in the same PR: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI. See `docs/engineering.md`.
-6. After finishing a task or substantive reply, always propose **What’s next**.
+6. **Request cost:** before freeze/list/cache designs, check DB egress, compute (Vercel + Workers), and 10× scale — prefer SQL-paginated rows over fat blobs. See `docs/engineering.md` / `.cursor/rules/request-cost.mdc`.
+7. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification
 
