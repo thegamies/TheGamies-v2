@@ -78,6 +78,34 @@
       "when": 1786494000000,
       "tag": "0010_community_live_lock",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786497000000,
+      "tag": "0011_community_editions",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786500000000,
+      "tag": "0012_community_edition_ballots",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786503000000,
+      "tag": "0013_community_live_lock_rows",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786506000000,
+      "tag": "0014_community_edition_voices_results",
+      "breakpoints": true
     }
   ]
 }

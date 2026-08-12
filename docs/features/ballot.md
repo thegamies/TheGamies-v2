@@ -10,15 +10,25 @@ Ballots belong to **editions** only (not live rankings).
 - Reordering must feel direct and stable
 - States: empty, partial, review, submitted, locked (after deadline / close)
 
+### Storage (shipped)
+
+Tables `community_edition_ballots` + `community_edition_ballot_items` — **not** personal `lists`, **not** `live_*_contrib`.
+
+- **Eligibility:** signed-in community members (open membership for now)
+- **Edit:** allowed while edition status is `open` (until `closesAt`); read-only after close/publish
+- GOTY eligibility matches personal GOTY helpers (`gotyEligibilityError`)
+
 ## Categories
 
 - Live alongside the main GOTY ballot; remain conceptually separate
-- Site-wide category definitions **and** per-community categories (both in v1)
-- Each category shows its voting rule clearly
-- Support single-choice, multi-choice, or ranked for **edition** categories (exact modes still open for communities/editions)
+- **Edition ballots:** site `award_categories` **single-choice** only
+- Per-community / multi / ranked edition category modes deferred
 - **Site live** categories (owned GOTY lists): single-choice locked — see [live-aggregate.md](./live-aggregate.md) / decisions
-- Avoid a long generic form; use artwork and clear selection states
 
-## Open decisions that still block full behavior
+## Voices
 
-See `docs/decisions.md`: Combined Voice weight, edit-before-deadline, exact category modes, tie-break, eligibility.
+Hosts designate Voices **per edition** (Settings). Historical rosters stay with the year; locked after publish.
+
+## Open decisions that still block polish
+
+See `docs/decisions.md`: degrading score curve beyond top 10, richer voter matrix, invite-only eligibility, moderation.

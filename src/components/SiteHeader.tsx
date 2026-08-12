@@ -6,11 +6,20 @@ import {
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { Button } from "@/components/ui/Button";
 
+/** Local + preview only — never on Vercel production. Opt-in elsewhere via SHOW_DESIGN_SYSTEM=1. */
+function showDesignSystemNav(): boolean {
+  if (process.env.VERCEL_ENV === "production") return false;
+  if (process.env.NODE_ENV === "development") return true;
+  if (process.env.VERCEL_ENV === "preview") return true;
+  return process.env.SHOW_DESIGN_SYSTEM === "1";
+}
+
 export async function SiteHeader() {
   const user = await getRequestSessionUser();
   const profile = user?.id
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
+  const designSystem = showDesignSystemNav();
 
   return (
     <header className="border-b border-line">
@@ -34,6 +43,11 @@ export async function SiteHeader() {
           <Link href="/create" className="hover:text-ink">
             Create
           </Link>
+          {designSystem ? (
+            <Link href="/design-system" className="hover:text-ink">
+              Design system
+            </Link>
+          ) : null}
           <Link href="/admin" className="hover:text-ink">
             Admin
           </Link>

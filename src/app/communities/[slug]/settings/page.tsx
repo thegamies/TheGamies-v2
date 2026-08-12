@@ -6,11 +6,19 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import {
+  listEditionsForCommunity,
+  pickFeaturedEdition,
+  type CommunityEditionPublic,
+} from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { listMembersWithEditionVoiceFlags } from "@/lib/communities/voices";
+import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
+import type { EditionVoiceMemberOption } from "./EditionVoicesForm";
 
 type Params = Promise<{ slug: string }>;
 
@@ -45,6 +53,28 @@ export default async function CommunitySettingsPage({
     redirect(`/communities/${community.slug}`);
   }
 
+  let editions: CommunityEditionPublic[] = [];
+  try {
+    editions = await listEditionsForCommunity(community.id);
+  } catch {
+    editions = [];
+  }
+  const featured = pickFeaturedEdition(editions);
+  const featuredStatus =
+    featured && featured.status !== "draft" ? featured.status : null;
+
+  const voicesByEditionId: Record<string, EditionVoiceMemberOption[]> = {};
+  for (const edition of editions) {
+    try {
+      voicesByEditionId[edition.id] = await listMembersWithEditionVoiceFlags(
+        community.id,
+        edition.id,
+      );
+    } catch {
+      voicesByEditionId[edition.id] = [];
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">
@@ -61,6 +91,7 @@ export default async function CommunitySettingsPage({
         slug={community.slug}
         liveEnabled={community.liveRankingsEnabled}
         canManage
+        editionStatus={featuredStatus}
         active="settings"
       />
 
@@ -88,6 +119,12 @@ export default async function CommunitySettingsPage({
           }
         />
       </section>
+
+      <EditionSettings
+        slug={community.slug}
+        editions={editions}
+        voicesByEditionId={voicesByEditionId}
+      />
     </main>
   );
 }

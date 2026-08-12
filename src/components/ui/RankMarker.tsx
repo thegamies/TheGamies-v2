@@ -7,7 +7,8 @@ type RankMarkerProps = {
 const sizeClass = {
   sm: "text-sm min-w-6",
   md: "text-xl min-w-8",
-  lg: "text-4xl min-w-12",
+  /** Scales down on narrow viewports so podium ranks fit a 360px layout. */
+  lg: "text-2xl min-w-8 sm:text-4xl sm:min-w-12",
 };
 
 export function RankMarker({

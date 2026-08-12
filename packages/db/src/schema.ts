@@ -229,18 +229,161 @@ export const communityMembers = pgTable(
   ],
 );
 
-/** Frozen community live board for one year while rankings are locked. */
-export const communityLiveLockSnapshots = pgTable(
-  "community_live_lock_snapshots",
+/** Frozen community live board for one year while rankings are locked.
+ * Normalized rows so page reads use SQL LIMIT — not a fat JSONB blob.
+ */
+export const communityLiveLockMeta = pgTable(
+  "community_live_lock_meta",
   {
     communityId: uuid("community_id")
       .notNull()
       .references(() => communities.id, { onDelete: "cascade" }),
     year: integer("year").notNull(),
-    payload: jsonb("payload").notNull(),
+    listCount: integer("list_count").notNull().default(0),
+    gotyTotal: integer("goty_total").notNull().default(0),
     lockedAt: timestamp("locked_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [primaryKey({ columns: [t.communityId, t.year] })],
+);
+
+export const communityLiveLockGoty = pgTable(
+  "community_live_lock_goty",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    gameYear: integer("game_year"),
+    coverUrl: text("cover_url"),
+    score: integer("score").notNull(),
+    listMentions: integer("list_mentions").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.year, t.place] }),
+    index("community_live_lock_goty_page_idx").on(
+      t.communityId,
+      t.year,
+      t.place,
+    ),
+  ],
+);
+
+export const communityLiveLockCategoryRows = pgTable(
+  "community_live_lock_category_rows",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    categoryId: text("category_id").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+    voteCount: integer("vote_count").notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.communityId, t.year, t.categoryId, t.place],
+    }),
+    index("community_live_lock_category_rows_idx").on(
+      t.communityId,
+      t.year,
+      t.categoryId,
+    ),
+  ],
+);
+
+/**
+ * Year awards ceremony for a community.
+ * Public status is computed from opensAt / closesAt / publishesAt (no stored status).
+ */
+export const communityEditions = pgTable(
+  "community_editions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    opensAt: timestamp("opens_at", { mode: "date" }),
+    closesAt: timestamp("closes_at", { mode: "date" }),
+    publishesAt: timestamp("publishes_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("community_editions_community_id_year_uidx").on(
+      t.communityId,
+      t.year,
+    ),
+    index("community_editions_community_id_idx").on(t.communityId),
+  ],
+);
+
+/**
+ * Member GOTY ballot for one community edition.
+ * Separate from personal `lists` and from live contrib.
+ */
+export const communityEditionBallots = pgTable(
+  "community_edition_ballots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    submittedAt: timestamp("submitted_at", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("community_edition_ballots_edition_profile_uidx").on(
+      t.editionId,
+      t.profileId,
+    ),
+    index("community_edition_ballots_edition_id_idx").on(t.editionId),
+  ],
+);
+
+export const communityEditionBallotItems = pgTable(
+  "community_edition_ballot_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => communityEditionBallots.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    blurb: text("blurb"),
+  },
+  (t) => [
+    uniqueIndex("community_edition_ballot_items_ballot_rank_uidx").on(
+      t.ballotId,
+      t.rank,
+    ),
+    uniqueIndex("community_edition_ballot_items_ballot_game_uidx").on(
+      t.ballotId,
+      t.gameId,
+    ),
+  ],
 );
 
 /** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
@@ -314,6 +457,200 @@ export const listCategoryVotes = pgTable(
       .references(() => games.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.listId, t.categoryId] })],
+);
+
+/** Site award_categories single-choice picks on an edition ballot. */
+export const communityEditionBallotCategoryVotes = pgTable(
+  "community_edition_ballot_category_votes",
+  {
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => communityEditionBallots.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.ballotId, t.categoryId] })],
+);
+
+/** Per-edition Voice designation (year history; not a mutable member flag). */
+export const communityEditionVoices = pgTable(
+  "community_edition_voices",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    designatedAt: timestamp("designated_at", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    designatedByProfileId: uuid("designated_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId] }),
+    index("community_edition_voices_edition_id_idx").on(t.editionId),
+  ],
+);
+
+/** Write-once edition results meta (no fat JSONB). */
+export const communityEditionResultMeta = pgTable("community_edition_result_meta", {
+  editionId: uuid("edition_id")
+    .primaryKey()
+    .references(() => communityEditions.id, { onDelete: "cascade" }),
+  frozenAt: timestamp("frozen_at", { mode: "date" }).defaultNow().notNull(),
+  ballotCountCommunity: integer("ballot_count_community").notNull().default(0),
+  ballotCountVoices: integer("ballot_count_voices").notNull().default(0),
+  gotyTotalCommunity: integer("goty_total_community").notNull().default(0),
+  gotyTotalVoices: integer("goty_total_voices").notNull().default(0),
+});
+
+/** Frozen GOTY standings row. mode: community | voices (Combined reads community). */
+export const communityEditionResultGoty = pgTable(
+  "community_edition_result_goty",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    gameYear: integer("game_year"),
+    coverUrl: text("cover_url"),
+    points: integer("points").notNull(),
+    firstPlaceVotes: integer("first_place_votes").notNull().default(0),
+    appearances: integer("appearances").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.mode, t.place] }),
+    uniqueIndex("community_edition_result_goty_game_uidx").on(
+      t.editionId,
+      t.mode,
+      t.gameId,
+    ),
+    index("community_edition_result_goty_page_idx").on(
+      t.editionId,
+      t.mode,
+      t.place,
+    ),
+  ],
+);
+
+export const communityEditionResultCategories = pgTable(
+  "community_edition_result_categories",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+    votes: integer("votes").notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.editionId, t.mode, t.categoryId, t.place],
+    }),
+    index("community_edition_result_categories_idx").on(
+      t.editionId,
+      t.mode,
+      t.categoryId,
+    ),
+  ],
+);
+
+export const communityEditionResultVoters = pgTable(
+  "community_edition_result_voters",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    isVoice: boolean("is_voice").notNull().default(false),
+    displayName: text("display_name").notNull(),
+    username: text("username").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId] }),
+    index("community_edition_result_voters_name_idx").on(
+      t.editionId,
+      t.displayName,
+    ),
+  ],
+);
+
+export const communityEditionResultVoterRanks = pgTable(
+  "community_edition_result_voter_ranks",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId, t.rank] }),
+    index("community_edition_result_voter_ranks_voter_idx").on(
+      t.editionId,
+      t.profileId,
+    ),
+  ],
+);
+
+export const communityEditionResultVoterCategoryPicks = pgTable(
+  "community_edition_result_voter_category_picks",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId, t.categoryId] }),
+  ],
 );
 
 /**

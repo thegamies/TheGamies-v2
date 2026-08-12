@@ -9,6 +9,7 @@ import {
 } from "@/lib/auth/session";
 import { getCommunityLiveStandings } from "@/lib/communities/live";
 import { isCommunityLiveScoresRevealed } from "@/lib/communities/live-reveal";
+import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
@@ -77,6 +78,17 @@ export default async function CommunityLiveYearPage({
   const current = new Date().getUTCFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => current - i);
 
+  let featuredEdition = null;
+  try {
+    featuredEdition = await getFeaturedEditionForCommunity(community.id);
+  } catch {
+    featuredEdition = null;
+  }
+  const editionStatus =
+    featuredEdition && featuredEdition.status !== "draft"
+      ? featuredEdition.status
+      : null;
+
   let standings;
   try {
     standings = await getCommunityLiveStandings(community.id, y, {
@@ -118,6 +130,7 @@ export default async function CommunityLiveYearPage({
         slug={community.slug}
         liveEnabled
         canManage={canManage}
+        editionStatus={editionStatus}
         active="live"
       />
 

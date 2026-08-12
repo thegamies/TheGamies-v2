@@ -35,19 +35,24 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-11 | Profile access control | **App-layer** session checks (`auth.getSession`) + ownership on profile writes. **Postgres RLS deferred** until Auth JWT → DB role is defined — do not invent policies yet |
 | 2026-08-11 | List drafts / Save / Share | **No list status column.** Signed-in create attaches owned list (slug + profile) immediately. Anon: draft cookie until Share → `/l/[publicId]`; claim → `/u/[username]/[slug]`. Owned `/l/[publicId]` redirects to slug URL. **Save** signed-in only. Notes require sign-in. |
 | 2026-08-11 | Site live aggregate | **`live_goty_contrib` / `live_category_contrib` = scoring truth**; **`live_*_scores` = disposable cache**. Save replaces contrib + marks dirty keys; **async/lazy locked absolute SUM refresh** (saves do not contend on score rows). **`standingsVersion` bumps only after refresh succeeds**. Reveal gate: ranks public, scores/votes hidden until admin reveals. Site live categories: **single-choice** on owned GOTY; plurality. Community later = `SUM(contrib)` for members (no save fan-out). |
-| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only / edition ballot eligibility still open. |
+| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only membership deferred. |
 | 2026-08-12 | Community live reveal | One community date: **`live_scores_visible_from`** (null = scores hidden for **all** live years). Hosts set date / reveal now / hide under Settings. |
-| 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board via **`community_live_lock_snapshots`** (current year eager; other years lazy). Unlock discards snapshots and resumes live `SUM(contrib)`. |
+| 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board into **normalized** `community_live_lock_*` tables (SQL-paginated reads). Unlock discards rows and resumes live `SUM(contrib)`. No fat JSONB on the hot path. |
+| 2026-08-12 | Request cost (reads) | Hot paths must consider **DB egress + compute + scale**. Prefer normalized freeze rows + SQL pagination; avoid fat JSONB blobs that force full read/parse per page. See `docs/engineering.md` / `.cursor/rules/request-cost.mdc`. |
+| 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. |
+| 2026-08-12 | Edition ballot eligibility | **Open community members** (signed-in profile + `community_members` row, including hosts). Invite-only / approval gates deferred. |
+| 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
+| 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
+| 2026-08-12 | Edition Voices | **Per-edition** host designation among community members (`community_edition_voices`). Year history retained; roster immutable after publish. |
+| 2026-08-12 | Edition Combined scoring | **Deferred from public UI** until Voice weight exists. Results show **Community · Voices** only. Combined ≡ Community under simple union is not shown as a third tab. |
+| 2026-08-12 | Edition results freeze | Write-once when first published. **Rebuild** if edition leaves published then publishes again, or via ops rebuild. Never silent overwrite while staying published. |
 
 ## Open (block dependent work until decided)
 
-- Exact scoring formula for Combined (Community + Voice weight / %)
 - Exact degrading score curve when scoring expands beyond top 10
-- Edition / community category voting modes beyond site-live single-choice
-- Community membership and edition ballot eligibility rules
-- Whether submitted edition ballots can be edited before the deadline
-- Tie-breaking rules (editions + live)
-- Edition result publication timing (manual publish vs auto on close)
+- Edition / community category voting modes beyond site single-choice
+- Invite-only / approval membership and any eligibility beyond open members
+- Tie-breaking rules beyond the freeze defaults (points → #1s → appearances → gameId)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

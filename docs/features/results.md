@@ -1,45 +1,48 @@
 # Results
 
-The final results page is the primary design-system foundation. Build it with realistic static fixtures before wiring production data.
+The final results page is the primary design-system foundation.
 
-## Page narrative
+## Page narrative (shipped on Edition tab when published)
 
-1. Celebratory winner reveal  
-2. Second- and third-place  
-3. Complete top-ten standings  
-4. Combined / Community / Voices comparison  
-5. Individual-ballot exploration  
-6. Category winners and vote breakdowns  
+One results toolbar under the Results heading:
 
-## Winner area
+- **Secondary** underline tabs: Highlights · Full standings · Categories · Voters · Your ballot (members only)  
+- **Tertiary** text toggle: Community · Voices (hidden on Your ballot)  
 
-Large winner artwork, rank marker, title, total points, first-place vote count, ballot count, short editorial explanation; smaller second/third treatments.
+Multi-year switching is a pop-open year control beside the Results heading (2+ public years). Community Overview · Live · Edition · Settings stay **primary** bordered chips. See `docs/design-system.md` → Navigation hierarchy.
 
-## Standings modes
+**Highlights** (`?view=` default / `overview`)
 
-Single surface with:
+1. **GOTY Top 3** — celebratory podium (#1 · #2 · #3)  
+2. **Rest of the Top 10** — places 4–10 in one row (fits wide desktop; horizontal scroll on smaller screens) → link to **Full standings** when more than 10  
+3. Ballot matrix (page-sticky column headers synced to horizontal pan; drag / prev·next)  
+4. Category podiums (#1 · #2 · #3 left-aligned, tops aligned; fluid covers fit 360px without sideways scroll) → link to **Categories**  
+
+Sections use the accent-tick `SectionRule` between later blocks.  
+
+**Full standings** — cover card grid for the entire GOTY board (paged from the server).
+
+**Categories** — per-award cover card grids, **10 per page**, Load more via API. Not the full tally dump on Highlights.
+
+**Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. Community · Voices filters Voices-only when on Voices. **Display name** opens that voter’s frozen ballot; **@username** opens their profile.
+
+**Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Voices toggle is hidden here.
+
+**Public voter ballot** (`?view=ballot&voter=username`) — frozen GOTY + category picks for any submitted voter. Linked from Voice names (ballot matrix + category strips) and the Voters list. Profile is secondary via `@username` on the ballot page.
+
+## Standings modes and views
 
 ```text
-Combined    Community    Voices
+Highlights    Full standings    Categories    Voters    Your ballot
+Community     Voices
 ```
 
-Switching source updates ordering and primary score; keep contextual columns available.
-
-Suggested columns: Rank | Game | Selected-source points | Community | Voices | #1 votes | Ballots
-
-Game expand: community rank, voice rank, appearance rate, rank-distribution, 1st–10th counts.
+Community = all submitted ballots. Voices = designated Voice ballots only.
 
 ## Ballot matrix
 
-| Voter | #1 | #2 | #3 | … | #10 |
-
-- Horizontally scrollable; voter column pinned on desktop
-- Searchable; filter Everyone / Community / Voices
-- Voices get a subtle public marker
-- Link to individual ballot
-- Virtualize or paginate for large communities
-- Mobile: focused views, not a compressed full matrix
+Horizontally scrollable parallel top-10 lists on Highlights. Cover cards have **no** rank on the art — matrix uses the pinned `#` column. Rest of the Top 10, Full standings, and Categories put the accent rank **in front of the title** (not on the cover).
 
 ## Category results
 
-Winner-first editorial block, then detailed tallies, with Community / Voices / View voters using the same table language as standings.
+Highlights: podium (`maxPlace: 3`), then a ballot-matrix-style horizontal table (You · each Voice pick). Categories tab: SQL-paginated cover cards (10) per award.

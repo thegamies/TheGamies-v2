@@ -1,6 +1,8 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
-  communityLiveLockSnapshots,
+  communityLiveLockCategoryRows,
+  communityLiveLockGoty,
+  communityLiveLockMeta,
   createDb,
   type Db,
 } from "@thegamies/db";
@@ -13,7 +15,6 @@ import {
   type StandingsPage,
 } from "@/lib/live-aggregate/service";
 import { isCommunityLiveScoresRevealed } from "./live-reveal";
-import { sliceLockGotyPage } from "./live-lock";
 
 /** Max GOTY rows frozen into a lock snapshot. */
 const LOCK_SNAPSHOT_GOTY_CAP = 2000;
@@ -78,73 +79,51 @@ type CategoryJsonRow = {
   voteCount: number | null;
 };
 
-export type CommunityLiveLockPayload = {
-  listCount: number;
-  goty: StandingsGameRow[];
-  categories: CategoryStandingsBlock[];
-};
-
-function parseLockPayload(raw: unknown): CommunityLiveLockPayload | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  const gotyRaw = Array.isArray(obj.goty) ? obj.goty : [];
-  const categoriesRaw = Array.isArray(obj.categories) ? obj.categories : [];
-  return {
-    listCount: asInt(obj.listCount),
-    goty: gotyRaw.map((row) => {
-      const g = row as StandingsGameRow;
-      return {
-        place: asInt(g.place),
-        gameId: String(g.gameId),
-        slug: String(g.slug),
-        title: String(g.title),
-        year: g.year == null ? null : asInt(g.year),
-        coverUrl: g.coverUrl ?? null,
-        score: g.score == null ? null : asInt(g.score),
-        listMentions: g.listMentions == null ? null : asInt(g.listMentions),
-        rankCounts: null,
+function groupCategoryBlocks(
+  rows: Array<{
+    categoryId: string;
+    label: string;
+    description: string | null;
+    sortOrder: number;
+    place: number;
+    gameId: string;
+    slug: string;
+    title: string;
+    coverUrl: string | null;
+    voteCount: number;
+  }>,
+): CategoryStandingsBlock[] {
+  type Acc = CategoryStandingsBlock & { sortOrder: number };
+  const byId = new Map<string, Acc>();
+  for (const row of rows) {
+    let block = byId.get(row.categoryId);
+    if (!block) {
+      block = {
+        categoryId: row.categoryId,
+        label: row.label,
+        description: row.description,
+        sortOrder: row.sortOrder,
+        rows: [],
       };
-    }),
-    categories: categoriesRaw.map((block) => {
-      const b = block as CategoryStandingsBlock;
-      return {
-        categoryId: String(b.categoryId),
-        label: String(b.label),
-        description: b.description ?? null,
-        rows: (b.rows ?? []).map((row) => ({
-          place: asInt(row.place),
-          gameId: String(row.gameId),
-          slug: String(row.slug),
-          title: String(row.title),
-          coverUrl: row.coverUrl ?? null,
-          voteCount: row.voteCount == null ? null : asInt(row.voteCount),
-        })),
-      };
-    }),
-  };
-}
-
-function pageFromPayload(
-  year: number,
-  payload: CommunityLiveLockPayload,
-  pageSize: number,
-  requestedPage: number,
-  revealed: boolean,
-): StandingsPage {
-  const paged = sliceLockGotyPage(payload.goty, pageSize, requestedPage);
-  return redactStandingsPage({
-    year,
-    listCount: payload.listCount,
-    detailedStatsRevealed: revealed,
-    standingsVersion: 0,
-    scoresFresh: true,
-    page: paged.page,
-    pageSize,
-    gotyTotal: payload.goty.length,
-    totalPages: paged.totalPages,
-    goty: paged.rows,
-    categories: payload.categories,
-  });
+      byId.set(row.categoryId, block);
+    }
+    block.rows.push({
+      place: row.place,
+      gameId: row.gameId,
+      slug: row.slug,
+      title: row.title,
+      coverUrl: row.coverUrl,
+      voteCount: row.voteCount,
+    });
+  }
+  return [...byId.values()]
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+    .map((block) => ({
+      categoryId: block.categoryId,
+      label: block.label,
+      description: block.description,
+      rows: block.rows,
+    }));
 }
 
 /**
@@ -362,22 +341,35 @@ async function queryCommunityLiveStandings(
   };
 }
 
-async function buildLockPayload(
+async function clearLockYear(
   communityId: string,
   year: number,
   db: Db,
-): Promise<CommunityLiveLockPayload> {
-  const live = await queryCommunityLiveStandings(
-    communityId,
-    year,
-    { page: 1, pageSize: LOCK_SNAPSHOT_GOTY_CAP },
-    db,
-  );
-  return {
-    listCount: live.listCount,
-    goty: live.goty,
-    categories: live.categories,
-  };
+): Promise<void> {
+  await db
+    .delete(communityLiveLockGoty)
+    .where(
+      and(
+        eq(communityLiveLockGoty.communityId, communityId),
+        eq(communityLiveLockGoty.year, year),
+      ),
+    );
+  await db
+    .delete(communityLiveLockCategoryRows)
+    .where(
+      and(
+        eq(communityLiveLockCategoryRows.communityId, communityId),
+        eq(communityLiveLockCategoryRows.year, year),
+      ),
+    );
+  await db
+    .delete(communityLiveLockMeta)
+    .where(
+      and(
+        eq(communityLiveLockMeta.communityId, communityId),
+        eq(communityLiveLockMeta.year, year),
+      ),
+    );
 }
 
 export async function clearCommunityLiveLockSnapshots(
@@ -385,64 +377,193 @@ export async function clearCommunityLiveLockSnapshots(
   db: Db = getDb(),
 ): Promise<void> {
   await db
-    .delete(communityLiveLockSnapshots)
-    .where(eq(communityLiveLockSnapshots.communityId, communityId));
+    .delete(communityLiveLockGoty)
+    .where(eq(communityLiveLockGoty.communityId, communityId));
+  await db
+    .delete(communityLiveLockCategoryRows)
+    .where(eq(communityLiveLockCategoryRows.communityId, communityId));
+  await db
+    .delete(communityLiveLockMeta)
+    .where(eq(communityLiveLockMeta.communityId, communityId));
 }
 
-/** Freeze the current live SUM for a year (idempotent upsert). */
+/** Freeze the current live SUM for a year (replace rows; SQL-paginated reads). */
 export async function upsertCommunityLiveLockSnapshot(
   communityId: string,
   year: number,
   db: Db = getDb(),
-): Promise<CommunityLiveLockPayload> {
-  const payload = await buildLockPayload(communityId, year, db);
-  await db
-    .insert(communityLiveLockSnapshots)
-    .values({
-      communityId,
-      year,
-      payload,
-      lockedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [
-        communityLiveLockSnapshots.communityId,
-        communityLiveLockSnapshots.year,
-      ],
-      set: {
-        payload,
-        lockedAt: new Date(),
-      },
-    });
-  return payload;
+): Promise<{ listCount: number; gotyTotal: number }> {
+  const live = await queryCommunityLiveStandings(
+    communityId,
+    year,
+    { page: 1, pageSize: LOCK_SNAPSHOT_GOTY_CAP },
+    db,
+  );
+
+  await clearLockYear(communityId, year, db);
+
+  const now = new Date();
+  await db.insert(communityLiveLockMeta).values({
+    communityId,
+    year,
+    listCount: live.listCount,
+    gotyTotal: live.goty.length,
+    lockedAt: now,
+  });
+
+  if (live.goty.length > 0) {
+    await db.insert(communityLiveLockGoty).values(
+      live.goty.map((row) => ({
+        communityId,
+        year,
+        place: row.place,
+        gameId: row.gameId,
+        slug: row.slug,
+        title: row.title,
+        gameYear: row.year,
+        coverUrl: row.coverUrl,
+        score: row.score ?? 0,
+        listMentions: row.listMentions ?? 0,
+      })),
+    );
+  }
+
+  const categoryInserts: Array<{
+    communityId: string;
+    year: number;
+    categoryId: string;
+    label: string;
+    description: string | null;
+    sortOrder: number;
+    place: number;
+    gameId: string;
+    slug: string;
+    title: string;
+    coverUrl: string | null;
+    voteCount: number;
+  }> = [];
+  live.categories.forEach((block, sortOrder) => {
+    for (const row of block.rows) {
+      categoryInserts.push({
+        communityId,
+        year,
+        categoryId: block.categoryId,
+        label: block.label,
+        description: block.description,
+        sortOrder,
+        place: row.place,
+        gameId: row.gameId,
+        slug: row.slug,
+        title: row.title,
+        coverUrl: row.coverUrl,
+        voteCount: row.voteCount ?? 0,
+      });
+    }
+  });
+  if (categoryInserts.length > 0) {
+    await db.insert(communityLiveLockCategoryRows).values(categoryInserts);
+  }
+
+  return { listCount: live.listCount, gotyTotal: live.goty.length };
 }
 
-async function getOrCreateLockPayload(
+async function ensureLockYear(
   communityId: string,
   year: number,
   db: Db,
-): Promise<CommunityLiveLockPayload> {
+): Promise<{ listCount: number; gotyTotal: number }> {
   const [existing] = await db
-    .select({ payload: communityLiveLockSnapshots.payload })
-    .from(communityLiveLockSnapshots)
+    .select({
+      listCount: communityLiveLockMeta.listCount,
+      gotyTotal: communityLiveLockMeta.gotyTotal,
+    })
+    .from(communityLiveLockMeta)
     .where(
       and(
-        eq(communityLiveLockSnapshots.communityId, communityId),
-        eq(communityLiveLockSnapshots.year, year),
+        eq(communityLiveLockMeta.communityId, communityId),
+        eq(communityLiveLockMeta.year, year),
       ),
     )
     .limit(1);
   if (existing) {
-    const parsed = parseLockPayload(existing.payload);
-    if (parsed) return parsed;
+    return {
+      listCount: existing.listCount,
+      gotyTotal: existing.gotyTotal,
+    };
   }
   return upsertCommunityLiveLockSnapshot(communityId, year, db);
+}
+
+async function queryLockedStandingsPage(
+  communityId: string,
+  year: number,
+  pageSize: number,
+  requestedPage: number,
+  db: Db,
+): Promise<{
+  listCount: number;
+  gotyTotal: number;
+  page: number;
+  totalPages: number;
+  goty: StandingsGameRow[];
+  categories: CategoryStandingsBlock[];
+}> {
+  const meta = await ensureLockYear(communityId, year, db);
+  const totalPages = Math.max(1, Math.ceil(meta.gotyTotal / pageSize) || 1);
+  const page = clampStandingsPage(requestedPage, totalPages);
+  const offset = (page - 1) * pageSize;
+
+  const gotyRows = await db
+    .select()
+    .from(communityLiveLockGoty)
+    .where(
+      and(
+        eq(communityLiveLockGoty.communityId, communityId),
+        eq(communityLiveLockGoty.year, year),
+      ),
+    )
+    .orderBy(asc(communityLiveLockGoty.place))
+    .limit(pageSize)
+    .offset(offset);
+
+  const categoryRows = await db
+    .select()
+    .from(communityLiveLockCategoryRows)
+    .where(
+      and(
+        eq(communityLiveLockCategoryRows.communityId, communityId),
+        eq(communityLiveLockCategoryRows.year, year),
+      ),
+    )
+    .orderBy(
+      asc(communityLiveLockCategoryRows.sortOrder),
+      asc(communityLiveLockCategoryRows.place),
+    );
+
+  return {
+    listCount: meta.listCount,
+    gotyTotal: meta.gotyTotal,
+    page,
+    totalPages,
+    goty: gotyRows.map((row) => ({
+      place: row.place,
+      gameId: row.gameId,
+      slug: row.slug,
+      title: row.title,
+      year: row.gameYear,
+      coverUrl: row.coverUrl,
+      score: row.score,
+      listMentions: row.listMentions,
+      rankCounts: null,
+    })),
+    categories: groupCategoryBlocks(categoryRows),
+  };
 }
 
 /**
  * Live GOTY + category standings for one community year.
  * SUM(live_*_contrib) for current members — never reads live_*_scores.
- * When locked, serves a frozen snapshot (created lazily per year).
+ * When locked, serves frozen rows (created lazily per year) with SQL pagination.
  */
 export async function getCommunityLiveStandings(
   communityId: string,
@@ -465,8 +586,26 @@ export async function getCommunityLiveStandings(
   );
 
   if (opts.locked) {
-    const payload = await getOrCreateLockPayload(communityId, year, db);
-    return pageFromPayload(year, payload, pageSize, requestedPage, revealed);
+    const locked = await queryLockedStandingsPage(
+      communityId,
+      year,
+      pageSize,
+      requestedPage,
+      db,
+    );
+    return redactStandingsPage({
+      year,
+      listCount: locked.listCount,
+      detailedStatsRevealed: revealed,
+      standingsVersion: 0,
+      scoresFresh: true,
+      page: locked.page,
+      pageSize,
+      gotyTotal: locked.gotyTotal,
+      totalPages: locked.totalPages,
+      goty: locked.goty,
+      categories: locked.categories,
+    });
   }
 
   const live = await queryCommunityLiveStandings(

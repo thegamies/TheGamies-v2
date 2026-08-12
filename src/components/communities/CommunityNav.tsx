@@ -1,16 +1,25 @@
 import Link from "next/link";
+import { navItemClass } from "@/components/ui/navLevels";
+import {
+  showEditionNav,
+  type EditionStatus,
+} from "@/lib/communities/edition-status";
 
 type Props = {
   slug: string;
   liveEnabled: boolean;
   canManage: boolean;
-  active: "overview" | "live" | "settings";
+  /** Non-draft featured edition status, or null if none public. */
+  editionStatus: EditionStatus | null;
+  active: "overview" | "live" | "edition" | "settings";
 };
 
+/** Primary community section switcher (bordered chips). */
 export function CommunityNav({
   slug,
   liveEnabled,
   canManage,
+  editionStatus,
   active,
 }: Props) {
   const items: { href: string; label: string; key: Props["active"] }[] = [
@@ -21,6 +30,13 @@ export function CommunityNav({
       href: `/communities/${slug}/live`,
       label: "Live",
       key: "live",
+    });
+  }
+  if (editionStatus && showEditionNav(editionStatus)) {
+    items.push({
+      href: `/communities/${slug}/edition`,
+      label: "Edition",
+      key: "edition",
     });
   }
   if (canManage) {
@@ -37,11 +53,7 @@ export function CommunityNav({
         <Link
           key={item.key}
           href={item.href}
-          className={`border px-3 py-1.5 text-sm tracking-wide transition-colors ${
-            active === item.key
-              ? "border-accent text-accent"
-              : "border-line text-muted hover:border-accent hover:text-ink"
-          }`}
+          className={navItemClass("primary", active === item.key)}
         >
           {item.label}
         </Link>

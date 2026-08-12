@@ -87,10 +87,10 @@ function shuffle<T>(items: T[]): T[] {
   return copy;
 }
 
-async function loadSeedGamePool(
+export async function loadSeedGamePool(
   year: number,
   poolSize: number,
-  db: Db,
+  db: Db = getDb(),
 ): Promise<PoolGame[]> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
