@@ -51,7 +51,7 @@ Keep feature branches short-lived. Prefer many small PRs over long-lived feature
 |---|---|---|---|
 | Local | Developer machine | `next dev` (Node); `pnpm preview:cf` for Workers parity | Neon dev branch or local connection string |
 | Preview | PR into `develop` | **Vercel preview and Cloudflare Workers preview** | Shared Neon database branch for that PR |
-| Staging | Push to `develop` | Both hosts (Vercel + Worker `thegamies-v2-develop`) | Neon staging via `STAGING_DATABASE_URL` (optional) |
+| Staging | Push to `develop` | Both hosts (Vercel + Worker `thegamies-v2-develop`) | Neon staging via `STAGING_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
 | Production | Merge to `main` | Both hosts (production) | Neon production branch |
 
 Rules:

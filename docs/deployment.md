@@ -95,10 +95,13 @@ App secrets are stored in **GitHub** (manually imported) and pushed onto Vercel/
 ```text
 Push / merge to develop (or workflow_dispatch)
   → ci: lint + typecheck + build
+  → migrate: pnpm db:migrate against STAGING_DATABASE_URL
   → staging: deploy Vercel with GitHub app secrets as --env
   → staging: deploy Cloudflare worker thegamies-v2-develop
        (.dev.vars for build + wrangler secret bulk for runtime / dashboard)
 ```
+
+Migrations run before both host deploys. If `STAGING_DATABASE_URL` is missing, migrate is skipped (hosts still deploy if their secrets are set).
 
 Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers.dev`).
 Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`.
@@ -109,6 +112,7 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 PR opened/updated
   → ci: lint + typecheck + build
   → neon: create branch preview/pr-<n>
+  → migrate: pnpm db:migrate on that branch
   → vercel / cloudflare: deploy with Neon URL + GitHub ADMIN_SYNC_SECRET / IGDB_*
   → comment both URLs on the PR
   → on PR close: delete Neon branch + optional CF preview worker

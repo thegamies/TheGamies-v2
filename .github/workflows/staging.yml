@@ -10,7 +10,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    outputs:
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.STAGING_DATABASE_URL }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "STAGING_DATABASE_URL missing; skipping migrate."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: pnpm db:migrate
+      - if: steps.guard.outputs.skipped == 'false'
+        run: |
+          echo "### Migrate (staging)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Applied \`pnpm db:migrate\` against \`STAGING_DATABASE_URL\`." >> "$GITHUB_STEP_SUMMARY"
+
   vercel:
+    needs: migrate
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -100,6 +136,7 @@ jobs:
           fi
 
   cloudflare:
+    needs: migrate
     runs-on: ubuntu-latest
     outputs:
       url: ${{ steps.deploy.outputs.url }}
@@ -210,12 +247,14 @@ jobs:
           echo "- Secrets: GitHub Actions ? wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
 
   summary:
-    needs: [vercel, cloudflare]
+    needs: [migrate, vercel, cloudflare]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Write combined summary
         env:
+          MIGRATE_SKIPPED: ${{ needs.migrate.outputs.skipped }}
+          MIGRATE_RESULT: ${{ needs.migrate.result }}
           VERCEL_URL: ${{ needs.vercel.outputs.url }}
           VERCEL_SKIPPED: ${{ needs.vercel.outputs.skipped }}
           CF_URL: ${{ needs.cloudflare.outputs.url }}
@@ -224,8 +263,15 @@ jobs:
           {
             echo "## Staging deploy (develop)"
             echo ""
-            echo "| Host | Status | URL |"
+            echo "| Step | Status | Detail |"
             echo "| --- | --- | --- |"
+            if [ "$MIGRATE_SKIPPED" = "true" ]; then
+              echo "| Migrate | skipped | set \`STAGING_DATABASE_URL\` |"
+            elif [ "$MIGRATE_RESULT" = "success" ]; then
+              echo "| Migrate | applied | \`pnpm db:migrate\` on staging Neon |"
+            else
+              echo "| Migrate | $MIGRATE_RESULT | |"
+            fi
             if [ "$VERCEL_SKIPPED" = "true" ]; then
               echo "| Vercel | skipped | |"
             else
