@@ -54,7 +54,7 @@ Hosts create editions and set the three times under Settings (optional “set to
 - Cover/avatar upload
 - Site-admin-only create gate
 - Per-community / multi / ranked edition category modes
-- Full ballot matrix virtualization polish / individual public ballot deep-links beyond voter list
+- Full all-member ballot matrix virtualization / individual public ballot deep-links beyond voter list + Voices columns
 
 ## Public shell
 
@@ -119,12 +119,14 @@ Hosts designate Voices **per edition** under Settings (`community_edition_voices
 
 On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public mode switcher is **Community · Voices** (Combined hidden until weighted scoring). GOTY and voters are **SQL-paginated** (50). Categories load in full (small).
 
+**Ballot matrix:** published results include parallel top-10 lists in a horizontally scrollable table — sticky rank column only; You · Community · Voices · each Voice scroll with the table.
+
 **Recalc rules:** first time status becomes `published`, freeze from current ballots. While still published, schedule tweaks do **not** rebuild. If the edition leaves published (reopen voting) and publishes again, results **rebuild**. Ops `/admin/communities` “Publish / rebuild results” always rebuilds.
 
 ### Results (later polish)
 
-- Richer ballot matrix / individual voter deep pages
-- Snapshot never recalculates after publish (already true)
+- Category matrix / richer individual voter deep pages
+- Virtualized all-member columns (current matrix is Voices-only)
 
 ## Voices
 

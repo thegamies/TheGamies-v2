@@ -1,7 +1,14 @@
 import Link from "next/link";
+import { BallotMatrix } from "@/components/communities/BallotMatrix";
+import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
+import {
+  StandingGameCard,
+  StandingGameCardGrid,
+} from "@/components/communities/StandingGameCard";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import type {
+  EditionBallotMatrix,
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
   EditionResultsMeta,
@@ -13,13 +20,11 @@ function modeHref(
   slug: string,
   year: number,
   mode: EditionResultsPublicMode,
-  page: number,
   votersPage: number,
   q: string,
 ) {
   const params = new URLSearchParams();
   if (mode !== "community") params.set("mode", mode);
-  if (page > 1) params.set("page", String(page));
   if (votersPage > 1) params.set("votersPage", String(votersPage));
   if (q) params.set("q", q);
   const qs = params.toString();
@@ -32,9 +37,9 @@ export function EditionResultsView({
   mode,
   meta,
   topTen,
-  standingsPage,
   categories,
   voters,
+  matrix,
   yourProfileId,
 }: {
   slug: string;
@@ -42,13 +47,6 @@ export function EditionResultsView({
   mode: EditionResultsPublicMode;
   meta: EditionResultsMeta;
   topTen: EditionGotyStandingRow[];
-  standingsPage: {
-    page: number;
-    pageSize: number;
-    total: number;
-    totalPages: number;
-    rows: EditionGotyStandingRow[];
-  };
   categories: EditionCategoryStandingBlock[];
   voters: {
     page: number;
@@ -58,6 +56,7 @@ export function EditionResultsView({
     rows: EditionVoterListRow[];
     q: string;
   };
+  matrix: EditionBallotMatrix;
   yourProfileId: string | null;
 }) {
   const winner = topTen[0] ?? null;
@@ -65,6 +64,9 @@ export function EditionResultsView({
   const modes: EditionResultsPublicMode[] = ["community", "voices"];
   const ballotCount =
     mode === "voices" ? meta.ballotCountVoices : meta.ballotCountCommunity;
+  const gotyTotal =
+    mode === "voices" ? meta.gotyTotalVoices : meta.gotyTotalCommunity;
+  const beyondTopTen = Math.max(0, gotyTotal - 10);
 
   return (
     <div className="mt-8 space-y-14">
@@ -72,7 +74,7 @@ export function EditionResultsView({
         {modes.map((m) => (
           <Link
             key={m}
-            href={modeHref(slug, year, m, 1, voters.page, voters.q)}
+            href={modeHref(slug, year, m, voters.page, voters.q)}
             className={`border px-3 py-1.5 text-sm tracking-wide capitalize transition-colors ${
               m === mode
                 ? "border-accent text-accent"
@@ -133,88 +135,32 @@ export function EditionResultsView({
           <h3 className="font-display text-3xl tracking-wide text-ink">
             Top 10
           </h3>
-          <ol className="mt-6 space-y-2">
-            {topTen.map((row) => (
-              <li
-                key={row.gameId}
-                className="flex items-center gap-3 border-b border-line py-3"
-              >
-                <RankMarker rank={row.place} className="w-8" />
-                <div className="w-10 shrink-0">
-                  <GameCover title={row.title} imageUrl={row.coverUrl} />
-                </div>
-                <p className="min-w-0 flex-1 font-semibold text-ink">
-                  {row.title}
-                </p>
-                <p className="text-sm text-muted">{row.points}</p>
+          <StandingGameCardGrid>
+            {topTen.map((row, i) => (
+              <li key={row.gameId}>
+                <StandingGameCard
+                  place={row.place}
+                  slug={row.slug}
+                  title={row.title}
+                  coverUrl={row.coverUrl}
+                  year={row.year}
+                  points={row.points}
+                  priority={i < 3}
+                />
               </li>
             ))}
-          </ol>
+          </StandingGameCardGrid>
         </section>
       ) : null}
 
-      {standingsPage.total > 10 ? (
-        <section>
-          <h3 className="font-display text-3xl tracking-wide text-ink">
-            Full standings
-          </h3>
-          <ol className="mt-6 space-y-2">
-            {(standingsPage.page === 1
-              ? standingsPage.rows.filter((row) => row.place > 10)
-              : standingsPage.rows
-            ).map((row) => (
-              <li
-                key={row.gameId}
-                className="flex items-center gap-3 border-b border-line py-3"
-              >
-                <RankMarker rank={row.place} className="w-8" />
-                <div className="w-10 shrink-0">
-                  <GameCover title={row.title} imageUrl={row.coverUrl} />
-                </div>
-                <p className="min-w-0 flex-1 text-ink">{row.title}</p>
-                <p className="text-sm text-muted">{row.points}</p>
-              </li>
-            ))}
-          </ol>
-          {standingsPage.totalPages > 1 ? (
-            <div className="mt-6 flex flex-wrap gap-3 text-sm">
-              {standingsPage.page > 1 ? (
-                <Link
-                  href={modeHref(
-                    slug,
-                    year,
-                    mode,
-                    standingsPage.page - 1,
-                    voters.page,
-                    voters.q,
-                  )}
-                  className="text-accent hover:underline"
-                >
-                  Previous
-                </Link>
-              ) : null}
-              <span className="text-muted">
-                Page {standingsPage.page} of {standingsPage.totalPages}
-              </span>
-              {standingsPage.page < standingsPage.totalPages ? (
-                <Link
-                  href={modeHref(
-                    slug,
-                    year,
-                    mode,
-                    standingsPage.page + 1,
-                    voters.page,
-                    voters.q,
-                  )}
-                  className="text-accent hover:underline"
-                >
-                  Next
-                </Link>
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-      ) : null}
+      <EditionFullStandings
+        slug={slug}
+        year={year}
+        mode={mode}
+        beyondTopTen={beyondTopTen}
+      />
+
+      <BallotMatrix matrix={matrix} />
 
       {categories.length > 0 ? (
         <section className="border-t border-line pt-10">
@@ -275,9 +221,6 @@ export function EditionResultsView({
           {mode !== "community" ? (
             <input type="hidden" name="mode" value={mode} />
           ) : null}
-          {standingsPage.page > 1 ? (
-            <input type="hidden" name="page" value={String(standingsPage.page)} />
-          ) : null}
           <input
             name="q"
             defaultValue={voters.q}
@@ -317,7 +260,6 @@ export function EditionResultsView({
                   slug,
                   year,
                   mode,
-                  standingsPage.page,
                   voters.page - 1,
                   voters.q,
                 )}
@@ -335,7 +277,6 @@ export function EditionResultsView({
                   slug,
                   year,
                   mode,
-                  standingsPage.page,
                   voters.page + 1,
                   voters.q,
                 )}

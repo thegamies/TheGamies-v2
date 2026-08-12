@@ -17,6 +17,7 @@ import {
 } from "@/lib/communities/ballots";
 import {
   ensurePublishedEditionResults,
+  getEditionBallotMatrix,
   getEditionCategoryResults,
   getEditionGotyPage,
   getEditionResultsMeta,
@@ -97,10 +98,7 @@ export default async function CommunityEditionYearPage({
 
   const sp = await searchParams;
   const mode = parseEditionResultMode(first(sp.mode));
-  const pageRaw = Number(first(sp.page) ?? "1");
   const votersPageRaw = Number(first(sp.votersPage) ?? "1");
-  const standingsPageNum =
-    Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
   const votersPageNum =
     Number.isFinite(votersPageRaw) && votersPageRaw >= 1
       ? Math.floor(votersPageRaw)
@@ -166,9 +164,9 @@ export default async function CommunityEditionYearPage({
   let resultsBundle: {
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyPage>>["rows"];
-    standingsPage: Awaited<ReturnType<typeof getEditionGotyPage>>;
     categories: Awaited<ReturnType<typeof getEditionCategoryResults>>;
     voters: Awaited<ReturnType<typeof getEditionVotersPage>> & { q: string };
+    matrix: Awaited<ReturnType<typeof getEditionBallotMatrix>>;
   } | null = null;
 
   if (edition.status === "published") {
@@ -180,28 +178,21 @@ export default async function CommunityEditionYearPage({
           page: 1,
           pageSize: 10,
         });
-        const fullPage =
-          standingsPageNum === 1
-            ? await getEditionGotyPage(edition.id, mode, {
-                page: 1,
-                pageSize: STANDINGS_PAGE_SIZE,
-              })
-            : await getEditionGotyPage(edition.id, mode, {
-                page: standingsPageNum,
-                pageSize: STANDINGS_PAGE_SIZE,
-              });
         const categories = await getEditionCategoryResults(edition.id, mode);
         const voters = await getEditionVotersPage(edition.id, {
           page: votersPageNum,
           pageSize: STANDINGS_PAGE_SIZE,
           q: votersQ,
         });
+        const matrix = await getEditionBallotMatrix(edition.id, {
+          viewerProfileId: profile?.id ?? null,
+        });
         resultsBundle = {
           meta,
           topTen: topTenPage.rows,
-          standingsPage: fullPage,
           categories,
           voters: { ...voters, q: votersQ },
+          matrix,
         };
       }
     } catch {
@@ -263,9 +254,9 @@ export default async function CommunityEditionYearPage({
             mode={mode}
             meta={resultsBundle.meta}
             topTen={resultsBundle.topTen}
-            standingsPage={resultsBundle.standingsPage}
             categories={resultsBundle.categories}
             voters={resultsBundle.voters}
+            matrix={resultsBundle.matrix}
             yourProfileId={profile?.id ?? null}
           />
           {profile && isMember ? (

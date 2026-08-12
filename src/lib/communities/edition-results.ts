@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
@@ -18,6 +18,13 @@ import {
 } from "@thegamies/db";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
+  assembleBallotMatrixRows,
+  BALLOT_MATRIX_TOP,
+  matrixHasAnyGames,
+  type EditionBallotMatrixRow,
+  type MatrixVoiceColumn,
+} from "./edition-ballot-matrix";
+import {
   aggregateEditionCategories,
   aggregateEditionGoty,
   storageModeFor,
@@ -31,6 +38,13 @@ export {
   parseEditionResultMode,
   type EditionResultsPublicMode,
 } from "./edition-results-scoring";
+
+export {
+  BALLOT_MATRIX_TOP,
+  type EditionBallotMatrixRow,
+  type MatrixGameCell,
+  type MatrixVoiceColumn,
+} from "./edition-ballot-matrix";
 
 function getDb(): Db {
   return createDb();
@@ -411,7 +425,7 @@ export async function ensurePublishedEditionResults(
 export async function getEditionGotyPage(
   editionId: string,
   mode: EditionResultMode,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { page?: number; pageSize?: number; afterPlace?: number } = {},
   db: Db = getDb(),
 ): Promise<{
   page: number;
@@ -425,25 +439,33 @@ export async function getEditionGotyPage(
     200,
     Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
   );
+  const afterPlace =
+    opts.afterPlace != null && Number.isFinite(opts.afterPlace)
+      ? Math.max(0, Math.floor(opts.afterPlace))
+      : 0;
   const meta = await getEditionResultsMeta(editionId, db);
-  const total =
+  const fullTotal =
     storage === "voices"
       ? (meta?.gotyTotalVoices ?? 0)
       : (meta?.gotyTotalCommunity ?? 0);
+  const total = Math.max(0, fullTotal - afterPlace);
   const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
   const requested = Math.max(1, Math.floor(opts.page ?? 1));
   const page = Math.min(requested, totalPages);
   const offset = (page - 1) * pageSize;
 
+  const conditions = [
+    eq(communityEditionResultGoty.editionId, editionId),
+    eq(communityEditionResultGoty.mode, storage),
+  ];
+  if (afterPlace > 0) {
+    conditions.push(gt(communityEditionResultGoty.place, afterPlace));
+  }
+
   const rows = await db
     .select()
     .from(communityEditionResultGoty)
-    .where(
-      and(
-        eq(communityEditionResultGoty.editionId, editionId),
-        eq(communityEditionResultGoty.mode, storage),
-      ),
-    )
+    .where(and(...conditions))
     .orderBy(asc(communityEditionResultGoty.place))
     .limit(pageSize)
     .offset(offset);
@@ -572,6 +594,135 @@ export async function getEditionVotersPage(
     .offset(offset);
 
   return { page, pageSize, total, totalPages, rows };
+}
+
+export type EditionBallotMatrix = {
+  showYou: boolean;
+  hasGames: boolean;
+  voiceColumns: MatrixVoiceColumn[];
+  rows: EditionBallotMatrixRow[];
+};
+
+/**
+ * Parallel top-10 GOTY lists: rank rows × You / Community / Voices / each Voice.
+ * Fixed 10 rows — no board pagination blob.
+ */
+export async function getEditionBallotMatrix(
+  editionId: string,
+  opts: {
+    viewerProfileId?: string | null;
+  } = {},
+  db: Db = getDb(),
+): Promise<EditionBallotMatrix> {
+  const [communityPage, voicesPage] = await Promise.all([
+    getEditionGotyPage(
+      editionId,
+      "community",
+      { page: 1, pageSize: BALLOT_MATRIX_TOP },
+      db,
+    ),
+    getEditionGotyPage(
+      editionId,
+      "voices",
+      { page: 1, pageSize: BALLOT_MATRIX_TOP },
+      db,
+    ),
+  ]);
+
+  const voiceColumns = await db
+    .select({
+      profileId: communityEditionResultVoters.profileId,
+      displayName: communityEditionResultVoters.displayName,
+      username: communityEditionResultVoters.username,
+    })
+    .from(communityEditionResultVoters)
+    .where(
+      and(
+        eq(communityEditionResultVoters.editionId, editionId),
+        eq(communityEditionResultVoters.isVoice, true),
+      ),
+    )
+    .orderBy(
+      asc(communityEditionResultVoters.displayName),
+      asc(communityEditionResultVoters.username),
+    );
+
+  const viewerProfileId = opts.viewerProfileId ?? null;
+  let showYou = false;
+  if (viewerProfileId) {
+    const [viewerRow] = await db
+      .select({ profileId: communityEditionResultVoters.profileId })
+      .from(communityEditionResultVoters)
+      .where(
+        and(
+          eq(communityEditionResultVoters.editionId, editionId),
+          eq(communityEditionResultVoters.profileId, viewerProfileId),
+        ),
+      )
+      .limit(1);
+    showYou = Boolean(viewerRow);
+  }
+
+  const profileIdsForRanks = [
+    ...voiceColumns.map((v) => v.profileId),
+    ...(showYou && viewerProfileId ? [viewerProfileId] : []),
+  ];
+  const uniqueProfileIds = [...new Set(profileIdsForRanks)];
+
+  let voterRanks: Array<{
+    profileId: string;
+    rank: number;
+    gameId: string;
+    slug: string;
+    title: string;
+    coverUrl: string | null;
+  }> = [];
+  if (uniqueProfileIds.length > 0) {
+    voterRanks = await db
+      .select({
+        profileId: communityEditionResultVoterRanks.profileId,
+        rank: communityEditionResultVoterRanks.rank,
+        gameId: communityEditionResultVoterRanks.gameId,
+        slug: communityEditionResultVoterRanks.slug,
+        title: communityEditionResultVoterRanks.title,
+        coverUrl: communityEditionResultVoterRanks.coverUrl,
+      })
+      .from(communityEditionResultVoterRanks)
+      .where(
+        and(
+          eq(communityEditionResultVoterRanks.editionId, editionId),
+          inArray(communityEditionResultVoterRanks.profileId, uniqueProfileIds),
+        ),
+      );
+  }
+
+  const rows = assembleBallotMatrixRows({
+    community: communityPage.rows.map((r) => ({
+      place: r.place,
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      coverUrl: r.coverUrl,
+    })),
+    voices: voicesPage.rows.map((r) => ({
+      place: r.place,
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      coverUrl: r.coverUrl,
+    })),
+    voiceColumns,
+    voterRanks,
+    viewerProfileId,
+    includeYou: showYou,
+  });
+
+  return {
+    showYou,
+    hasGames: matrixHasAnyGames(rows),
+    voiceColumns,
+    rows,
+  };
 }
 
 export async function getEditionVoterDetail(

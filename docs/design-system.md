@@ -60,7 +60,9 @@ Use Radix, React Aria, or Headless UI for behavior and accessibility only. Resty
 
 Shipped stubs: `GameCover`, `RankMarker`, `Button`, skeleton family.
 
-Planned: `CommunityHeader`, `EventNavigation`, `RankedBallot`, `BallotGameRow`, `WinnerReveal`, `WinnerPodium`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `BallotMatrix`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
+Planned: `CommunityHeader`, `EventNavigation`, `RankedBallot`, `BallotGameRow`, `WinnerReveal`, `WinnerPodium`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
+
+Shipped on edition results: `BallotMatrix` (horizontal scroll; parallel top-10 lists — You · Community · Voices · Voice columns).
 
 ## Tokens
 
