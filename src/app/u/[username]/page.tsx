@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { SiteHeader } from "@/components/SiteHeader";
 import { auth } from "@/lib/auth/server";
 import { listOwnedForProfile } from "@/lib/lists/service";
 import { listSharePath } from "@/lib/lists/urls";
@@ -48,7 +47,6 @@ export default async function PublicProfilePage({
 
   return (
     <>
-      <SiteHeader />
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">
           @{profile.username}

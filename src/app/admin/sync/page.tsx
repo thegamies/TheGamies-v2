@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createDb } from "@thegamies/db";
 import {
   getBackfillResumeInfo,
   listRecentSyncRuns,
 } from "@thegamies/igdb";
-import { SiteHeader } from "@/components/SiteHeader";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import { AdminSyncClient } from "./AdminSyncClient";
 
@@ -33,9 +33,12 @@ export default async function AdminSyncPage() {
 
   return (
     <>
-      <SiteHeader />
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Ops</p>
+        <p className="text-xs uppercase tracking-[0.2em] text-muted">
+          <Link href="/admin" className="hover:text-ink">
+            Ops
+          </Link>
+        </p>
         <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
           Catalog sync
         </h1>

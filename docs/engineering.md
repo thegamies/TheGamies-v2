@@ -135,6 +135,42 @@ Use Playwright screenshots compared to approved references under `design-referen
 
 Catalog / IGDB sync unit coverage lives under `packages/igdb/src/*.test.ts` and `src/lib/admin-sync-schema.test.ts`. Integration tests against Neon remain a follow-up.
 
+## App Router layouts and request data
+
+Shared chrome and per-request auth must not create **server waterfalls** with page data.
+
+### Site header
+
+- Render **`SiteHeader` once in `src/app/layout.tsx`** (root layout).
+- **Do not** import or render `SiteHeader` in individual `page.tsx` files or nested feature layouts (`create/`, etc.).
+- Layout and page Server Components fetch **in parallel**; putting the header only in the page (and `await`ing page data first) serializes auth behind the page query.
+
+### Per-request memoization (`cache`)
+
+Use React `cache()` helpers in `src/lib/auth/session.ts`:
+
+| Helper | Role |
+|---|---|
+| `getRequestSessionUser` | Neon Auth session user (once per request) |
+| `getRequestProfileByAuthUserId` | Profile row for that auth id (once per request) |
+
+`SiteHeader` and any page that needs the same session/profile (e.g. `/account`) should call these helpers so layout + page share one auth/profile round-trip.
+
+Do **not** put `cache()` around DB clients or auth *factory* setup in a way that permanently caches `null` across requests when env loads late (see `getAuthOrNull` comments). `cache()` here is **per React request**, not process-lifetime.
+
+### Page data
+
+- Keep route-specific data fetching in the **page** (or a dedicated loader), not the root layout.
+- Prefer **one Neon round-trip** for a board when HTTP latency dominates (see standings bundle in `docs/features/live-aggregate.md`).
+- Optional later: wrap heavy page sections in `<Suspense>` so the layout shell can stream first.
+
+### Checklist for new pages
+
+1. No `<SiteHeader />` in the page.
+2. Session/profile via `getRequestSessionUser` / `getRequestProfileByAuthUserId` when needed.
+3. Page-only data fetches stay in the page module.
+4. Avoid `await`ing page data before starting independent work that could live in layout (header already does).
+
 ## Day-to-day workflow
 
 ### Humans and AI

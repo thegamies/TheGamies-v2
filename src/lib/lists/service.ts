@@ -29,6 +29,11 @@ import {
   slugifyListTitle,
 } from "@/lib/lists/rules";
 import { listSharePath } from "@/lib/lists/urls";
+import {
+  clearOwnedGotyContrib,
+  syncOwnedGotyContribFromList,
+} from "@/lib/live-aggregate/contrib";
+import { scheduleYearRefresh } from "@/lib/live-aggregate/refresh";
 import { z } from "zod";
 
 export type ListRow = typeof lists.$inferSelect;
@@ -38,6 +43,32 @@ export type UpdateListMetaInput = z.infer<typeof updateListMetaSchema>;
 
 export function getDb(): Db {
   return createDb();
+}
+
+/** Contrib-on-save; score refresh is scheduled (non-blocking). */
+export async function syncLiveAggregateForOwnedList(
+  list: ListRow,
+  db: Db = getDb(),
+): Promise<void> {
+  try {
+    if (list.listType === "goty" && list.profileId && list.year != null) {
+      const result = await syncOwnedGotyContribFromList(list.id, db);
+      if ("error" in result) return;
+      scheduleYearRefresh(result.years);
+      return;
+    }
+    const cleared = await clearOwnedGotyContrib(list.id, db);
+    scheduleYearRefresh(cleared.years);
+  } catch {
+    // List write already succeeded; standings catch up on next save/read/rebuild.
+  }
+}
+
+async function syncLiveAggregateForList(
+  list: ListRow,
+  db: Db,
+): Promise<void> {
+  await syncLiveAggregateForOwnedList(list, db);
 }
 
 function defaultGotyTitle(year: number): string {
@@ -337,6 +368,9 @@ export async function replaceItems(
       .update(lists)
       .set({ updatedAt: new Date() })
       .where(eq(lists.id, list.id));
+    if (list.profileId && list.listType === "goty") {
+      await syncLiveAggregateForList(list, db);
+    }
     return { items: [] };
   }
 
@@ -380,7 +414,11 @@ export async function replaceItems(
     .set({ updatedAt: new Date() })
     .where(eq(lists.id, list.id));
 
-  return { items: await loadListItems(list.id, db) };
+  const items = await loadListItems(list.id, db);
+  if (list.profileId && list.listType === "goty") {
+    await syncLiveAggregateForList(list, db);
+  }
+  return { items };
 }
 
 async function ensurePublishedAt(
@@ -474,6 +512,9 @@ export async function claimList(
       })
       .where(eq(lists.id, list.id))
       .returning();
+    if (updated.listType === "goty" && updated.profileId && updated.year != null) {
+      await syncLiveAggregateForList(updated, db);
+    }
     return { list: updated };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -809,6 +850,9 @@ export async function shareListFromClientDraft(
   if ("error" in written) return written;
 
   list = await ensurePublishedAt(list, db);
+  if (list.profileId) {
+    await syncLiveAggregateForList(list, db);
+  }
 
   return { list, editSecret };
 }
@@ -861,7 +905,11 @@ export async function syncExistingSharedListFromClientDraft(
   );
   if ("error" in written) return written;
 
-  return { list: await ensurePublishedAt(meta.list, db) };
+  const published = await ensurePublishedAt(meta.list, db);
+  if (published.profileId) {
+    await syncLiveAggregateForList(published, db);
+  }
+  return { list: published };
 }
 
 export async function saveOwnedListFromClientDraft(
@@ -968,6 +1016,7 @@ export async function saveOwnedListFromClientDraft(
   }
 
   list = await ensurePublishedAt(list, db);
+  await syncLiveAggregateForList(list, db);
 
   return { list };
 }

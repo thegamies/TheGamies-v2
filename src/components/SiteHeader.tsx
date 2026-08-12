@@ -1,24 +1,15 @@
 import Link from "next/link";
-import { getAuthOrNull } from "@/lib/auth/server";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { Button } from "@/components/ui/Button";
 
 export async function SiteHeader() {
-  let user: { id: string; name?: string | null; email?: string | null } | null =
-    null;
-  const auth = getAuthOrNull();
-  if (auth) {
-    try {
-      const { data: session } = await auth.getSession();
-      user = session?.user ?? null;
-    } catch {
-      user = null;
-    }
-  }
-
+  const user = await getRequestSessionUser();
   const profile = user?.id
-    ? await getProfileByAuthUserId(user.id).catch(() => null)
+    ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
 
   return (
@@ -34,8 +25,14 @@ export async function SiteHeader() {
           <Link href="/games" className="hover:text-ink">
             Games
           </Link>
+          <Link href="/game-of-the-year" className="hover:text-ink">
+            Standings
+          </Link>
           <Link href="/create" className="hover:text-ink">
             Create
+          </Link>
+          <Link href="/admin" className="hover:text-ink">
+            Admin
           </Link>
           {user ? (
             <>

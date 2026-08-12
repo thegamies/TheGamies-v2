@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { SiteHeader } from "@/components/SiteHeader";
 import { GameCover } from "@/components/ui/GameCover";
 import { browseGames } from "@/lib/catalog";
 
@@ -45,7 +44,6 @@ export default async function GamesPage({
 
   return (
     <>
-      <SiteHeader />
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">Catalog</p>
         <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-7xl">

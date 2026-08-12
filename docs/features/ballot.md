@@ -15,7 +15,8 @@ Ballots belong to **editions** only (not live rankings).
 - Live alongside the main GOTY ballot; remain conceptually separate
 - Site-wide category definitions **and** per-community categories (both in v1)
 - Each category shows its voting rule clearly
-- Support single-choice, multi-choice, or ranked (exact modes per category still open)
+- Support single-choice, multi-choice, or ranked for **edition** categories (exact modes still open for communities/editions)
+- **Site live** categories (owned GOTY lists): single-choice locked — see [live-aggregate.md](./live-aggregate.md) / decisions
 - Avoid a long generic form; use artwork and clear selection states
 
 ## Open decisions that still block full behavior

@@ -24,8 +24,11 @@ import {
   saveOwnedListFromClientDraft,
   shareListFromClientDraft,
   syncExistingSharedListFromClientDraft,
+  syncLiveAggregateForOwnedList,
 } from "@/lib/lists/service";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { replaceCategoryVotesForList } from "@/lib/live-aggregate/contrib";
+import { replaceCategoryVotesSchema } from "@/lib/live-aggregate/schema";
 
 async function currentProfileId(): Promise<string | null> {
   const auth = getAuthOrNull();
@@ -172,10 +175,34 @@ export async function saveOwnedListAction(
   });
   if ("error" in result) return { error: result.error };
 
+  const votesRaw = String(formData.get("categoryVotesJson") ?? "").trim();
+  if (votesRaw && result.list.listType === "goty") {
+    let parsedVotes: unknown;
+    try {
+      parsedVotes = JSON.parse(votesRaw);
+    } catch {
+      return { error: "Could not save category picks." };
+    }
+    const votes = replaceCategoryVotesSchema.safeParse(parsedVotes);
+    if (!votes.success) {
+      return { error: "Only one game per category." };
+    }
+    const written = await replaceCategoryVotesForList(
+      result.list.id,
+      votes.data,
+    );
+    if ("error" in written) return { error: written.error };
+    await syncLiveAggregateForOwnedList(result.list);
+  }
+
   await clearListDraftCookie();
 
   revalidatePath(`/create/goty`);
   revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
   const share = await getListShareTarget(result.list);
   revalidatePath(share.path);
   revalidatePath(`/l/${result.list.publicId}`);
