@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { listCommunitiesForProfile } from "@/lib/communities/service";
 import { listOwnedForProfile } from "@/lib/lists/service";
 import { listSharePath } from "@/lib/lists/urls";
 import {
@@ -66,6 +67,7 @@ export default async function PublicProfilePage({
         )}
 
         <ProfileLists profileId={profile.id} username={profile.username} />
+        <ProfileCommunities profileId={profile.id} />
       </main>
     </>
   );
@@ -102,6 +104,35 @@ async function ProfileLists({
                 {list.listType === "goty" ? "Game of the Year" : "Custom"}
                 {list.year ? ` · ${list.year}` : ""}
               </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+async function ProfileCommunities({ profileId }: { profileId: string }) {
+  const memberships = await listCommunitiesForProfile(profileId).catch(
+    () => [],
+  );
+  return (
+    <section className="mt-12 border-t border-line pt-8">
+      <h2 className="font-display text-3xl tracking-wide text-ink">
+        Communities
+      </h2>
+      {memberships.length === 0 ? (
+        <p className="mt-4 text-muted">No communities yet.</p>
+      ) : (
+        <ul className="mt-6 divide-y divide-line border-y border-line">
+          {memberships.map((community) => (
+            <li key={community.slug} className="py-4">
+              <Link
+                href={`/communities/${community.slug}`}
+                className="text-lg text-ink hover:text-accent"
+              >
+                {community.name}
+              </Link>
             </li>
           ))}
         </ul>

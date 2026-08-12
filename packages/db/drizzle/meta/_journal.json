@@ -50,6 +50,34 @@
       "when": 1786480000000,
       "tag": "0006_live_goty_scores_year_score_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786485000000,
+      "tag": "0007_communities",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786488000000,
+      "tag": "0008_community_live_scores_visible_from",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786491000000,
+      "tag": "0009_community_live_scores_visible_from",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786494000000,
+      "tag": "0010_community_live_lock",
+      "breakpoints": true
     }
   ]
 }
