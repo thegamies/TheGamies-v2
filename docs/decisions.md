@@ -37,6 +37,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-11 | Site live aggregate | **`live_goty_contrib` / `live_category_contrib` = scoring truth**; **`live_*_scores` = disposable cache**. Save replaces contrib + marks dirty keys; **async/lazy locked absolute SUM refresh** (saves do not contend on score rows). **`standingsVersion` bumps only after refresh succeeds**. Reveal gate: ranks public, scores/votes hidden until admin reveals. Site live categories: **single-choice** on owned GOTY; plurality. Community later = `SUM(contrib)` for members (no save fan-out). |
 | 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only / edition ballot eligibility still open. |
 | 2026-08-12 | Community live reveal | One community date: **`live_scores_visible_from`** (null = scores hidden for **all** live years). Hosts set date / reveal now / hide under Settings. |
+| 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board via **`community_live_lock_snapshots`** (current year eager; other years lazy). Unlock discards snapshots and resumes live `SUM(contrib)`. |
 
 ## Open (block dependent work until decided)
 

@@ -12,6 +12,10 @@ import {
   type CommunityRole,
 } from "./schema";
 import { parseScoresVisibleDateInput } from "./live-reveal";
+import {
+  clearCommunityLiveLockSnapshots,
+  upsertCommunityLiveLockSnapshot,
+} from "./live";
 
 export type Community = typeof communities.$inferSelect;
 export type CommunityMemberRow = typeof communityMembers.$inferSelect;
@@ -56,6 +60,7 @@ export async function listCommunities(
       description: communities.description,
       createdByProfileId: communities.createdByProfileId,
       liveRankingsEnabled: communities.liveRankingsEnabled,
+      liveRankingsLocked: communities.liveRankingsLocked,
       liveScoresVisibleFrom: communities.liveScoresVisibleFrom,
       createdAt: communities.createdAt,
       updatedAt: communities.updatedAt,
@@ -240,14 +245,62 @@ export async function setLiveRankingsEnabled(
     .update(communities)
     .set({
       liveRankingsEnabled: enabled,
+      ...(enabled
+        ? {}
+        : { liveRankingsLocked: false }),
       updatedAt: new Date(),
     })
     .where(eq(communities.id, detail.id))
     .returning({ liveRankingsEnabled: communities.liveRankingsEnabled });
 
+  if (!enabled) {
+    await clearCommunityLiveLockSnapshots(detail.id, db);
+  }
+
   return {
     ok: true,
     liveRankingsEnabled: updated?.liveRankingsEnabled ?? enabled,
+  };
+}
+
+export async function setLiveRankingsLocked(
+  slug: string,
+  profileId: string,
+  locked: boolean,
+  db: Db = getDb(),
+): Promise<{ ok: true; liveRankingsLocked: boolean } | { error: string }> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can lock or unlock live rankings." };
+  }
+  if (!detail.liveRankingsEnabled && locked) {
+    return { error: "Turn live rankings on before locking them." };
+  }
+
+  if (locked) {
+    await clearCommunityLiveLockSnapshots(detail.id, db);
+    await upsertCommunityLiveLockSnapshot(
+      detail.id,
+      new Date().getUTCFullYear(),
+      db,
+    );
+  } else {
+    await clearCommunityLiveLockSnapshots(detail.id, db);
+  }
+
+  const [updated] = await db
+    .update(communities)
+    .set({
+      liveRankingsLocked: locked,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id))
+    .returning({ liveRankingsLocked: communities.liveRankingsLocked });
+
+  return {
+    ok: true,
+    liveRankingsLocked: updated?.liveRankingsLocked ?? locked,
   };
 }
 

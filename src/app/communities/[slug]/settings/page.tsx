@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/session";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
 
@@ -74,6 +75,11 @@ export default async function CommunitySettingsPage({
         <LiveSettingsForm
           slug={community.slug}
           enabled={community.liveRankingsEnabled}
+        />
+        <LiveLockForm
+          slug={community.slug}
+          locked={community.liveRankingsLocked}
+          liveEnabled={community.liveRankingsEnabled}
         />
         <LiveRevealSettings
           slug={community.slug}

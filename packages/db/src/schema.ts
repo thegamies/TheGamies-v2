@@ -202,6 +202,8 @@ export const communities = pgTable("communities", {
   liveRankingsEnabled: boolean("live_rankings_enabled")
     .notNull()
     .default(false),
+  /** When true, public live board reads frozen snapshots until unlocked. */
+  liveRankingsLocked: boolean("live_rankings_locked").notNull().default(false),
   /** When set and reached, live scores are public for every year. Null = hidden. */
   liveScoresVisibleFrom: timestamp("live_scores_visible_from", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -225,6 +227,20 @@ export const communityMembers = pgTable(
     primaryKey({ columns: [t.communityId, t.profileId] }),
     index("community_members_profile_id_idx").on(t.profileId),
   ],
+);
+
+/** Frozen community live board for one year while rankings are locked. */
+export const communityLiveLockSnapshots = pgTable(
+  "community_live_lock_snapshots",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    payload: jsonb("payload").notNull(),
+    lockedAt: timestamp("locked_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.communityId, t.year] })],
 );
 
 /** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */

@@ -4,7 +4,7 @@
 
 | System | Source | Visibility | Mutability |
 |---|---|---|---|
-| **Live rankings** | Signed-in members’ lists | Board visible when enabled; scores from host date (all years) | Continuous; community admin may **lock** |
+| **Live rankings** | Signed-in members’ lists | Board visible when enabled; scores from host date (all years); lock freezes board | Continuous until **locked** |
 | **Editions** | Edition ballots (GOTY + categories) | Hidden until edition closes | **Frozen** after publish |
 
 Communities may turn **live rankings** on or off. Editions are the end-of-year ceremony flow.
@@ -17,7 +17,9 @@ Public UI never says admin / judge / expert — members are listed by display na
 
 `liveRankingsEnabled` defaults false. Hosts toggle it under Settings. When on, `/communities/[slug]/live` shows a public board: **`SUM(live_goty_contrib)` / `SUM(live_category_contrib)` for current members** — never `live_*_scores`.
 
-**Reveal gate:** ranks public. Scores stay hidden until `live_scores_visible_from` (null = hidden for every year; set a date, reveal now, or clear to hide). Hosts manage this under Settings. Live **lock** (pause updates) is still deferred.
+**Reveal gate:** ranks public. Scores stay hidden until `live_scores_visible_from` (null = hidden for every year; set a date, reveal now, or clear to hide). Hosts manage this under Settings.
+
+**Lock:** hosts can freeze the public board (`live_rankings_locked`). Lock stores a snapshot (`community_live_lock_snapshots`); member list changes do not move standings until unlock. Current year is snapshotted on lock; other years snapshot lazily on first view.
 
 ### URLs
 
@@ -25,13 +27,12 @@ Public UI never says admin / judge / expert — members are listed by display na
 - `/communities/new` — signed-in create (requires profile)
 - `/communities/[slug]` — public home (identity, members, join/leave)
 - `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
-- `/communities/[slug]/settings` — hosts only (live on/off, scores date)
+- `/communities/[slug]/settings` — hosts only (live on/off, lock, scores date)
 - Profile `/u/[username]` lists communities the person belongs to
 
 ### Non-goals (this slice)
 
 - Editions, ballots, Voices, frozen results
-- Live **lock** / pause updates
 - Invite-only or approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
@@ -57,7 +58,7 @@ Settings and event management live on a separate administrative surface.
 - Fed by signed-in lists only (same abuse rule as site aggregate)
 - Board is `SUM(live_*_contrib)` for current members — not `live_*_scores`
 - Ranks public; scores from host date (`live_scores_visible_from`) for every live year
-- Community admin can lock/unlock for suspense (deferred)
+- Hosts can **lock** to freeze the public board (snapshot; unlock resumes live SUM)
 - Not fed by edition ballots; not written into frozen edition snapshots
 
 ## Editions

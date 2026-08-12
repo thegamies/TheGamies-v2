@@ -12,6 +12,7 @@ import {
   leaveCommunity,
   setCommunityLiveScoresVisibleFrom,
   setLiveRankingsEnabled,
+  setLiveRankingsLocked,
 } from "@/lib/communities/service";
 
 async function requireProfile() {
@@ -102,6 +103,24 @@ export async function setLiveRankingsEnabledAction(
   if (!gate.ok) return { error: gate.error };
 
   const result = await setLiveRankingsEnabled(slug, gate.profile.id, enabled);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function setLiveRankingsLockedAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+  const locked = String(formData.get("locked") ?? "") === "true";
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setLiveRankingsLocked(slug, gate.profile.id, locked);
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(slug, gate.profile.username);

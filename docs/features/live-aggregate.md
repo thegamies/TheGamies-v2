@@ -52,6 +52,7 @@ Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisf
 - Scores, list mentions, rank histograms, and category vote counts hidden until `detailedStatsRevealed`.
 - Site admin: `/admin/rankings` (same unlock as catalog sync).
 - Community live: all years gated by `communities.live_scores_visible_from` (null = hidden). Hosts set date under Settings.
+- Community live lock: `live_rankings_locked` + `community_live_lock_snapshots` freeze the public board until unlock.
 
 ## Categories
 
@@ -71,7 +72,7 @@ Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisf
 ## Non-goals
 
 - Journal / cron drain as primary path
-- Pause-updates lock
+- Site live pause-updates lock
 - Multi / ranked category modes
 
 ## Ops: standings seed

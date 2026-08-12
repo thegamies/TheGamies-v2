@@ -102,11 +102,13 @@ export function CommunityLiveView({
   communityName,
   page,
   yearOptions,
+  locked,
 }: {
   slug: string;
   communityName: string;
   page: StandingsPage;
   yearOptions: number[];
+  locked: boolean;
 }) {
   const revealed = page.detailedStatsRevealed;
   const from = (page.page - 1) * page.pageSize + 1;
@@ -120,8 +122,16 @@ export function CommunityLiveView({
       </h2>
       <p className="mt-3 max-w-2xl font-serif text-lg leading-relaxed text-muted">
         From signed-in {communityName} members’ Game of the Year lists
-        {page.listCount > 0 ? ` · ${page.listCount} lists` : null}.
+        {page.listCount > 0 ? ` · ${page.listCount} lists` : null}
+        {locked ? " · Locked" : null}.
       </p>
+
+      {locked ? (
+        <p className="mt-4 max-w-2xl text-sm text-muted" role="status">
+          Standings are locked. Rank order will not change until they are
+          unlocked.
+        </p>
+      ) : null}
 
       {!revealed ? (
         <p className="mt-4 max-w-2xl text-sm text-muted" role="status">

@@ -4,6 +4,7 @@ import {
   isCommunityLiveScoresRevealed,
   parseScoresVisibleDateInput,
 } from "./live-reveal";
+import { sliceLockGotyPage } from "./live-lock";
 import { canManageCommunity, leaveBlockedReason } from "./rules";
 import {
   communitySlugSchema,
@@ -124,5 +125,17 @@ describe("parseScoresVisibleDateInput", () => {
       formatScoresVisibleDateInput(new Date("2026-12-15T00:00:00.000Z")),
     ).toBe("2026-12-15");
     expect(formatScoresVisibleDateInput(null)).toBe("");
+  });
+});
+
+describe("sliceLockGotyPage", () => {
+  it("pages frozen rows without changing order", () => {
+    const rows = [1, 2, 3, 4, 5];
+    expect(sliceLockGotyPage(rows, 2, 2)).toEqual({
+      page: 2,
+      totalPages: 3,
+      rows: [3, 4],
+    });
+    expect(sliceLockGotyPage(rows, 2, 99).page).toBe(3);
   });
 });

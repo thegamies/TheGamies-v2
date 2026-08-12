@@ -83,6 +83,7 @@ export default async function CommunityLiveYearPage({
       page: requestedPage,
       pageSize: STANDINGS_PAGE_SIZE,
       scoresVisibleFrom: community.liveScoresVisibleFrom,
+      locked: community.liveRankingsLocked,
     });
   } catch {
     standings = {
@@ -125,6 +126,7 @@ export default async function CommunityLiveYearPage({
         communityName={community.name}
         page={standings}
         yearOptions={yearOptions}
+        locked={community.liveRankingsLocked}
       />
     </main>
   );
