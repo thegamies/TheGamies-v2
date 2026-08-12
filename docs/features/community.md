@@ -49,11 +49,12 @@ Hosts create editions and set the three times under Settings (optional “set to
 
 ### Non-goals (next slices)
 
-- Voices, Combined weight, frozen result payloads, voter matrix
+- Weighted Combined (Voice %)
 - Invite-only or approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
 - Per-community / multi / ranked edition category modes
+- Full ballot matrix virtualization polish / individual public ballot deep-links beyond voter list
 
 ## Public shell
 
@@ -88,16 +89,16 @@ Settings and event management live on a separate administrative surface.
 3. User actively completing ballot (`open` + editor)
 4. User submitted ballot (saved; still editable while `open`)
 5. Voting closed; results pending (`closed`) — member ballot read-only
-6. Final results published (`published` + frozen payload later)
-7. Individual voter ballot / current users exploration (later)
-8. Community settings (separate from public pages)
+6. Final results published (`published` + frozen normalized boards)
+7. Individual voter exploration (paged voter list on results; deeper matrix later)
+8. Community settings (schedule + Voices per edition)
 
 ### Ballots (shipped)
 
 Separate tables from personal lists / live contrib:
 
 - `community_edition_ballots` — one per `(editionId, profileId)`
-- `community_edition_ballot_items` — ranked GOTY (up to 100; scoring later uses top 10 via `pointsForRank`)
+- `community_edition_ballot_items` — ranked GOTY (up to 100; scoring uses top 10 via `pointsForRank`)
 - `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only
 
 **Eligibility:** signed-in profile that is a community member (including hosts). Non-members see join / sign-in CTAs.
@@ -106,12 +107,18 @@ Separate tables from personal lists / live contrib:
 
 Does not write `live_*_contrib`. Does not feed live rankings.
 
-### Results (later)
+### Voices (shipped)
 
-- Modes: **Combined · Community · Voices**
-- Show **current users / voters** (searchable exploration)
-- Categories with winner-first presentation
-- Snapshot never recalculates after publish
+Hosts designate Voices **per edition** under Settings (`community_edition_voices`). Roster is year-specific and locks after publish.
+
+### Results (shipped)
+
+On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public Combined / Community / Voices mode switcher (Combined ≡ Community scores). GOTY and voters are **SQL-paginated** (50). Categories load in full (small). Snapshot never recalculates.
+
+### Results (later polish)
+
+- Richer ballot matrix / individual voter deep pages
+- Snapshot never recalculates after publish (already true)
 
 ## Voices
 

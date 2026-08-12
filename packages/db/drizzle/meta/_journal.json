@@ -99,6 +99,13 @@
       "when": 1786503000000,
       "tag": "0013_community_live_lock_rows",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786506000000,
+      "tag": "0014_community_edition_voices_results",
+      "breakpoints": true
     }
   ]
 }

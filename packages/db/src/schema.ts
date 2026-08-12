@@ -476,6 +476,183 @@ export const communityEditionBallotCategoryVotes = pgTable(
   (t) => [primaryKey({ columns: [t.ballotId, t.categoryId] })],
 );
 
+/** Per-edition Voice designation (year history; not a mutable member flag). */
+export const communityEditionVoices = pgTable(
+  "community_edition_voices",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    designatedAt: timestamp("designated_at", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    designatedByProfileId: uuid("designated_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId] }),
+    index("community_edition_voices_edition_id_idx").on(t.editionId),
+  ],
+);
+
+/** Write-once edition results meta (no fat JSONB). */
+export const communityEditionResultMeta = pgTable("community_edition_result_meta", {
+  editionId: uuid("edition_id")
+    .primaryKey()
+    .references(() => communityEditions.id, { onDelete: "cascade" }),
+  frozenAt: timestamp("frozen_at", { mode: "date" }).defaultNow().notNull(),
+  ballotCountCommunity: integer("ballot_count_community").notNull().default(0),
+  ballotCountVoices: integer("ballot_count_voices").notNull().default(0),
+  gotyTotalCommunity: integer("goty_total_community").notNull().default(0),
+  gotyTotalVoices: integer("goty_total_voices").notNull().default(0),
+});
+
+/** Frozen GOTY standings row. mode: community | voices (Combined reads community). */
+export const communityEditionResultGoty = pgTable(
+  "community_edition_result_goty",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    gameYear: integer("game_year"),
+    coverUrl: text("cover_url"),
+    points: integer("points").notNull(),
+    firstPlaceVotes: integer("first_place_votes").notNull().default(0),
+    appearances: integer("appearances").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.mode, t.place] }),
+    uniqueIndex("community_edition_result_goty_game_uidx").on(
+      t.editionId,
+      t.mode,
+      t.gameId,
+    ),
+    index("community_edition_result_goty_page_idx").on(
+      t.editionId,
+      t.mode,
+      t.place,
+    ),
+  ],
+);
+
+export const communityEditionResultCategories = pgTable(
+  "community_edition_result_categories",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    place: integer("place").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+    votes: integer("votes").notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.editionId, t.mode, t.categoryId, t.place],
+    }),
+    index("community_edition_result_categories_idx").on(
+      t.editionId,
+      t.mode,
+      t.categoryId,
+    ),
+  ],
+);
+
+export const communityEditionResultVoters = pgTable(
+  "community_edition_result_voters",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    isVoice: boolean("is_voice").notNull().default(false),
+    displayName: text("display_name").notNull(),
+    username: text("username").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId] }),
+    index("community_edition_result_voters_name_idx").on(
+      t.editionId,
+      t.displayName,
+    ),
+  ],
+);
+
+export const communityEditionResultVoterRanks = pgTable(
+  "community_edition_result_voter_ranks",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId, t.rank] }),
+    index("community_edition_result_voter_ranks_voter_idx").on(
+      t.editionId,
+      t.profileId,
+    ),
+  ],
+);
+
+export const communityEditionResultVoterCategoryPicks = pgTable(
+  "community_edition_result_voter_category_picks",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    title: text("title").notNull(),
+    coverUrl: text("cover_url"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.profileId, t.categoryId] }),
+  ],
+);
+
 /**
  * Scored top-10 facts for owned GOTY lists (scoring source of truth).
  * Site rollups and future community SUM both read from here.

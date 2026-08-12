@@ -13,10 +13,12 @@ import {
 } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { listMembersWithEditionVoiceFlags } from "@/lib/communities/voices";
 import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
+import type { EditionVoiceMemberOption } from "./EditionVoicesForm";
 
 type Params = Promise<{ slug: string }>;
 
@@ -60,6 +62,18 @@ export default async function CommunitySettingsPage({
   const featured = pickFeaturedEdition(editions);
   const featuredStatus =
     featured && featured.status !== "draft" ? featured.status : null;
+
+  const voicesByEditionId: Record<string, EditionVoiceMemberOption[]> = {};
+  for (const edition of editions) {
+    try {
+      voicesByEditionId[edition.id] = await listMembersWithEditionVoiceFlags(
+        community.id,
+        edition.id,
+      );
+    } catch {
+      voicesByEditionId[edition.id] = [];
+    }
+  }
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
@@ -106,7 +120,11 @@ export default async function CommunitySettingsPage({
         />
       </section>
 
-      <EditionSettings slug={community.slug} editions={editions} />
+      <EditionSettings
+        slug={community.slug}
+        editions={editions}
+        voicesByEditionId={voicesByEditionId}
+      />
     </main>
   );
 }

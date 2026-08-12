@@ -13,6 +13,7 @@ import {
 } from "./edition-status";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
+import { ensureEditionResultsFrozen } from "./edition-results";
 
 export type CommunityEdition = typeof communityEditions.$inferSelect;
 
@@ -32,6 +33,18 @@ function withStatus(
     ...edition,
     status: computeEditionStatus(edition, now),
   };
+}
+
+async function afterEditionWrite(
+  edition: CommunityEdition,
+  db: Db,
+  now: Date = new Date(),
+): Promise<CommunityEditionPublic> {
+  const publicEdition = withStatus(edition, now);
+  if (publicEdition.status === "published") {
+    await ensureEditionResultsFrozen(edition.id, db);
+  }
+  return publicEdition;
 }
 
 export async function listEditionsForCommunity(
@@ -187,7 +200,7 @@ export async function setCommunityEditionSchedule(
     .returning();
 
   if (!updated) return { error: "Edition not found." };
-  return withStatus(updated);
+  return afterEditionWrite(updated, db);
 }
 
 export async function setCommunityEditionTimestampNow(
@@ -243,5 +256,5 @@ export async function setCommunityEditionTimestampNow(
     .returning();
 
   if (!updated) return { error: "Could not update that edition." };
-  return withStatus(updated, now);
+  return afterEditionWrite(updated, db, now);
 }

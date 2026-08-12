@@ -21,13 +21,14 @@ Tables `community_edition_ballots` + `community_edition_ballot_items` — **not*
 ## Categories
 
 - Live alongside the main GOTY ballot; remain conceptually separate
-- Site-wide category definitions **and** per-community categories (both in v1 product intent)
-- Each category shows its voting rule clearly
-- **Edition ballots (this slice):** site `award_categories` **single-choice** only (`community_edition_ballot_category_votes`)
+- **Edition ballots:** site `award_categories` **single-choice** only
 - Per-community / multi / ranked edition category modes deferred
 - **Site live** categories (owned GOTY lists): single-choice locked — see [live-aggregate.md](./live-aggregate.md) / decisions
-- Avoid a long generic form; use artwork and clear selection states
 
-## Open decisions that still block full ceremony
+## Voices
 
-See `docs/decisions.md`: Combined Voice weight, community category modes beyond site single-choice, invite-only eligibility, tie-break, moderation.
+Hosts designate Voices **per edition** (Settings). Historical rosters stay with the year; locked after publish.
+
+## Open decisions that still block polish
+
+See `docs/decisions.md`: degrading score curve beyond top 10, richer voter matrix, invite-only eligibility, moderation.

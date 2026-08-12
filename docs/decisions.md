@@ -43,14 +43,16 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-12 | Edition ballot eligibility | **Open community members** (signed-in profile + `community_members` row, including hosts). Invite-only / approval gates deferred. |
 | 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
 | 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
+| 2026-08-12 | Edition Voices | **Per-edition** host designation among community members (`community_edition_voices`). Year history retained; roster immutable after publish. |
+| 2026-08-12 | Edition Combined scoring | **Simple union** — all ballots scored the same; Combined reads Community storage. Voice marker for Voices board / filters only. |
+| 2026-08-12 | Edition results freeze | Write-once **normalized** tables at publish (SQL-paginated GOTY + voters). Never recalculate. Lazy ensure on first published read if needed. |
 
 ## Open (block dependent work until decided)
 
-- Exact scoring formula for Combined (Community + Voice weight / %)
 - Exact degrading score curve when scoring expands beyond top 10
 - Edition / community category voting modes beyond site single-choice
 - Invite-only / approval membership and any eligibility beyond open members
-- Tie-breaking rules (editions + live)
+- Tie-breaking rules beyond the freeze defaults (points → #1s → appearances → gameId)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

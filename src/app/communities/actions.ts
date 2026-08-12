@@ -21,6 +21,7 @@ import {
 } from "@/lib/communities/editions";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
+import { setEditionVoice } from "@/lib/communities/voices";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -296,5 +297,34 @@ export async function setCommunityEditionTimestampNowAction(
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function setEditionVoiceAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const year = Number(formData.get("year"));
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  const isVoice = String(formData.get("isVoice") ?? "") === "1";
+  if (!slug) return { error: "Community not found." };
+  if (!Number.isFinite(year)) return { error: "Pick a valid year." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setEditionVoice(
+    slug,
+    Math.floor(year),
+    gate.profile.id,
+    profileId,
+    isVoice,
+  );
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
   return null;
 }
