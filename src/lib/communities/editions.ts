@@ -13,7 +13,10 @@ import {
 } from "./edition-status";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
-import { ensureEditionResultsFrozen } from "./edition-results";
+import {
+  ensureEditionResultsFrozen,
+  rebuildEditionResultsFrozen,
+} from "./edition-results";
 
 export type CommunityEdition = typeof communityEditions.$inferSelect;
 
@@ -35,14 +38,23 @@ function withStatus(
   };
 }
 
+/**
+ * Freeze on first publish. If the edition left published (reopened) and
+ * publishes again, rebuild so new ballots are included.
+ */
 async function afterEditionWrite(
   edition: CommunityEdition,
   db: Db,
   now: Date = new Date(),
+  previousStatus?: EditionStatus,
 ): Promise<CommunityEditionPublic> {
   const publicEdition = withStatus(edition, now);
   if (publicEdition.status === "published") {
-    await ensureEditionResultsFrozen(edition.id, db);
+    if (previousStatus != null && previousStatus !== "published") {
+      await rebuildEditionResultsFrozen(edition.id, db);
+    } else {
+      await ensureEditionResultsFrozen(edition.id, db);
+    }
   }
   return publicEdition;
 }
@@ -183,6 +195,13 @@ export async function setCommunityEditionSchedule(
     return { error: "Only hosts can schedule editions." };
   }
 
+  const existing = await getEditionByCommunityYear(
+    detail.id,
+    yearParsed.year,
+    db,
+  );
+  const previousStatus = existing?.status;
+
   const [updated] = await db
     .update(communityEditions)
     .set({
@@ -200,7 +219,7 @@ export async function setCommunityEditionSchedule(
     .returning();
 
   if (!updated) return { error: "Edition not found." };
-  return afterEditionWrite(updated, db);
+  return afterEditionWrite(updated, db, new Date(), previousStatus);
 }
 
 export async function setCommunityEditionTimestampNow(
@@ -228,6 +247,7 @@ export async function setCommunityEditionTimestampNow(
   );
   if (!edition) return { error: "Edition not found." };
 
+  const previousStatus = edition.status;
   const now = new Date();
   const next = {
     opensAt: edition.opensAt,
@@ -256,5 +276,5 @@ export async function setCommunityEditionTimestampNow(
     .returning();
 
   if (!updated) return { error: "Could not update that edition." };
-  return afterEditionWrite(updated, db, now);
+  return afterEditionWrite(updated, db, now, previousStatus);
 }

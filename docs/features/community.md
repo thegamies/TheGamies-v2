@@ -107,13 +107,19 @@ Separate tables from personal lists / live contrib:
 
 Does not write `live_*_contrib`. Does not feed live rankings.
 
+### Ops seed (admin)
+
+`/admin/communities` (admin code): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Voices, write edition ballots (creates a scheduled-open edition window if missing). Clear removes seed memberships/ballots/Voices; optional profile delete. Separate from standings seed (`/admin/seed`).
+
 ### Voices (shipped)
 
 Hosts designate Voices **per edition** under Settings (`community_edition_voices`). Roster is year-specific and locks after publish.
 
 ### Results (shipped)
 
-On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public Combined / Community / Voices mode switcher (Combined ≡ Community scores). GOTY and voters are **SQL-paginated** (50). Categories load in full (small). Snapshot never recalculates.
+On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public mode switcher is **Community · Voices** (Combined hidden until weighted scoring). GOTY and voters are **SQL-paginated** (50). Categories load in full (small).
+
+**Recalc rules:** first time status becomes `published`, freeze from current ballots. While still published, schedule tweaks do **not** rebuild. If the edition leaves published (reopen voting) and publishes again, results **rebuild**. Ops `/admin/communities` “Publish / rebuild results” always rebuilds.
 
 ### Results (later polish)
 

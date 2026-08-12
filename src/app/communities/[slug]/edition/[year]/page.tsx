@@ -13,6 +13,7 @@ import {
 import {
   canSubmitEditionBallot,
   getEditionBallotForProfile,
+  listEditionBallotSubmitters,
 } from "@/lib/communities/ballots";
 import {
   ensurePublishedEditionResults,
@@ -153,6 +154,15 @@ export default async function CommunityEditionYearPage({
       ? await listActiveAwardCategories().catch(() => [])
       : [];
 
+  let submitters: Awaited<ReturnType<typeof listEditionBallotSubmitters>> = [];
+  if (canManage && edition.status !== "published") {
+    try {
+      submitters = await listEditionBallotSubmitters(edition.id);
+    } catch {
+      submitters = [];
+    }
+  }
+
   let resultsBundle: {
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyPage>>["rows"];
@@ -280,6 +290,35 @@ export default async function CommunityEditionYearPage({
           <p className="mt-4 max-w-xl text-muted">
             {editionIntroCopy(edition.status)}
           </p>
+
+          {canManage && submitters.length > 0 ? (
+            <div className="mt-8 border border-line p-4">
+              <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+                Host preview
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                {submitters.length} submitted ballot
+                {submitters.length === 1 ? "" : "s"} (hidden from the public
+                until results publish).
+              </p>
+              <ul className="mt-4 max-h-64 space-y-2 overflow-auto text-sm">
+                {submitters.map((s) => (
+                  <li key={s.profileId} className="flex justify-between gap-3">
+                    <span className="text-ink">
+                      {s.displayName}
+                      {s.isVoice ? " · Voice" : ""}
+                    </span>
+                    <span className="text-muted">{s.itemCount} games</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : canManage && edition.status !== "published" ? (
+            <p className="mt-6 text-sm text-muted">
+              No ballots submitted yet. Seed from Ops → Community seed, or vote
+              while open.
+            </p>
+          ) : null}
 
           {edition.status === "scheduled" ? null : edition.status ===
             "open" ? (

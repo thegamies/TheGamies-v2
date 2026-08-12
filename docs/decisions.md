@@ -44,8 +44,8 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
 | 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
 | 2026-08-12 | Edition Voices | **Per-edition** host designation among community members (`community_edition_voices`). Year history retained; roster immutable after publish. |
-| 2026-08-12 | Edition Combined scoring | **Simple union** — all ballots scored the same; Combined reads Community storage. Voice marker for Voices board / filters only. |
-| 2026-08-12 | Edition results freeze | Write-once **normalized** tables at publish (SQL-paginated GOTY + voters). Never recalculate. Lazy ensure on first published read if needed. |
+| 2026-08-12 | Edition Combined scoring | **Deferred from public UI** until Voice weight exists. Results show **Community · Voices** only. Combined ≡ Community under simple union is not shown as a third tab. |
+| 2026-08-12 | Edition results freeze | Write-once when first published. **Rebuild** if edition leaves published then publishes again, or via ops rebuild. Never silent overwrite while staying published. |
 
 ## Open (block dependent work until decided)
 

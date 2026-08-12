@@ -27,6 +27,11 @@ import {
 import { getEditionByCommunityYear } from "./editions";
 import { listEditionVoiceProfileIds } from "./voices";
 
+export {
+  parseEditionResultMode,
+  type EditionResultsPublicMode,
+} from "./edition-results-scoring";
+
 function getDb(): Db {
   return createDb();
 }
@@ -98,12 +103,45 @@ export async function getEditionResultsMeta(
 
 /**
  * Write-once freeze. No-op if meta already exists.
+ * Use rebuildEditionResultsFrozen when re-publishing after reopen.
  */
 export async function ensureEditionResultsFrozen(
   editionId: string,
   db: Db = getDb(),
 ): Promise<EditionResultsMeta | { error: string }> {
   return freezeEditionResults(editionId, db);
+}
+
+/** Clear existing freeze rows and write a new snapshot from current ballots. */
+export async function rebuildEditionResultsFrozen(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<EditionResultsMeta | { error: string }> {
+  await clearEditionResultTables(editionId, db);
+  return freezeEditionResults(editionId, db);
+}
+
+async function clearEditionResultTables(editionId: string, db: Db) {
+  await db
+    .delete(communityEditionResultVoterCategoryPicks)
+    .where(
+      eq(communityEditionResultVoterCategoryPicks.editionId, editionId),
+    );
+  await db
+    .delete(communityEditionResultVoterRanks)
+    .where(eq(communityEditionResultVoterRanks.editionId, editionId));
+  await db
+    .delete(communityEditionResultVoters)
+    .where(eq(communityEditionResultVoters.editionId, editionId));
+  await db
+    .delete(communityEditionResultCategories)
+    .where(eq(communityEditionResultCategories.editionId, editionId));
+  await db
+    .delete(communityEditionResultGoty)
+    .where(eq(communityEditionResultGoty.editionId, editionId));
+  await db
+    .delete(communityEditionResultMeta)
+    .where(eq(communityEditionResultMeta.editionId, editionId));
 }
 
 async function freezeEditionResults(
@@ -612,11 +650,4 @@ export async function getEditionVoterDetail(
       coverUrl: r.coverUrl,
     })),
   };
-}
-
-export function parseEditionResultMode(
-  raw: string | undefined,
-): EditionResultMode {
-  if (raw === "voices" || raw === "community" || raw === "combined") return raw;
-  return "combined";
 }

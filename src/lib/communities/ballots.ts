@@ -1,12 +1,14 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
   communityEditionBallotItems,
   communityEditionBallots,
+  communityEditionVoices,
   covers,
   createDb,
   games,
+  profiles,
   type Db,
 } from "@thegamies/db";
 import {
@@ -148,6 +150,65 @@ export async function getEditionBallotForProfile(
       coverUrl: coverUrlFromImageId(row.coverImageId),
     })),
   };
+}
+
+/** Live (pre-freeze) submitters — for hosts while voting is open/closed. */
+export async function listEditionBallotSubmitters(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<
+  Array<{
+    profileId: string;
+    displayName: string;
+    username: string;
+    isVoice: boolean;
+    itemCount: number;
+    submittedAt: Date;
+  }>
+> {
+  const rows = await db
+    .select({
+      profileId: communityEditionBallots.profileId,
+      displayName: profiles.displayName,
+      username: profiles.username,
+      submittedAt: communityEditionBallots.submittedAt,
+      ballotId: communityEditionBallots.id,
+    })
+    .from(communityEditionBallots)
+    .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
+    .where(eq(communityEditionBallots.editionId, editionId))
+    .orderBy(asc(profiles.displayName), asc(profiles.username));
+
+  if (rows.length === 0) return [];
+
+  const voiceRows = await db
+    .select({ profileId: communityEditionVoices.profileId })
+    .from(communityEditionVoices)
+    .where(eq(communityEditionVoices.editionId, editionId));
+  const voiceIds = new Set(voiceRows.map((r) => r.profileId));
+
+  const ballotIds = rows.map((r) => r.ballotId);
+  const itemCountRows = await db
+    .select({
+      ballotId: communityEditionBallotItems.ballotId,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(communityEditionBallotItems)
+    .where(inArray(communityEditionBallotItems.ballotId, ballotIds))
+    .groupBy(communityEditionBallotItems.ballotId);
+
+  const countByBallot = new Map(
+    itemCountRows.map((row) => [row.ballotId, Number(row.n)]),
+  );
+
+  return rows.map((row) => ({
+    profileId: row.profileId,
+    displayName: row.displayName,
+    username: row.username,
+    isVoice: voiceIds.has(row.profileId),
+    itemCount: countByBallot.get(row.ballotId) ?? 0,
+    submittedAt: row.submittedAt,
+  }));
 }
 
 export async function upsertEditionBallot(input: {

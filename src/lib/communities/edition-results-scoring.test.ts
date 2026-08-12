@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aggregateEditionCategories,
   aggregateEditionGoty,
+  parseEditionResultMode,
   storageModeFor,
   type GameMeta,
 } from "./edition-results-scoring";
@@ -29,11 +30,14 @@ const games = new Map<string, GameMeta>([
   ],
 ]);
 
-describe("storageModeFor", () => {
-  it("maps combined to community storage", () => {
+describe("storageModeFor / parseEditionResultMode", () => {
+  it("maps combined to community storage and hides combined in public parse", () => {
     expect(storageModeFor("combined")).toBe("community");
     expect(storageModeFor("community")).toBe("community");
     expect(storageModeFor("voices")).toBe("voices");
+    expect(parseEditionResultMode("combined")).toBe("community");
+    expect(parseEditionResultMode(undefined)).toBe("community");
+    expect(parseEditionResultMode("voices")).toBe("voices");
   });
 });
 

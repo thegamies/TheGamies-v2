@@ -22,6 +22,12 @@ const ADMIN_LINKS = [
     title: "Standings seed",
     description: "Create synthetic GOTY voters for standings QA.",
   },
+  {
+    href: "/admin/communities",
+    title: "Community seed",
+    description:
+      "Seed community members, Voices, and edition ballots for ceremony QA.",
+  },
 ] as const;
 
 export default function AdminIndexPage() {

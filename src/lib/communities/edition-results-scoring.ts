@@ -2,11 +2,22 @@ import { pointsForRank } from "@/lib/lists/scoring";
 
 export type EditionResultMode = "combined" | "community" | "voices";
 
-/** Combined uses community rows (simple union). */
+/** Public UI modes until weighted Combined exists. */
+export type EditionResultsPublicMode = "community" | "voices";
+
+/** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
   mode: EditionResultMode,
 ): "community" | "voices" {
   return mode === "voices" ? "voices" : "community";
+}
+
+export function parseEditionResultMode(
+  raw: string | undefined,
+): EditionResultsPublicMode {
+  if (raw === "voices") return "voices";
+  // "combined" redirects to community until weighted Combined ships
+  return "community";
 }
 
 export type RankedBallotLine = {

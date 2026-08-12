@@ -7,18 +7,18 @@ import type {
   EditionResultsMeta,
   EditionVoterListRow,
 } from "@/lib/communities/edition-results";
-import type { EditionResultMode } from "@/lib/communities/edition-results-scoring";
+import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
 
 function modeHref(
   slug: string,
   year: number,
-  mode: EditionResultMode,
+  mode: EditionResultsPublicMode,
   page: number,
   votersPage: number,
   q: string,
 ) {
   const params = new URLSearchParams();
-  if (mode !== "combined") params.set("mode", mode);
+  if (mode !== "community") params.set("mode", mode);
   if (page > 1) params.set("page", String(page));
   if (votersPage > 1) params.set("votersPage", String(votersPage));
   if (q) params.set("q", q);
@@ -39,7 +39,7 @@ export function EditionResultsView({
 }: {
   slug: string;
   year: number;
-  mode: EditionResultMode;
+  mode: EditionResultsPublicMode;
   meta: EditionResultsMeta;
   topTen: EditionGotyStandingRow[];
   standingsPage: {
@@ -62,7 +62,7 @@ export function EditionResultsView({
 }) {
   const winner = topTen[0] ?? null;
   const podium = topTen.slice(1, 3);
-  const modes: EditionResultMode[] = ["combined", "community", "voices"];
+  const modes: EditionResultsPublicMode[] = ["community", "voices"];
   const ballotCount =
     mode === "voices" ? meta.ballotCountVoices : meta.ballotCountCommunity;
 
@@ -272,7 +272,7 @@ export function EditionResultsView({
           {voters.total} submitted ballot{voters.total === 1 ? "" : "s"}
         </p>
         <form className="mt-4 flex flex-wrap gap-2" method="get">
-          {mode !== "combined" ? (
+          {mode !== "community" ? (
             <input type="hidden" name="mode" value={mode} />
           ) : null}
           {standingsPage.page > 1 ? (

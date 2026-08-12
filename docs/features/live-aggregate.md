@@ -86,4 +86,6 @@ Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisf
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
 - Ends with one year score rebuild (or after Stop)
 
+Community / edition ceremony seeding is separate: `/admin/communities` — see [community.md](./community.md).
+
 Seed voters cannot sign in. Use Clear year / Clear all to remove them.
