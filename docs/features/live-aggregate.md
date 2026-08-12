@@ -14,7 +14,7 @@ live_goty_scores           disposable site read cache
 live_category_scores
 ```
 
-Later community live boards should `SUM(live_goty_contrib)` for member profiles — **not** filter `live_goty_scores`, and **not** fan out writes on list save.
+Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` for current `community_members` — **not** filter `live_goty_scores`, and **not** fan out writes on list save. See [community.md](./community.md).
 
 ## Eligibility
 
@@ -50,7 +50,8 @@ Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisf
 
 - Ranks always public.
 - Scores, list mentions, rank histograms, and category vote counts hidden until `detailedStatsRevealed`.
-- Admin: `/admin/rankings` (same unlock as catalog sync).
+- Site admin: `/admin/rankings` (same unlock as catalog sync).
+- Community live: all years gated by `communities.live_scores_visible_from` (null = hidden). Hosts set date under Settings.
 
 ## Categories
 
@@ -71,7 +72,6 @@ Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisf
 
 - Journal / cron drain as primary path
 - Pause-updates lock
-- Community live UI (indexes + contrib ready)
 - Multi / ranked category modes
 
 ## Ops: standings seed

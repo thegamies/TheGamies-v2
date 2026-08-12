@@ -6,11 +6,12 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import { leaveBlockedReason } from "./rules";
+import { canManageCommunity, leaveBlockedReason } from "./rules";
 import {
   parseCreateCommunityInput,
   type CommunityRole,
 } from "./schema";
+import { parseScoresVisibleDateInput } from "./live-reveal";
 
 export type Community = typeof communities.$inferSelect;
 export type CommunityMemberRow = typeof communityMembers.$inferSelect;
@@ -55,6 +56,7 @@ export async function listCommunities(
       description: communities.description,
       createdByProfileId: communities.createdByProfileId,
       liveRankingsEnabled: communities.liveRankingsEnabled,
+      liveScoresVisibleFrom: communities.liveScoresVisibleFrom,
       createdAt: communities.createdAt,
       updatedAt: communities.updatedAt,
       memberCount: count(communityMembers.profileId),
@@ -220,4 +222,70 @@ export async function leaveCommunity(
       ),
     );
   return { ok: true };
+}
+
+export async function setLiveRankingsEnabled(
+  slug: string,
+  profileId: string,
+  enabled: boolean,
+  db: Db = getDb(),
+): Promise<{ ok: true; liveRankingsEnabled: boolean } | { error: string }> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can change live rankings." };
+  }
+
+  const [updated] = await db
+    .update(communities)
+    .set({
+      liveRankingsEnabled: enabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id))
+    .returning({ liveRankingsEnabled: communities.liveRankingsEnabled });
+
+  return {
+    ok: true,
+    liveRankingsEnabled: updated?.liveRankingsEnabled ?? enabled,
+  };
+}
+
+export async function setCommunityLiveScoresVisibleFrom(
+  slug: string,
+  profileId: string,
+  input: { mode: "hide" } | { mode: "now" } | { mode: "date"; date: string },
+  db?: Db,
+): Promise<{ ok: true; liveScoresVisibleFrom: Date | null } | { error: string }> {
+  const conn = db ?? getDb();
+  const detail = await getCommunityBySlug(slug, profileId, conn);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can change when scores are shown." };
+  }
+
+  let liveScoresVisibleFrom: Date | null;
+  if (input.mode === "hide") {
+    liveScoresVisibleFrom = null;
+  } else if (input.mode === "now") {
+    liveScoresVisibleFrom = new Date();
+  } else {
+    const parsed = parseScoresVisibleDateInput(input.date);
+    if ("error" in parsed) return { error: parsed.error };
+    liveScoresVisibleFrom = parsed.date;
+  }
+
+  const [updated] = await conn
+    .update(communities)
+    .set({
+      liveScoresVisibleFrom,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id))
+    .returning({ liveScoresVisibleFrom: communities.liveScoresVisibleFrom });
+
+  return {
+    ok: true,
+    liveScoresVisibleFrom: updated?.liveScoresVisibleFrom ?? liveScoresVisibleFrom,
+  };
 }

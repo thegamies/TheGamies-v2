@@ -4,7 +4,7 @@
 
 | System | Source | Visibility | Mutability |
 |---|---|---|---|
-| **Live rankings** | Signed-in members’ lists | Always visible when enabled | Continuous; community admin may **lock** |
+| **Live rankings** | Signed-in members’ lists | Board visible when enabled; scores from host date (all years) | Continuous; community admin may **lock** |
 | **Editions** | Edition ballots (GOTY + categories) | Hidden until edition closes | **Frozen** after publish |
 
 Communities may turn **live rankings** on or off. Editions are the end-of-year ceremony flow.
@@ -15,21 +15,25 @@ Signed-in users with a **profile** can **create** a community. The creator is th
 
 Public UI never says admin / judge / expert — members are listed by display name. Internal role is `admin` | `member`.
 
-`liveRankingsEnabled` exists on the row (default false) but there is **no Live tab or toggle** yet.
+`liveRankingsEnabled` defaults false. Hosts toggle it under Settings. When on, `/communities/[slug]/live` shows a public board: **`SUM(live_goty_contrib)` / `SUM(live_category_contrib)` for current members** — never `live_*_scores`.
+
+**Reveal gate:** ranks public. Scores stay hidden until `live_scores_visible_from` (null = hidden for every year; set a date, reveal now, or clear to hide). Hosts manage this under Settings. Live **lock** (pause updates) is still deferred.
 
 ### URLs
 
 - `/communities` — public directory
 - `/communities/new` — signed-in create (requires profile)
 - `/communities/[slug]` — public home (identity, members, join/leave)
+- `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
+- `/communities/[slug]/settings` — hosts only (live on/off, scores date)
 - Profile `/u/[username]` lists communities the person belongs to
 
 ### Non-goals (this slice)
 
 - Editions, ballots, Voices, frozen results
-- Community live rankings UI / `SUM(contrib)` board / lock
+- Live **lock** / pause updates
 - Invite-only or approval join, bans, extra roles
-- Settings surface, cover/avatar upload
+- Cover/avatar upload
 - Site-admin-only create gate
 
 ## Public shell (edition-aware, later)
@@ -51,9 +55,10 @@ Settings and event management live on a separate administrative surface.
 
 - Optional per community
 - Fed by signed-in lists only (same abuse rule as site aggregate)
-- Community admin can lock/unlock for suspense
+- Board is `SUM(live_*_contrib)` for current members — not `live_*_scores`
+- Ranks public; scores from host date (`live_scores_visible_from`) for every live year
+- Community admin can lock/unlock for suspense (deferred)
 - Not fed by edition ballots; not written into frozen edition snapshots
-- Later boards should `SUM(live_goty_contrib)` for member profiles — not filter `live_goty_scores`
 
 ## Editions
 

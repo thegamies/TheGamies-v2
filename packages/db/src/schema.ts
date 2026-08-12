@@ -202,6 +202,8 @@ export const communities = pgTable("communities", {
   liveRankingsEnabled: boolean("live_rankings_enabled")
     .notNull()
     .default(false),
+  /** When set and reached, live scores are public for every year. Null = hidden. */
+  liveScoresVisibleFrom: timestamp("live_scores_visible_from", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

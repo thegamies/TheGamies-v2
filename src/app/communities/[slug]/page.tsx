@@ -5,7 +5,8 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { leaveBlockedReason } from "@/lib/communities/rules";
+import { CommunityNav } from "@/components/communities/CommunityNav";
+import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { MembershipActions } from "./MembershipActions";
 
@@ -53,6 +54,7 @@ export default async function CommunityHomePage({
   const canLeave =
     community.viewerRole != null &&
     leaveBlockedReason(community.viewerRole, adminCount) == null;
+  const canManage = canManageCommunity(community.viewerRole);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}`;
 
   return (
@@ -74,6 +76,13 @@ export default async function CommunityHomePage({
           {community.description}
         </p>
       ) : null}
+
+      <CommunityNav
+        slug={community.slug}
+        liveEnabled={community.liveRankingsEnabled}
+        canManage={canManage}
+        active="overview"
+      />
 
       {profile ? (
         <MembershipActions

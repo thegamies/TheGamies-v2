@@ -9,3 +9,8 @@ export function leaveBlockedReason(
   }
   return null;
 }
+
+/** Internal admin role; public UI still says “host”, not admin. */
+export function canManageCommunity(role: CommunityRole | null): boolean {
+  return role === "admin";
+}
