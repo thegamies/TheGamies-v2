@@ -28,6 +28,8 @@ type Props = {
   onChange: (next: CategoryVoteSelection[]) => void;
   /** GOTY year — category search is restricted to this year. */
   year: number;
+  /** Optional body copy under the heading. */
+  description?: string;
 };
 
 export function CategoryVotesEditor({
@@ -35,6 +37,7 @@ export function CategoryVotesEditor({
   value,
   onChange,
   year,
+  description = "Choose one game per category. These feed the site live category standings.",
 }: Props) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
     categories[0]?.id ?? null,
@@ -90,10 +93,7 @@ export function CategoryVotesEditor({
       <h2 className="mt-2 font-display text-3xl tracking-wide text-ink">
         Award picks
       </h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted">
-        Choose one game per category. These feed the site live category
-        standings.
-      </p>
+      <p className="mt-2 max-w-2xl text-sm text-muted">{description}</p>
 
       <div className="mt-6 grid gap-4">
         {categories.map((cat) => {

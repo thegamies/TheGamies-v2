@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MembershipActions } from "@/app/communities/[slug]/MembershipActions";
+import { EditionBallotEditor } from "@/components/communities/EditionBallotEditor";
+import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { CommunityNav } from "@/components/communities/CommunityNav";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import {
+  canSubmitEditionBallot,
+  getEditionBallotForProfile,
+} from "@/lib/communities/ballots";
 import {
   getEditionByCommunityYear,
   listEditionsForCommunity,
@@ -19,6 +26,7 @@ import {
 } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 
 type Params = Promise<{ slug: string; year: string }>;
 
@@ -44,12 +52,12 @@ export async function generateMetadata({
   }
 }
 
-function editionBodyCopy(status: EditionStatus): string {
+function editionIntroCopy(status: EditionStatus): string {
   switch (status) {
     case "scheduled":
       return "This edition is coming soon. Voting has not opened yet.";
     case "open":
-      return "Voting is open. Ballot entry is coming soon.";
+      return "Voting is open. Rank your Game of the Year and make category picks.";
     case "closed":
       return "Voting has closed. Final standings are not published yet.";
     case "published":
@@ -99,6 +107,23 @@ export default async function CommunityEditionYearPage({
   const navStatus = featured?.status ?? edition.status;
   const yearOptions = publicEditions.map((e) => e.year).sort((a, b) => b - a);
 
+  const isMember = canSubmitEditionBallot(community.viewerRole);
+  const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}/edition/${y}`;
+
+  let ballot = null;
+  if (profile && isMember) {
+    try {
+      ballot = await getEditionBallotForProfile(edition.id, profile.id);
+    } catch {
+      ballot = null;
+    }
+  }
+
+  const awardCategories =
+    edition.status === "open" || ballot
+      ? await listActiveAwardCategories().catch(() => [])
+      : [];
+
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">
@@ -144,8 +169,59 @@ export default async function CommunityEditionYearPage({
           Game of the Year
         </h2>
         <p className="mt-4 max-w-xl text-muted">
-          {editionBodyCopy(edition.status)}
+          {editionIntroCopy(edition.status)}
         </p>
+
+        {edition.status === "scheduled" ? null : edition.status === "open" ? (
+          !user ? (
+            <p className="mt-6 max-w-xl text-muted">
+              <Link href={signInHref} className="text-accent hover:underline">
+                Sign in
+              </Link>{" "}
+              and join this community to submit a ballot.
+            </p>
+          ) : !profile ? (
+            <p className="mt-6 max-w-xl text-muted">
+              <Link href="/account" className="text-accent hover:underline">
+                Finish your profile
+              </Link>{" "}
+              to join this community and vote.
+            </p>
+          ) : !isMember ? (
+            <div className="mt-6 max-w-xl">
+              <p className="text-muted">
+                Join this community to submit a ballot while voting is open.
+              </p>
+              <MembershipActions
+                slug={community.slug}
+                isMember={false}
+                canLeave={false}
+              />
+            </div>
+          ) : (
+            <EditionBallotEditor
+              slug={community.slug}
+              year={edition.year}
+              initialItems={ballot?.items ?? []}
+              initialCategoryVotes={ballot?.categoryVotes ?? []}
+              awardCategories={awardCategories}
+            />
+          )
+        ) : (
+          // closed | published
+          !user || !profile || !isMember ? (
+            <p className="mt-6 max-w-xl text-muted">
+              Voting has closed for this edition.
+            </p>
+          ) : (
+            <EditionBallotReadonly
+              items={ballot?.items ?? []}
+              categoryVotes={ballot?.categoryVotes ?? []}
+              categories={awardCategories}
+              emptyMessage="You did not submit a ballot for this edition."
+            />
+          )
+        )}
       </section>
     </main>
   );

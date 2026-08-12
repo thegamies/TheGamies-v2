@@ -19,6 +19,8 @@ import {
   setCommunityEditionSchedule,
   setCommunityEditionTimestampNow,
 } from "@/lib/communities/editions";
+import { upsertEditionBallot } from "@/lib/communities/ballots";
+import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -46,6 +48,58 @@ function revalidateCommunity(slug: string, username?: string) {
   revalidatePath(`/communities/${slug}/ballot`);
   revalidatePath(`/communities/${slug}/results`);
   if (username) revalidatePath(`/u/${username}`);
+}
+
+export type SaveEditionBallotState = {
+  error?: string;
+  saved?: boolean;
+} | null;
+
+export async function saveEditionBallotAction(
+  _prev: SaveEditionBallotState,
+  formData: FormData,
+): Promise<SaveEditionBallotState> {
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  let itemsJson: unknown = [];
+  let categoryVotesJson: unknown = [];
+  try {
+    itemsJson = JSON.parse(String(formData.get("itemsJson") ?? "[]"));
+    categoryVotesJson = JSON.parse(
+      String(formData.get("categoryVotesJson") ?? "[]"),
+    );
+  } catch {
+    return { error: "Could not save the ballot." };
+  }
+
+  const parsed = saveEditionBallotInputSchema.safeParse({
+    slug: String(formData.get("slug") ?? ""),
+    year: formData.get("year"),
+    items: itemsJson,
+    categoryVotes: categoryVotesJson,
+  });
+  if (!parsed.success) {
+    return {
+      error:
+        parsed.error.issues[0]?.message ?? "Could not save the ballot.",
+    };
+  }
+
+  const result = await upsertEditionBallot({
+    slug: parsed.data.slug,
+    year: parsed.data.year,
+    profileId: gate.profile.id,
+    items: parsed.data.items,
+    categoryVotes: parsed.data.categoryVotes,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const slug = parsed.data.slug.trim().toLowerCase();
+  const year = parsed.data.year;
+  revalidateCommunity(slug, gate.profile.username);
+  revalidatePath(`/communities/${slug}/edition/${year}`);
+  return { saved: true };
 }
 
 export async function createCommunityAction(

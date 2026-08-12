@@ -49,11 +49,11 @@ Hosts create editions and set the three times under Settings (optional “set to
 
 ### Non-goals (next slices)
 
-- Ballot submit/edit storage and UI
 - Voices, Combined weight, frozen result payloads, voter matrix
 - Invite-only or approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
+- Per-community / multi / ranked edition category modes
 
 ## Public shell
 
@@ -84,13 +84,27 @@ Settings and event management live on a separate administrative surface.
 ### Required states
 
 1. Coming soon (`scheduled`)
-2. Voting open (`open`)
-3. User actively completing ballot (later)
-4. User submitted ballot (later)
-5. Voting closed; results pending (`closed`)
+2. Voting open (`open`) — members edit GOTY + site category picks
+3. User actively completing ballot (`open` + editor)
+4. User submitted ballot (saved; still editable while `open`)
+5. Voting closed; results pending (`closed`) — member ballot read-only
 6. Final results published (`published` + frozen payload later)
 7. Individual voter ballot / current users exploration (later)
 8. Community settings (separate from public pages)
+
+### Ballots (shipped)
+
+Separate tables from personal lists / live contrib:
+
+- `community_edition_ballots` — one per `(editionId, profileId)`
+- `community_edition_ballot_items` — ranked GOTY (up to 100; scoring later uses top 10 via `pointsForRank`)
+- `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only
+
+**Eligibility:** signed-in profile that is a community member (including hosts). Non-members see join / sign-in CTAs.
+
+**Edit window:** submit and update while status is `open` (until `closesAt`). After close/publish, the voter’s ballot is read-only (or “you did not submit”).
+
+Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Results (later)
 

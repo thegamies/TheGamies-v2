@@ -270,6 +270,59 @@ export const communityEditions = pgTable(
   ],
 );
 
+/**
+ * Member GOTY ballot for one community edition.
+ * Separate from personal `lists` and from live contrib.
+ */
+export const communityEditionBallots = pgTable(
+  "community_edition_ballots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    submittedAt: timestamp("submitted_at", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("community_edition_ballots_edition_profile_uidx").on(
+      t.editionId,
+      t.profileId,
+    ),
+    index("community_edition_ballots_edition_id_idx").on(t.editionId),
+  ],
+);
+
+export const communityEditionBallotItems = pgTable(
+  "community_edition_ballot_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => communityEditionBallots.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    rank: integer("rank").notNull(),
+    blurb: text("blurb"),
+  },
+  (t) => [
+    uniqueIndex("community_edition_ballot_items_ballot_rank_uidx").on(
+      t.ballotId,
+      t.rank,
+    ),
+    uniqueIndex("community_edition_ballot_items_ballot_game_uidx").on(
+      t.ballotId,
+      t.gameId,
+    ),
+  ],
+);
+
 /** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
 export const lists = pgTable(
   "lists",
@@ -341,6 +394,23 @@ export const listCategoryVotes = pgTable(
       .references(() => games.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.listId, t.categoryId] })],
+);
+
+/** Site award_categories single-choice picks on an edition ballot. */
+export const communityEditionBallotCategoryVotes = pgTable(
+  "community_edition_ballot_category_votes",
+  {
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => communityEditionBallots.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.ballotId, t.categoryId] })],
 );
 
 /**

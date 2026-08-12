@@ -35,18 +35,20 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-11 | Profile access control | **App-layer** session checks (`auth.getSession`) + ownership on profile writes. **Postgres RLS deferred** until Auth JWT → DB role is defined — do not invent policies yet |
 | 2026-08-11 | List drafts / Save / Share | **No list status column.** Signed-in create attaches owned list (slug + profile) immediately. Anon: draft cookie until Share → `/l/[publicId]`; claim → `/u/[username]/[slug]`. Owned `/l/[publicId]` redirects to slug URL. **Save** signed-in only. Notes require sign-in. |
 | 2026-08-11 | Site live aggregate | **`live_goty_contrib` / `live_category_contrib` = scoring truth**; **`live_*_scores` = disposable cache**. Save replaces contrib + marks dirty keys; **async/lazy locked absolute SUM refresh** (saves do not contend on score rows). **`standingsVersion` bumps only after refresh succeeds**. Reveal gate: ranks public, scores/votes hidden until admin reveals. Site live categories: **single-choice** on owned GOTY; plurality. Community later = `SUM(contrib)` for members (no save fan-out). |
-| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only / edition ballot eligibility still open. |
+| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only membership deferred. |
 | 2026-08-12 | Community live reveal | One community date: **`live_scores_visible_from`** (null = scores hidden for **all** live years). Hosts set date / reveal now / hide under Settings. |
 | 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board via **`community_live_lock_snapshots`** (current year eager; other years lazy). Unlock discards snapshots and resumes live `SUM(contrib)`. |
-| 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. Ballot/results payloads later. |
+| 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. |
+| 2026-08-12 | Edition ballot eligibility | **Open community members** (signed-in profile + `community_members` row, including hosts). Invite-only / approval gates deferred. |
+| 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
+| 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
 
 ## Open (block dependent work until decided)
 
 - Exact scoring formula for Combined (Community + Voice weight / %)
 - Exact degrading score curve when scoring expands beyond top 10
-- Edition / community category voting modes beyond site-live single-choice
-- Community membership and edition ballot eligibility rules
-- Whether submitted edition ballots can be edited before the deadline
+- Edition / community category voting modes beyond site single-choice
+- Invite-only / approval membership and any eligibility beyond open members
 - Tie-breaking rules (editions + live)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
