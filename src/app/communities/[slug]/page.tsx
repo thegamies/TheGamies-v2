@@ -7,6 +7,10 @@ import {
 } from "@/lib/auth/session";
 import { CommunityNav } from "@/components/communities/CommunityNav";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
+import {
+  getFeaturedEditionForCommunity,
+} from "@/lib/communities/editions";
+import { editionStatusLabel } from "@/lib/communities/edition-status";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { MembershipActions } from "./MembershipActions";
 
@@ -57,6 +61,17 @@ export default async function CommunityHomePage({
   const canManage = canManageCommunity(community.viewerRole);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}`;
 
+  let featuredEdition = null;
+  try {
+    featuredEdition = await getFeaturedEditionForCommunity(community.id);
+  } catch {
+    featuredEdition = null;
+  }
+  const publicEdition =
+    featuredEdition && featuredEdition.status !== "draft"
+      ? featuredEdition
+      : null;
+
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">
@@ -76,11 +91,23 @@ export default async function CommunityHomePage({
           {community.description}
         </p>
       ) : null}
+      {publicEdition ? (
+        <p className="mt-4 text-sm text-ink" role="status">
+          <Link
+            href={`/communities/${community.slug}/edition/${publicEdition.year}`}
+            className="hover:text-accent"
+          >
+            {publicEdition.year} edition ·{" "}
+            {editionStatusLabel(publicEdition.status)}
+          </Link>
+        </p>
+      ) : null}
 
       <CommunityNav
         slug={community.slug}
         liveEnabled={community.liveRankingsEnabled}
         canManage={canManage}
+        editionStatus={publicEdition?.status ?? null}
         active="overview"
       />
 

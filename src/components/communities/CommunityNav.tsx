@@ -1,16 +1,23 @@
 import Link from "next/link";
+import {
+  showEditionNav,
+  type EditionStatus,
+} from "@/lib/communities/edition-status";
 
 type Props = {
   slug: string;
   liveEnabled: boolean;
   canManage: boolean;
-  active: "overview" | "live" | "settings";
+  /** Non-draft featured edition status, or null if none public. */
+  editionStatus: EditionStatus | null;
+  active: "overview" | "live" | "edition" | "settings";
 };
 
 export function CommunityNav({
   slug,
   liveEnabled,
   canManage,
+  editionStatus,
   active,
 }: Props) {
   const items: { href: string; label: string; key: Props["active"] }[] = [
@@ -21,6 +28,13 @@ export function CommunityNav({
       href: `/communities/${slug}/live`,
       label: "Live",
       key: "live",
+    });
+  }
+  if (editionStatus && showEditionNav(editionStatus)) {
+    items.push({
+      href: `/communities/${slug}/edition`,
+      label: "Edition",
+      key: "edition",
     });
   }
   if (canManage) {

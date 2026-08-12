@@ -5,7 +5,7 @@
 | System | Source | Visibility | Mutability |
 |---|---|---|---|
 | **Live rankings** | Signed-in members’ lists | Board visible when enabled; scores from host date (all years); lock freezes board | Continuous until **locked** |
-| **Editions** | Edition ballots (GOTY + categories) | Hidden until edition closes | **Frozen** after publish |
+| **Editions** | Edition ballots (GOTY + categories) | Hidden until `publishesAt` | **Frozen** after publish (payload later) |
 
 Communities may turn **live rankings** on or off. Editions are the end-of-year ceremony flow.
 
@@ -21,23 +21,41 @@ Public UI never says admin / judge / expert — members are listed by display na
 
 **Lock:** hosts can freeze the public board (`live_rankings_locked`). Lock stores a snapshot (`community_live_lock_snapshots`); member list changes do not move standings until unlock. Current year is snapshotted on lock; other years snapshot lazily on first view.
 
+## Edition schedule shell (shipped)
+
+Table `community_editions`: one row per `(communityId, year)` with `opensAt`, `closesAt`, `publishesAt` (nullable).
+
+**Status is computed** (no stored enum):
+
+- missing any timestamp → `draft` (hosts only)
+- before `opensAt` → `scheduled` (coming soon)
+- before `closesAt` → `open` (voting open)
+- before `publishesAt` → `closed` (results pending)
+- else → `published`
+
+Hosts create editions and set the three times under Settings (optional “set to now” shortcuts). Public home shows ceremony status for non-draft editions. Nav: one **Edition** tab (year switcher inside) when any non-draft edition exists — ballot and results share that surface.
+
 ### URLs
 
 - `/communities` — public directory
 - `/communities/new` — signed-in create (requires profile)
-- `/communities/[slug]` — public home (identity, members, join/leave)
+- `/communities/[slug]` — public home (identity, members, join/leave, edition status)
 - `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
-- `/communities/[slug]/settings` — hosts only (live on/off, lock, scores date)
+- `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY ceremony (vote + results by schedule)
+- `/communities/[slug]/ballot` → redirects to edition
+- `/communities/[slug]/results` → redirects to edition
+- `/communities/[slug]/settings` — hosts only (live + edition schedule)
 - Profile `/u/[username]` lists communities the person belongs to
 
-### Non-goals (this slice)
+### Non-goals (next slices)
 
-- Editions, ballots, Voices, frozen results
+- Ballot submit/edit storage and UI
+- Voices, Combined weight, frozen result payloads, voter matrix
 - Invite-only or approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
 
-## Public shell (edition-aware, later)
+## Public shell
 
 ```text
 Community identity
@@ -45,10 +63,10 @@ Live rankings status (if enabled) / lock state
 Active edition status and year
 Hosts / Voices
 
-Overview    Live    Ballot    Results    Members
+Overview    Live    Edition    Members
 ```
 
-Exact tab labels can flex; keep **Live** and **Edition Ballot/Results** distinct.
+Exact tab labels can flex; keep **Live** and **Edition** distinct. Vote and results share the Edition tab with a year switcher.
 
 Settings and event management live on a separate administrative surface.
 
@@ -65,16 +83,16 @@ Settings and event management live on a separate administrative surface.
 
 ### Required states
 
-1. Coming soon  
-2. Voting open  
-3. User actively completing ballot  
-4. User submitted ballot  
-5. Voting closed; results pending (still hidden)  
-6. Final results published (frozen)  
-7. Individual voter ballot / current users exploration  
+1. Coming soon (`scheduled`)
+2. Voting open (`open`)
+3. User actively completing ballot (later)
+4. User submitted ballot (later)
+5. Voting closed; results pending (`closed`)
+6. Final results published (`published` + frozen payload later)
+7. Individual voter ballot / current users exploration (later)
 8. Community settings (separate from public pages)
 
-### Results
+### Results (later)
 
 - Modes: **Combined · Community · Voices**
 - Show **current users / voters** (searchable exploration)

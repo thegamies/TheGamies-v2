@@ -38,6 +38,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only / edition ballot eligibility still open. |
 | 2026-08-12 | Community live reveal | One community date: **`live_scores_visible_from`** (null = scores hidden for **all** live years). Hosts set date / reveal now / hide under Settings. |
 | 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board via **`community_live_lock_snapshots`** (current year eager; other years lazy). Unlock discards snapshots and resumes live `SUM(contrib)`. |
+| 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. Ballot/results payloads later. |
 
 ## Open (block dependent work until decided)
 
@@ -47,7 +48,6 @@ Record product and architecture decisions here. Do not invent answers to open it
 - Community membership and edition ballot eligibility rules
 - Whether submitted edition ballots can be edited before the deadline
 - Tie-breaking rules (editions + live)
-- Edition result publication timing (manual publish vs auto on close)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

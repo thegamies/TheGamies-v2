@@ -243,6 +243,33 @@ export const communityLiveLockSnapshots = pgTable(
   (t) => [primaryKey({ columns: [t.communityId, t.year] })],
 );
 
+/**
+ * Year awards ceremony for a community.
+ * Public status is computed from opensAt / closesAt / publishesAt (no stored status).
+ */
+export const communityEditions = pgTable(
+  "community_editions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year").notNull(),
+    opensAt: timestamp("opens_at", { mode: "date" }),
+    closesAt: timestamp("closes_at", { mode: "date" }),
+    publishesAt: timestamp("publishes_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("community_editions_community_id_year_uidx").on(
+      t.communityId,
+      t.year,
+    ),
+    index("community_editions_community_id_idx").on(t.communityId),
+  ],
+);
+
 /** Personal GOTY or custom ranked list. Owned lists use profile slug URLs; anon shares use publicId. */
 export const lists = pgTable(
   "lists",

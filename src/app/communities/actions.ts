@@ -14,6 +14,11 @@ import {
   setLiveRankingsEnabled,
   setLiveRankingsLocked,
 } from "@/lib/communities/service";
+import {
+  createCommunityEdition,
+  setCommunityEditionSchedule,
+  setCommunityEditionTimestampNow,
+} from "@/lib/communities/editions";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -36,6 +41,10 @@ function revalidateCommunity(slug: string, username?: string) {
   revalidatePath(`/communities/${slug}/live`);
   revalidatePath(`/communities/${slug}/live`, "layout");
   revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}/edition`);
+  revalidatePath(`/communities/${slug}/edition`, "layout");
+  revalidatePath(`/communities/${slug}/ballot`);
+  revalidatePath(`/communities/${slug}/results`);
   if (username) revalidatePath(`/u/${username}`);
 }
 
@@ -161,6 +170,77 @@ export async function setCommunityLiveScoresVisibleFromAction(
 
   const year = new Date().getUTCFullYear();
   revalidatePath(`/communities/${slug}/live/${year}`);
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function createCommunityEditionAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await createCommunityEdition(
+    slug,
+    gate.profile.id,
+    formData.get("year"),
+  );
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function setCommunityEditionScheduleAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setCommunityEditionSchedule(slug, gate.profile.id, {
+    year: formData.get("year"),
+    opensAt: String(formData.get("opensAt") ?? ""),
+    closesAt: String(formData.get("closesAt") ?? ""),
+    publishesAt: String(formData.get("publishesAt") ?? ""),
+  });
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function setCommunityEditionTimestampNowAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const fieldRaw = String(formData.get("field") ?? "");
+  if (!slug) return { error: "Community not found." };
+  if (
+    fieldRaw !== "opensAt" &&
+    fieldRaw !== "closesAt" &&
+    fieldRaw !== "publishesAt"
+  ) {
+    return { error: "Choose which time to update." };
+  }
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setCommunityEditionTimestampNow(slug, gate.profile.id, {
+    year: formData.get("year"),
+    field: fieldRaw,
+  });
+  if ("error" in result) return { error: result.error };
+
   revalidateCommunity(slug, gate.profile.username);
   return null;
 }
