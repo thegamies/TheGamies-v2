@@ -16,8 +16,8 @@ Multi-year switching is a pop-open year control beside the Results heading (2+ p
 Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per chapter** (title + stage together — nested sticky breaks iOS Safari) so place/award handoffs are horizontal (left in / right out at the same time). Long scrub distance keeps the pace deliberate. Respects `prefers-reduced-motion`.
 
 1. **Chapter titles** pin with the stage and shrink early in the scrub  
-2. **Game of the Year** — single stage cycles **#10 → #1**; games that share a derived rank share **one stage** (same number, extra titles listed); the countdown then jumps to the next rank  
-3. **Categories** — single stage cycles awards the same way; within each award layout **#1 · #2 · #3**, appear **#3 → #2 → #1**. A slot is a rank group (one cover, or extra titles if several games share that rank). Competition can skip a slot (1–1–3: no #2); Dense fills 1 then 2  
+2. **Game of the Year** — single stage cycles **#10 → #1**. Each rank: the number slides in, grows in the center, then parks on the **right, inset, on the same row as Tied** and **stays through every cover**. Ties: **Tied** lands in the middle, lifts, then each tied game’s cover gets its own beat. Solo ranks skip Tied and bring in that cover. The number only leaves when the next rank takes over.  
+3. **Categories** — single stage cycles awards the same way; within each award layout **#1 · #2 · #3**, appear **#3 → #2 → #1**. A slot is a rank group (every tied game shows a cover). Competition can skip a slot (1–1–3: no #2); Dense fills 1 then 2  
 4. **Summary** — Top 10 + each category’s #1 (all games at rank 1) on a normal scrolling board  
 5. Quiet cue toward Highlights
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import {
   createContext,
@@ -14,6 +13,17 @@ import type {
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
+import { ceremonyProgress, documentOffsetTop } from "@/lib/communities/edition-reveal-scrub";
+import {
+  gotyRevealGameLocal,
+  gotyRevealGameMotion,
+  gotyRevealLocalT,
+  gotyRevealNumber,
+  gotyRevealNumberShift,
+  GOTY_REVEAL_TIED_PARK_Y_VH,
+  gotyRevealRankUnits,
+  gotyRevealTied,
+} from "@/lib/communities/edition-reveal-motion";
 import { groupByRank } from "@/lib/standings/shared-rank";
 
 function clamp(n: number, min: number, max: number) {
@@ -53,6 +63,9 @@ type PaintFn = (progress: number, frame: HTMLElement) => void;
  * Nested sticky (title then stage) breaks scrubbing on iOS Safari.
  * Stage uses grid + absolute fill — flex-1 children often collapse to 0
  * height on iPhone, which hid every place/award layer.
+ *
+ * Safari often skips `scroll` during momentum; keep a rAF loop while the
+ * chapter is on screen so Chrome and Safari scrub the same way.
  */
 function CeremonyChapter({
   eyebrow,
@@ -86,21 +99,36 @@ function CeremonyChapter({
 
     let raf = 0;
     let lastShrink = -1;
+    let trackDocTop = documentOffsetTop(track);
+    const scrollRoot =
+      (document.scrollingElement as HTMLElement | null) ??
+      document.documentElement;
+
+    const measure = () => {
+      trackDocTop = documentOffsetTop(track);
+    };
 
     const apply = () => {
-      raf = 0;
+      const viewportH = Math.max(1, window.innerHeight);
+
       if (reduced) {
         titleEl.style.fontSize = "1.5rem";
         head.style.paddingTop = "0.6rem";
         head.style.paddingBottom = "0.6rem";
-        paintRef.current(1, stage);
+        stage.dataset.revealReduced = "1";
+        paintRef.current(0, stage);
+        raf = 0;
         return;
       }
+      stage.dataset.revealReduced = "0";
 
-      const frameH = Math.max(1, frame.offsetHeight || window.innerHeight);
-      const total = Math.max(1, track.offsetHeight - frameH);
-      const scrolled = -track.getBoundingClientRect().top;
-      const p = clamp(scrolled / total, 0, 1);
+      const frameH = Math.max(1, frame.offsetHeight || viewportH);
+      const p = ceremonyProgress(
+        scrollRoot.scrollTop,
+        trackDocTop,
+        track.offsetHeight,
+        frameH,
+      );
       paintRef.current(p, stage);
 
       const shrink = easeInOut(clamp(p / 0.08, 0, 1));
@@ -110,24 +138,39 @@ function CeremonyChapter({
         head.style.paddingTop = `${0.5 + (1 - shrink) * 0.45}rem`;
         head.style.paddingBottom = `${0.45 + (1 - shrink) * 0.3}rem`;
       }
+
+      const rect = track.getBoundingClientRect();
+      const onScreen = rect.bottom > 0 && rect.top < viewportH;
+      raf = onScreen ? requestAnimationFrame(apply) : 0;
     };
 
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(apply);
+    const kick = () => {
+      if (!raf) raf = requestAnimationFrame(apply);
     };
 
-    apply();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
-    window.visualViewport?.addEventListener("resize", onScroll);
-    window.visualViewport?.addEventListener("scroll", onScroll);
+    const onResize = () => {
+      measure();
+      kick();
+    };
+
+    measure();
+    kick();
+    scrollRoot.addEventListener("scroll", kick, { passive: true });
+    window.addEventListener("scroll", kick, { passive: true });
+    document.addEventListener("scroll", kick, { passive: true, capture: true });
+    window.addEventListener("resize", onResize, { passive: true });
+    window.addEventListener("touchmove", kick, { passive: true });
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", kick);
     return () => {
       if (raf) cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      window.visualViewport?.removeEventListener("resize", onScroll);
-      window.visualViewport?.removeEventListener("scroll", onScroll);
+      scrollRoot.removeEventListener("scroll", kick);
+      window.removeEventListener("scroll", kick);
+      document.removeEventListener("scroll", kick, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("touchmove", kick);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", kick);
     };
   }, [reduced]);
 
@@ -135,7 +178,8 @@ function CeremonyChapter({
     <div ref={trackRef} className="relative" style={{ height: `${heightVh}vh` }}>
       <div
         ref={frameRef}
-        className="sticky top-0 h-[100svh] overflow-hidden bg-paper"
+        className="sticky top-0 overflow-hidden bg-paper"
+        style={{ height: "100vh", maxHeight: "100dvh" }}
       >
         {/* Full-bleed stage first so it always owns the viewport box on iOS. */}
         <div ref={stageRef} className="absolute inset-0">
@@ -144,7 +188,8 @@ function CeremonyChapter({
 
         <div
           ref={headRef}
-          className="absolute inset-x-0 top-0 z-20 border-b border-line bg-paper/95 px-[var(--gutter)] backdrop-blur-[2px]"
+          data-c-head
+          className="absolute inset-x-0 top-0 z-20 border-b border-line bg-paper/95 px-[var(--gutter)]"
           style={{ paddingTop: "1.1rem", paddingBottom: "0.85rem" }}
         >
           <div className="relative mx-auto w-full max-w-[var(--page-max)]">
@@ -172,23 +217,28 @@ function CeremonyChapter({
 function CeremonyArt({
   title,
   coverUrl,
-  priority,
 }: {
   title: string;
   coverUrl: string | null;
   priority?: boolean;
 }) {
   return (
-    <div className="relative aspect-[3/4] overflow-hidden border border-line bg-panel">
+    <div
+      className="relative w-full overflow-hidden border border-line bg-panel"
+      style={{ aspectRatio: "3 / 4" }}
+    >
       {coverUrl ? (
-        <Image
+        // Native img: Next/Image + opacity/transform often blanks in Safari.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={coverUrl}
           alt=""
-          fill
-          priority={priority}
           draggable={false}
-          className="object-cover"
-          sizes="(max-width: 768px) 45vw, 300px"
+          loading="eager"
+          decoding="async"
+          width={264}
+          height={352}
+          className="block h-full w-full object-cover"
         />
       ) : (
         <div className="flex h-full items-end p-3">
@@ -201,53 +251,112 @@ function CeremonyArt({
   );
 }
 
-/**
- * Map global progress → per-item local t in roughly [-0.2, 1.2]
- * so neighbors overlap: one exits right while the next enters left.
- */
-function localT(p: number, index: number, count: number) {
-  if (count <= 1) return Math.max(p, 0.4);
-  // Each item owns 1 unit; overlap windows by ~0.35 units.
-  // +0.4 so the first place is fully on-stage at p=0 (no blank first paint).
-  const span = count - 0.35;
-  return p * span - index + 0.4;
+function paintGotyNumber(
+  num: HTMLElement,
+  frame: HTMLElement,
+  motion: { opacity: number; enter: number; park: number; scale: number },
+) {
+  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+  const shift = gotyRevealNumberShift(
+    motion,
+    {
+      width: Math.max(1, num.offsetWidth),
+      height: Math.max(1, num.offsetHeight),
+    },
+    {
+      width: Math.max(1, frame.offsetWidth),
+      height: Math.max(1, frame.offsetHeight),
+      topInset: (head?.offsetHeight ?? 72) + 8,
+      sideInset: 16,
+    },
+  );
+  num.style.opacity = String(motion.opacity);
+  num.style.transform = `translate(-50%, -50%) translate3d(${shift.x}px, ${shift.y}px, 0) scale(${shift.scale})`;
 }
 
-function layerMotion(t: number) {
-  // t: 0 start enter, ~0.35 full, ~0.65 start exit, 1 gone
-  // Ghost leads; main content follows. Alpha on both enter and exit.
-  const ghostEnter = easeInOut(clamp(t / 0.3, 0, 1));
-  const mainEnter = easeInOut(clamp((t - 0.14) / 0.32, 0, 1));
-  const exit = easeInOut(clamp((t - 0.62) / 0.38, 0, 1));
-  const live = t >= 0 && t <= 1;
-  const ghostOpacity = live ? ghostEnter * (1 - exit) : 0;
-  const mainOpacity = live ? mainEnter * (1 - exit) : 0;
-  const ghostX = (1 - ghostEnter) * -42 + exit * 40;
-  const mainX = (1 - mainEnter) * -34 + exit * 38;
-  return { ghostOpacity, mainOpacity, ghostX, mainX, mainEnter, exit };
+function paintGotyReduced(frame: HTMLElement) {
+  const layers = frame.querySelectorAll<HTMLElement>("[data-c-place]");
+  layers.forEach((layer, i) => {
+    const on = i === 0;
+    const num = layer.querySelector<HTMLElement>("[data-c-num]");
+    const tied = layer.querySelector<HTMLElement>("[data-c-tied]");
+    const games = layer.querySelectorAll<HTMLElement>("[data-c-game]");
+    if (num) {
+      paintGotyNumber(num, frame, {
+        opacity: on ? 1 : 0,
+        enter: 1,
+        park: 1,
+        scale: 0.57,
+      });
+    }
+    if (tied) {
+      const show = on && games.length > 1;
+      tied.style.opacity = show ? "1" : "0";
+      tied.style.transform = `translate(-50%, -50%) translate3d(0, ${GOTY_REVEAL_TIED_PARK_Y_VH}vh, 0)`;
+    }
+    games.forEach((game, gi) => {
+      game.style.opacity = on ? "1" : "0";
+      game.style.pointerEvents = on ? "auto" : "none";
+      if (on && games.length > 1) {
+        const spread = Math.min(14, 36 / games.length);
+        const scale = Math.max(0.48, 0.82 - games.length * 0.06);
+        const x = (gi - (games.length - 1) / 2) * spread;
+        game.style.transform = `translate3d(${x}vw, 8vh, 0) scale(${scale})`;
+      } else {
+        game.style.transform = "translate3d(0, 0, 0)";
+      }
+    });
+    layer.style.pointerEvents = on ? "auto" : "none";
+    layer.style.zIndex = on ? "10" : "0";
+  });
 }
 
 function paintGotyCountdown(p: number, frame: HTMLElement) {
-  const layers = frame.querySelectorAll<HTMLElement>("[data-c-place]");
-  const count = layers.length;
+  if (frame.dataset.revealReduced === "1") {
+    paintGotyReduced(frame);
+    return;
+  }
+
+  const layers = [...frame.querySelectorAll<HTMLElement>("[data-c-place]")];
+  const units = layers.map((layer) =>
+    gotyRevealRankUnits(Number(layer.dataset.games ?? "1")),
+  );
+
   layers.forEach((layer, i) => {
-    const t = localT(p, i, count);
-    const { ghostOpacity, mainOpacity, ghostX, mainX, mainEnter } =
-      layerMotion(t);
-    const ghost = layer.querySelector<HTMLElement>("[data-c-ghost]");
-    const main = layer.querySelector<HTMLElement>("[data-c-main]");
-    if (ghost) {
-      ghost.style.opacity = String(ghostOpacity);
-      ghost.style.transform = `translate3d(${ghostX}vw, -50%, 0)`;
+    const rankUnits = units[i] ?? 1;
+    const t = gotyRevealLocalT(p, i, units);
+    const gameEls = layer.querySelectorAll<HTMLElement>("[data-c-game]");
+    const tied = gameEls.length > 1;
+    const num = layer.querySelector<HTMLElement>("[data-c-num]");
+    const tiedEl = layer.querySelector<HTMLElement>("[data-c-tied]");
+    const n = gotyRevealNumber(t, rankUnits);
+    const k = gotyRevealTied(t, tied, rankUnits);
+
+    if (num) paintGotyNumber(num, frame, n);
+    if (tiedEl) {
+      tiedEl.style.opacity = String(k.opacity);
+      tiedEl.style.transform = `translate(-50%, -50%) translate3d(0, ${k.yVh}vh, 0)`;
     }
-    if (main) {
-      main.style.opacity = String(mainOpacity);
-      main.style.transform = `translate3d(${mainX}vw, 0, 0)`;
-    }
-    layer.style.pointerEvents = mainOpacity > 0.4 ? "auto" : "none";
-    layer.style.zIndex = String(
-      Math.round(mainOpacity * 10 + mainEnter * 4),
-    );
+
+    let maxGame = 0;
+    gameEls.forEach((game, gi) => {
+      const gT = gotyRevealGameLocal(
+        t,
+        gi,
+        gameEls.length,
+        tied,
+        rankUnits,
+      );
+      const m = gotyRevealGameMotion(gT);
+      maxGame = Math.max(maxGame, m.opacity);
+      game.style.opacity = String(m.opacity);
+      game.style.transform = `translate3d(${m.xVw}vw, 0, 0)`;
+      game.style.pointerEvents = m.opacity > 0.4 ? "auto" : "none";
+    });
+
+    layer.style.pointerEvents =
+      n.opacity > 0.35 || maxGame > 0.4 ? "auto" : "none";
+    layer.style.zIndex = String(Math.round(n.opacity * 8 + maxGame * 8));
   });
 }
 
@@ -259,9 +368,11 @@ function GotyCountdown({
   places: EditionGotyStandingRow[];
 }) {
   const groups = groupByRank(places);
-  const n = Math.max(groups.length, 1);
-  // ~100vh of scroll per place — calm, but one viewport so handoffs are horizontal.
-  const heightVh = 40 + n * 100;
+  const extra = groups.reduce(
+    (sum, group) => sum + Math.max(0, group.rows.length - 1),
+    0,
+  );
+  const heightVh = Math.min(1400, 40 + groups.length * 100 + extra * 80);
 
   return (
     <CeremonyChapter
@@ -271,98 +382,105 @@ function GotyCountdown({
       paint={paintGotyCountdown}
     >
       <div className="relative h-full w-full">
-        {groups.map((group, i) => {
-          const row = group.rows[0]!;
+        {groups.map((group) => {
           const featured = group.rank === 1;
-          // First place visible before paint() runs (avoids a blank stage on slow iOS).
-          const boot = i === 0;
+          const tied = group.rows.length > 1;
+          const rankUnits = gotyRevealRankUnits(group.rows.length);
+          const bootNum = gotyRevealNumber(0, rankUnits);
           return (
             <div
-              key={`${group.rank}-${row.gameId}`}
+              key={`${group.rank}-${group.rows[0]!.gameId}`}
               data-c-place
-              className="absolute inset-0 flex items-center overflow-hidden px-[var(--gutter)] pt-[7.5rem] sm:pt-36"
+              data-games={group.rows.length}
+              className="absolute inset-0 overflow-visible"
             >
               <p
-                data-c-ghost
+                data-c-num
                 aria-hidden
-                className="pointer-events-none absolute top-1/2 right-[4%] z-0 font-display leading-none tracking-tight text-accent/30 will-change-transform sm:right-[6%]"
+                className="pointer-events-none absolute top-1/2 left-1/2 z-30 origin-center font-display leading-none tracking-tight will-change-transform"
                 style={{
+                  color: "#ff5a1f",
                   fontSize: featured
-                    ? "clamp(7rem, 24vw, 14rem)"
-                    : "clamp(5.5rem, 18vw, 11rem)",
-                  opacity: boot ? 1 : 0,
-                  transform: boot
-                    ? "translate3d(0, -50%, 0)"
-                    : "translate3d(-42vw, -50%, 0)",
+                    ? "clamp(7rem, 26vw, 15rem)"
+                    : "clamp(6rem, 22vw, 13rem)",
+                  opacity: bootNum.opacity,
+                  transform: `translate(-50%, -50%) scale(${bootNum.scale})`,
                 }}
               >
                 {group.rank}
               </p>
 
-              <div
-                data-c-main
-                className="relative z-10 mx-auto flex w-full max-w-[var(--page-max)] items-end gap-6 will-change-transform sm:gap-10 md:gap-14"
-                style={{
-                  opacity: boot ? 1 : 0,
-                  transform: boot
-                    ? "translate3d(0, 0, 0)"
-                    : "translate3d(-34vw, 0, 0)",
-                }}
-              >
-                <Link
-                  href={`/games/${row.slug}`}
-                  className={`relative block shrink-0 ${
-                    featured
-                      ? "w-[min(52vw,240px)] md:w-[280px]"
-                      : "w-[min(48vw,200px)] md:w-[240px]"
-                  }`}
-                  draggable={false}
+              {tied ? (
+                <p
+                  data-c-tied
+                  aria-hidden
+                  className="pointer-events-none absolute top-1/2 left-1/2 z-[15] font-display leading-none tracking-[0.12em] text-ink will-change-transform"
+                  style={{
+                    fontSize: "clamp(2.75rem, 10vw, 6.5rem)",
+                    opacity: 0,
+                    transform: "translate(-50%, -50%) translate3d(0, 12vh, 0)",
+                  }}
                 >
-                  <CeremonyArt
-                    title={row.title}
-                    coverUrl={row.coverUrl}
-                    priority={i < 3 || featured}
-                  />
-                </Link>
+                  Tied
+                </p>
+              ) : null}
 
-                <div className="min-w-0 flex-1 pb-1">
-                  <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
-                    Game of the Year
-                  </p>
-                  <p
-                    className={`mt-2 font-display leading-none tracking-wide text-accent ${
-                      featured ? "text-5xl sm:text-6xl" : "text-4xl sm:text-5xl"
-                    }`}
-                  >
-                    #{group.rank}
-                  </p>
-                  <h3
-                    className={`mt-3 font-display leading-[0.95] tracking-wide text-ink ${
-                      featured
-                        ? "text-[clamp(1.75rem,4vw,3rem)]"
-                        : "text-[clamp(1.5rem,3.5vw,2.5rem)]"
-                    }`}
-                  >
-                    <Link href={`/games/${row.slug}`} className="hover:text-accent">
-                      {row.title}
+              {group.rows.map((row, gi) => (
+                <div
+                  key={row.gameId}
+                  data-c-game
+                  className="absolute inset-0 z-10 flex items-center px-[var(--gutter)] pt-[7.5rem] will-change-transform sm:pt-36"
+                  style={{
+                    opacity: 0,
+                    transform: "translate3d(-32vw, 0, 0)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  <div className="relative mx-auto flex w-full max-w-[var(--page-max)] items-end gap-5 pr-[min(22vw,7rem)] sm:gap-10 md:gap-14">
+                    <Link
+                      href={`/games/${row.slug}`}
+                      className="relative block shrink-0"
+                      style={{
+                        width: featured
+                          ? "min(48vw, 220px)"
+                          : "min(44vw, 190px)",
+                        minWidth: 112,
+                      }}
+                      draggable={false}
+                    >
+                      <CeremonyArt
+                        title={row.title}
+                        coverUrl={row.coverUrl}
+                      />
                     </Link>
-                  </h3>
-                  {group.rows.length > 1 ? (
-                    <ul className="mt-3 space-y-1">
-                      {group.rows.slice(1).map((tied) => (
-                        <li key={tied.gameId}>
-                          <Link
-                            href={`/games/${tied.slug}`}
-                            className="font-display text-lg text-ink hover:text-accent sm:text-xl"
-                          >
-                            {tied.title}
-                          </Link>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
+
+                    <div className="min-w-0 flex-1 pb-1">
+                      <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
+                        {tied ? `Tied for #${group.rank}` : "Game of the Year"}
+                      </p>
+                      {tied ? (
+                        <p className="mt-2 font-display text-2xl leading-none tracking-wide text-accent sm:text-3xl">
+                          {gi + 1} of {group.rows.length}
+                        </p>
+                      ) : null}
+                      <h3
+                        className={`mt-3 font-display leading-[0.95] tracking-wide text-ink ${
+                          featured
+                            ? "text-[clamp(1.75rem,4vw,3rem)]"
+                            : "text-[clamp(1.5rem,3.5vw,2.5rem)]"
+                        }`}
+                      >
+                        <Link
+                          href={`/games/${row.slug}`}
+                          className="hover:text-accent"
+                        >
+                          {row.title}
+                        </Link>
+                      </h3>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           );
         })}
@@ -497,11 +615,11 @@ function CategoriesCountdown({
                       <li key={`e-${i}`} className="min-w-0 flex-1" aria-hidden />
                     );
                   }
-                  const row = slot.rows[0]!;
                   const featured = slot.rank === 1;
+                  const tied = slot.rows.length > 1;
                   return (
                     <li
-                      key={`${cat.categoryId}-${slot.rank}-${row.slug}`}
+                      key={`${cat.categoryId}-${slot.rank}-${slot.rows[0]!.slug}`}
                       data-c-slot
                       data-place={slot.rank}
                       className={`min-w-0 will-change-transform ${
@@ -514,51 +632,49 @@ function CategoriesCountdown({
                           : "translate3d(-30vw, 0, 0)",
                       }}
                     >
-                      <Link
-                        href={`/games/${row.slug}`}
-                        className="group block"
-                        draggable={false}
+                      <p
+                        className={`font-display leading-none text-accent ${
+                          featured
+                            ? "text-4xl sm:text-5xl"
+                            : "text-3xl sm:text-4xl"
+                        }`}
                       >
-                        <p
-                          className={`font-display leading-none text-accent ${
-                            featured
-                              ? "text-4xl sm:text-5xl"
-                              : "text-3xl sm:text-4xl"
-                          }`}
-                        >
-                          #{slot.rank}
+                        #{slot.rank}
+                      </p>
+                      {tied ? (
+                        <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">
+                          Tied
                         </p>
-                        <div className="mt-2">
-                          <CeremonyArt
-                            title={row.title}
-                            coverUrl={row.coverUrl}
-                            priority={featured}
-                          />
-                        </div>
-                        <p
-                          className={`mt-3 font-display leading-snug text-ink group-hover:text-accent ${
-                            featured
-                              ? "text-xl sm:text-2xl"
-                              : "text-lg sm:text-xl"
-                          }`}
-                        >
-                          {row.title}
-                        </p>
-                      </Link>
-                      {slot.rows.length > 1 ? (
-                        <ul className="mt-2 space-y-1">
-                          {slot.rows.slice(1).map((tied) => (
-                            <li key={tied.slug}>
-                              <Link
-                                href={`/games/${tied.slug}`}
-                                className="font-display text-sm text-ink hover:text-accent"
-                              >
-                                {tied.title}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
                       ) : null}
+                      <ul
+                        className={`mt-2 gap-1.5 ${
+                          tied ? "grid grid-cols-2" : "grid grid-cols-1"
+                        }`}
+                      >
+                        {slot.rows.map((tiedRow) => (
+                          <li key={tiedRow.slug} className="min-w-0">
+                            <Link
+                              href={`/games/${tiedRow.slug}`}
+                              className="group block"
+                              draggable={false}
+                            >
+                              <CeremonyArt
+                                title={tiedRow.title}
+                                coverUrl={tiedRow.coverUrl}
+                              />
+                              <p
+                                className={`mt-2 font-display leading-snug text-ink group-hover:text-accent ${
+                                  featured
+                                    ? "text-lg sm:text-xl"
+                                    : "text-base sm:text-lg"
+                                }`}
+                              >
+                                {tiedRow.title}
+                              </p>
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
                     </li>
                   );
                 })}

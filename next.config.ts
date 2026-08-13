@@ -1,3 +1,4 @@
+import os from "node:os";
 import type { NextConfig } from "next";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
@@ -7,10 +8,21 @@ const extraDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
   .map((s) => s.trim())
   .filter(Boolean);
 
+/** Current machine IPv4s so a phone can load `/_next` after DHCP changes. */
+function lanDevOrigins(): string[] {
+  const hosts = new Set<string>(["127.0.0.1"]);
+  for (const addrs of Object.values(os.networkInterfaces())) {
+    for (const addr of addrs ?? []) {
+      if (addr.family === "IPv4" && !addr.internal) hosts.add(addr.address);
+    }
+  }
+  return [...hosts];
+}
+
 const nextConfig: NextConfig = {
   // Dev server blocks cross-origin /_next assets unless the browser host is
   // allowlisted (localhost alone is not enough for 127.0.0.1 or LAN IPs).
-  allowedDevOrigins: ["127.0.0.1", "192.168.1.164", ...extraDevOrigins],
+  allowedDevOrigins: [...lanDevOrigins(), ...extraDevOrigins],
   images: {
     remotePatterns: [
       {
