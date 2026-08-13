@@ -70,21 +70,25 @@ Use Radix, React Aria, or Headless UI for behavior and accessibility only. Resty
 
 ## Navigation hierarchy
 
-Stacking identical bordered chips is forbidden — each level must read quieter than the one above.
+Stacking identical treatments is forbidden — each level must read quieter than the one above.
 
 | Level | Role | Look | Use |
 |---|---|---|---|
-| **Primary** | Section / page switcher | Bordered chips (`border-line` / active `border-accent`) | Community: Overview · Live · Edition · Settings |
-| **Secondary** | In-page views | Underline tabs (`border-b-2`, active accent) | Results: Highlights · Full standings · Categories · Voters · Your ballot |
-| **Tertiary** | Board / filter | Plain text + middots, muted / active accent | Community · Voices |
+| **Primary** | Community section switcher | Bordered chips inside `CommunityHeader` (`--panel` band) | Overview · Live · Edition · Settings |
+| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Highlights · Full standings · Categories · Voters · Your ballot |
+| **Tertiary** | Board / filter | Plain text + middots, muted / active accent | Community · Voices · Competition · Dense |
 
-Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation.
+Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.
 
 Rules:
 
-- Only **one** primary row per page chrome
-- Secondary sits under the local heading (e.g. Results), not as a second chip strip cloning primary
+- Community chrome uses `CommunityHeader`: eyebrow + name + primary chips on a `--panel` band — **no** meta between title and nav, **no** underline on the switcher
+- Chips scroll horizontally on small screens (`overflow-x-auto`, no wrap, no arrow controls)
+- Do **not** put secondary underlines in the community masthead (that clones Results)
+- Results in-page views stay secondary underlines under Results / Game of the Year
+- Never stack identical primary chip rows
 - Tertiary never uses boxes or underlines — text weight alone
+- Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of the Results / Game of the Year heading — not a second underline strip. Only when 2+ public years.
 
 ## Section rule
@@ -93,30 +97,32 @@ Rules:
 
 ## Standing cards + rank
 
-`StandingGameCard` — cover + title (+ optional pts/year meta).
+`StandingGameCard` — cover + title (+ optional pts/year meta). Equal scores share a **displayed rank** (competition 1–1–3 or dense 1–1–2). Stored freeze `place` is board order only.
 
 | Context | Rank treatment |
 |---|---|
-| GOTY podium | Large `RankMarker` **above** cover |
-| Ballot matrix | Pinned `#` column only — **no** place on the card |
+| GOTY podium | Large `RankMarker` **above** cover; cover **bottoms** share a baseline (all rank-1 games use winner size) |
+| GOTY / category Reveal | Sticky scroll ceremony (default tab). DOM-scrubbed sticky frames; GOTY #10→#1 alternating entrances, **tied ranks share one stage**; **categories assemble #3·#2·#1 in one stage** (a slot may stack). Not standings cards. `prefers-reduced-motion` skips scrubbing |
+| GOTY / category Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title. GOTY Top 10 even grid; Categories Top 3 tiered — #1 ≈ GOTY/podium width, #2/#3 smaller — shared cover baseline |
+| GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Skip · Dense · Board on GOTY Comparison |
 | Rest of Top 10 / Full standings / Categories | Accent place **in front of the title** (tight `gap-1`), meta aligned under the title — **never** a badge on the art |
 
-Titles use `FitDisplayTitle` (3-line clamp, shrink toward 12px).
+Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
 
 ## Horizontal scroll
 
-`HorizontalScroll` — intentional sideways strips (ballot matrix, Rest of Top 10 on small screens, category pick strips).
+`HorizontalScroll` — intentional sideways strips (Rest of Top 10 on small screens, GOTY / category Comparison strips). Not used for Ranked layouts.
 
 - Hide scrollbars; edge fade + quiet accent hairline when more content exists
-- Desktop: drag-to-pan (click still works after a short move) + prev/next (~3 columns)
+- Desktop: drag-to-pan (click still works after a short move); optional prev/next via `showArrowControls` (off by default)
 - Do **not** remap vertical wheel to horizontal
 - Optional `stickyHeader` mirrors body scroll (one-way); no nested vertical scrollport
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `StandingGameCard` / `WinnerPodium`, `CommunityNav`, `BallotMatrix`.
+Shipped: `GameCover`, `RankMarker`, `Button`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `CommunityHeader` / `CommunityNav`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`.
 
-Planned: `CommunityHeader`, `EventNavigation`, `RankedBallot`, `BallotGameRow`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
+Planned: `EventNavigation`, `RankedBallot`, `BallotGameRow`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 
 ## Tokens
 
@@ -154,7 +160,7 @@ Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimme
 - Minimum layout width we design for: **360px** (phone)
 - Desktop (~1440): editorial width, pinned table identifiers when scrolling horizontally
 - Tablet (~1024) / Mobile (~390): focused segmented views for Combined / Community / Voices / Ballots; no two-axis navigation for core comprehension
-- Horizontal strips (ballot matrix, category picks): hide scrollbars; edge fade when more content; desktop drag-to-pan (click still works — drag starts after a short move) and prev/next. Touch/trackpad native scroll. Do not remap vertical wheel to horizontal. Ballot matrix column headers stick to the page (synced horizontal pan) — no nested vertical scrollport. Podium top-3 must fit 360 without sideways scroll.
+- Horizontal strips (GOTY / category Comparison, Rest of Top 10): hide scrollbars; edge fade when more content; desktop drag-to-pan (click still works — drag starts after a short move). Arrow controls optional (`showArrowControls`, off by default). Touch/trackpad native scroll. Do not remap vertical wheel to horizontal. Comparison strips keep headers with each chapter’s table. Podium top-3 and Ranked layouts must fit 360 without sideways scroll.
 
 ## Fixtures that mocks must cover
 

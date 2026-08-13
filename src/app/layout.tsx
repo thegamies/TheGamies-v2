@@ -41,6 +41,8 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable} h-full`}
+      // Cursor / remote preview injects attributes on <html>; ignore those.
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
         <AppProviders>

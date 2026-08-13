@@ -1,22 +1,15 @@
 import Link from "next/link";
-import { BallotMatrix } from "@/components/communities/BallotMatrix";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
-import {
-  EditionCategoryPodiums,
-  EditionCategoryResults,
-} from "@/components/communities/EditionCategoryResults";
+import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
+import { EditionCategoryResults } from "@/components/communities/EditionCategoryResults";
 import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
-import {
-  StandingGameCard,
-  WinnerPodium,
-} from "@/components/communities/StandingGameCard";
-import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
+import { EditionGotyHighlights } from "@/components/communities/EditionGotyHighlights";
+import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { navItemClass } from "@/components/ui/navLevels";
-import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionBallotMatrix,
+  EditionCategoryComparisonMatrix,
   EditionCategoryMeta,
-  EditionCategoryPickCard,
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
   EditionResultsMeta,
@@ -29,6 +22,7 @@ import {
 import type {
   EditionResultsPublicMode,
   EditionResultsViewId,
+  SharedRankMode,
 } from "@/lib/communities/edition-results-scoring";
 
 type BallotPayload = {
@@ -51,11 +45,12 @@ export function EditionResultsView({
   slug,
   year,
   mode,
+  rankMode = "competition",
   view,
   meta,
   topTen,
   categoryPodiums,
-  categoryPickStrips,
+  categoryComparison,
   categoryMeta,
   voters,
   matrix,
@@ -67,11 +62,12 @@ export function EditionResultsView({
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
+  rankMode?: SharedRankMode;
   view: EditionResultsViewId;
   meta: EditionResultsMeta;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
-  categoryPickStrips: Record<string, EditionCategoryPickCard[]>;
+  categoryComparison: EditionCategoryComparisonMatrix;
   categoryMeta: EditionCategoryMeta[];
   voters: {
     page: number;
@@ -96,10 +92,9 @@ export function EditionResultsView({
   /** Raw `?voter=` value — used when lookup misses. */
   voterUsername?: string | null;
 }) {
-  const winner = topTen[0] ?? null;
-  const podium = topTen.slice(1, 3);
   const modes: EditionResultsPublicMode[] = ["community", "voices"];
   const views: Array<{ id: EditionResultsViewId; label: string }> = [
+    { id: "reveal", label: "Reveal" },
     { id: "overview", label: "Highlights" },
     { id: "standings", label: "Full standings" },
     { id: "categories", label: "Categories" },
@@ -108,21 +103,22 @@ export function EditionResultsView({
   if (yourBallot) {
     views.push({ id: "ballot", label: "Your ballot" });
   }
-  const ballotCount =
-    mode === "voices" ? meta.ballotCountVoices : meta.ballotCountCommunity;
   const gotyTotal =
     mode === "voices" ? meta.gotyTotalVoices : meta.gotyTotalCommunity;
   const standingsHref = editionResultsHref(slug, year, {
     mode,
     view: "standings",
+    rank: rankMode,
   });
   const categoriesHref = editionResultsHref(slug, year, {
     mode,
     view: "categories",
+    rank: rankMode,
   });
   const votersHref = editionResultsHref(slug, year, {
     mode,
     view: "voters",
+    rank: rankMode,
   });
   const youBallotHref = yourBallot
     ? editionVoterBallotHref(slug, year)
@@ -138,7 +134,7 @@ export function EditionResultsView({
   const showBoardModes = view !== "ballot";
 
   return (
-    <div className="mt-8 space-y-14">
+    <div className="mt-6 space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-0">
         <div className="flex flex-wrap gap-5" aria-label="Results view">
           {views.map((v) => {
@@ -156,6 +152,7 @@ export function EditionResultsView({
                   view: v.id,
                   votersPage: voters.page,
                   q: voters.q,
+                  rank: rankMode,
                 })}
                 className={navItemClass("secondary", active)}
               >
@@ -183,10 +180,45 @@ export function EditionResultsView({
                     view,
                     votersPage: 1,
                     q: voters.q,
+                    rank: rankMode,
                   })}
                   className={`capitalize ${navItemClass("tertiary", m === mode)}`}
                 >
                   {m}
+                </Link>
+              </span>
+            ))}
+            <span className="text-muted" aria-hidden>
+              ·
+            </span>
+            {(
+              [
+                { id: "competition" as const, label: "Competition" },
+                { id: "dense" as const, label: "Dense" },
+              ] as const
+            ).map((opt, i) => (
+              <span key={opt.id} className="contents">
+                {i > 0 ? (
+                  <span className="text-muted" aria-hidden>
+                    ·
+                  </span>
+                ) : null}
+                <Link
+                  href={editionResultsHref(slug, year, {
+                    mode,
+                    view,
+                    votersPage: 1,
+                    q: voters.q,
+                    rank: opt.id,
+                  })}
+                  className={navItemClass("tertiary", opt.id === rankMode)}
+                  title={
+                    opt.id === "dense"
+                      ? "Equal scores share a rank; next score is the next number (1 · 1 · 2)"
+                      : "Equal scores share a rank; next score skips (1 · 1 · 3)"
+                  }
+                >
+                  {opt.label}
                 </Link>
               </span>
             ))}
@@ -199,6 +231,7 @@ export function EditionResultsView({
           slug={slug}
           year={year}
           mode={mode}
+          rankMode={rankMode}
           totalGames={gotyTotal}
         />
       ) : view === "categories" ? (
@@ -206,6 +239,7 @@ export function EditionResultsView({
           slug={slug}
           year={year}
           mode={mode}
+          rankMode={rankMode}
           categories={categoryMeta}
         />
       ) : viewingPublicBallot && publicBallot ? (
@@ -262,6 +296,9 @@ export function EditionResultsView({
             {mode !== "community" ? (
               <input type="hidden" name="mode" value={mode} />
             ) : null}
+            {rankMode !== "competition" ? (
+              <input type="hidden" name="rank" value={rankMode} />
+            ) : null}
             <input type="hidden" name="view" value="voters" />
             <input
               name="q"
@@ -316,6 +353,7 @@ export function EditionResultsView({
                     view: "voters",
                     votersPage: voters.page - 1,
                     q: voters.q,
+                    rank: rankMode,
                   })}
                   className="text-accent hover:underline"
                 >
@@ -332,6 +370,7 @@ export function EditionResultsView({
                     view: "voters",
                     votersPage: voters.page + 1,
                     q: voters.q,
+                    rank: rankMode,
                   })}
                   className="text-accent hover:underline"
                 >
@@ -341,106 +380,34 @@ export function EditionResultsView({
             </div>
           ) : null}
         </section>
+      ) : view === "reveal" ? (
+        <EditionRevealView
+          year={year}
+          topTen={topTen}
+          categoryPodiums={categoryPodiums}
+        />
       ) : (
         <>
-          {winner ? (
-            <section>
-              <h3 className="font-display text-3xl tracking-wide text-ink">
-                GOTY Top 3
-              </h3>
-              <div className="mt-6">
-                <WinnerPodium
-                  winner={{
-                    place: winner.place,
-                    gameId: winner.gameId,
-                    slug: winner.slug,
-                    title: winner.title,
-                    coverUrl: winner.coverUrl,
-                    meta: `${winner.points} points · ${winner.firstPlaceVotes} first-place votes · ${ballotCount} ballots`,
-                  }}
-                  runnersUp={podium.map((row) => ({
-                    place: row.place,
-                    gameId: row.gameId,
-                    slug: row.slug,
-                    title: row.title,
-                    coverUrl: row.coverUrl,
-                    meta: `${row.points} points`,
-                  }))}
-                />
-              </div>
-            </section>
-          ) : (
-            <p className="text-muted">
-              No Game of the Year scores for this mode.
-            </p>
-          )}
-
-          {topTen.length > 3 ? (
-            <section className="mt-12">
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <h3 className="font-display text-3xl tracking-wide text-ink">
-                  Rest of the Top 10
-                </h3>
-                {gotyTotal > 10 ? (
-                  <Link
-                    href={standingsHref}
-                    className="text-sm text-accent hover:underline"
-                  >
-                    Full standings
-                  </Link>
-                ) : null}
-              </div>
-              <HorizontalScroll className="mt-6" label="rest of the top 10">
-                <ul className="flex w-max min-w-full flex-nowrap gap-4 lg:w-full lg:gap-5">
-                  {topTen.slice(3, 10).map((row) => (
-                    <li
-                      key={row.gameId}
-                      className="w-[132px] shrink-0 lg:w-auto lg:min-w-0 lg:flex-1"
-                    >
-                      <StandingGameCard
-                        place={row.place}
-                        slug={row.slug}
-                        title={row.title}
-                        coverUrl={row.coverUrl}
-                        year={row.year}
-                        points={row.points}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              </HorizontalScroll>
-            </section>
-          ) : null}
-
-          <BallotMatrix
-            matrix={matrix}
+          <EditionGotyHighlights
             slug={slug}
             year={year}
+            topTen={topTen}
+            matrix={matrix}
+            gotyTotal={gotyTotal}
+            standingsHref={standingsHref}
             youBallotHref={youBallotHref}
+            rankMode={rankMode}
           />
 
-          {categoryPodiums.length > 0 ? (
-            <section>
-              <SectionRule className="mb-8" />
-              <div className="flex flex-wrap items-end justify-between gap-4">
-                <h3 className="font-display text-3xl tracking-wide text-ink">
-                  Categories
-                </h3>
-                <Link
-                  href={categoriesHref}
-                  className="text-sm text-accent hover:underline"
-                >
-                  Full category results
-                </Link>
-              </div>
-              <EditionCategoryPodiums
-                slug={slug}
-                year={year}
-                categories={categoryPodiums}
-                pickStrips={categoryPickStrips}
-                youBallotHref={youBallotHref}
-              />
-            </section>
+          {categoryPodiums.length > 0 || categoryComparison.hasGames ? (
+            <EditionCategoriesHighlights
+              slug={slug}
+              year={year}
+              categoriesHref={categoriesHref}
+              categoryPodiums={categoryPodiums}
+              categoryComparison={categoryComparison}
+              youBallotHref={youBallotHref}
+            />
           ) : null}
         </>
       )}

@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import { withDisplayRanks, withDisplayRanksOnPage } from "@/lib/standings/shared-rank";
 import { liveGotyYearStats, type Db } from "@thegamies/db";
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
@@ -144,6 +145,7 @@ type StandingsBundleRow = {
   goty_total: unknown;
   page: unknown;
   total_pages: unknown;
+  higher_count: unknown;
   goty: unknown;
   categories: unknown;
 };
@@ -236,6 +238,19 @@ async function fetchStandingsBundle(
       b.goty_total,
       b.page,
       b.total_pages,
+      (
+        select count(*)::int
+        from live_goty_scores hs
+        where hs.year = ${year}
+          and hs.score > (
+            select s0.score
+            from live_goty_scores s0
+            where s0.year = ${year}
+            order by s0.score desc, s0.game_id asc
+            offset (b.page - 1) * ${pageSize}
+            limit 1
+          )
+      ) as higher_count,
       coalesce(
         (
           select json_agg(row_to_json(p) order by p."place")
@@ -330,7 +345,7 @@ async function fetchStandingsBundle(
     };
   }
 
-  const goty: StandingsGameRow[] = parseJsonArray<GotyJsonRow>(row.goty).map(
+  const gotyRaw: StandingsGameRow[] = parseJsonArray<GotyJsonRow>(row.goty).map(
     (g) => ({
       place: asInt(g.place),
       gameId: String(g.gameId),
@@ -354,6 +369,16 @@ async function fetchStandingsBundle(
       ],
     }),
   );
+  const page = asInt(row.page, 1);
+  const goty = withDisplayRanksOnPage(
+    gotyRaw,
+    (r) => r.score ?? 0,
+    {
+      offset: (page - 1) * pageSize,
+      firstGroupRank: asInt(row.higher_count) + 1,
+      mode: "competition",
+    },
+  ).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
   const byId = new Map<string, CategoryStandingsBlock>();
@@ -379,6 +404,13 @@ async function fetchStandingsBundle(
       });
     }
   }
+  for (const block of byId.values()) {
+    block.rows = withDisplayRanks(
+      block.rows,
+      (r) => r.voteCount ?? 0,
+      "competition",
+    ).map((r) => ({ ...r, place: r.rank }));
+  }
 
   return {
     listCount: asInt(row.list_count),
@@ -386,7 +418,7 @@ async function fetchStandingsBundle(
     standingsVersion: asInt(row.standings_version),
     contribGeneration: asInt(row.contrib_generation),
     scoresGeneration: asInt(row.scores_generation),
-    page: asInt(row.page, 1),
+    page,
     gotyTotal: asInt(row.goty_total),
     totalPages: asInt(row.total_pages, 1),
     goty,

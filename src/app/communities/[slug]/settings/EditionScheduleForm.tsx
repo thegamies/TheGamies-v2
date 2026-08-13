@@ -68,8 +68,7 @@ export function EditionScheduleForm({
         </div>
       </div>
       <p className="mt-2 text-sm text-muted">
-        Voting opens, voting closes, then results publish — status follows these
-        times.
+        Set when voting opens, when it closes, and when results go live.
       </p>
 
       <form action={scheduleAction} className="mt-4 max-w-xl space-y-3">

@@ -5,12 +5,12 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { CommunityNav } from "@/components/communities/CommunityNav";
+import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
 import {
   getFeaturedEditionForCommunity,
 } from "@/lib/communities/editions";
-import { editionStatusLabel } from "@/lib/communities/edition-status";
+import { editionOverviewLinkLabel } from "@/lib/communities/edition-status";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { MembershipActions } from "./MembershipActions";
 
@@ -73,16 +73,17 @@ export default async function CommunityHomePage({
       : null;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted">
-        <Link href="/communities" className="hover:text-ink">
-          Communities
-        </Link>
-      </p>
-      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-7xl">
-        {community.name}
-      </h1>
-      <p className="mt-2 text-sm text-muted">
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
+      <CommunityHeader
+        name={community.name}
+        slug={community.slug}
+        liveEnabled={community.liveRankingsEnabled}
+        canManage={canManage}
+        editionStatus={publicEdition?.status ?? null}
+        active="overview"
+      />
+
+      <p className="mt-8 text-sm text-muted">
         {community.memberCount}{" "}
         {community.memberCount === 1 ? "member" : "members"}
       </p>
@@ -97,19 +98,13 @@ export default async function CommunityHomePage({
             href={`/communities/${community.slug}/edition/${publicEdition.year}`}
             className="hover:text-accent"
           >
-            {publicEdition.year} edition ·{" "}
-            {editionStatusLabel(publicEdition.status)}
+            {editionOverviewLinkLabel(
+              publicEdition.year,
+              publicEdition.status,
+            )}
           </Link>
         </p>
       ) : null}
-
-      <CommunityNav
-        slug={community.slug}
-        liveEnabled={community.liveRankingsEnabled}
-        canManage={canManage}
-        editionStatus={publicEdition?.status ?? null}
-        active="overview"
-      />
 
       {profile ? (
         <MembershipActions

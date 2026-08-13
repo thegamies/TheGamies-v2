@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
 import { Button } from "@/components/ui/Button";
@@ -14,6 +16,7 @@ import {
   SkeletonStandingsRow,
   SkeletonText,
 } from "@/components/ui/Skeleton";
+import type { EditionStatus } from "@/lib/communities/edition-status";
 
 export const metadata = {
   title: "Design system",
@@ -43,6 +46,56 @@ function Section({
       <h2 className="font-display text-3xl tracking-wide text-ink">{title}</h2>
       <div className="mt-6">{children}</div>
     </section>
+  );
+}
+
+const RESULTS_VIEWS = [
+  "Reveal",
+  "Highlights",
+  "Full standings",
+  "Categories",
+  "Voters",
+  "Your ballot",
+] as const;
+
+const EDITION_COPY_STATES: EditionStatus[] = [
+  "scheduled",
+  "open",
+  "closed",
+  "published",
+];
+
+/** Fixture: Results block under the community masthead. */
+function MastheadResultsFixture() {
+  return (
+    <div className="mt-10">
+      <EditionSectionHeader
+        status="published"
+        slug="example"
+        year={2026}
+        years={[2026, 2025]}
+      />
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line">
+        <div className="flex flex-wrap gap-5">
+          {RESULTS_VIEWS.map((label, i) => (
+            <span
+              key={label}
+              className={navItemClass("secondary", i === 0)}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 pb-1.5">
+          <span className={navItemClass("tertiary", true)}>Community</span>
+          <span className="text-muted" aria-hidden>
+            ·
+          </span>
+          <span className={navItemClass("tertiary", false)}>Voices</span>
+        </div>
+      </div>
+      <p className="mt-6 text-sm text-muted">Standings content starts here…</p>
+    </div>
   );
 }
 
@@ -112,28 +165,29 @@ export default function DesignSystemPage() {
 
       <Section title="Navigation">
         <p className="mb-4 max-w-2xl text-sm text-muted">
-          Primary bordered chips for page sections. Secondary underline tabs for
-          in-page views. Tertiary plain text for board filters. Never stack
-          identical chip rows. Helper:{" "}
+          Primary chips for community masthead. Secondary underlines only under
+          a local heading (Results). Tertiary for board filters. Helper:{" "}
           <code className="text-ink">navItemClass()</code>.
         </p>
         <div className="space-y-8">
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
-              Primary
+              Primary · bordered chips
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <span className={navItemClass("primary", true)}>Edition</span>
               <span className={navItemClass("primary", false)}>Overview</span>
               <span className={navItemClass("primary", false)}>Live</span>
+              <span className={navItemClass("primary", false)}>Settings</span>
             </div>
           </div>
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
-              Secondary
+              Secondary · underline on hairline
             </p>
             <div className="mt-3 flex flex-wrap gap-5 border-b border-line">
-              <span className={navItemClass("secondary", true)}>Highlights</span>
+              <span className={navItemClass("secondary", true)}>Reveal</span>
+              <span className={navItemClass("secondary", false)}>Highlights</span>
               <span className={navItemClass("secondary", false)}>
                 Full standings
               </span>
@@ -144,7 +198,7 @@ export default function DesignSystemPage() {
           </div>
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
-              Tertiary
+              Tertiary · plain text
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-2">
               <span className={navItemClass("tertiary", true)}>Community</span>
@@ -173,6 +227,49 @@ export default function DesignSystemPage() {
               />
             </div>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Community header">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Canonical masthead:{" "}
+          <code className="text-ink">CommunityHeader</code> —{" "}
+          <code className="text-ink">--panel</code> band, name, primary chips.
+          No meta between title and nav; no underline on the switcher. Results
+          secondary stays under the local heading on paper.
+        </p>
+        <div className="overflow-hidden border border-line">
+          <div className="px-[var(--gutter)] py-6">
+            <CommunityHeader
+              name="Test"
+              slug="example"
+              liveEnabled
+              canManage
+              editionStatus="published"
+              active="edition"
+            />
+            <MastheadResultsFixture />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Edition section header">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          One title, year, and serif deck — no status jargon line. Year alone
+          when there is only one public year; pop-open select when there are
+          two or more.
+        </p>
+        <div className="space-y-8">
+          {EDITION_COPY_STATES.map((status) => (
+            <div key={status} className="border border-line p-5">
+              <EditionSectionHeader
+                status={status}
+                slug="example"
+                year={2026}
+                years={status === "published" ? [2026, 2025] : [2026]}
+              />
+            </div>
+          ))}
         </div>
       </Section>
 
@@ -224,7 +321,7 @@ export default function DesignSystemPage() {
       <Section title="Standing cards">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           <code className="text-ink">StandingGameCard</code> — cover + title (+
-          meta). Place before title when needed; omit for ballot matrix cells.
+          meta). Place before title when needed; omit for Comparison strip cells.
         </p>
         <ul className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
           <li>
@@ -261,8 +358,9 @@ export default function DesignSystemPage() {
       <Section title="Horizontal scroll">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           <code className="text-ink">HorizontalScroll</code> — hide scrollbars,
-          edge fade + accent hairline, drag + prev/next. Never remap vertical
-          wheel. Optional sticky header syncs sideways only.
+          edge fade + accent hairline, drag-to-pan. Arrow controls off by
+          default (<code className="text-ink">showArrowControls</code>). Never
+          remap vertical wheel. Optional sticky header syncs sideways only.
         </p>
         <HorizontalScroll label="fixture strip">
           <ul className="flex w-max gap-4 px-1 py-2">

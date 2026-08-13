@@ -25,7 +25,7 @@ Work top to bottom.
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
-- [ ] Add trusted domains in Neon Auth for local + staging hosts
+- [ ] Add trusted domains in Neon Auth for staging/production hosts (Console → Auth → Configuration → Domains). `localhost` ports are pre-approved; **LAN IPs are not** — for phone/device testing add e.g. `http://192.168.1.164:3000`. Also add that host to `allowedDevOrigins` / Doppler `ALLOWED_DEV_ORIGINS` so Next.js serves `/_next` assets.
 - [ ] `doppler run --config dev_personal -- pnpm db:migrate` (includes `profiles`; hits your personal Neon branch)
 
 ## 2. Vercel

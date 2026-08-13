@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   computeEditionStatus,
+  editionDeckCopy,
+  editionOverviewLinkLabel,
+  editionSectionTitle,
+  editionStatusLabel,
   formatEditionDateTimeInput,
   parseEditionDateTimeInput,
   parseEditionYear,
@@ -67,6 +71,19 @@ describe("edition nav gates", () => {
     expect(showEditionNav("open")).toBe(true);
     expect(showEditionNav("closed")).toBe(true);
     expect(showEditionNav("published")).toBe(true);
+  });
+});
+
+describe("edition public copy", () => {
+  it("uses product titles and decks without status jargon lines", () => {
+    expect(editionSectionTitle("published")).toBe("Results");
+    expect(editionSectionTitle("open")).toBe("Game of the Year");
+    expect(editionDeckCopy("published")).toBeNull();
+    expect(editionDeckCopy("closed")).not.toMatch(/pending|published/i);
+    expect(editionOverviewLinkLabel(2026, "published")).toBe("2026 results");
+    expect(editionOverviewLinkLabel(2026, "open")).toBe("2026 · Voting open");
+    expect(editionStatusLabel("published")).toBe("Results");
+    expect(editionStatusLabel("closed")).toBe("Voting closed");
   });
 });
 

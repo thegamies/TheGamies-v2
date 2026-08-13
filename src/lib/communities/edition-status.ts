@@ -58,9 +58,53 @@ export function editionStatusLabel(status: EditionStatus): string {
     case "open":
       return "Voting open";
     case "closed":
-      return "Results pending";
+      return "Voting closed";
     case "published":
-      return "Results published";
+      return "Results";
+  }
+}
+
+/** Section heading on the Edition tab. */
+export function editionSectionTitle(status: EditionStatus): string {
+  return status === "published" ? "Results" : "Game of the Year";
+}
+
+/**
+ * Single editorial deck under the Edition heading.
+ * No status jargon, no year (year lives beside the title).
+ * Published has no deck — the boards speak for themselves.
+ */
+export function editionDeckCopy(status: EditionStatus): string | null {
+  switch (status) {
+    case "draft":
+      return "This ceremony isn’t open to the public yet.";
+    case "scheduled":
+      return "Voting hasn’t opened yet.";
+    case "open":
+      return "Rank your Game of the Year and make your category picks.";
+    case "closed":
+      return "Ballots are locked. Standings will appear when results are ready.";
+    case "published":
+      return null;
+  }
+}
+
+/** Overview link into the featured edition — short, product voice. */
+export function editionOverviewLinkLabel(
+  year: number,
+  status: EditionStatus,
+): string {
+  switch (status) {
+    case "published":
+      return `${year} results`;
+    case "open":
+      return `${year} · Voting open`;
+    case "closed":
+      return `${year} · Voting closed`;
+    case "scheduled":
+      return `${year} · Coming soon`;
+    case "draft":
+      return `${year} edition`;
   }
 }
 

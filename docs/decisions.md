@@ -46,13 +46,13 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-12 | Edition Voices | **Per-edition** host designation among community members (`community_edition_voices`). Year history retained; roster immutable after publish. |
 | 2026-08-12 | Edition Combined scoring | **Deferred from public UI** until Voice weight exists. Results show **Community · Voices** only. Combined ≡ Community under simple union is not shown as a third tab. |
 | 2026-08-12 | Edition results freeze | Write-once when first published. **Rebuild** if edition leaves published then publishes again, or via ops rebuild. Never silent overwrite while staying published. |
+| 2026-08-12 | Shared ranks | **Do not store display ranks.** Equal GOTY points / category votes / live scores share a displayed rank derived at read. Secondary keys (#1s, appearances, `gameId`) **sort only**. Viewer chooser: **competition** (1–1–3, default) vs **dense** (1–1–2) via `?rank=` on editions. Site and community live use competition only. Unique freeze / lock `place` stays board order + pagination cursor. |
 
 ## Open (block dependent work until decided)
 
 - Exact degrading score curve when scoring expands beyond top 10
 - Edition / community category voting modes beyond site single-choice
 - Invite-only / approval membership and any eligibility beyond open members
-- Tie-breaking rules beyond the freeze defaults (points → #1s → appearances → gameId)
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

@@ -10,6 +10,7 @@ import {
 } from "./scoring";
 import { gotyEligibilityError } from "@/lib/lists/rules";
 import { redactStandingsPage, clampStandingsPage, type StandingsPage } from "./service";
+import { withDisplayRanksOnPage } from "@/lib/standings/shared-rank";
 
 describe("buildGotyContribRows", () => {
   it("keeps top-10 scored non-adult rows", () => {
@@ -212,5 +213,20 @@ describe("redactStandingsPage", () => {
     });
     expect(revealed.goty[0]?.score).toBe(20);
     expect(revealed.categories[0]?.rows[0]?.voteCount).toBe(2);
+  });
+});
+
+describe("live page competition rank", () => {
+  it("continues a split tie from higher_count then walks the page", () => {
+    const numbered = withDisplayRanksOnPage(
+      [
+        { gameId: "a", score: 40 },
+        { gameId: "b", score: 40 },
+        { gameId: "c", score: 30 },
+      ],
+      (r) => r.score,
+      { offset: 50, firstGroupRank: 49, mode: "competition" },
+    ).map((r) => ({ ...r, place: r.rank }));
+    expect(numbered.map((r) => r.place)).toEqual([49, 49, 53]);
   });
 });

@@ -19,9 +19,13 @@ import {
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
   assembleBallotMatrixRows,
-  BALLOT_MATRIX_TOP,
+  assembleCategoryComparisonRows,
+  BALLOT_MATRIX_STANDINGS_FETCH,
+  categoryComparisonHasGames,
   matrixHasAnyGames,
   type EditionBallotMatrixRow,
+  type EditionCategoryComparisonRow,
+  type MatrixGameCell,
   type MatrixVoiceColumn,
 } from "./edition-ballot-matrix";
 import {
@@ -31,19 +35,28 @@ import {
   type EditionResultMode,
   type GameMeta,
 } from "./edition-results-scoring";
+import {
+  withDisplayRanks,
+  withDisplayRanksOnPage,
+  type SharedRankMode,
+} from "@/lib/standings/shared-rank";
 import { getEditionByCommunityYear } from "./editions";
 import { listEditionVoiceProfileIds } from "./voices";
 
 export {
+  parseEditionRankMode,
   parseEditionResultMode,
   parseEditionResultsView,
   type EditionResultsPublicMode,
   type EditionResultsViewId,
+  type SharedRankMode,
 } from "./edition-results-scoring";
 
 export {
   BALLOT_MATRIX_TOP,
+  BALLOT_MATRIX_STANDINGS_FETCH,
   type EditionBallotMatrixRow,
+  type EditionCategoryComparisonRow,
   type MatrixGameCell,
   type MatrixVoiceColumn,
 } from "./edition-ballot-matrix";
@@ -59,6 +72,7 @@ function coverUrlFrom(imageId: string | null | undefined): string | null {
 
 export type EditionGotyStandingRow = {
   place: number;
+  rank: number;
   gameId: string;
   slug: string;
   title: string;
@@ -75,6 +89,7 @@ export type EditionCategoryStandingBlock = {
   description: string | null;
   rows: Array<{
     place: number;
+    rank: number;
     gameId: string;
     slug: string;
     title: string;
@@ -427,7 +442,12 @@ export async function ensurePublishedEditionResults(
 export async function getEditionGotyPage(
   editionId: string,
   mode: EditionResultMode,
-  opts: { page?: number; pageSize?: number; afterPlace?: number } = {},
+  opts: {
+    page?: number;
+    pageSize?: number;
+    afterPlace?: number;
+    rankMode?: SharedRankMode;
+  } = {},
   db: Db = getDb(),
 ): Promise<{
   page: number;
@@ -472,29 +492,63 @@ export async function getEditionGotyPage(
     .limit(pageSize)
     .offset(offset);
 
+  const mapped = rows.map((r) => ({
+    place: r.place,
+    gameId: r.gameId,
+    slug: r.slug,
+    title: r.title,
+    year: r.gameYear,
+    coverUrl: r.coverUrl,
+    points: r.points,
+    firstPlaceVotes: r.firstPlaceVotes,
+    appearances: r.appearances,
+  }));
+
+  const rankMode = opts.rankMode ?? "competition";
+  let firstGroupRank = 1;
+  if (mapped[0]) {
+    const firstPoints = mapped[0].points;
+    const higherWhere = and(
+      eq(communityEditionResultGoty.editionId, editionId),
+      eq(communityEditionResultGoty.mode, storage),
+      gt(communityEditionResultGoty.points, firstPoints),
+    );
+    if (rankMode === "dense") {
+      const [row] = await db
+        .select({
+          n: sql<number>`count(distinct ${communityEditionResultGoty.points})::int`,
+        })
+        .from(communityEditionResultGoty)
+        .where(higherWhere);
+      firstGroupRank = Number(row?.n ?? 0) + 1;
+    } else {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(communityEditionResultGoty)
+        .where(higherWhere);
+      firstGroupRank = Number(row?.n ?? 0) + 1;
+    }
+  }
+
+  const ranked = withDisplayRanksOnPage(mapped, (r) => r.points, {
+    offset: mapped[0] ? mapped[0].place - 1 : 0,
+    firstGroupRank,
+    mode: rankMode,
+  });
+
   return {
     page,
     pageSize,
     total,
     totalPages,
-    rows: rows.map((r) => ({
-      place: r.place,
-      gameId: r.gameId,
-      slug: r.slug,
-      title: r.title,
-      year: r.gameYear,
-      coverUrl: r.coverUrl,
-      points: r.points,
-      firstPlaceVotes: r.firstPlaceVotes,
-      appearances: r.appearances,
-    })),
+    rows: ranked,
   };
 }
 
 export async function getEditionCategoryResults(
   editionId: string,
   mode: EditionResultMode,
-  opts: { maxPlace?: number } = {},
+  opts: { maxPlace?: number; rankMode?: SharedRankMode } = {},
   db: Db = getDb(),
 ): Promise<EditionCategoryStandingBlock[]> {
   const storage = storageModeFor(mode);
@@ -502,13 +556,16 @@ export async function getEditionCategoryResults(
     opts.maxPlace != null && Number.isFinite(opts.maxPlace)
       ? Math.max(1, Math.floor(opts.maxPlace))
       : null;
+  const rankMode = opts.rankMode ?? "competition";
+  const fetchPlace =
+    maxPlace != null ? Math.max(maxPlace, maxPlace * 3) : null;
 
   const conditions = [
     eq(communityEditionResultCategories.editionId, editionId),
     eq(communityEditionResultCategories.mode, storage),
   ];
-  if (maxPlace != null) {
-    conditions.push(lte(communityEditionResultCategories.place, maxPlace));
+  if (fetchPlace != null) {
+    conditions.push(lte(communityEditionResultCategories.place, fetchPlace));
   }
 
   const rows = await db
@@ -534,6 +591,7 @@ export async function getEditionCategoryResults(
     }
     block.rows.push({
       place: row.place,
+      rank: row.place,
       gameId: row.gameId,
       slug: row.slug,
       title: row.title,
@@ -541,7 +599,17 @@ export async function getEditionCategoryResults(
       votes: row.votes,
     });
   }
-  return [...byId.values()];
+  const blocks = [...byId.values()].map((block) => {
+    const ranked = withDisplayRanks(block.rows, (r) => r.votes, rankMode);
+    return {
+      ...block,
+      rows:
+        maxPlace != null
+          ? ranked.filter((r) => r.rank <= maxPlace)
+          : ranked,
+    };
+  });
+  return blocks;
 }
 
 export const CATEGORY_RESULTS_PAGE_SIZE = 10;
@@ -595,165 +663,11 @@ export async function listEditionCategoryMeta(
 export type EditionCategoryStandingRow =
   EditionCategoryStandingBlock["rows"][number];
 
-export type EditionCategoryPickCard = {
-  kind: "you" | "voice";
-  profileId: string;
-  displayName: string;
-  username: string;
-  gameId: string;
-  slug: string;
-  title: string;
-  coverUrl: string | null;
-};
-
-/** You + Voice picks per category for Overview strips (cheap: Voices roster only). */
-export async function getEditionCategoryPickStrips(
-  editionId: string,
-  opts: { viewerProfileId?: string | null } = {},
-  db: Db = getDb(),
-): Promise<Record<string, EditionCategoryPickCard[]>> {
-  const voiceRows = await db
-    .select({
-      profileId: communityEditionResultVoters.profileId,
-      displayName: communityEditionResultVoters.displayName,
-      username: communityEditionResultVoters.username,
-    })
-    .from(communityEditionResultVoters)
-    .where(
-      and(
-        eq(communityEditionResultVoters.editionId, editionId),
-        eq(communityEditionResultVoters.isVoice, true),
-      ),
-    )
-    .orderBy(
-      asc(communityEditionResultVoters.displayName),
-      asc(communityEditionResultVoters.username),
-    );
-
-  const viewerProfileId = opts.viewerProfileId ?? null;
-  const profileIds = [
-    ...voiceRows.map((v) => v.profileId),
-    ...(viewerProfileId ? [viewerProfileId] : []),
-  ];
-  const uniqueIds = [...new Set(profileIds)];
-  if (uniqueIds.length === 0) return {};
-
-  const voterLabel = new Map(
-    voiceRows.map((v) => [
-      v.profileId,
-      { displayName: v.displayName, username: v.username },
-    ]),
-  );
-
-  let youLabel: { displayName: string; username: string } | null = null;
-  if (viewerProfileId && !voterLabel.has(viewerProfileId)) {
-    const [you] = await db
-      .select({
-        displayName: communityEditionResultVoters.displayName,
-        username: communityEditionResultVoters.username,
-      })
-      .from(communityEditionResultVoters)
-      .where(
-        and(
-          eq(communityEditionResultVoters.editionId, editionId),
-          eq(communityEditionResultVoters.profileId, viewerProfileId),
-        ),
-      )
-      .limit(1);
-    if (you) youLabel = you;
-  } else if (viewerProfileId) {
-    youLabel = voterLabel.get(viewerProfileId) ?? null;
-  }
-
-  const picks = await db
-    .select({
-      profileId: communityEditionResultVoterCategoryPicks.profileId,
-      categoryId: communityEditionResultVoterCategoryPicks.categoryId,
-      gameId: communityEditionResultVoterCategoryPicks.gameId,
-      slug: communityEditionResultVoterCategoryPicks.slug,
-      title: communityEditionResultVoterCategoryPicks.title,
-      coverUrl: communityEditionResultVoterCategoryPicks.coverUrl,
-    })
-    .from(communityEditionResultVoterCategoryPicks)
-    .where(
-      and(
-        eq(communityEditionResultVoterCategoryPicks.editionId, editionId),
-        inArray(
-          communityEditionResultVoterCategoryPicks.profileId,
-          uniqueIds,
-        ),
-      ),
-    );
-
-  const voiceIdSet = new Set(voiceRows.map((v) => v.profileId));
-  const byCategory = new Map<string, EditionCategoryPickCard[]>();
-
-  for (const pick of picks) {
-    const isYou = Boolean(
-      viewerProfileId && pick.profileId === viewerProfileId && youLabel,
-    );
-    const isVoice = voiceIdSet.has(pick.profileId);
-    if (!isYou && !isVoice) continue;
-
-    // Prefer a dedicated You card; Voice who is also you still gets You first via kind.
-    const label = isYou
-      ? youLabel!
-      : voterLabel.get(pick.profileId);
-    if (!label) continue;
-
-    const card: EditionCategoryPickCard = {
-      kind: isYou ? "you" : "voice",
-      profileId: pick.profileId,
-      displayName: isYou ? "You" : label.displayName,
-      username: label.username,
-      gameId: pick.gameId,
-      slug: pick.slug,
-      title: pick.title,
-      coverUrl: pick.coverUrl,
-    };
-
-    const list = byCategory.get(pick.categoryId) ?? [];
-    // If viewer is also a Voice, keep You and skip duplicate Voice card for same profile.
-    if (isYou) {
-      list.unshift(card);
-    } else if (
-      !(viewerProfileId && pick.profileId === viewerProfileId)
-    ) {
-      list.push(card);
-    } else {
-      // Voice same as viewer already added as You
-    }
-    byCategory.set(pick.categoryId, list);
-  }
-
-  // Stable Voice order: You first, then Voices by display name (already ordered in voiceRows)
-  const voiceOrder = new Map(voiceRows.map((v, i) => [v.profileId, i]));
-  for (const [categoryId, list] of byCategory) {
-    list.sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "you" ? -1 : 1;
-      return (
-        (voiceOrder.get(a.profileId) ?? 0) - (voiceOrder.get(b.profileId) ?? 0)
-      );
-    });
-    // Dedupe profileId (You wins)
-    const seen = new Set<string>();
-    const deduped: EditionCategoryPickCard[] = [];
-    for (const card of list) {
-      if (seen.has(card.profileId)) continue;
-      seen.add(card.profileId);
-      deduped.push(card);
-    }
-    byCategory.set(categoryId, deduped);
-  }
-
-  return Object.fromEntries(byCategory);
-}
-
 export async function getEditionCategoryPage(
   editionId: string,
   mode: EditionResultMode,
   categoryId: string,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { page?: number; pageSize?: number; rankMode?: SharedRankMode } = {},
   db: Db = getDb(),
 ): Promise<{
   page: number;
@@ -798,19 +712,54 @@ export async function getEditionCategoryPage(
     .limit(pageSize)
     .offset(offset);
 
+  const mapped = rows.map((r) => ({
+    place: r.place,
+    gameId: r.gameId,
+    slug: r.slug,
+    title: r.title,
+    coverUrl: r.coverUrl,
+    votes: r.votes,
+  }));
+
+  const rankMode = opts.rankMode ?? "competition";
+  let firstGroupRank = 1;
+  if (mapped[0]) {
+    const firstVotes = mapped[0].votes;
+    const higherWhere = and(
+      eq(communityEditionResultCategories.editionId, editionId),
+      eq(communityEditionResultCategories.mode, storage),
+      eq(communityEditionResultCategories.categoryId, categoryId),
+      gt(communityEditionResultCategories.votes, firstVotes),
+    );
+    if (rankMode === "dense") {
+      const [row] = await db
+        .select({
+          n: sql<number>`count(distinct ${communityEditionResultCategories.votes})::int`,
+        })
+        .from(communityEditionResultCategories)
+        .where(higherWhere);
+      firstGroupRank = Number(row?.n ?? 0) + 1;
+    } else {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(communityEditionResultCategories)
+        .where(higherWhere);
+      firstGroupRank = Number(row?.n ?? 0) + 1;
+    }
+  }
+
+  const ranked = withDisplayRanksOnPage(mapped, (r) => r.votes, {
+    offset: mapped[0] ? mapped[0].place - 1 : 0,
+    firstGroupRank,
+    mode: rankMode,
+  });
+
   return {
     page,
     pageSize,
     total,
     totalPages,
-    rows: rows.map((r) => ({
-      place: r.place,
-      gameId: r.gameId,
-      slug: r.slug,
-      title: r.title,
-      coverUrl: r.coverUrl,
-      votes: r.votes,
-    })),
+    rows: ranked,
   };
 }
 
@@ -881,7 +830,12 @@ export type EditionBallotMatrix = {
   showYou: boolean;
   hasGames: boolean;
   voiceColumns: MatrixVoiceColumn[];
+  /** Competition slots (1–1–3 skip). */
   rows: EditionBallotMatrixRow[];
+  /** Dense slots (1–1–2). */
+  rowsDense: EditionBallotMatrixRow[];
+  /** Board span: tie group repeats in every ordinal slot it occupies. */
+  rowsSpan: EditionBallotMatrixRow[];
 };
 
 /**
@@ -899,13 +853,13 @@ export async function getEditionBallotMatrix(
     getEditionGotyPage(
       editionId,
       "community",
-      { page: 1, pageSize: BALLOT_MATRIX_TOP },
+      { page: 1, pageSize: BALLOT_MATRIX_STANDINGS_FETCH },
       db,
     ),
     getEditionGotyPage(
       editionId,
       "voices",
-      { page: 1, pageSize: BALLOT_MATRIX_TOP },
+      { page: 1, pageSize: BALLOT_MATRIX_STANDINGS_FETCH },
       db,
     ),
   ]);
@@ -977,9 +931,10 @@ export async function getEditionBallotMatrix(
       );
   }
 
-  const rows = assembleBallotMatrixRows({
+  const standingInput = {
     community: communityPage.rows.map((r) => ({
       place: r.place,
+      points: r.points,
       gameId: r.gameId,
       slug: r.slug,
       title: r.title,
@@ -987,6 +942,7 @@ export async function getEditionBallotMatrix(
     })),
     voices: voicesPage.rows.map((r) => ({
       place: r.place,
+      points: r.points,
       gameId: r.gameId,
       slug: r.slug,
       title: r.title,
@@ -996,11 +952,172 @@ export async function getEditionBallotMatrix(
     voterRanks,
     viewerProfileId,
     includeYou: showYou,
+  } as const;
+
+  const rows = assembleBallotMatrixRows({
+    ...standingInput,
+    tieMode: "competition",
+  });
+  const rowsDense = assembleBallotMatrixRows({
+    ...standingInput,
+    tieMode: "dense",
+  });
+  const rowsSpan = assembleBallotMatrixRows({
+    ...standingInput,
+    tieMode: "span",
   });
 
   return {
     showYou,
-    hasGames: matrixHasAnyGames(rows),
+    hasGames:
+      matrixHasAnyGames(rows) ||
+      matrixHasAnyGames(rowsDense) ||
+      matrixHasAnyGames(rowsSpan),
+    voiceColumns,
+    rows,
+    rowsDense,
+    rowsSpan,
+  };
+}
+
+export type EditionCategoryComparisonMatrix = {
+  showYou: boolean;
+  hasGames: boolean;
+  voiceColumns: MatrixVoiceColumn[];
+  rows: EditionCategoryComparisonRow[];
+};
+
+function winnersByCategory(
+  blocks: EditionCategoryStandingBlock[],
+): Record<string, MatrixGameCell[]> {
+  const out: Record<string, MatrixGameCell[]> = {};
+  for (const block of blocks) {
+    out[block.categoryId] = block.rows
+      .filter((r) => r.rank === 1)
+      .map((top) => ({
+        gameId: top.gameId,
+        slug: top.slug,
+        title: top.title,
+        coverUrl: top.coverUrl,
+      }));
+  }
+  return out;
+}
+
+/**
+ * Award rows × You / Community (#1) / Voices (#1) / each Voice pick.
+ * Place-1 boards only — not full category tallies.
+ */
+export async function getEditionCategoryComparisonMatrix(
+  editionId: string,
+  opts: { viewerProfileId?: string | null; rankMode?: SharedRankMode } = {},
+  db: Db = getDb(),
+): Promise<EditionCategoryComparisonMatrix> {
+  const rankMode = opts.rankMode ?? "competition";
+  const [communityBlocks, voicesBlocks, voiceColumns] = await Promise.all([
+    getEditionCategoryResults(editionId, "community", { maxPlace: 1, rankMode }, db),
+    getEditionCategoryResults(editionId, "voices", { maxPlace: 1, rankMode }, db),
+    db
+      .select({
+        profileId: communityEditionResultVoters.profileId,
+        displayName: communityEditionResultVoters.displayName,
+        username: communityEditionResultVoters.username,
+      })
+      .from(communityEditionResultVoters)
+      .where(
+        and(
+          eq(communityEditionResultVoters.editionId, editionId),
+          eq(communityEditionResultVoters.isVoice, true),
+        ),
+      )
+      .orderBy(
+        asc(communityEditionResultVoters.displayName),
+        asc(communityEditionResultVoters.username),
+      ),
+  ]);
+
+  const categoryOrder = new Map<string, { categoryId: string; label: string }>();
+  for (const block of communityBlocks) {
+    categoryOrder.set(block.categoryId, {
+      categoryId: block.categoryId,
+      label: block.label,
+    });
+  }
+  for (const block of voicesBlocks) {
+    if (!categoryOrder.has(block.categoryId)) {
+      categoryOrder.set(block.categoryId, {
+        categoryId: block.categoryId,
+        label: block.label,
+      });
+    }
+  }
+  const categories = [...categoryOrder.values()];
+
+  const viewerProfileId = opts.viewerProfileId ?? null;
+  let showYou = false;
+  if (viewerProfileId) {
+    const [viewerRow] = await db
+      .select({ profileId: communityEditionResultVoters.profileId })
+      .from(communityEditionResultVoters)
+      .where(
+        and(
+          eq(communityEditionResultVoters.editionId, editionId),
+          eq(communityEditionResultVoters.profileId, viewerProfileId),
+        ),
+      )
+      .limit(1);
+    showYou = Boolean(viewerRow);
+  }
+
+  const profileIds = [
+    ...voiceColumns.map((v) => v.profileId),
+    ...(showYou && viewerProfileId ? [viewerProfileId] : []),
+  ];
+  const uniqueProfileIds = [...new Set(profileIds)];
+
+  let picks: Array<{
+    profileId: string;
+    categoryId: string;
+    gameId: string;
+    slug: string;
+    title: string;
+    coverUrl: string | null;
+  }> = [];
+  if (uniqueProfileIds.length > 0 && categories.length > 0) {
+    picks = await db
+      .select({
+        profileId: communityEditionResultVoterCategoryPicks.profileId,
+        categoryId: communityEditionResultVoterCategoryPicks.categoryId,
+        gameId: communityEditionResultVoterCategoryPicks.gameId,
+        slug: communityEditionResultVoterCategoryPicks.slug,
+        title: communityEditionResultVoterCategoryPicks.title,
+        coverUrl: communityEditionResultVoterCategoryPicks.coverUrl,
+      })
+      .from(communityEditionResultVoterCategoryPicks)
+      .where(
+        and(
+          eq(communityEditionResultVoterCategoryPicks.editionId, editionId),
+          inArray(
+            communityEditionResultVoterCategoryPicks.profileId,
+            uniqueProfileIds,
+          ),
+        ),
+      );
+  }
+
+  const rows = assembleCategoryComparisonRows({
+    categories,
+    communityByCategory: winnersByCategory(communityBlocks),
+    voicesByCategory: winnersByCategory(voicesBlocks),
+    picks,
+    voiceColumns,
+    viewerProfileId,
+    includeYou: showYou,
+  });
+
+  return {
+    showYou,
+    hasGames: categoryComparisonHasGames(rows),
     voiceColumns,
     rows,
   };

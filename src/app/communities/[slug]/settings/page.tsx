@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CommunityNav } from "@/components/communities/CommunityNav";
+import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -76,18 +75,9 @@ export default async function CommunitySettingsPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted">
-        <Link href="/communities" className="hover:text-ink">
-          Communities
-        </Link>
-      </p>
-      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-        {community.name}
-      </h1>
-      <p className="mt-2 text-sm text-muted">Settings</p>
-
-      <CommunityNav
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
+      <CommunityHeader
+        name={community.name}
         slug={community.slug}
         liveEnabled={community.liveRankingsEnabled}
         canManage
@@ -95,7 +85,7 @@ export default async function CommunitySettingsPage({
         active="settings"
       />
 
-      <section className="mt-10 border-t border-line pt-8">
+      <section className="mt-10">
         <h2 className="font-display text-3xl tracking-wide text-ink">
           Live rankings
         </h2>

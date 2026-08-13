@@ -1,4 +1,11 @@
 import { pointsForRank } from "@/lib/lists/scoring";
+import {
+  parseSharedRankMode,
+  type SharedRankMode,
+} from "@/lib/standings/shared-rank";
+
+export type { SharedRankMode };
+export { parseSharedRankMode as parseEditionRankMode };
 
 export type EditionResultMode = "combined" | "community" | "voices";
 
@@ -7,6 +14,7 @@ export type EditionResultsPublicMode = "community" | "voices";
 
 /** Ceremony narrative, full GOTY board, category awards, voters, or the viewer's ballot. */
 export type EditionResultsViewId =
+  | "reveal"
   | "overview"
   | "standings"
   | "categories"
@@ -31,11 +39,13 @@ export function parseEditionResultMode(
 export function parseEditionResultsView(
   raw: string | undefined,
 ): EditionResultsViewId {
+  if (raw === "overview") return "overview";
   if (raw === "standings") return "standings";
   if (raw === "categories") return "categories";
   if (raw === "voters") return "voters";
   if (raw === "ballot") return "ballot";
-  return "overview";
+  if (raw === "reveal") return "reveal";
+  return "reveal";
 }
 
 export type RankedBallotLine = {
