@@ -68,6 +68,92 @@ body {
   animation: skeleton-pulse 1.4s var(--ease-standard) infinite;
 }
 
+.category-reveal-grid {
+  display: grid;
+  grid-auto-flow: column;
+  align-content: start;
+  justify-content: start;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.category-reveal-grid > * {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+}
+
+.category-reveal-grid .category-reveal-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.category-reveal-grid .category-reveal-cover img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+.category-reveal-grid .category-reveal-title {
+  display: -webkit-box;
+  /* autoprefixer: ignore next — Safari needs this for line-clamp */
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  margin-top: 0.25rem;
+  font-size: 0.625rem;
+  line-height: 1.2;
+  /* Hard cap — don’t rely on min-height (that reserved space but didn’t clip). */
+  max-height: calc(1.2em * 2);
+  min-height: 0;
+}
+
+/* Track width via CSS var so md+ can grow without fighting paint. */
+.category-reveal-grid--editorial {
+  --category-reveal-col: 84px;
+  grid-template-rows: auto auto;
+  grid-auto-columns: var(--category-reveal-col);
+  gap: 8px;
+}
+
+.category-reveal-grid--dense {
+  --category-reveal-col: 76px;
+  grid-template-rows: auto auto auto;
+  grid-auto-columns: var(--category-reveal-col);
+  gap: 6px;
+}
+
+@media (min-width: 768px) {
+  .category-reveal-grid .category-reveal-title {
+    font-size: 0.75rem;
+    line-height: 1.25;
+    max-height: calc(1.25em * 2);
+  }
+
+  .category-reveal-grid--editorial {
+    --category-reveal-col: 104px;
+  }
+
+  .category-reveal-grid--dense {
+    --category-reveal-col: 96px;
+  }
+}
+
 /* Hide scrollbars on intentional horizontal strips (drag / touch / trackpad). */
 .scrollbar-none {
   scrollbar-width: none;
@@ -76,4 +162,10 @@ body {
 
 .scrollbar-none::-webkit-scrollbar {
   display: none;
+}
+
+.reveal-opener-dots {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Ccircle cx='7' cy='7' r='1' fill='%23ff5a1f' fill-opacity='0.42'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-position: center top;
 }

@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
@@ -557,21 +557,19 @@ export async function getEditionCategoryResults(
       ? Math.max(1, Math.floor(opts.maxPlace))
       : null;
   const rankMode = opts.rankMode ?? "competition";
-  const fetchPlace =
-    maxPlace != null ? Math.max(maxPlace, maxPlace * 3) : null;
 
-  const conditions = [
-    eq(communityEditionResultCategories.editionId, editionId),
-    eq(communityEditionResultCategories.mode, storage),
-  ];
-  if (fetchPlace != null) {
-    conditions.push(lte(communityEditionResultCategories.place, fetchPlace));
-  }
-
+  // Load the full category board for this mode, then filter by *derived*
+  // rank. A SQL `place <= N` cap drops ties (e.g. 12 games tied for #1
+  // only need places 1–3 on the podium).
   const rows = await db
     .select()
     .from(communityEditionResultCategories)
-    .where(and(...conditions))
+    .where(
+      and(
+        eq(communityEditionResultCategories.editionId, editionId),
+        eq(communityEditionResultCategories.mode, storage),
+      ),
+    )
     .orderBy(
       asc(communityEditionResultCategories.sortOrder),
       asc(communityEditionResultCategories.place),

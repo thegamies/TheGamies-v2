@@ -65,6 +65,17 @@ describe("gotyRevealNumberShift", () => {
     expect(shift.x).toBeGreaterThan(0);
     expect(Math.abs(shift.y - (GOTY_REVEAL_TIED_PARK_Y_VH / 100) * frame.height)).toBeLessThan(2);
   });
+
+  it("keeps a wide glyph on-screen on a narrow phone frame", () => {
+    const parked = gotyRevealNumber(0.55, gotyRevealRankUnits(1));
+    const frame = { width: 360, height: 640, topInset: 96, sideInset: 12 };
+    const box = { width: 280, height: 300 };
+    const shift = gotyRevealNumberShift(parked, box, frame);
+    const w = box.width * shift.scale;
+    const cx = frame.width / 2 + shift.x;
+    expect(cx - w / 2).toBeGreaterThanOrEqual(8);
+    expect(cx + w / 2).toBeLessThanOrEqual(frame.width - 8);
+  });
 });
 
 describe("gotyRevealTied", () => {

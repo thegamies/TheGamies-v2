@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import {
   CategoryChapterHeader,
@@ -300,8 +301,9 @@ export function EditionCategoriesHighlights({
   youBallotHref?: string | null;
 }) {
   const [layout, setLayout] = useState<Layout>("podiums");
+  const categories = useEditionCategoryPodiums(categoryPodiums);
 
-  if (categoryPodiums.length === 0 && !categoryComparison.hasGames) {
+  if (categories.length === 0 && !categoryComparison.hasGames) {
     return null;
   }
 
@@ -351,13 +353,13 @@ export function EditionCategoriesHighlights({
       </div>
 
       {layout === "podiums" ? (
-        <EditionCategoryPodiums categories={categoryPodiums} />
+        <EditionCategoryPodiums categories={categories} />
       ) : layout === "ranked" ? (
-        <CategoryRankedSections categories={categoryPodiums} />
+        <CategoryRankedSections categories={categories} />
       ) : (
         <CategoryComparisonSections
           matrix={categoryComparison}
-          categoryPodiums={categoryPodiums}
+          categoryPodiums={categories}
           slug={slug}
           year={year}
           youBallotHref={youBallotHref}

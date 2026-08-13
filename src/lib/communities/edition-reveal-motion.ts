@@ -93,8 +93,10 @@ export function gotyRevealNumber(
 }
 
 /**
- * Pixel shift from the stage center. Parked rest is on the right,
- * inset, on the same row as Tied.
+ * Pixel shift of the glyph center from the stage center.
+ * Parked rest is on the right, inset, on the same row as Tied.
+ * Callers should position with top-left + translate3d (no % translate)
+ * so Chrome mobile matches Safari.
  */
 export function gotyRevealNumberShift(
   motion: { enter: number; park: number; scale: number },
@@ -107,7 +109,9 @@ export function gotyRevealNumberShift(
   },
 ): { x: number; y: number; scale: number } {
   const peakScale = Math.max(0.01, motion.scale);
-  const side = Math.max(frame.sideInset, frame.width * NUMBER_PARK_SIDE);
+  const narrow = frame.width < 480;
+  const sideFrac = narrow ? 0.06 : NUMBER_PARK_SIDE;
+  const side = Math.max(frame.sideInset, frame.width * sideFrac);
   const maxW = Math.max(1, frame.width - side * 2);
   const maxH = Math.max(1, frame.height - frame.topInset - side);
   const fitScale = Math.min(
@@ -120,11 +124,21 @@ export function gotyRevealNumberShift(
   const h = Math.max(1, box.height * scale);
   const parkedX = frame.width / 2 - side - w / 2;
   const tiedY = (GOTY_REVEAL_TIED_PARK_Y_VH / 100) * frame.height;
-  return {
-    x: (1 - motion.enter) * frame.width * -0.58 + motion.park * parkedX,
-    y: motion.park * tiedY,
-    scale,
-  };
+  let x = (1 - motion.enter) * frame.width * -0.58 + motion.park * parkedX;
+  let y = motion.park * tiedY;
+
+  // Keep the scaled glyph inside the visible stage (Chrome mobile can
+  // otherwise park wide display numbers past the left edge).
+  const halfW = w / 2;
+  const halfH = h / 2;
+  const minX = -frame.width / 2 + side + halfW;
+  const maxX = frame.width / 2 - side - halfW;
+  const minY = -frame.height / 2 + frame.topInset + halfH;
+  const maxY = frame.height / 2 - side - halfH;
+  x = clamp(x, Math.min(minX, maxX), Math.max(minX, maxX));
+  y = clamp(y, Math.min(minY, maxY), Math.max(minY, maxY));
+
+  return { x, y, scale };
 }
 
 export function gotyRevealTied(

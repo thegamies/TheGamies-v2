@@ -102,7 +102,7 @@ Rules:
 | Context | Rank treatment |
 |---|---|
 | GOTY podium | Large `RankMarker` **above** cover; cover **bottoms** share a baseline (all rank-1 games use winner size) |
-| GOTY / category Reveal | Sticky scroll ceremony (default tab). GOTY #10→#1: number parks right on the Tied row; **tied ranks share one stage** — Tied lifts, then each cover in turn. Categories assemble **#3·#2·#1** (every tied game shows a cover). Not standings cards. `prefers-reduced-motion` skips scrubbing |
+| GOTY / category Reveal | Sticky scroll ceremony (default tab). GOTY #10→#1: number parks right on the Tied row; **tied ranks share one stage** — Tied lifts, then each cover in turn. Categories: `#1 · #2 · #3` columns in one board; each slides in from off-screen left (**#3→#2→#1**) and packs so earlier ranks push right; multi-row tied mosaics with titles. Not standings cards. `prefers-reduced-motion` skips scrubbing |
 | GOTY / category Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title. GOTY Top 10 even grid; Categories Top 3 tiered — #1 ≈ GOTY/podium width, #2/#3 smaller — shared cover baseline |
 | GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Skip · Dense · Board on GOTY Comparison |
 | Rest of Top 10 / Full standings / Categories | Accent place **in front of the title** (tight `gap-1`), meta aligned under the title — **never** a badge on the art |
@@ -111,7 +111,7 @@ Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
 
 ## Horizontal scroll
 
-`HorizontalScroll` — intentional sideways strips (Rest of Top 10 on small screens, GOTY / category Comparison strips). Not used for Ranked layouts.
+`HorizontalScroll` — intentional sideways strips (Rest of Top 10 on small screens, GOTY / category Comparison strips). Category Reveal slides its own #3→#2→#1 columns via scrub instead. Not used for Ranked layouts.
 
 - Hide scrollbars; edge fade + quiet accent hairline when more content exists
 - Desktop: drag-to-pan (click still works after a short move); optional prev/next via `showArrowControls` (off by default)

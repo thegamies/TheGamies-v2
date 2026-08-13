@@ -1,10 +1,13 @@
 "use client";
 
+import { CompactTieStack } from "@/components/communities/CompactTieStack";
+import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import Link from "next/link";
 import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -13,6 +16,19 @@ import type {
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
+import {
+  applyCategoryRevealGridColumns,
+  CATEGORY_REVEAL_EXIT_AT,
+  CATEGORY_REVEAL_EXIT_DUR,
+  categoryRevealAwardLocalT,
+  categoryRevealAwardScrollUnits,
+  categoryRevealGridOffscreenLead,
+  categoryRevealPlaceGridEnter,
+  categoryRevealPlaceLabelEnter,
+  categoryRevealPlaceOpens,
+  categoryRevealPlaceTranslateX,
+  categoryRevealSlotDensity,
+} from "@/lib/communities/edition-reveal-category-ties";
 import { ceremonyProgress, documentOffsetTop } from "@/lib/communities/edition-reveal-scrub";
 import {
   gotyRevealGameLocal,
@@ -72,18 +88,19 @@ function CeremonyChapter({
   title,
   heightVh,
   paint,
+  fadeHead = false,
   children,
 }: {
   eyebrow: string;
   title: string;
   heightVh: number;
   paint: PaintFn;
+  fadeHead?: boolean;
   children: ReactNode;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
-  const titleRef = useRef<HTMLHeadingElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
   const paintRef = useRef(paint);
   paintRef.current = paint;
@@ -93,28 +110,29 @@ function CeremonyChapter({
     const track = trackRef.current;
     const frame = frameRef.current;
     const stage = stageRef.current;
-    const titleEl = titleRef.current;
     const head = headRef.current;
-    if (!track || !frame || !stage || !titleEl || !head) return;
+    if (!track || !frame || !stage || !head) return;
 
     let raf = 0;
-    let lastShrink = -1;
     let trackDocTop = documentOffsetTop(track);
+    let openerStartTop: number | null = null;
+    const opener = track.previousElementSibling instanceof HTMLElement
+      ? track.previousElementSibling
+      : null;
     const scrollRoot =
       (document.scrollingElement as HTMLElement | null) ??
       document.documentElement;
 
     const measure = () => {
       trackDocTop = documentOffsetTop(track);
+      openerStartTop = null;
     };
 
     const apply = () => {
       const viewportH = Math.max(1, window.innerHeight);
 
       if (reduced) {
-        titleEl.style.fontSize = "1.5rem";
-        head.style.paddingTop = "0.6rem";
-        head.style.paddingBottom = "0.6rem";
+        head.style.opacity = "1";
         stage.dataset.revealReduced = "1";
         paintRef.current(0, stage);
         raf = 0;
@@ -131,12 +149,16 @@ function CeremonyChapter({
       );
       paintRef.current(p, stage);
 
-      const shrink = easeInOut(clamp(p / 0.08, 0, 1));
-      if (Math.abs(shrink - lastShrink) >= 0.003) {
-        lastShrink = shrink;
-        titleEl.style.fontSize = `clamp(${2.1 - shrink * 0.7}rem, ${7.5 - shrink * 5.2}vw, ${4.5 - shrink * 3}rem)`;
-        head.style.paddingTop = `${0.5 + (1 - shrink) * 0.45}rem`;
-        head.style.paddingBottom = `${0.45 + (1 - shrink) * 0.3}rem`;
+      if (fadeHead && opener) {
+        const top = opener.getBoundingClientRect().top;
+        if (openerStartTop == null) openerStartTop = top;
+        const gone = Math.max(0, openerStartTop - top);
+        head.style.opacity = String(easeInOut(clamp(gone / 320, 0, 1)));
+      } else if (fadeHead) {
+        const top = frame.getBoundingClientRect().top;
+        head.style.opacity = String(easeInOut(clamp(1 - top / 320, 0, 1)));
+      } else {
+        head.style.opacity = "1";
       }
 
       const rect = track.getBoundingClientRect();
@@ -172,7 +194,7 @@ function CeremonyChapter({
       window.visualViewport?.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("scroll", kick);
     };
-  }, [reduced]);
+  }, [reduced, fadeHead]);
 
   return (
     <div ref={trackRef} className="relative" style={{ height: `${heightVh}vh` }}>
@@ -190,21 +212,21 @@ function CeremonyChapter({
           ref={headRef}
           data-c-head
           className="absolute inset-x-0 top-0 z-20 border-b border-line bg-paper/95 px-[var(--gutter)]"
-          style={{ paddingTop: "1.1rem", paddingBottom: "0.85rem" }}
+          style={{
+            paddingTop: "1.1rem",
+            paddingBottom: "0.85rem",
+            opacity: fadeHead && !reduced ? 0 : 1,
+          }}
         >
           <div className="relative mx-auto w-full max-w-[var(--page-max)]">
             <div
               aria-hidden
               className="absolute -left-[var(--gutter)] top-0 bottom-0 w-1 bg-accent"
             />
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent sm:text-sm sm:tracking-[0.18em]">
               {eyebrow}
             </p>
-            <h2
-              ref={titleRef}
-              className="mt-1 font-display leading-[0.9] tracking-wide text-ink"
-              style={{ fontSize: "clamp(2.25rem, 8vw, 4.5rem)" }}
-            >
+            <h2 className="mt-1 font-display text-[clamp(2.25rem,8vw,4.5rem)] leading-[0.9] tracking-wide text-ink">
               {title}
             </h2>
           </div>
@@ -217,14 +239,40 @@ function CeremonyChapter({
 function CeremonyArt({
   title,
   coverUrl,
+  mosaic = false,
 }: {
   title: string;
   coverUrl: string | null;
   priority?: boolean;
+  /** Category mosaic cell — fixed-ratio box, no intrinsic img size fights. */
+  mosaic?: boolean;
 }) {
+  if (mosaic) {
+    return (
+      <div className="category-reveal-cover">
+        {coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverUrl}
+            alt=""
+            draggable={false}
+            loading="eager"
+            decoding="async"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-end p-1">
+            <p className="font-display text-[10px] leading-none text-muted">
+              {title}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
-      className="relative w-full overflow-hidden border border-line bg-panel"
+      className="relative w-full min-w-0 overflow-hidden border border-line bg-panel"
       style={{ aspectRatio: "3 / 4" }}
     >
       {coverUrl ? (
@@ -236,9 +284,7 @@ function CeremonyArt({
           draggable={false}
           loading="eager"
           decoding="async"
-          width={264}
-          height={352}
-          className="block h-full w-full object-cover"
+          className="absolute inset-0 block h-full w-full max-w-full object-cover"
         />
       ) : (
         <div className="flex h-full items-end p-3">
@@ -257,6 +303,13 @@ function paintGotyNumber(
   motion: { opacity: number; enter: number; park: number; scale: number },
 ) {
   const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 72);
+  const boxEl =
+    (num.offsetParent instanceof HTMLElement ? num.offsetParent : null) ??
+    frame;
+  const frameW = Math.max(1, boxEl.clientWidth || frame.clientWidth);
+  const frameH = Math.max(1, boxEl.clientHeight || frame.clientHeight);
+  const stageH = Math.max(1, frameH - headH);
   const shift = gotyRevealNumberShift(
     motion,
     {
@@ -264,14 +317,54 @@ function paintGotyNumber(
       height: Math.max(1, num.offsetHeight),
     },
     {
-      width: Math.max(1, frame.offsetWidth),
-      height: Math.max(1, frame.offsetHeight),
-      topInset: (head?.offsetHeight ?? 72) + 8,
+      width: frameW,
+      height: stageH,
+      topInset: 8,
       sideInset: 16,
     },
   );
+  const bw = Math.max(1, num.offsetWidth);
+  const bh = Math.max(1, num.offsetHeight);
+  const cx = frameW / 2 + shift.x;
+  const cy = headH + stageH / 2 + shift.y;
+  // Pixel translate from top-left — avoids Chrome mobile bugs with
+  // left/top 50% + translate(-50%, -50%) + scale.
+  num.style.left = "0px";
+  num.style.top = "0px";
+  num.style.right = "auto";
+  num.style.bottom = "auto";
   num.style.opacity = String(motion.opacity);
-  num.style.transform = `translate(-50%, -50%) translate3d(${shift.x}px, ${shift.y}px, 0) scale(${shift.scale})`;
+  num.style.transformOrigin = "center center";
+  num.style.transform = `translate3d(${cx - bw / 2}px, ${cy - bh / 2}px, 0) scale(${shift.scale})`;
+}
+
+function paintGotyTied(
+  tied: HTMLElement,
+  frame: HTMLElement,
+  motion: { opacity: number; yVh: number },
+) {
+  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 72);
+  const boxEl =
+    (tied.offsetParent instanceof HTMLElement ? tied.offsetParent : null) ??
+    frame;
+  const frameW = Math.max(1, boxEl.clientWidth || frame.clientWidth);
+  const frameH = Math.max(1, boxEl.clientHeight || frame.clientHeight);
+  const stageH = Math.max(1, frameH - headH);
+  const bw = Math.max(1, tied.offsetWidth);
+  const bh = Math.max(1, tied.offsetHeight);
+  const cx = frameW / 2;
+  const cy = headH + stageH / 2 + (motion.yVh / 100) * stageH;
+  // Keep “Tied” fully on-screen horizontally (wide tracking on mobile).
+  const pad = 12;
+  const left = clamp(cx - bw / 2, pad, Math.max(pad, frameW - pad - bw));
+  tied.style.left = "0px";
+  tied.style.top = "0px";
+  tied.style.right = "auto";
+  tied.style.bottom = "auto";
+  tied.style.opacity = String(motion.opacity);
+  tied.style.transformOrigin = "center center";
+  tied.style.transform = `translate3d(${left}px, ${cy - bh / 2}px, 0)`;
 }
 
 function paintGotyReduced(frame: HTMLElement) {
@@ -291,8 +384,10 @@ function paintGotyReduced(frame: HTMLElement) {
     }
     if (tied) {
       const show = on && games.length > 1;
-      tied.style.opacity = show ? "1" : "0";
-      tied.style.transform = `translate(-50%, -50%) translate3d(0, ${GOTY_REVEAL_TIED_PARK_Y_VH}vh, 0)`;
+      paintGotyTied(tied, frame, {
+        opacity: show ? 1 : 0,
+        yVh: GOTY_REVEAL_TIED_PARK_Y_VH,
+      });
     }
     games.forEach((game, gi) => {
       game.style.opacity = on ? "1" : "0";
@@ -321,6 +416,8 @@ function paintGotyCountdown(p: number, frame: HTMLElement) {
   const units = layers.map((layer) =>
     gotyRevealRankUnits(Number(layer.dataset.games ?? "1")),
   );
+  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 108);
 
   layers.forEach((layer, i) => {
     const rankUnits = units[i] ?? 1;
@@ -333,13 +430,11 @@ function paintGotyCountdown(p: number, frame: HTMLElement) {
     const k = gotyRevealTied(t, tied, rankUnits);
 
     if (num) paintGotyNumber(num, frame, n);
-    if (tiedEl) {
-      tiedEl.style.opacity = String(k.opacity);
-      tiedEl.style.transform = `translate(-50%, -50%) translate3d(0, ${k.yVh}vh, 0)`;
-    }
+    if (tiedEl) paintGotyTied(tiedEl, frame, k);
 
     let maxGame = 0;
     gameEls.forEach((game, gi) => {
+      game.style.paddingTop = `${headH}px`;
       const gT = gotyRevealGameLocal(
         t,
         gi,
@@ -362,9 +457,11 @@ function paintGotyCountdown(p: number, frame: HTMLElement) {
 
 function GotyCountdown({
   year,
+  communityName,
   places,
 }: {
   year: number;
+  communityName: string;
   places: EditionGotyStandingRow[];
 }) {
   const groups = groupByRank(places);
@@ -376,10 +473,11 @@ function GotyCountdown({
 
   return (
     <CeremonyChapter
-      eyebrow={`${year} Edition · Ceremony`}
-      title="Game of the Year"
+      eyebrow={`${year} ${communityName} community`}
+      title={`${year} Game of the Year`}
       heightVh={heightVh}
       paint={paintGotyCountdown}
+      fadeHead
     >
       <div className="relative h-full w-full">
         {groups.map((group) => {
@@ -397,14 +495,14 @@ function GotyCountdown({
               <p
                 data-c-num
                 aria-hidden
-                className="pointer-events-none absolute top-1/2 left-1/2 z-30 origin-center font-display leading-none tracking-tight will-change-transform"
+                className="pointer-events-none absolute top-0 left-0 z-30 origin-center font-display leading-none tracking-tight will-change-transform"
                 style={{
                   color: "#ff5a1f",
                   fontSize: featured
-                    ? "clamp(7rem, 26vw, 15rem)"
-                    : "clamp(6rem, 22vw, 13rem)",
+                    ? "clamp(5.5rem, 22vw, 15rem)"
+                    : "clamp(5rem, 20vw, 13rem)",
                   opacity: bootNum.opacity,
-                  transform: `translate(-50%, -50%) scale(${bootNum.scale})`,
+                  transform: `translate3d(0, 0, 0) scale(${bootNum.scale})`,
                 }}
               >
                 {group.rank}
@@ -414,11 +512,11 @@ function GotyCountdown({
                 <p
                   data-c-tied
                   aria-hidden
-                  className="pointer-events-none absolute top-1/2 left-1/2 z-[15] font-display leading-none tracking-[0.12em] text-ink will-change-transform"
+                  className="pointer-events-none absolute top-0 left-0 z-[15] font-display leading-none tracking-[0.12em] text-ink will-change-transform"
                   style={{
-                    fontSize: "clamp(2.75rem, 10vw, 6.5rem)",
+                    fontSize: "clamp(2.25rem, 9vw, 6.5rem)",
                     opacity: 0,
-                    transform: "translate(-50%, -50%) translate3d(0, 12vh, 0)",
+                    transform: "translate3d(0, 0, 0)",
                   }}
                 >
                   Tied
@@ -429,7 +527,7 @@ function GotyCountdown({
                 <div
                   key={row.gameId}
                   data-c-game
-                  className="absolute inset-0 z-10 flex items-center px-[var(--gutter)] pt-[7.5rem] will-change-transform sm:pt-36"
+                  className="absolute inset-0 z-10 flex items-center px-[var(--gutter)] will-change-transform"
                   style={{
                     opacity: 0,
                     transform: "translate3d(-32vw, 0, 0)",
@@ -505,21 +603,36 @@ type CatAward = {
 
 /**
  * One sticky stage for all category awards.
- * Title settles and holds still, then #3 → #2 → #1 with gaps;
- * exit only after #1 is fully in. Layout stays #1 · #2 · #3.
+ * Each award is a CategoryRevealBoard of #1 · #2 · #3 columns.
+ * Columns stay full-size in layout; each slides in from off-screen left
+ * via translate3d and packs stage-left (#3 → #2 → #1 push).
  */
 function paintCategoriesCountdown(p: number, frame: HTMLElement) {
   const awards = frame.querySelectorAll<HTMLElement>("[data-c-award]");
   const count = awards.length;
+  const reduced = frame.dataset.revealReduced === "1";
+  const units = Array.from(awards).map((award) =>
+    categoryRevealAwardScrollUnits(Number(award.dataset.placeCount || "1")),
+  );
+
   awards.forEach((award, i) => {
-    // Less neighbor overlap than GOTY so each award can finish its beat.
-    const t = count <= 1 ? Math.max(p, 0.55) : p * (count - 0.12) - i + 0.55;
+    const t =
+      count <= 1
+        ? Math.max(p, 0.35)
+        : categoryRevealAwardLocalT(p, i, units);
     const inWindow = t > -0.05 && t < 1.08;
 
-    // Title settles by ~0.22, then stays put (x=0) until exit.
-    const titleEnter = easeInOut(clamp(t / 0.22, 0, 1));
-    // #3 @ 0.30, #2 @ 0.50, #1 @ 0.70 → #1 full ~0.88; hold; exit @ 0.94
-    const exit = easeInOut(clamp((t - 0.94) / 0.1, 0, 1));
+    const titleEnter = easeInOut(clamp(t / 0.16, 0, 1));
+    const exit = easeInOut(
+      clamp((t - CATEGORY_REVEAL_EXIT_AT) / CATEGORY_REVEAL_EXIT_DUR, 0, 1),
+    );
+    const live = inWindow ? 1 - exit : 0;
+
+    // Vertically center in the stage *below* the live ceremony head height.
+    const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+    const headH = Math.ceil(head?.getBoundingClientRect().height ?? 108);
+    award.style.paddingTop = `${headH}px`;
+    award.style.paddingBottom = "0px";
 
     award.style.opacity = inWindow ? "1" : "0";
     award.style.pointerEvents =
@@ -536,35 +649,320 @@ function paintCategoriesCountdown(p: number, frame: HTMLElement) {
       title.style.transform = `translate3d(${titleX}vw, 0, 0)`;
     }
 
-    const slots = award.querySelectorAll<HTMLElement>("[data-c-slot]");
-    slots.forEach((slot) => {
-      const place = Number(slot.dataset.place ?? "1");
-      const appear = place === 3 ? 0 : place === 2 ? 1 : 2;
-      const start = 0.3 + appear * 0.2;
-      const slotEnter = easeInOut(clamp((t - start) / 0.18, 0, 1));
-      const slotOpacity = inWindow ? slotEnter * (1 - exit) : 0;
-      const slotX = (1 - slotEnter) * -30 + exit * 36;
-      slot.style.opacity = String(slotOpacity);
-      slot.style.transform = `translate3d(${slotX}vw, 0, 0)`;
+    const board = award.querySelector<HTMLElement>("[data-c-board]");
+    const stage = board?.parentElement;
+    const stageW = Number(
+      stage?.dataset.stageWidth ||
+        stage?.clientWidth ||
+        frame.clientWidth ||
+        0,
+    );
+    const offscreenLead = Math.max(stageW * 0.92, 1);
+    const gridLead = categoryRevealGridOffscreenLead(stageW);
+    const gapPx = Number(board?.dataset.placeGap || "20");
+    const placeEls = award.querySelectorAll<HTMLElement>("[data-c-place]");
+    const layouts = Array.from(placeEls).map((el) => ({
+      place: Number(el.dataset.place ?? "0"),
+      left: Number(el.dataset.offsetLeft || "0"),
+      width: Number(el.dataset.fullWidth || "0"),
+    }));
+    const opens = categoryRevealPlaceOpens(t, layouts, reduced);
+
+    if (board) {
+      board.style.opacity = String(titleEnter * live);
+      board.style.transform = "translate3d(0, 0, 0)";
+      board.style.gap = `${gapPx}px`;
+    }
+
+    placeEls.forEach((placeEl) => {
+      const place = Number(placeEl.dataset.place ?? "1");
+      const labelEnter = reduced
+        ? 1
+        : categoryRevealPlaceLabelEnter(
+            t,
+            place,
+            layouts.map((row) => row.place),
+          );
+      const gridEnter = reduced
+        ? 1
+        : categoryRevealPlaceGridEnter(
+            t,
+            place,
+            layouts.map((row) => row.place),
+          );
+      const tx = categoryRevealPlaceTranslateX(
+        place,
+        layouts,
+        opens,
+        offscreenLead,
+        gapPx,
+      );
+
+      // Column seats with # / Tied first; covers stay clipped until their slide.
+      placeEl.style.opacity = String(inWindow && labelEnter > 0.02 ? 1 : 0);
+      placeEl.style.transform = `translate3d(${tx}px, 0, 0)`;
+      placeEl.style.overflow = gridEnter < 0.995 ? "hidden" : "visible";
+      placeEl.style.marginLeft = "";
+      placeEl.style.width = "";
+      placeEl.style.pointerEvents =
+        live > 0.5 && gridEnter > 0.35 ? "auto" : "none";
+
+      const num = placeEl.querySelector<HTMLElement>("[data-c-place-num]");
+      const meta = placeEl.querySelector<HTMLElement>("[data-c-place-meta]");
+      const grid = placeEl.querySelector<HTMLElement>("[data-c-place-grid]");
+      if (num) {
+        num.style.opacity = String(inWindow ? labelEnter * live : 0);
+        num.style.transform = `translate3d(${(1 - labelEnter) * -6}vw, 0, 0)`;
+      }
+      if (meta) {
+        meta.style.opacity = String(inWindow ? labelEnter * live : 0);
+        meta.style.transform = `translate3d(${(1 - labelEnter) * -3}vw, 0, 0)`;
+      }
+      if (grid) {
+        // Literal px every paint — CSS vars / stylesheet tracks were ignored on
+        // mobile and covers blew up to intrinsic image size.
+        applyCategoryRevealGridColumns(grid, window.innerWidth);
+        // Park fully off-screen left during the label beat, then slide in.
+        const gx = (1 - gridEnter) * -gridLead;
+        grid.style.opacity = String(
+          inWindow && gridEnter > 0.02 ? Math.min(1, gridEnter * 1.15) * live : 0,
+        );
+        grid.style.transform = `translate3d(${gx}px, 0, 0)`;
+      }
     });
   });
 }
 
+type CategoryBoardPlace = {
+  rank: number;
+  rows: CatSlot[];
+};
+
+/**
+ * Podium board for one award: #1 · #2 · #3 columns in one component.
+ * Layout is always full-size; ceremony slides each column in from the left.
+ */
+function CategoryRevealBoard({
+  places,
+  boot,
+}: {
+  places: CategoryBoardPlace[];
+  boot: boolean;
+}) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const bootRank =
+    places.find((p) => p.rank === 3)?.rank ??
+    places.find((p) => p.rank === 2)?.rank ??
+    places[0]?.rank;
+
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    const stage = stageRef.current;
+    if (!board || !stage) return;
+
+    const measureLayout = () => {
+      const vw = window.innerWidth;
+      board
+        .querySelectorAll<HTMLElement>("[data-c-place-grid]")
+        .forEach((grid) => applyCategoryRevealGridColumns(grid, vw));
+      stage.dataset.stageWidth = String(stage.clientWidth);
+      board.querySelectorAll<HTMLElement>("[data-c-place]").forEach((el) => {
+        el.dataset.offsetLeft = String(el.offsetLeft);
+        el.dataset.fullWidth = String(el.offsetWidth);
+      });
+    };
+
+    const applyPark = (opens: { 1: number; 2: number; 3: number }) => {
+      measureLayout();
+      const lead = Math.max(stage.clientWidth * 0.92, 1);
+      const gapPx = Number(board.dataset.placeGap || "20");
+      const layouts = Array.from(
+        board.querySelectorAll<HTMLElement>("[data-c-place]"),
+      ).map((el) => ({
+        place: Number(el.dataset.place ?? "0"),
+        left: Number(el.dataset.offsetLeft || "0"),
+        width: Number(el.dataset.fullWidth || "0"),
+      }));
+      board.querySelectorAll<HTMLElement>("[data-c-place]").forEach((el) => {
+        const place = Number(el.dataset.place ?? "0");
+        const tx = categoryRevealPlaceTranslateX(
+          place,
+          layouts,
+          opens,
+          lead,
+          gapPx,
+        );
+        el.style.transform = `translate3d(${tx}px, 0, 0)`;
+        const open =
+          place === 1 ? opens[1] : place === 2 ? opens[2] : opens[3];
+        el.style.opacity = open > 0.02 ? "1" : "0";
+      });
+      if (boot) board.style.opacity = "1";
+    };
+
+    const opens = { 1: 0, 2: 0, 3: 0 };
+    if (boot && (bootRank === 1 || bootRank === 2 || bootRank === 3)) {
+      opens[bootRank] = 1;
+    }
+    applyPark(opens);
+
+    const ro = new ResizeObserver(() => {
+      measureLayout();
+    });
+    ro.observe(stage);
+    ro.observe(board);
+    return () => ro.disconnect();
+  }, [places, boot, bootRank]);
+
+  return (
+    <div
+      ref={stageRef}
+      className="relative mx-auto mt-5 w-full max-w-[var(--page-max)] overflow-hidden sm:mt-6"
+    >
+      <div
+        ref={boardRef}
+        data-c-board
+        data-place-gap="20"
+        className="flex w-max items-start gap-5 sm:gap-8"
+        style={{ opacity: boot ? 1 : 0, gap: "20px" }}
+      >
+        {places.map((place) => {
+          const tied = place.rows.length > 1;
+          const density = categoryRevealSlotDensity(place.rows.length, {
+            rank: place.rank,
+          });
+          const bootOn = boot && place.rank === bootRank;
+
+          return (
+            <section
+              key={place.rank}
+              data-c-place
+              data-place={place.rank}
+              className="shrink-0 overflow-hidden will-change-transform"
+              style={{ opacity: 0 }}
+            >
+              <div
+                data-c-place-head
+                className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 will-change-transform"
+              >
+                <p
+                  data-c-place-num
+                  className={`font-display leading-none text-accent will-change-transform ${
+                    density.hero
+                      ? "text-4xl sm:text-5xl"
+                      : "text-3xl sm:text-4xl"
+                  }`}
+                  style={{
+                    opacity: bootOn ? 1 : 0,
+                    transform: bootOn
+                      ? "translate3d(0, 0, 0)"
+                      : "translate3d(-8vw, 0, 0)",
+                  }}
+                >
+                  #{place.rank}
+                </p>
+                {tied ? (
+                  <p
+                    data-c-place-meta
+                    className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted will-change-transform"
+                    style={{
+                      opacity: bootOn ? 1 : 0,
+                      transform: bootOn
+                        ? "translate3d(0, 0, 0)"
+                        : "translate3d(-4vw, 0, 0)",
+                    }}
+                  >
+                    Tied
+                    {density.showGameCount ? (
+                      <span className="text-ink"> · {place.rows.length}</span>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
+
+              <ul
+                data-c-place-grid
+                className={`mt-2 will-change-transform ${density.gridClassName}`}
+                style={{
+                  ...density.gridStyle,
+                  opacity: bootOn ? 1 : 0,
+                  transform: bootOn ? "none" : "translate3d(-95%, 0, 0)",
+                }}
+              >
+                {place.rows.map((row) => (
+                  <li key={row.slug} className="min-w-0 w-full max-w-full">
+                    <Link
+                      href={`/games/${row.slug}`}
+                      className="group block min-w-0"
+                      draggable={false}
+                      aria-label={row.title}
+                    >
+                      <CeremonyArt
+                        title={row.title}
+                        coverUrl={row.coverUrl}
+                        mosaic
+                      />
+                      {density.showTitles ? (
+                        <p
+                          className={
+                            density.stackRows === 1
+                              ? `mt-1.5 line-clamp-2 font-display leading-snug text-ink group-hover:text-accent ${
+                                  density.hero
+                                    ? "text-lg sm:text-xl"
+                                    : "text-base sm:text-lg"
+                                }`
+                              : "category-reveal-title mt-1 line-clamp-2 font-display text-ink group-hover:text-accent"
+                          }
+                        >
+                          {row.title}
+                        </p>
+                      ) : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CategoriesCountdown({
   year,
+  communityName,
   awards,
 }: {
   year: number;
+  communityName: string;
   awards: CatAward[];
 }) {
-  const n = Math.max(awards.length, 1);
-  // Title settle → games → hold on full board → exit.
-  const heightVh = 80 + n * 170;
+  const placeUnits = awards.reduce((sum, cat) => {
+    const grouped = groupByRank(
+      cat.rows.map((r) => ({ ...r, rank: r.place })),
+    );
+    const placeCount = [1, 2, 3].filter((place) =>
+      grouped.some((g) => g.rank === place),
+    ).length;
+    return sum + categoryRevealAwardScrollUnits(placeCount);
+  }, 0);
+  const coverExtra = awards.reduce((sum, cat) => {
+    const grouped = groupByRank(
+      cat.rows.map((r) => ({ ...r, rank: r.place })),
+    );
+    return (
+      sum +
+      grouped.reduce((s, g) => s + Math.max(0, g.rows.length - 1), 0)
+    );
+  }, 0);
+  const heightVh = Math.min(2200, 70 + placeUnits * 115 + coverExtra * 3);
 
   return (
     <CeremonyChapter
-      eyebrow={`${year} Edition · Awards`}
-      title="Categories"
+      eyebrow={`${year} ${communityName} community`}
+      title={`${year} Categories`}
       heightVh={heightVh}
       paint={paintCategoriesCountdown}
     >
@@ -573,112 +971,61 @@ function CategoriesCountdown({
           const grouped = groupByRank(
             cat.rows.map((r) => ({ ...r, rank: r.place })),
           );
-          const board = [1, 2, 3].map((n) => {
-            const g = grouped.find((x) => x.rank === n);
-            return g ? { rank: n, rows: g.rows } : null;
-          });
+          const places: CategoryBoardPlace[] = [1, 2, 3]
+            .map((place) => {
+              const g = grouped.find((x) => x.rank === place);
+              if (!g) return null;
+              return {
+                rank: place,
+                rows: g.rows.map((r) => ({
+                  place: r.place,
+                  slug: r.slug,
+                  title: r.title,
+                  coverUrl: r.coverUrl,
+                })),
+              };
+            })
+            .filter((s): s is CategoryBoardPlace => s != null);
           const boot = awardIndex === 0;
           return (
             <div
               key={cat.categoryId}
               data-c-award
-              className="absolute inset-0 flex flex-col justify-center overflow-hidden px-[var(--gutter)] pt-[7.5rem] sm:pt-36"
-              style={{ opacity: boot ? 1 : 0 }}
+              data-place-count={places.length}
+              className="absolute inset-0 box-border flex flex-col overflow-hidden px-[var(--gutter)]"
+              style={{ opacity: boot ? 1 : 0, paddingTop: "6.75rem" }}
             >
               <div
-                data-c-award-title
-                className="mx-auto w-full max-w-[var(--page-max)] will-change-transform"
-                style={{
-                  opacity: boot ? 1 : 0,
-                  transform: boot
-                    ? "translate3d(0, 0, 0)"
-                    : "translate3d(-28vw, 0, 0)",
-                }}
+                data-c-award-body
+                className="flex min-h-0 w-full flex-1 flex-col justify-center"
               >
-                <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
-                  Category award
-                </p>
-                <h3 className="mt-2 font-display text-[clamp(1.75rem,5vw,2.75rem)] leading-[0.92] tracking-wide text-ink">
-                  {cat.label}
-                </h3>
-                {cat.description ? (
-                  <p className="mt-2 max-w-xl font-serif text-sm text-muted">
-                    {cat.description}
-                  </p>
-                ) : null}
-              </div>
-
-              <ul className="mx-auto mt-8 flex w-full max-w-[var(--page-max)] items-end gap-4 sm:mt-10 sm:gap-6 md:gap-8">
-                {board.map((slot, i) => {
-                  if (!slot) {
-                    return (
-                      <li key={`e-${i}`} className="min-w-0 flex-1" aria-hidden />
-                    );
-                  }
-                  const featured = slot.rank === 1;
-                  const tied = slot.rows.length > 1;
-                  return (
-                    <li
-                      key={`${cat.categoryId}-${slot.rank}-${slot.rows[0]!.slug}`}
-                      data-c-slot
-                      data-place={slot.rank}
-                      className={`min-w-0 will-change-transform ${
-                        featured ? "w-[36%] max-w-[240px]" : "w-[30%] max-w-[180px]"
-                      }`}
-                      style={{
-                        opacity: boot ? 1 : 0,
-                        transform: boot
-                          ? "translate3d(0, 0, 0)"
-                          : "translate3d(-30vw, 0, 0)",
-                      }}
-                    >
-                      <p
-                        className={`font-display leading-none text-accent ${
-                          featured
-                            ? "text-4xl sm:text-5xl"
-                            : "text-3xl sm:text-4xl"
-                        }`}
-                      >
-                        #{slot.rank}
+                <div className="w-full shrink-0">
+                  <div
+                    data-c-award-title
+                    className="mx-auto w-full max-w-[var(--page-max)] will-change-transform"
+                    style={{
+                      opacity: boot ? 1 : 0,
+                      transform: boot
+                        ? "translate3d(0, 0, 0)"
+                        : "translate3d(-28vw, 0, 0)",
+                    }}
+                  >
+                    <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
+                      Category award
+                    </p>
+                    <h3 className="mt-2 font-display text-[clamp(2.25rem,8vw,4.5rem)] leading-[0.9] tracking-wide text-ink">
+                      {cat.label}
+                    </h3>
+                    {cat.description ? (
+                      <p className="mt-2 max-w-xl font-serif text-sm text-muted">
+                        {cat.description}
                       </p>
-                      {tied ? (
-                        <p className="mt-1 text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">
-                          Tied
-                        </p>
-                      ) : null}
-                      <ul
-                        className={`mt-2 gap-1.5 ${
-                          tied ? "grid grid-cols-2" : "grid grid-cols-1"
-                        }`}
-                      >
-                        {slot.rows.map((tiedRow) => (
-                          <li key={tiedRow.slug} className="min-w-0">
-                            <Link
-                              href={`/games/${tiedRow.slug}`}
-                              className="group block"
-                              draggable={false}
-                            >
-                              <CeremonyArt
-                                title={tiedRow.title}
-                                coverUrl={tiedRow.coverUrl}
-                              />
-                              <p
-                                className={`mt-2 font-display leading-snug text-ink group-hover:text-accent ${
-                                  featured
-                                    ? "text-lg sm:text-xl"
-                                    : "text-base sm:text-lg"
-                                }`}
-                              >
-                                {tiedRow.title}
-                              </p>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </li>
-                  );
-                })}
-              </ul>
+                    ) : null}
+                  </div>
+
+                  <CategoryRevealBoard places={places} boot={boot} />
+                </div>
+              </div>
             </div>
           );
         })}
@@ -689,10 +1036,12 @@ function CategoriesCountdown({
 
 function CeremonySummary({
   year,
+  communityName,
   topTen,
   categoryPodiums,
 }: {
   year: number;
+  communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
 }) {
@@ -713,21 +1062,32 @@ function CeremonySummary({
     .filter((w): w is NonNullable<typeof w> => w != null);
 
   return (
-    <section className="border-t border-line px-[var(--gutter)] py-12 sm:py-16">
-      <div className="mx-auto w-full max-w-[var(--page-max)]">
-        <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent">
-          {year} Edition · Summary
-        </p>
-        <h2 className="mt-2 font-display text-[clamp(2rem,6vw,3.5rem)] leading-[0.9] tracking-wide text-ink">
-          The board
-        </h2>
+    <section className="border-t border-line">
+      <div
+        className="sticky top-0 z-20 border-b border-line bg-paper/95 px-[var(--gutter)]"
+        style={{ paddingTop: "1.1rem", paddingBottom: "0.85rem" }}
+      >
+        <div className="relative mx-auto w-full max-w-[var(--page-max)]">
+          <div
+            aria-hidden
+            className="absolute -left-[var(--gutter)] top-0 bottom-0 w-1 bg-accent"
+          />
+          <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent sm:text-sm sm:tracking-[0.18em]">
+            {year} {communityName} community
+          </p>
+          <h2 className="mt-1 font-display text-[clamp(2.25rem,8vw,4.5rem)] leading-[0.9] tracking-wide text-ink">
+            {year} Summary
+          </h2>
+        </div>
+      </div>
 
+      <div className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10 sm:py-12">
         {gotyAsc.length > 0 ? (
-          <div className="mt-8 sm:mt-10">
+          <div>
             <h3 className="font-display text-xl tracking-wide text-ink sm:text-2xl">
               Game of the Year · Top 10
             </h3>
-            <ol className="mt-4 grid grid-cols-5 gap-2 sm:gap-3 md:gap-4">
+            <ol className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 md:gap-4">
               {gotyAsc.map((row) => (
                 <li key={row.gameId} className="min-w-0">
                   <Link
@@ -735,7 +1095,7 @@ function CeremonySummary({
                     className="group block"
                     draggable={false}
                   >
-                    <p className="font-display text-sm leading-none text-accent sm:text-base">
+                    <p className="font-display text-lg leading-none text-accent sm:text-xl">
                       #{row.rank}
                     </p>
                     <div className="mt-1">
@@ -745,7 +1105,7 @@ function CeremonySummary({
                         priority={row.rank <= 3}
                       />
                     </div>
-                    <p className="mt-1.5 line-clamp-2 font-display text-[11px] leading-snug text-ink group-hover:text-accent sm:text-xs">
+                    <p className="mt-1.5 line-clamp-2 font-display text-base leading-snug text-ink group-hover:text-accent sm:text-lg">
                       {row.title}
                     </p>
                   </Link>
@@ -756,55 +1116,48 @@ function CeremonySummary({
         ) : null}
 
         {winners.length > 0 ? (
-          <div className="mt-10 sm:mt-12">
+          <div className={gotyAsc.length > 0 ? "mt-10 sm:mt-12" : undefined}>
             <h3 className="font-display text-xl tracking-wide text-ink sm:text-2xl">
               Category winners
             </h3>
-            <ul
-              className={`mt-4 grid gap-3 sm:gap-4 ${
-                winners.length <= 4
-                  ? "grid-cols-2 sm:grid-cols-4"
-                  : winners.length <= 6
-                    ? "grid-cols-3 sm:grid-cols-6"
-                    : "grid-cols-3 sm:grid-cols-4 md:grid-cols-6"
-              }`}
-            >
+            <ul className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 md:gap-4">
               {winners.map((w) => {
                 const first = w.games[0]!;
+                const tied = w.games.length > 1;
                 return (
                   <li key={w.categoryId} className="min-w-0">
-                    <Link
-                      href={`/games/${first.slug}`}
-                      className="group block"
-                      draggable={false}
-                    >
-                      <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.14em] text-muted">
-                        {w.label}
-                      </p>
+                    <p className="truncate text-xs font-extrabold uppercase tracking-[0.14em] text-muted sm:text-sm">
+                      {w.label}
+                    </p>
+                    {tied ? (
                       <div className="mt-1.5">
+                        <CompactTieStack
+                          games={w.games.map((g) => ({
+                            gameId: g.gameId,
+                            slug: g.slug,
+                            title: g.title,
+                            coverUrl: g.coverUrl,
+                          }))}
+                          className="w-full"
+                          titleMaxPx={20}
+                          titleMinPx={15}
+                        />
+                      </div>
+                    ) : (
+                      <Link
+                        href={`/games/${first.slug}`}
+                        className="group mt-1.5 block"
+                        draggable={false}
+                      >
                         <CeremonyArt
                           title={first.title}
                           coverUrl={first.coverUrl}
                         />
-                      </div>
-                      <p className="mt-1.5 line-clamp-2 font-display text-[11px] leading-snug text-ink group-hover:text-accent sm:text-xs">
-                        {first.title}
-                      </p>
-                    </Link>
-                    {w.games.length > 1 ? (
-                      <ul className="mt-1 space-y-0.5">
-                        {w.games.slice(1).map((tied) => (
-                          <li key={tied.gameId}>
-                            <Link
-                              href={`/games/${tied.slug}`}
-                              className="line-clamp-2 font-display text-[11px] leading-snug text-ink hover:text-accent sm:text-xs"
-                            >
-                              {tied.title}
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
+                        <p className="mt-1.5 line-clamp-2 font-display text-base leading-snug text-ink group-hover:text-accent sm:text-lg">
+                          {first.title}
+                        </p>
+                      </Link>
+                    )}
                   </li>
                 );
               })}
@@ -821,18 +1174,60 @@ function CeremonySummary({
 }
 
 /**
- * Reveal — one sticky viewport per chapter (title + stage together) so
- * handoffs stay horizontal and iOS Safari doesn’t break nested sticky.
+ * Compact centered welcome above the GOTY header.
  */
+function RevealOpener({
+  year,
+  communityName,
+}: {
+  year: number;
+  communityName: string;
+}) {
+  return (
+    <section className="relative overflow-hidden px-[var(--gutter)] py-12 sm:py-14">
+      <div
+        className="pointer-events-none absolute inset-x-0 -top-6 bottom-0"
+        aria-hidden
+      >
+        <div className="reveal-opener-dots absolute inset-0 bg-panel/70" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent from-40% to-paper" />
+      </div>
+      <div className="relative mx-auto max-w-xl text-center">
+        <h2 className="font-display text-[clamp(2.15rem,8.5vw,2.85rem)] leading-[0.95] tracking-wide text-ink">
+          Welcome to the {communityName} community {year} Game of the Year
+        </h2>
+        <p className="mt-4 font-serif text-base leading-relaxed text-muted sm:text-lg">
+          A countdown of the top 10, then the category awards.
+        </p>
+        <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.22em] text-muted sm:text-[11px]">
+          Scroll to reveal
+        </p>
+        <svg
+          className="mx-auto mt-3 block text-accent"
+          width="1"
+          height="24"
+          viewBox="0 0 1 24"
+          aria-hidden
+        >
+          <rect width="1" height="24" fill="currentColor" />
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 export function EditionRevealView({
   year,
+  communityName,
   topTen,
   categoryPodiums,
 }: {
   year: number;
+  communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
 }) {
+  const categories = useEditionCategoryPodiums(categoryPodiums);
   const gotyDesc = groupByRank(
     [...topTen]
       .filter((r) => r.rank >= 1 && r.rank <= 10)
@@ -846,24 +1241,32 @@ export function EditionRevealView({
       <div className="reveal-ceremony -mx-[var(--gutter)] w-[calc(100%+2*var(--gutter))]">
         {gotyDesc.length === 0 ? (
           <section className="border-b border-line px-[var(--gutter)] py-16">
-            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent">
-              {year} Edition · Ceremony
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent sm:text-sm sm:tracking-[0.18em]">
+              {year} {communityName} community
             </p>
             <h2 className="mt-1 font-display text-[clamp(2.25rem,8vw,4.5rem)] leading-[0.9] tracking-wide text-ink">
-              Game of the Year
+              {year} Game of the Year
             </h2>
             <p className="mt-8 text-center text-muted">
               No Game of the Year scores for this mode.
             </p>
           </section>
         ) : (
-          <GotyCountdown year={year} places={gotyDesc} />
+          <>
+            <RevealOpener year={year} communityName={communityName} />
+            <GotyCountdown
+              year={year}
+              communityName={communityName}
+              places={gotyDesc}
+            />
+          </>
         )}
 
-        {categoryPodiums.length > 0 ? (
+        {categories.length > 0 ? (
           <CategoriesCountdown
             year={year}
-            awards={categoryPodiums.map((c) => ({
+            communityName={communityName}
+            awards={categories.map((c) => ({
               categoryId: c.categoryId,
               label: c.label,
               description: c.description,
@@ -879,8 +1282,9 @@ export function EditionRevealView({
 
         <CeremonySummary
           year={year}
+          communityName={communityName}
           topTen={topTen}
-          categoryPodiums={categoryPodiums}
+          categoryPodiums={categories}
         />
       </div>
     </ReducedMotionProvider>

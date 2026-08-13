@@ -378,6 +378,7 @@ export default async function CommunityEditionYearPage({
           <EditionResultsView
             slug={community.slug}
             year={edition.year}
+            communityName={community.name}
             mode={mode}
             rankMode={rankMode}
             view={view}

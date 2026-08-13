@@ -102,8 +102,19 @@ type Layer = {
 /**
  * Tied Community / Voices in one strip-card footprint.
  * Two persistent layers crossfade so the visible stack never remounts mid-fade.
+ * Optional `className` / title fit for denser boards (e.g. Reveal summary).
  */
-export function CompactTieStack({ games }: { games: TieGame[] }) {
+export function CompactTieStack({
+  games,
+  className = "w-[103px] lg:w-[206px]",
+  titleMaxPx = 14,
+  titleMinPx = 12,
+}: {
+  games: TieGame[];
+  className?: string;
+  titleMaxPx?: number;
+  titleMinPx?: number;
+}) {
   const count = games.length;
   const [front, setFront] = useState(0);
   const [layerA, setLayerA] = useState<Layer>({ index: 0, opacity: 1 });
@@ -196,7 +207,7 @@ export function CompactTieStack({ games }: { games: TieGame[] }) {
   }
 
   return (
-    <div className="w-[103px] lg:w-[206px]">
+    <div className={className}>
       <button
         type="button"
         onClick={cycle}
@@ -244,7 +255,12 @@ export function CompactTieStack({ games }: { games: TieGame[] }) {
 
       <div className="relative mt-2 min-w-0">
         <div className="invisible" aria-hidden>
-          <FitDisplayTitle className="w-full" maxPx={14} minPx={12} lines={2}>
+          <FitDisplayTitle
+            className="w-full"
+            maxPx={titleMaxPx}
+            minPx={titleMinPx}
+            lines={2}
+          >
             {active.title}
           </FitDisplayTitle>
         </div>
@@ -261,8 +277,8 @@ export function CompactTieStack({ games }: { games: TieGame[] }) {
           >
             <FitDisplayTitle
               className="w-full group-hover/title:text-accent"
-              maxPx={14}
-              minPx={12}
+              maxPx={titleMaxPx}
+              minPx={titleMinPx}
               lines={2}
             >
               {titleA.title}
@@ -283,8 +299,8 @@ export function CompactTieStack({ games }: { games: TieGame[] }) {
             >
               <FitDisplayTitle
                 className="w-full group-hover/title:text-accent"
-                maxPx={14}
-                minPx={12}
+                maxPx={titleMaxPx}
+                minPx={titleMinPx}
                 lines={2}
               >
                 {titleB.title}

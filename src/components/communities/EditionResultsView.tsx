@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
+import {
+  EditionCategoryDebugBar,
+  EditionCategoryDebugProvider,
+} from "@/components/communities/EditionCategoryDebug";
 import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
 import { EditionCategoryResults } from "@/components/communities/EditionCategoryResults";
 import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
@@ -44,6 +48,7 @@ type BallotPayload = {
 export function EditionResultsView({
   slug,
   year,
+  communityName,
   mode,
   rankMode = "competition",
   view,
@@ -61,6 +66,7 @@ export function EditionResultsView({
 }: {
   slug: string;
   year: number;
+  communityName: string;
   mode: EditionResultsPublicMode;
   rankMode?: SharedRankMode;
   view: EditionResultsViewId;
@@ -134,6 +140,7 @@ export function EditionResultsView({
   const showBoardModes = view !== "ballot";
 
   return (
+    <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
     <div className="mt-6 space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-0">
         <div className="flex flex-wrap gap-5" aria-label="Results view">
@@ -222,6 +229,7 @@ export function EditionResultsView({
                 </Link>
               </span>
             ))}
+            <EditionCategoryDebugBar />
           </div>
         ) : null}
       </div>
@@ -383,6 +391,7 @@ export function EditionResultsView({
       ) : view === "reveal" ? (
         <EditionRevealView
           year={year}
+          communityName={communityName}
           topTen={topTen}
           categoryPodiums={categoryPodiums}
         />
@@ -412,5 +421,6 @@ export function EditionResultsView({
         </>
       )}
     </div>
+    </EditionCategoryDebugProvider>
   );
 }
