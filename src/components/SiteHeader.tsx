@@ -5,59 +5,55 @@ import {
 } from "@/lib/auth/session";
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { Button } from "@/components/ui/Button";
-
-/** Local + preview only — never on Vercel production. Opt-in elsewhere via SHOW_DESIGN_SYSTEM=1. */
-function showDesignSystemNav(): boolean {
-  if (process.env.VERCEL_ENV === "production") return false;
-  if (process.env.NODE_ENV === "development") return true;
-  if (process.env.VERCEL_ENV === "preview") return true;
-  return process.env.SHOW_DESIGN_SYSTEM === "1";
-}
+import { SiteMobileNav } from "@/components/SiteMobileNav";
+import {
+  buildPrimarySiteNavLinks,
+  showDesignSystemNav,
+  type SiteNavAccount,
+} from "@/lib/site-nav";
 
 export async function SiteHeader() {
   const user = await getRequestSessionUser();
   const profile = user?.id
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
-  const designSystem = showDesignSystemNav();
+  const links = buildPrimarySiteNavLinks({
+    includeDesignSystem: showDesignSystemNav({
+      vercelEnv: process.env.VERCEL_ENV,
+      nodeEnv: process.env.NODE_ENV,
+      showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
+    }),
+  });
+  const account: SiteNavAccount = user
+    ? {
+        status: "authenticated",
+        profileHref: profile ? `/u/${profile.username}` : "/account",
+        label: profile?.displayName ?? user.name ?? "Account",
+      }
+    : { status: "anonymous" };
 
   return (
     <header className="border-b border-line">
-      <div className="mx-auto flex max-w-[var(--page-max)] items-baseline justify-between gap-6 px-[var(--gutter)] py-5">
+      <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-5">
         <Link
           href="/"
           className="font-display text-3xl tracking-wide text-ink hover:text-accent"
         >
           The Gamies
         </Link>
-        <nav className="flex flex-wrap items-center gap-5 text-sm text-muted">
-          <Link href="/games" className="hover:text-ink">
-            Games
-          </Link>
-          <Link href="/game-of-the-year" className="hover:text-ink">
-            Standings
-          </Link>
-          <Link href="/communities" className="hover:text-ink">
-            Communities
-          </Link>
-          <Link href="/create" className="hover:text-ink">
-            Create
-          </Link>
-          {designSystem ? (
-            <Link href="/design-system" className="hover:text-ink">
-              Design system
+        <nav
+          className="hidden flex-wrap items-center gap-5 text-sm text-muted lg:flex"
+          aria-label="Site"
+        >
+          {links.map((link) => (
+            <Link key={link.href} href={link.href} className="hover:text-ink">
+              {link.label}
             </Link>
-          ) : null}
-          <Link href="/admin" className="hover:text-ink">
-            Admin
-          </Link>
-          {user ? (
+          ))}
+          {account.status === "authenticated" ? (
             <>
-              <Link
-                href={profile ? `/u/${profile.username}` : "/account"}
-                className="hover:text-ink"
-              >
-                {profile?.displayName ?? user.name ?? "Account"}
+              <Link href={account.profileHref} className="hover:text-ink">
+                {account.label}
               </Link>
               <Link href="/account" className="hover:text-ink">
                 Settings
@@ -74,6 +70,7 @@ export async function SiteHeader() {
             </Link>
           )}
         </nav>
+        <SiteMobileNav links={links} account={account} />
       </div>
     </header>
   );
