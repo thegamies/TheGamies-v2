@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
 import {
+  awardCategories,
   communityLiveLockCategoryRows,
   communityLiveLockGoty,
   communityLiveLockMeta,
@@ -14,6 +15,10 @@ import {
   type StandingsGameRow,
   type StandingsPage,
 } from "@/lib/live-aggregate/service";
+import {
+  parseAwardCategoryGroup,
+  type AwardCategoryGroup,
+} from "@/lib/live-aggregate/award-category-defs";
 import { isCommunityLiveScoresRevealed } from "./live-reveal";
 import {
   withDisplayRanks,
@@ -141,7 +146,7 @@ function groupCategoryBlocks(
 async function queryCommunityLiveStandings(
   communityId: string,
   year: number,
-  opts: { page: number; pageSize: number },
+  opts: { page: number; pageSize: number; categoryGroup?: AwardCategoryGroup },
   db: Db,
 ): Promise<{
   listCount: number;
@@ -151,7 +156,7 @@ async function queryCommunityLiveStandings(
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
 }> {
-  const { pageSize, page: requestedPage } = opts;
+  const { pageSize, page: requestedPage, categoryGroup } = opts;
 
   const result = await db.execute(sql`
     with bounds as (
@@ -305,6 +310,11 @@ async function queryCommunityLiveStandings(
               limit 10
             ) r on true
             where ac.active = true
+              ${
+                categoryGroup
+                  ? sql`and ac.category_group = ${categoryGroup}`
+                  : sql``
+              }
           ) cat
         ),
         '[]'::json
@@ -547,6 +557,7 @@ async function queryLockedStandingsPage(
   year: number,
   pageSize: number,
   requestedPage: number,
+  categoryGroup: AwardCategoryGroup,
   db: Db,
 ): Promise<{
   listCount: number;
@@ -575,12 +586,28 @@ async function queryLockedStandingsPage(
     .offset(offset);
 
   const categoryRows = await db
-    .select()
+    .select({
+      categoryId: communityLiveLockCategoryRows.categoryId,
+      label: communityLiveLockCategoryRows.label,
+      description: communityLiveLockCategoryRows.description,
+      sortOrder: communityLiveLockCategoryRows.sortOrder,
+      place: communityLiveLockCategoryRows.place,
+      gameId: communityLiveLockCategoryRows.gameId,
+      slug: communityLiveLockCategoryRows.slug,
+      title: communityLiveLockCategoryRows.title,
+      coverUrl: communityLiveLockCategoryRows.coverUrl,
+      voteCount: communityLiveLockCategoryRows.voteCount,
+    })
     .from(communityLiveLockCategoryRows)
+    .innerJoin(
+      awardCategories,
+      eq(awardCategories.id, communityLiveLockCategoryRows.categoryId),
+    )
     .where(
       and(
         eq(communityLiveLockCategoryRows.communityId, communityId),
         eq(communityLiveLockCategoryRows.year, year),
+        eq(awardCategories.categoryGroup, categoryGroup),
       ),
     )
     .orderBy(
@@ -642,6 +669,7 @@ export async function getCommunityLiveStandings(
     pageSize?: number;
     scoresVisibleFrom?: Date | null;
     locked?: boolean;
+    categoryGroup?: AwardCategoryGroup;
   } = {},
   db: Db = getDb(),
 ): Promise<StandingsPage> {
@@ -650,6 +678,7 @@ export async function getCommunityLiveStandings(
     Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
+  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
   const revealed = isCommunityLiveScoresRevealed(
     opts.scoresVisibleFrom ?? null,
   );
@@ -660,6 +689,7 @@ export async function getCommunityLiveStandings(
       year,
       pageSize,
       requestedPage,
+      categoryGroup,
       db,
     );
     return redactStandingsPage({
@@ -674,13 +704,14 @@ export async function getCommunityLiveStandings(
       totalPages: locked.totalPages,
       goty: locked.goty,
       categories: locked.categories,
+      categoryGroup,
     });
   }
 
   const live = await queryCommunityLiveStandings(
     communityId,
     year,
-    { page: requestedPage, pageSize },
+    { page: requestedPage, pageSize, categoryGroup },
     db,
   );
 
@@ -696,5 +727,6 @@ export async function getCommunityLiveStandings(
     totalPages: live.totalPages,
     goty: live.goty,
     categories: live.categories,
+    categoryGroup,
   });
 }

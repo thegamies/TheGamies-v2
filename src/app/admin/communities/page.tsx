@@ -37,7 +37,7 @@ export default async function AdminCommunitiesPage() {
         Community seed
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
-        Join synthetic members to a community, designate Voices, and write
+        Join synthetic members to a community, designate Hosts, and write
         edition ballots for local or staging QA.
       </p>
       <div className="mt-10">

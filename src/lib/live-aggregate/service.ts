@@ -3,6 +3,11 @@ import { withDisplayRanks, withDisplayRanksOnPage } from "@/lib/standings/shared
 import { liveGotyYearStats, type Db } from "@thegamies/db";
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
+import {
+  DEFAULT_AWARD_CATEGORY_GROUP,
+  parseAwardCategoryGroup,
+  type AwardCategoryGroup,
+} from "./award-category-defs";
 
 /** GOTY standings rows per page on `/game-of-the-year/[year]`. */
 export const STANDINGS_PAGE_SIZE = 50;
@@ -48,6 +53,7 @@ export type StandingsPage = {
   totalPages: number;
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
+  categoryGroup: AwardCategoryGroup;
 };
 
 /** Clamp a requested page number to a valid 1-based index. */
@@ -192,6 +198,7 @@ async function fetchStandingsBundle(
   year: number,
   requestedPage: number,
   pageSize: number,
+  categoryGroup: AwardCategoryGroup,
   db: Db,
 ): Promise<Omit<StandingsPage, "year" | "pageSize" | "scoresFresh"> & {
   contribGeneration: number;
@@ -322,6 +329,7 @@ async function fetchStandingsBundle(
               limit 10
             ) r on true
             where ac.active = true
+              and ac.category_group = ${categoryGroup}
           ) cat
         ),
         '[]'::json
@@ -342,6 +350,7 @@ async function fetchStandingsBundle(
       totalPages: 1,
       goty: [],
       categories: [],
+      categoryGroup,
     };
   }
 
@@ -423,6 +432,7 @@ async function fetchStandingsBundle(
     totalPages: asInt(row.total_pages, 1),
     goty,
     categories: [...byId.values()],
+    categoryGroup,
   };
 }
 
@@ -433,6 +443,7 @@ export async function getStandingsPage(
     forceReveal?: boolean;
     page?: number;
     pageSize?: number;
+    categoryGroup?: AwardCategoryGroup;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<StandingsPage> {
@@ -447,11 +458,13 @@ export async function getStandingsPage(
     Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
+  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
 
   const bundle = await fetchStandingsBundle(
     year,
     requestedPage,
     pageSize,
+    categoryGroup,
     db,
   );
 
@@ -467,6 +480,7 @@ export async function getStandingsPage(
     totalPages: bundle.totalPages,
     goty: bundle.goty,
     categories: bundle.categories,
+    categoryGroup: bundle.categoryGroup,
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });

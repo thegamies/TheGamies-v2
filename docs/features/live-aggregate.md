@@ -35,7 +35,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 **One** Neon HTTP round-trip loads the public board (like old `rankings_page_bundle`):
 
 - year stats + GOTY total + paginated scores (joined to games/covers)
-- all active category tallies (top 10 each via `LATERAL`)
+- all **active** category tallies in the selected **group** (top 10 each via `LATERAL`). Default group is Premier (`?group=`). Do not load every category on one request.
 
 Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisfy the sort.
 
@@ -58,16 +58,18 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## Categories
 
-- Site defs in `award_categories` (seeded).
-- Owned GOTY lists: **one game per category** (`list_category_votes`).
-- **Server validation** matches GOTY list rules: same year, released, not edition/version, not adult; category must be an active site def.
+- Site defs in `award_categories` (seeded from `AWARD_CATEGORY_DEFS`, sort 2–64; GOTY itself is the main board).
+- Groups (Premier, Major, Genre, …) for browsing standings and the ballot picker.
+- **Eligibility** per category: current year, current/active, active in year, upcoming, any year. Current/active and active-in-year currently treat prior-year *released* titles as eligible (no live-ops catalog flag yet). **Upcoming** is later years only — not the list year, even if still unreleased. Remake/DLC categories allow edition/version titles.
+- Owned GOTY lists and edition ballots: **one game per category**. Voters **add categories from a grouped list** instead of seeing every slot at once. Order follows `sort_order`.
+- **Server validation** uses `categoryEligibilityError` for picks (GOTY ranking still uses GOTY rules).
 - Plurality tallies in `live_category_scores`.
 - Contrib sync only counts eligible picks (stale ineligible votes are ignored for scoring until cleared).
 
 ## URLs
 
 - `/game-of-the-year` → current year
-- `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`)
+- `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`); category boards by group (`?group=genre`)
 - `/admin` — ops index (sync, rankings, seed)
 - `/admin/rankings`
 

@@ -1,3 +1,4 @@
+import { ballotRankGridClass } from "@/components/communities/BallotRankGrid";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
 
 export type RankedStandingItem = {
@@ -16,9 +17,8 @@ function categoryColClass(place: number): string {
 }
 
 /**
- * Ranked Highlights layout. Place sits in front of the title with a larger
- * display marker. Category Top 3: tiered widths (#1 ≈ GOTY, #2/#3 smaller),
- * shared cover baseline. GOTY Top 10: even wrapping grid.
+ * Ranked GOTY layout. Place sits in front of the title with a larger
+ * display marker. GOTY Top 10: even wrapping grid.
  */
 export function RankedStandingBillboard({
   items,
@@ -58,9 +58,7 @@ export function RankedStandingBillboard({
   }
 
   return (
-    <ul
-      className={`${className} grid grid-cols-2 gap-x-3 gap-y-8 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 lg:grid-cols-5`}
-    >
+    <ul className={`${className} ${ballotRankGridClass}`}>
       {items.map((row) => (
         <li key={row.gameId} className="min-w-0">
           <StandingGameCard

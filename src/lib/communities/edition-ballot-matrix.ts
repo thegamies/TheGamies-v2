@@ -2,12 +2,6 @@
 
 export const BALLOT_MATRIX_TOP = 10;
 
-/**
- * Fetch enough sequential standings rows so competition-ranked slots 1…TOP
- * still fill when early places are multi-way ties.
- */
-export const BALLOT_MATRIX_STANDINGS_FETCH = BALLOT_MATRIX_TOP * 3;
-
 export type MatrixVoiceColumn = {
   profileId: string;
   displayName: string;

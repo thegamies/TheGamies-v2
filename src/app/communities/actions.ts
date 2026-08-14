@@ -11,14 +11,19 @@ import {
   joinCommunity,
   leaveCommunity,
   setCommunityLiveScoresVisibleFrom,
+  setCommunityMemberRole,
   setLiveRankingsEnabled,
   setLiveRankingsLocked,
 } from "@/lib/communities/service";
+import { COMMUNITY_ROLES } from "@/lib/communities/schema";
 import {
   createCommunityEdition,
+  deleteCommunityEdition,
+  setCommunityEditionRankMode,
   setCommunityEditionSchedule,
   setCommunityEditionTimestampNow,
 } from "@/lib/communities/editions";
+import { communitySettingsHref } from "@/lib/communities/community-settings-href";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
 import { setEditionVoice } from "@/lib/communities/voices";
@@ -44,6 +49,7 @@ function revalidateCommunity(slug: string, username?: string) {
   revalidatePath(`/communities/${slug}/live`);
   revalidatePath(`/communities/${slug}/live`, "layout");
   revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}/members`);
   revalidatePath(`/communities/${slug}/edition`);
   revalidatePath(`/communities/${slug}/edition`, "layout");
   revalidatePath(`/communities/${slug}/ballot`);
@@ -111,7 +117,6 @@ export async function createCommunityAction(
   if (!gate.ok) return { error: gate.error };
 
   const result = await createCommunity(gate.profile.id, {
-    slug: String(formData.get("slug") ?? ""),
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
   });
@@ -149,6 +154,36 @@ export async function leaveCommunityAction(
   if (!gate.ok) return { error: gate.error };
 
   const result = await leaveCommunity(slug, gate.profile.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  if (String(formData.get("from") ?? "") === "settings") {
+    redirect(`/communities/${slug}`);
+  }
+  return null;
+}
+
+export async function setCommunityMemberRoleAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  const roleRaw = String(formData.get("role") ?? "").trim();
+  const nextRole = COMMUNITY_ROLES.find((role) => role === roleRaw);
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+  if (!nextRole) return { error: "Choose a valid role." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setCommunityMemberRole(
+    slug,
+    gate.profile.id,
+    profileId,
+    nextRole,
+  );
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(slug, gate.profile.username);
@@ -239,15 +274,42 @@ export async function createCommunityEditionAction(
   const gate = await requireProfile();
   if (!gate.ok) return { error: gate.error };
 
-  const result = await createCommunityEdition(
-    slug,
-    gate.profile.id,
-    formData.get("year"),
-  );
+  const result = await createCommunityEdition(slug, gate.profile.id, {
+    year: formData.get("year"),
+    opensAt: String(formData.get("opensAt") ?? ""),
+    closesAt: String(formData.get("closesAt") ?? ""),
+    publishesAt: String(formData.get("publishesAt") ?? ""),
+  });
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(slug, gate.profile.username);
-  return null;
+  redirect(
+    communitySettingsHref(slug, { tab: "events", year: result.year }),
+  );
+}
+
+export async function deleteCommunityEditionAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const year = formData.get("year");
+  const result = await deleteCommunityEdition(slug, gate.profile.id, {
+    year,
+    confirmYear: formData.get("confirmYear"),
+  });
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  if (Number.isFinite(Number(year))) {
+    revalidatePath(`/communities/${slug}/edition/${Math.floor(Number(year))}`);
+  }
+  redirect(communitySettingsHref(slug, { tab: "events" }));
 }
 
 export async function setCommunityEditionScheduleAction(
@@ -297,6 +359,30 @@ export async function setCommunityEditionTimestampNowAction(
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function setCommunityEditionRankModeAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setCommunityEditionRankMode(slug, gate.profile.id, {
+    year: formData.get("year"),
+    rankMode: String(formData.get("rankMode") ?? ""),
+  });
+  if ("error" in result) return { error: result.error };
+
+  const year = Number(formData.get("year"));
+  revalidateCommunity(slug, gate.profile.username);
+  if (Number.isFinite(year)) {
+    revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
+  }
   return null;
 }
 

@@ -8,9 +8,16 @@ type Props = {
   slug: string;
   isMember: boolean;
   canLeave: boolean;
+  /** Hosts leave from Settings, not Overview. */
+  isHost?: boolean;
 };
 
-export function MembershipActions({ slug, isMember, canLeave }: Props) {
+export function MembershipActions({
+  slug,
+  isMember,
+  canLeave,
+  isHost = false,
+}: Props) {
   const [joinState, joinFormAction, joinPending] = useActionState(
     joinCommunityAction,
     null,
@@ -21,11 +28,16 @@ export function MembershipActions({ slug, isMember, canLeave }: Props) {
   );
 
   const error = joinState?.error ?? leaveState?.error ?? null;
+  const showLeave = isMember && canLeave && !isHost;
+
+  if (isMember && !showLeave && !error) {
+    return null;
+  }
 
   return (
     <div className="mt-6 space-y-3">
       {isMember ? (
-        canLeave ? (
+        showLeave ? (
           <form action={leaveFormAction}>
             <input type="hidden" name="slug" value={slug} />
             <Button
@@ -36,11 +48,7 @@ export function MembershipActions({ slug, isMember, canLeave }: Props) {
               {leavePending ? "Leaving…" : "Leave community"}
             </Button>
           </form>
-        ) : (
-          <p className="text-sm text-muted">
-            You host this community. The last host cannot leave.
-          </p>
-        )
+        ) : null
       ) : (
         <form action={joinFormAction}>
           <input type="hidden" name="slug" value={slug} />

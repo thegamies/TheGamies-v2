@@ -321,6 +321,11 @@ export const communityEditions = pgTable(
     opensAt: timestamp("opens_at", { mode: "date" }),
     closesAt: timestamp("closes_at", { mode: "date" }),
     publishesAt: timestamp("publishes_at", { mode: "date" }),
+    /** Displayed tie numbering. Not a viewer chooser. */
+    rankMode: text("rank_mode")
+      .notNull()
+      .default("competition")
+      .$type<"competition" | "dense">(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
@@ -440,6 +445,9 @@ export const awardCategories = pgTable("award_categories", {
   description: text("description"),
   sortOrder: integer("sort_order").notNull().default(0),
   active: boolean("active").notNull().default(true),
+  categoryGroup: text("category_group").notNull().default("premier"),
+  eligibility: text("eligibility").notNull().default("current_year"),
+  allowEditions: boolean("allow_editions").notNull().default(false),
 });
 
 /** One game pick per category on an owned GOTY list. */

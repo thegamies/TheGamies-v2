@@ -1,55 +1,78 @@
+import Link from "next/link";
 import { CreateEditionForm } from "./CreateEditionForm";
-import { EditionScheduleForm } from "./EditionScheduleForm";
-import {
-  EditionVoicesForm,
-  type EditionVoiceMemberOption,
-} from "./EditionVoicesForm";
+import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
+import { EditionYearSettings } from "@/components/communities/EditionYearSettings";
+import type { EditionHostPreviewSubmitter } from "./EditionHostPreview";
+import type { EditionVoiceMemberOption } from "./EditionVoicesForm";
+import { editionHostSettingsHref } from "@/lib/communities/edition-results-href";
 import type { CommunityEditionPublic } from "@/lib/communities/editions";
 
 export function EditionSettings({
   slug,
   editions,
-  voicesByEditionId,
+  selectedYear,
+  voices,
+  submitters,
 }: {
   slug: string;
   editions: CommunityEditionPublic[];
-  voicesByEditionId: Record<string, EditionVoiceMemberOption[]>;
+  selectedYear: number | null;
+  voices: EditionVoiceMemberOption[];
+  submitters: EditionHostPreviewSubmitter[];
 }) {
   const currentYear = new Date().getUTCFullYear();
+  const years = editions.map((edition) => edition.year);
+  const selected =
+    selectedYear == null
+      ? null
+      : (editions.find((edition) => edition.year === selectedYear) ?? null);
 
   return (
-    <section className="mt-14 border-t border-line pt-8">
-      <h2 className="font-display text-3xl tracking-wide text-ink">Edition</h2>
-      <p className="mt-2 max-w-xl text-sm text-muted">
-        Year awards ceremony schedule, Voices, and publish timing. The Edition
-        tab follows these times.
+    <div>
+      <p className="mt-6 max-w-xl text-sm text-muted">
+        Yearly awards vote. Create an event with its year and schedule, then
+        manage Hosts and ballots for that year.
       </p>
 
-      <CreateEditionForm slug={slug} defaultYear={currentYear} />
+      <CreateEditionForm
+        slug={slug}
+        defaultYear={currentYear}
+        existingYears={years}
+      />
 
-      {editions.length === 0 ? (
-        <p className="mt-6 text-sm text-muted">No editions yet.</p>
-      ) : (
-        editions.map((edition) => (
-          <div key={edition.id} className="mt-10">
-            <EditionScheduleForm
+      {selected ? (
+        <>
+          <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
+            <EditionYearSelect
               slug={slug}
-              year={edition.year}
-              status={edition.status}
-              opensAt={edition.opensAt?.toISOString() ?? null}
-              closesAt={edition.closesAt?.toISOString() ?? null}
-              publishesAt={edition.publishesAt?.toISOString() ?? null}
+              year={selected.year}
+              years={years}
+              alwaysShow
+              links="settings"
             />
-            <EditionVoicesForm
-              slug={slug}
-              year={edition.year}
-              status={edition.status}
-              members={voicesByEditionId[edition.id] ?? []}
-              locked={edition.status === "published"}
-            />
+            <Link
+              href={editionHostSettingsHref(slug, selected.year)}
+              className="inline-flex h-9 items-center justify-center rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold tracking-wide text-ink transition-[color,border-color] duration-[var(--motion-fast)] hover:border-accent"
+            >
+              Open event
+            </Link>
           </div>
-        ))
+          <EditionYearSettings
+            slug={slug}
+            year={selected.year}
+            status={selected.status}
+            opensAt={selected.opensAt?.toISOString() ?? null}
+            closesAt={selected.closesAt?.toISOString() ?? null}
+            publishesAt={selected.publishesAt?.toISOString() ?? null}
+            rankMode={selected.rankMode}
+            submitters={submitters}
+            voiceMembers={voices}
+            showHeading={false}
+          />
+        </>
+      ) : (
+        <p className="mt-6 text-sm text-muted">No events yet.</p>
       )}
-    </section>
+    </div>
   );
 }

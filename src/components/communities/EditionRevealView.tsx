@@ -1336,7 +1336,7 @@ function CeremonySummary({
         ) : null}
 
         <p className="mt-12 font-serif text-sm text-muted">
-          Continue in Highlights for the full board.
+          Continue in Results for the full board.
         </p>
       </div>
     </section>

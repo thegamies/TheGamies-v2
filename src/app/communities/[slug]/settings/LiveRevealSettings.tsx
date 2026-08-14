@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { fieldInputClass } from "@/components/ui/controls";
+import { DatePicker } from "@/components/ui/DatePicker";
 import { setCommunityLiveScoresVisibleFromAction } from "../../actions";
 import {
   formatScoresVisibleDateInput,
@@ -35,7 +35,7 @@ export function LiveRevealSettings({
     setCommunityLiveScoresVisibleFromAction,
     null,
   );
-  const dateValue = formatScoresVisibleDateInput(from);
+  const [dateValue, setDateValue] = useState(formatScoresVisibleDateInput(from));
 
   return (
     <div className="mt-10 max-w-xl">
@@ -48,15 +48,22 @@ export function LiveRevealSettings({
 
       <form action={formAction} className="mt-4 space-y-3">
         <input type="hidden" name="slug" value={slug} />
-        <label className="block text-sm text-muted">
-          Show scores from
-          <input
-            type="date"
+        <div>
+          <label
+            htmlFor="live-scores-visible-from"
+            className="block text-sm text-muted"
+          >
+            Show scores from
+          </label>
+          <DatePicker
+            id="live-scores-visible-from"
             name="date"
-            defaultValue={dateValue}
-            className={`${fieldInputClass} mt-1`}
+            value={dateValue}
+            disabled={pending}
+            className="mt-1"
+            onChange={setDateValue}
           />
-        </label>
+        </div>
         <div className="flex flex-wrap gap-2">
           <Button
             type="submit"

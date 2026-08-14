@@ -1,12 +1,21 @@
 import Link from "next/link";
+import {
+  CategoryVotesEditorFixture,
+  GameSearchFieldFixture,
+} from "@/app/design-system/BallotFixtures";
+import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
+import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { Button } from "@/components/ui/Button";
+import { Radio, RadioOption } from "@/components/ui/Radio";
+import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { GameCover } from "@/components/ui/GameCover";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { navItemClass } from "@/components/ui/navLevels";
+import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { SectionRule } from "@/components/ui/SectionRule";
 import {
@@ -32,6 +41,7 @@ const swatches = [
   { name: "muted", className: "bg-muted", value: "#aaa69e" },
   { name: "line", className: "bg-line", value: "#2b2a28" },
   { name: "accent", className: "bg-accent", value: "#ff5a1f" },
+  { name: "danger", className: "bg-danger", value: "#c7372a" },
 ] as const;
 
 function Section({
@@ -51,7 +61,7 @@ function Section({
 
 const RESULTS_VIEWS = [
   "Reveal",
-  "Highlights",
+  "Results",
   "Full standings",
   "Categories",
   "Voters",
@@ -91,8 +101,15 @@ function MastheadResultsFixture() {
           <span className="text-muted" aria-hidden>
             ·
           </span>
-          <span className={navItemClass("tertiary", false)}>Voices</span>
+          <span className={navItemClass("tertiary", false)}>Hosts</span>
         </div>
+      </div>
+      <div className="mt-6 flex flex-wrap items-center gap-x-2">
+        <span className={navItemClass("tertiary", true)}>Ranked</span>
+        <span className="text-muted" aria-hidden>
+          ·
+        </span>
+        <span className={navItemClass("tertiary", false)}>Comparison</span>
       </div>
       <p className="mt-6 text-sm text-muted">Standings content starts here…</p>
     </div>
@@ -157,16 +174,69 @@ export default function DesignSystemPage() {
           <Button variant="accent">Accent</Button>
           <Button variant="bordered">Bordered</Button>
           <Button variant="quiet">Quiet</Button>
+          <Button variant="danger">Danger</Button>
+          <Button variant="danger-bordered">Danger bordered</Button>
           <Button variant="accent" disabled>
             Disabled
           </Button>
         </div>
+        <p className="mt-8 mb-4 max-w-2xl text-sm text-muted">
+          Radios: empty `--line` ring, `--accent` fill when selected. Native
+          input for forms. Helper: <code className="text-ink">Radio</code> /{" "}
+          <code className="text-ink">RadioOption</code>.
+        </p>
+        <fieldset className="max-w-xl space-y-3">
+          <legend className="mb-3 text-sm font-medium tracking-wide text-muted">
+            Tie numbering
+          </legend>
+          <RadioOption
+            name="design-system-rank"
+            value="competition"
+            defaultChecked
+            hint="Tied games share a place. The next place skips (1 · 1 · 3)."
+          >
+            Competition
+          </RadioOption>
+          <RadioOption
+            name="design-system-rank"
+            value="dense"
+            hint="Tied games share a place. The next place is the next number (1 · 1 · 2)."
+          >
+            Dense
+          </RadioOption>
+          <div className="flex flex-wrap items-center gap-6 pt-2">
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <Radio name="design-system-rank-plain" value="on" defaultChecked />
+              Selected
+            </label>
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <Radio name="design-system-rank-plain" value="off" />
+              Unselected
+            </label>
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <Radio name="design-system-rank-disabled" value="x" disabled />
+              Disabled
+            </label>
+          </div>
+        </fieldset>
+        <p className="mt-10 mb-4 max-w-2xl text-sm text-muted">
+          Year, date, time, and combined date-time pickers: no typing. Click
+          the field to open a year grid, month grid, or scrolling time.
+          Helpers: <code className="text-ink">YearPicker</code>,{" "}
+          <code className="text-ink">DatePicker</code>,{" "}
+          <code className="text-ink">TimePicker</code>,{" "}
+          <code className="text-ink">DateTimePicker</code>.{" "}
+          <code className="text-ink">Dialog</code> for create;{" "}
+          <code className="text-ink">tone="danger"</code> for delete.
+        </p>
+        <DatePickerFixture />
       </Section>
 
       <Section title="Navigation">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           Primary chips for community masthead. Secondary underlines only under
-          a local heading (Results). Tertiary for board filters. Helper:{" "}
+          a local heading (Results, Community Settings). Tertiary for board
+          filters. Helper:{" "}
           <code className="text-ink">navItemClass()</code>.
         </p>
         <div className="space-y-8">
@@ -175,9 +245,12 @@ export default function DesignSystemPage() {
               Primary · bordered chips
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className={navItemClass("primary", true)}>Edition</span>
+              <span className={navItemClass("primary", true)}>Events</span>
               <span className={navItemClass("primary", false)}>Overview</span>
-              <span className={navItemClass("primary", false)}>Live</span>
+              <span className={navItemClass("primary", false)}>
+                Live Rankings
+              </span>
+              <span className={navItemClass("primary", false)}>Members</span>
               <span className={navItemClass("primary", false)}>Settings</span>
             </div>
           </div>
@@ -187,13 +260,19 @@ export default function DesignSystemPage() {
             </p>
             <div className="mt-3 flex flex-wrap gap-5 border-b border-line">
               <span className={navItemClass("secondary", true)}>Reveal</span>
-              <span className={navItemClass("secondary", false)}>Highlights</span>
+              <span className={navItemClass("secondary", false)}>Results</span>
               <span className={navItemClass("secondary", false)}>
                 Full standings
               </span>
               <span className={navItemClass("secondary", false)}>Categories</span>
               <span className={navItemClass("secondary", false)}>Voters</span>
               <span className={navItemClass("secondary", false)}>Your ballot</span>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-5 border-b border-line">
+              <span className={navItemClass("secondary", true)}>
+                Live Rankings
+              </span>
+              <span className={navItemClass("secondary", false)}>Events</span>
             </div>
           </div>
           <div>
@@ -205,7 +284,7 @@ export default function DesignSystemPage() {
               <span className="text-muted" aria-hidden>
                 ·
               </span>
-              <span className={navItemClass("tertiary", false)}>Voices</span>
+              <span className={navItemClass("tertiary", false)}>Hosts</span>
             </div>
           </div>
           <div>
@@ -213,12 +292,12 @@ export default function DesignSystemPage() {
               Year select
             </p>
             <p className="mt-2 max-w-xl text-sm text-muted">
-              Pop-open beside Results / Game of the Year when 2+ public years
-              exist — not a second underline strip.
+              Pop-open beside the awards title when 2+ public years exist —
+              not a second underline strip.
             </p>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
               <h3 className="font-display text-3xl tracking-wide text-ink">
-                Results
+                2026 Video Game Awards
               </h3>
               <EditionYearSelect
                 slug="example"
@@ -255,9 +334,9 @@ export default function DesignSystemPage() {
 
       <Section title="Edition section header">
         <p className="mb-6 max-w-2xl text-sm text-muted">
-          One title, year, and serif deck — no status jargon line. Year alone
-          when there is only one public year; pop-open select when there are
-          two or more.
+          Same awards title as overview (2026 Video Game Awards). Serif deck
+          for schedule. Year select only when there are two or more public
+          years — no duplicate year beside a single-year title.
         </p>
         <div className="space-y-8">
           {EDITION_COPY_STATES.map((status) => (
@@ -267,6 +346,9 @@ export default function DesignSystemPage() {
                 slug="example"
                 year={2026}
                 years={status === "published" ? [2026, 2025] : [2026]}
+                opensAt={new Date("2026-11-01T18:00:00.000Z")}
+                closesAt={new Date("2026-12-15T18:00:00.000Z")}
+                publishesAt={new Date("2026-12-20T18:00:00.000Z")}
               />
             </div>
           ))}
@@ -378,6 +460,77 @@ export default function DesignSystemPage() {
             ))}
           </ul>
         </HorizontalScroll>
+      </Section>
+
+      <Section title="Ballot">
+        <p className="mb-4 max-w-2xl text-sm text-muted">
+          Voting uses chapter headers, overlay search, a GOTY cover grid, and
+          category pick cards. After an edit,{" "}
+          <code className="text-ink">PinnedSaveBar</code> sticks Save to the
+          bottom. Leaving with unsaved edits uses{" "}
+          <code className="text-ink">useUnsavedChangesGuard</code>. Helpers:{" "}
+          <code className="text-ink">BallotChapterHeader</code>,{" "}
+          <code className="text-ink">GameSearchField</code>,{" "}
+          <code className="text-ink">CategoryPickCard</code>,{" "}
+          <code className="text-ink">PinnedSaveBar</code>.
+        </p>
+        <div className="space-y-10">
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Chapter header
+            </p>
+            <BallotChapterHeader
+              eyebrow="Top 10"
+              title="Game of the Year"
+              description="Rank up to 10 games from 2026. Drag to reorder."
+            />
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Overlay search
+            </p>
+            <p className="mb-3 max-w-xl text-sm text-muted">
+              Type two or more letters. The menu sits on top of whatever
+              follows.
+            </p>
+            <GameSearchFieldFixture />
+            <p className="mt-6 text-sm text-muted">
+              Content under the field stays put — this line does not jump.
+            </p>
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Category pick
+            </p>
+            <CategoryPickCard
+              label="Best Narrative"
+              description="Story, writing, and world."
+              title="Super Battle Golf"
+              coverUrl={FIXTURE_COVER}
+            />
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Award picks editor
+            </p>
+            <CategoryVotesEditorFixture />
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Pinned save
+            </p>
+            <p className="mb-3 max-w-xl text-sm text-muted">
+              Appears after an edit. Panel band + hairline — not a floating
+              card.
+            </p>
+            <div className="relative h-36 overflow-hidden border border-line">
+              <p className="p-4 text-sm text-muted">Ballot content…</p>
+              <PinnedSaveBar className="absolute inset-x-0 bottom-0">
+                <Button type="button">Save ballot</Button>
+              </PinnedSaveBar>
+            </div>
+          </div>
+        </div>
       </Section>
 
       <Section title="Skeletons">

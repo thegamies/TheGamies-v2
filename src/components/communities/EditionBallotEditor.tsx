@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useRef, useState, useTransition } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
@@ -15,27 +15,31 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
+  rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   saveEditionBallotAction,
   type SaveEditionBallotState,
 } from "@/app/communities/actions";
-import {
-  searchGamesForList,
-  type GameSearchHit,
-} from "@/app/create/search-actions";
+import { type GameSearchHit } from "@/app/create/search-actions";
 import {
   CategoryVotesEditor,
   type AwardCategoryOption,
   type CategoryVoteSelection,
 } from "@/components/lists/CategoryVotesEditor";
+import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { Button } from "@/components/ui/Button";
-import { fieldInputClass } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
-import { RankMarker } from "@/components/ui/RankMarker";
-import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import { GameSearchField } from "@/components/ui/GameSearchField";
+import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
+import { BallotRankGrid } from "@/components/communities/BallotRankGrid";
+import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+import {
+  capEditionBallotItems,
+  editionBallotDraftKey,
+  EDITION_BALLOT_MAX_ITEMS,
+} from "@/lib/communities/ballot-schema";
 
 export type EditionBallotEditorItem = {
   gameId: string;
@@ -54,10 +58,25 @@ type Props = {
   initialItems: EditionBallotEditorItem[];
   initialCategoryVotes: CategoryVoteSelection[];
   awardCategories: AwardCategoryOption[];
+  /** Top 10 from the viewer's site GOTY list for this year, if one exists. */
+  siteGotyItems?: EditionBallotEditorItem[] | null;
 };
 
 function withRanks(items: EditionBallotEditorItem[]): EditionBallotEditorItem[] {
   return items.map((item, i) => ({ ...item, rank: i + 1 }));
+}
+
+function draftKey(
+  items: EditionBallotEditorItem[],
+  votes: CategoryVoteSelection[],
+): string {
+  return editionBallotDraftKey({
+    items,
+    categoryVotes: votes.map((vote) => ({
+      categoryId: vote.categoryId,
+      gameId: vote.gameId,
+    })),
+  });
 }
 
 export function EditionBallotEditor({
@@ -66,18 +85,45 @@ export function EditionBallotEditor({
   initialItems,
   initialCategoryVotes,
   awardCategories,
+  siteGotyItems = null,
 }: Props) {
-  const searchId = useId();
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [items, setItems] = useState(withRanks(initialItems));
+  const dndId = useId();
+  const [items, setItems] = useState(() =>
+    withRanks(capEditionBallotItems(initialItems)),
+  );
   const [categoryVotes, setCategoryVotes] = useState(initialCategoryVotes);
-  const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<GameSearchHit[]>([]);
-  const [searchPending, startSearch] = useTransition();
+  const [confirmImport, setConfirmImport] = useState(false);
+  const [savedKey, setSavedKey] = useState(() =>
+    draftKey(
+      withRanks(capEditionBallotItems(initialItems)),
+      initialCategoryVotes,
+    ),
+  );
+  const submittedKeyRef = useRef<string | null>(null);
   const [state, formAction, pending] = useActionState(
     saveEditionBallotAction,
     null as SaveEditionBallotState,
   );
+
+  const currentKey = draftKey(items, categoryVotes);
+  const dirty = currentKey !== savedKey;
+  const { dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
+    message: "Leave without saving? Your latest edits won’t be kept on this ballot.",
+  });
+
+  useEffect(() => {
+    if (!state) return;
+    /* eslint-disable react-hooks/set-state-in-effect -- sync saved snapshot after the action returns */
+    if (state.saved && submittedKeyRef.current) {
+      setSavedKey(submittedKeyRef.current);
+    }
+    submittedKeyRef.current = null;
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [state]);
+
+  const isFull = items.length >= EDITION_BALLOT_MAX_ITEMS;
+  const canImport = Boolean(siteGotyItems && siteGotyItems.length > 0);
+  const addedIds = new Set(items.map((item) => item.gameId));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -86,27 +132,10 @@ export function EditionBallotEditor({
     }),
   );
 
-  function setSearchQuery(next: string) {
-    setQuery(next);
-    if (next.trim().length < 2) {
-      setHits([]);
-      return;
-    }
-    const q = next.trim();
-    startSearch(async () => {
-      const results = await searchGamesForList({
-        q,
-        year,
-        gotyMode: true,
-      });
-      setHits(results);
-    });
-  }
-
   function addGame(hit: GameSearchHit) {
     if (items.some((i) => i.gameId === hit.id)) return;
     if (hit.year != null && hit.year !== year) return;
-    if (items.length >= LIST_MAX_ITEMS) return;
+    if (items.length >= EDITION_BALLOT_MAX_ITEMS) return;
     setItems((prev) =>
       withRanks([
         ...prev,
@@ -122,18 +151,25 @@ export function EditionBallotEditor({
         },
       ]),
     );
-    setQuery("");
-    setHits([]);
   }
 
   function removeGame(gameId: string) {
     setItems((prev) => withRanks(prev.filter((item) => item.gameId !== gameId)));
   }
 
-  function setBlurb(gameId: string, blurb: string) {
-    setItems((prev) =>
-      prev.map((item) => (item.gameId === gameId ? { ...item, blurb } : item)),
-    );
+  function applyImport() {
+    if (!siteGotyItems || siteGotyItems.length === 0) return;
+    setItems(withRanks(capEditionBallotItems(siteGotyItems)));
+    setConfirmImport(false);
+  }
+
+  function onImportClick() {
+    if (!canImport) return;
+    if (items.length > 0) {
+      setConfirmImport(true);
+      return;
+    }
+    applyImport();
   }
 
   function onDragEnd(event: DragEndEvent) {
@@ -148,77 +184,66 @@ export function EditionBallotEditor({
   }
 
   return (
-    <div className="mt-8 space-y-10">
+    <div className={`mt-8 space-y-10 ${dirty ? "pb-24" : ""}`}>
       <section>
-        <label htmlFor={searchId} className="sr-only">
-          Search games
-        </label>
-        <input
-          ref={searchRef}
-          id={searchId}
-          className={fieldInputClass}
-          value={query}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={`Search ${year} games`}
+        <BallotChapterHeader
+          eyebrow="Top 10"
+          title="Game of the Year"
+          description={`Rank up to ${EDITION_BALLOT_MAX_ITEMS} games from ${year}. Drag to reorder.`}
+          actions={
+            canImport ? (
+              <Button
+                type="button"
+                variant="bordered"
+                size="sm"
+                onClick={onImportClick}
+              >
+                Import your Game of the Year list
+              </Button>
+            ) : null
+          }
         />
-        {searchPending ? (
-          <p className="mt-2 text-xs text-muted">Searching…</p>
-        ) : null}
-        {hits.length > 0 ? (
-          <ul className="mt-2 max-h-56 overflow-auto border border-line">
-            {hits.map((hit) => (
-              <li key={hit.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-panel"
-                  onClick={() => addGame(hit)}
-                >
-                  <div className="w-8 shrink-0">
-                    <GameCover title={hit.title} imageUrl={hit.coverUrl} />
-                  </div>
-                  <span>{hit.title}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+        <div className="mt-6">
+          <GameSearchField
+            year={year}
+            onSelect={addGame}
+            aria-label={`Search ${year} games`}
+            isFull={isFull}
+            fullMessage={`Your ranking is full (${EDITION_BALLOT_MAX_ITEMS} of ${EDITION_BALLOT_MAX_ITEMS}).`}
+            excludeIds={addedIds}
+          />
+        </div>
 
-      <section>
         {items.length === 0 ? (
-          <button
-            type="button"
-            onClick={() => searchRef.current?.focus()}
-            className="w-full border border-dashed border-line px-4 py-10 text-left text-muted transition-colors hover:border-accent hover:text-ink"
-          >
-            Search and add games to build your Game of the Year ranking.
-          </button>
+          <p className="mt-6 text-sm text-muted">
+            Search to add games to your top 10.
+          </p>
         ) : (
           <DndContext
+            id={dndId}
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={onDragEnd}
           >
             <SortableContext
               items={items.map((item) => item.gameId)}
-              strategy={verticalListSortingStrategy}
+              strategy={rectSortingStrategy}
             >
-              <ol className="space-y-3">
+              <BallotRankGrid>
                 {items.map((item, index) => (
-                  <BallotRankCard
+                  <BallotGridCard
                     key={item.gameId}
                     item={item}
                     rank={index + 1}
-                    onBlurbChange={setBlurb}
                     onRemove={removeGame}
                   />
                 ))}
-              </ol>
+              </BallotRankGrid>
             </SortableContext>
           </DndContext>
         )}
         <p className="mt-4 text-xs text-muted">
-          {items.length} of {LIST_MAX_ITEMS} slots · drag to reorder
+          {items.length} of {EDITION_BALLOT_MAX_ITEMS} · drag to reorder
         </p>
       </section>
 
@@ -229,68 +254,84 @@ export function EditionBallotEditor({
           value={categoryVotes}
           onChange={setCategoryVotes}
           year={year}
-          description="Choose one game per category for this edition."
+          description="Choose one game per category for this event."
         />
       ) : null}
 
-      <form action={formAction} className="border-t border-line pt-6">
-        <input type="hidden" name="slug" value={slug} />
-        <input type="hidden" name="year" value={String(year)} />
-        <input
-          type="hidden"
-          name="itemsJson"
-          value={JSON.stringify(
-            items.map((item) => ({
-              gameId: item.gameId,
-              rank: item.rank,
-              blurb: item.blurb.trim() ? item.blurb : null,
-            })),
-          )}
+      {dirty ? (
+        <form
+          action={formAction}
+          onSubmit={() => {
+            submittedKeyRef.current = currentKey;
+          }}
+        >
+          <input type="hidden" name="slug" value={slug} />
+          <input type="hidden" name="year" value={String(year)} />
+          <input
+            type="hidden"
+            name="itemsJson"
+            value={JSON.stringify(
+              items.map((item) => ({
+                gameId: item.gameId,
+                rank: item.rank,
+                blurb: item.blurb.trim() ? item.blurb : null,
+              })),
+            )}
+          />
+          <input
+            type="hidden"
+            name="categoryVotesJson"
+            value={JSON.stringify(
+              categoryVotes.map((v) => ({
+                categoryId: v.categoryId,
+                gameId: v.gameId,
+              })),
+            )}
+          />
+          <PinnedSaveBar
+            message={
+              state?.error ? (
+                <span className="text-accent">{state.error}</span>
+              ) : (
+                "Unsaved changes"
+              )
+            }
+          >
+            <Button type="submit" disabled={pending}>
+              {pending ? "Saving…" : "Save ballot"}
+            </Button>
+          </PinnedSaveBar>
+        </form>
+      ) : null}
+
+      {confirmImport ? (
+        <ConfirmDialog
+          title="Replace your ranking?"
+          message="Importing your Game of the Year list will remove the games already on this ballot."
+          confirmLabel="Import anyway"
+          onCancel={() => setConfirmImport(false)}
+          onConfirm={applyImport}
         />
-        <input
-          type="hidden"
-          name="categoryVotesJson"
-          value={JSON.stringify(
-            categoryVotes.map((v) => ({
-              categoryId: v.categoryId,
-              gameId: v.gameId,
-            })),
-          )}
-        />
-        <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : "Save ballot"}
-        </Button>
-        {state?.error ? (
-          <p className="mt-3 text-sm text-accent" role="alert">
-            {state.error}
-          </p>
-        ) : null}
-        {state?.saved ? (
-          <p className="mt-3 text-sm text-muted" role="status">
-            Ballot saved. You can keep editing until voting closes.
-          </p>
-        ) : null}
-      </form>
+      ) : null}
+
+      {unsavedDialog}
     </div>
   );
 }
 
-function BallotRankCard({
+function BallotGridCard({
   item,
   rank,
-  onBlurbChange,
   onRemove,
 }: {
   item: EditionBallotEditorItem;
   rank: number;
-  onBlurbChange: (gameId: string, blurb: string) => void;
   onRemove: (gameId: string) => void;
 }) {
   const {
     attributes,
     listeners,
     setNodeRef,
-    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -303,44 +344,76 @@ function BallotRankCard({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`flex items-stretch border border-line bg-panel ${
-        isDragging ? "z-10 opacity-90 shadow-lg" : ""
-      }`}
+      className={`min-w-0 ${isDragging ? "z-10 opacity-90" : ""}`}
     >
       <button
         type="button"
-        ref={setActivatorNodeRef}
-        className="flex w-12 shrink-0 cursor-grab items-center justify-center border-r border-line text-muted active:cursor-grabbing"
+        className="w-full cursor-grab text-left active:cursor-grabbing"
         aria-label={`Drag to reorder ${item.title}`}
         {...attributes}
         {...listeners}
       >
-        <RankMarker rank={rank} />
+        <GameCover title={item.title} imageUrl={item.coverUrl} />
+        <div className="mt-2 flex items-start gap-1">
+          <span
+            className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent"
+            aria-hidden
+          >
+            {rank}
+          </span>
+          <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug text-ink">
+            {item.title}
+          </span>
+        </div>
       </button>
-      <div className="flex min-w-0 flex-1 items-start gap-3 p-3">
-        <div className="w-12 shrink-0">
-          <GameCover title={item.title} imageUrl={item.coverUrl} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-ink">{item.title}</p>
-          <textarea
-            className={`${fieldInputClass} mt-2 min-h-[4.5rem] resize-y`}
-            value={item.blurb}
-            onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
-            placeholder="Optional note"
-            maxLength={500}
-            aria-label={`Note for ${item.title}`}
-          />
-        </div>
-        <Button
-          type="button"
-          variant="quiet"
-          className="px-0 py-0"
-          onClick={() => onRemove(item.gameId)}
-        >
-          Remove
-        </Button>
-      </div>
+      <button
+        type="button"
+        className="mt-1 text-xs text-muted hover:text-ink"
+        onClick={() => onRemove(item.gameId)}
+      >
+        Remove
+      </button>
     </li>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ballot-import-title"
+        className="w-full max-w-md border border-line bg-panel p-5"
+      >
+        <p
+          id="ballot-import-title"
+          className="font-display text-2xl tracking-wide text-ink"
+        >
+          {title}
+        </p>
+        <p className="mt-3 text-sm text-muted">{message}</p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="bordered" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button type="button" size="sm" onClick={onConfirm}>
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

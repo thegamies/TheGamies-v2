@@ -97,7 +97,7 @@ export function AdminCommunitiesClient({
         return;
       }
       setMessage(
-        `Seeded ${result.createdBallots + result.updatedBallots} ballots (${result.joinedMembers} joined, ${result.voicesSet} Voices). Edition ${result.year} is ${result.editionStatus}. Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.${result.resultsRefreshed ? " Published results refreshed." : ""}`,
+        `Seeded ${result.createdBallots + result.updatedBallots} ballots (${result.joinedMembers} joined, ${result.voicesSet} Hosts). Edition ${result.year} is ${result.editionStatus}. Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.${result.resultsRefreshed ? " Published results refreshed." : ""}`,
       );
       await refreshStats();
     });
@@ -115,7 +115,7 @@ export function AdminCommunitiesClient({
         return;
       }
       setMessage(
-        `Cleared ${result.removedBallots} ballots, ${result.removedMembers} memberships, ${result.removedVoices} Voices${deleteProfiles ? `, deleted ${result.deletedProfiles} profiles` : ""}.`,
+        `Cleared ${result.removedBallots} ballots, ${result.removedMembers} memberships, ${result.removedVoices} Hosts${deleteProfiles ? `, deleted ${result.deletedProfiles} profiles` : ""}.`,
       );
       await refreshStats();
     });
@@ -157,7 +157,7 @@ export function AdminCommunitiesClient({
 
       <p className="mt-3 max-w-2xl text-sm text-muted">
         Seed members cannot sign in. While voting is open, hosts see a submitted
-        ballot list on the Edition page. Public Community/Voices boards appear
+        ballot list on the Edition page. Public Community/Hosts boards appear
         after you publish.
       </p>
 
@@ -211,7 +211,7 @@ export function AdminCommunitiesClient({
           />
         </label>
         <label className="block text-sm text-muted">
-          Voices in this batch (from the start of the batch)
+          Hosts in this batch (from the start of the batch)
           <input
             className={`${fieldInputClass} mt-1`}
             type="number"
@@ -302,7 +302,7 @@ export function AdminCommunitiesClient({
 
       <div className="border-t border-line pt-6 space-y-3">
         <p className="text-sm text-muted">
-          Clear removes seed memberships, Voices, and ballots
+          Clear removes seed memberships, Hosts, and ballots
           {slug.trim() ? ` for “${slug.trim()}”` : " for all communities"}.
         </p>
         <label className="flex items-center gap-2 text-sm text-muted">

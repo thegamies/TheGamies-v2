@@ -1,7 +1,13 @@
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
+import type {
+  EditionResultsPublicMode,
+  EditionResultsViewId,
+} from "@/lib/communities/edition-results-scoring";
 import {
   editionDeckCopy,
-  editionSectionTitle,
+  editionOverviewTitle,
+  editionBallotCountCopy,
+  type EditionSchedule,
   type EditionStatus,
 } from "@/lib/communities/edition-status";
 
@@ -10,16 +16,34 @@ type Props = {
   slug: string;
   year: number;
   years: number[];
+  view?: EditionResultsViewId;
+  mode?: EditionResultsPublicMode;
+  opensAt?: Date | null;
+  closesAt?: Date | null;
+  publishesAt?: Date | null;
+  ballotCount?: number | null;
 };
 
 /**
- * Edition tab section heading — title + year select + one serif deck.
- * No status meta line; year is only in the year control when multiple years exist.
+ * Events tab heading — same awards title as overview (`{year} Video Game Awards`).
+ * Year select only when 2+ public years. No status jargon line.
  */
-export function EditionSectionHeader({ status, slug, year, years }: Props) {
-  const title = editionSectionTitle(status);
-  const deck = editionDeckCopy(status);
-  const showYearAlone = years.length <= 1;
+export function EditionSectionHeader({
+  status,
+  slug,
+  year,
+  years,
+  view,
+  mode,
+  opensAt,
+  closesAt,
+  publishesAt,
+  ballotCount,
+}: Props) {
+  const title = editionOverviewTitle(year);
+  const schedule: EditionSchedule = { opensAt, closesAt, publishesAt };
+  const deck = editionDeckCopy(status, schedule);
+  const showYearSelect = years.length > 1;
 
   return (
     <header>
@@ -27,20 +51,26 @@ export function EditionSectionHeader({ status, slug, year, years }: Props) {
         <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
           {title}
         </h2>
-        {showYearAlone ? (
-          <p
-            className="font-display text-2xl tracking-wide text-muted"
-            aria-label={`${year} edition`}
-          >
-            {year}
-          </p>
-        ) : (
-          <EditionYearSelect slug={slug} year={year} years={years} />
-        )}
+        {showYearSelect ? (
+          <EditionYearSelect
+            slug={slug}
+            year={year}
+            years={years}
+            view={view}
+            mode={mode}
+          />
+        ) : null}
       </div>
       {deck ? (
         <p className="mt-3 max-w-xl font-serif text-lg leading-relaxed text-muted">
           {deck}
+        </p>
+      ) : null}
+      {ballotCount != null ? (
+        <p
+          className={`${deck ? "mt-2" : "mt-3"} text-sm text-muted`}
+        >
+          {editionBallotCountCopy(ballotCount)}
         </p>
       ) : null}
     </header>

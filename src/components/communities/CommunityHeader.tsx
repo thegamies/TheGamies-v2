@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { navItemClass } from "@/components/ui/navLevels";
 import {
+  EDITION_PUBLIC_LABEL,
   showEditionNav,
   type EditionStatus,
 } from "@/lib/communities/edition-status";
+
+export const LIVE_PUBLIC_LABEL = "Live Rankings";
 
 export type CommunityNavActive =
   | "overview"
   | "live"
   | "edition"
+  | "members"
   | "settings";
 
 type NavProps = {
@@ -37,17 +41,22 @@ export function CommunityNav({
   if (liveEnabled) {
     items.push({
       href: `/communities/${slug}/live`,
-      label: "Live",
+      label: LIVE_PUBLIC_LABEL,
       key: "live",
     });
   }
   if (editionStatus && showEditionNav(editionStatus)) {
     items.push({
       href: `/communities/${slug}/edition`,
-      label: "Edition",
+      label: EDITION_PUBLIC_LABEL,
       key: "edition",
     });
   }
+  items.push({
+    href: `/communities/${slug}/members`,
+    label: "Members",
+    key: "members",
+  });
   if (canManage) {
     items.push({
       href: `/communities/${slug}/settings`,

@@ -3,7 +3,6 @@ import {
   CATEGORY_RESULTS_PAGE_SIZE,
   ensurePublishedEditionResults,
   getEditionCategoryPage,
-  parseEditionRankMode,
   parseEditionResultMode,
 } from "@/lib/communities/edition-results";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
@@ -24,9 +23,6 @@ export async function GET(
   const url = new URL(request.url);
   const mode = parseEditionResultMode(
     url.searchParams.get("mode") ?? undefined,
-  );
-  const rankMode = parseEditionRankMode(
-    url.searchParams.get("rank") ?? undefined,
   );
   const categoryId = (url.searchParams.get("categoryId") ?? "").trim();
   if (!categoryId) {
@@ -56,7 +52,7 @@ export async function GET(
     const data = await getEditionCategoryPage(edition.id, mode, categoryId, {
       page,
       pageSize: CATEGORY_RESULTS_PAGE_SIZE,
-      rankMode,
+      rankMode: edition.rankMode,
     });
 
     return NextResponse.json(data);

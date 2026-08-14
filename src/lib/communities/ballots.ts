@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
@@ -15,10 +15,12 @@ import {
   gotyEligibilityError,
   normalizeRanks,
 } from "@/lib/lists/rules";
-import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
+import { categoryEligibilityError } from "@/lib/live-aggregate/category-eligibility";
 import type { EditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
 import {
+  EDITION_BALLOT_MAX_ITEMS,
   saveEditionBallotCategoryVotesSchema,
   saveEditionBallotItemsSchema,
 } from "./ballot-schema";
@@ -64,7 +66,7 @@ export function editionBallotWriteBlockedReason(
   if (status === "closed" || status === "published") {
     return "Voting has closed.";
   }
-  return "This edition is not open for voting.";
+    return "This event is not open for voting.";
 }
 
 /** Signed-in community members (including hosts) may submit. */
@@ -211,6 +213,109 @@ export async function listEditionBallotSubmitters(
   }));
 }
 
+export async function countEditionSubmittedBallots(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(communityEditionBallots)
+    .where(eq(communityEditionBallots.editionId, editionId));
+  return Number(row?.n ?? 0);
+}
+
+export async function getLiveEditionVotersPage(
+  editionId: string,
+  opts: {
+    page?: number;
+    pageSize?: number;
+    q?: string;
+    voicesOnly?: boolean;
+  } = {},
+  db: Db = getDb(),
+): Promise<{
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  rows: Array<{
+    profileId: string;
+    displayName: string;
+    username: string;
+    isVoice: boolean;
+  }>;
+}> {
+  const pageSize = Math.min(200, Math.max(1, Math.floor(opts.pageSize ?? 50)));
+  const q = opts.q?.trim() ?? "";
+
+  const conditions = [eq(communityEditionBallots.editionId, editionId)];
+  if (opts.voicesOnly) {
+    conditions.push(isNotNull(communityEditionVoices.profileId));
+  }
+  if (q.length >= 1) {
+    conditions.push(
+      sql`(${profiles.displayName} ILIKE ${`%${q}%`} OR ${profiles.username} ILIKE ${`%${q}%`})`,
+    );
+  }
+  const where = and(...conditions);
+
+  const fromVoters = () =>
+    db
+      .select({
+        profileId: communityEditionBallots.profileId,
+        displayName: profiles.displayName,
+        username: profiles.username,
+        voiceProfileId: communityEditionVoices.profileId,
+      })
+      .from(communityEditionBallots)
+      .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
+      .leftJoin(
+        communityEditionVoices,
+        and(
+          eq(communityEditionVoices.editionId, communityEditionBallots.editionId),
+          eq(communityEditionVoices.profileId, communityEditionBallots.profileId),
+        ),
+      )
+      .where(where);
+
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(communityEditionBallots)
+    .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
+    .leftJoin(
+      communityEditionVoices,
+      and(
+        eq(communityEditionVoices.editionId, communityEditionBallots.editionId),
+        eq(communityEditionVoices.profileId, communityEditionBallots.profileId),
+      ),
+    )
+    .where(where);
+
+  const total = Number(countRow?.n ?? 0);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+  const requested = Math.max(1, Math.floor(opts.page ?? 1));
+  const page = Math.min(requested, totalPages);
+  const offset = (page - 1) * pageSize;
+
+  const rows = await fromVoters()
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(pageSize)
+    .offset(offset);
+
+  return {
+    page,
+    pageSize,
+    total,
+    totalPages,
+    rows: rows.map((row) => ({
+      profileId: row.profileId,
+      displayName: row.displayName,
+      username: row.username,
+      isVoice: Boolean(row.voiceProfileId),
+    })),
+  };
+}
+
 export async function upsertEditionBallot(input: {
   slug: string;
   year: number;
@@ -228,7 +333,7 @@ export async function upsertEditionBallot(input: {
     return {
       error:
         itemsParsed.error.issues[0]?.message ??
-        `Ballots can hold at most ${LIST_MAX_ITEMS} games.`,
+        `Ballots can hold at most ${EDITION_BALLOT_MAX_ITEMS} games.`,
     };
   }
   const votesParsed = saveEditionBallotCategoryVotesSchema.safeParse(
@@ -248,7 +353,7 @@ export async function upsertEditionBallot(input: {
   }
 
   const edition = await getEditionByCommunityYear(detail.id, year, db);
-  if (!edition) return { error: "Edition not found." };
+  if (!edition) return { error: "Event not found." };
 
   const writeBlock = editionBallotWriteBlockedReason(edition.status);
   if (writeBlock) return { error: writeBlock };
@@ -282,7 +387,11 @@ export async function upsertEditionBallot(input: {
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
     const activeCats = await db
-      .select({ id: awardCategories.id })
+      .select({
+        id: awardCategories.id,
+        eligibility: awardCategories.eligibility,
+        allowEditions: awardCategories.allowEditions,
+      })
       .from(awardCategories)
       .where(
         and(
@@ -293,6 +402,7 @@ export async function upsertEditionBallot(input: {
     if (activeCats.length !== categoryIds.length) {
       return { error: "One or more categories are not available." };
     }
+    const catById = new Map(activeCats.map((c) => [c.id, c]));
 
     const gameIds = [...new Set(votes.map((v) => v.gameId))];
     const found = await db
@@ -312,7 +422,14 @@ export async function upsertEditionBallot(input: {
     for (const vote of votes) {
       const game = byId.get(vote.gameId);
       if (!game) return { error: "One or more games could not be found." };
-      const err = gotyEligibilityError(game, year);
+      const cat = catById.get(vote.categoryId);
+      if (!cat) return { error: "One or more categories are not available." };
+      const err = categoryEligibilityError(
+        game,
+        year,
+        parseAwardCategoryEligibility(cat.eligibility),
+        { allowEditions: cat.allowEditions },
+      );
       if (err) return { error: err };
     }
   }

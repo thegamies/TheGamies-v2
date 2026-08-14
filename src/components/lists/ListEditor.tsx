@@ -222,7 +222,9 @@ export function ListEditor({
   const dirty =
     signedIn &&
     persistSnapshot({ listType, title, year, items }) !== savedSnapshot;
-  const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty);
+  const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
+    message: "Leave without saving? Your latest edits won’t be kept on this list.",
+  });
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -622,6 +624,7 @@ export function ListEditor({
     });
   }
 
+  const notesDndId = useId();
   const notesSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, {
@@ -1008,6 +1011,7 @@ export function ListEditor({
                 </button>
               ) : (
                 <DndContext
+                  id={notesDndId}
                   sensors={notesSensors}
                   collisionDetection={closestCenter}
                   onDragEnd={onNotesDragEnd}

@@ -1,10 +1,48 @@
 import { z } from "zod";
-import { LIST_MAX_ITEMS, listItemInputSchema } from "@/lib/lists/schema";
+import { listItemInputSchema } from "@/lib/lists/schema";
 import { replaceCategoryVotesSchema } from "@/lib/live-aggregate/schema";
 
+/** Event ballots score top 10 only; the ballot itself is capped to match. */
+export const EDITION_BALLOT_MAX_ITEMS = 10;
+
+export const editionBallotItemInputSchema = listItemInputSchema.extend({
+  rank: z.number().int().min(1).max(EDITION_BALLOT_MAX_ITEMS),
+});
+
+export function capEditionBallotItems<T extends { rank: number }>(
+  items: T[],
+): T[] {
+  return [...items]
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, EDITION_BALLOT_MAX_ITEMS)
+    .map((item, i) => ({ ...item, rank: i + 1 }));
+}
+
+/** Stable key for dirty-checking a ballot draft. Vote order does not matter. */
+export function editionBallotDraftKey(input: {
+  items: Array<{ gameId: string; rank: number; blurb?: string | null }>;
+  categoryVotes: Array<{ categoryId: string; gameId: string }>;
+}): string {
+  return JSON.stringify({
+    items: input.items.map((item) => ({
+      gameId: item.gameId,
+      rank: item.rank,
+      blurb: (item.blurb ?? "").trim(),
+    })),
+    categoryVotes: [...input.categoryVotes]
+      .map((vote) => ({
+        categoryId: vote.categoryId,
+        gameId: vote.gameId,
+      }))
+      .sort((a, b) => a.categoryId.localeCompare(b.categoryId)),
+  });
+}
+
 export const saveEditionBallotItemsSchema = z
-  .array(listItemInputSchema)
-  .max(LIST_MAX_ITEMS)
+  .array(editionBallotItemInputSchema)
+  .max(EDITION_BALLOT_MAX_ITEMS, {
+    message: `Ballots can hold at most ${EDITION_BALLOT_MAX_ITEMS} games.`,
+  })
   .superRefine((items, ctx) => {
     const keys = new Set<string>();
     const ranks = new Set<number>();

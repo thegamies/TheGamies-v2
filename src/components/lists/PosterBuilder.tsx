@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -91,6 +91,7 @@ export function PosterBuilder({
   onPickEmpty?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const dndId = useId();
   const [scale, setScale] = useState(0.4);
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -225,6 +226,7 @@ export function PosterBuilder({
 
   return (
     <DndContext
+      id={dndId}
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleDragStart}

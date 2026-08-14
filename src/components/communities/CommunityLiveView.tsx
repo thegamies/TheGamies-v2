@@ -1,3 +1,4 @@
+import { AwardCategoryGroupNav } from "@/components/live-aggregate/AwardCategoryGroupNav";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { GameCover } from "@/components/ui/GameCover";
 import type {
@@ -5,12 +6,16 @@ import type {
   StandingsGameRow,
   StandingsPage,
 } from "@/lib/live-aggregate/service";
+import { standingsQueryString } from "@/lib/live-aggregate/award-category-defs";
 import Link from "next/link";
 
-function liveHref(slug: string, year: number, page: number): string {
-  const base = `/communities/${slug}/live/${year}`;
-  if (page <= 1) return base;
-  return `${base}?page=${page}`;
+function liveHref(
+  slug: string,
+  year: number,
+  page: number,
+  group: StandingsPage["categoryGroup"],
+): string {
+  return `/communities/${slug}/live/${year}${standingsQueryString({ page, group })}`;
 }
 
 function StandingsRow({
@@ -118,7 +123,7 @@ export function CommunityLiveView({
   return (
     <div className="mt-10">
       <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
-        {page.year} live standings
+        {page.year} Live Rankings
       </h2>
       <p className="mt-3 max-w-2xl font-serif text-lg leading-relaxed text-muted">
         From signed-in {communityName} members’ Game of the Year lists
@@ -144,7 +149,7 @@ export function CommunityLiveView({
         {yearOptions.map((y) => (
           <Link
             key={y}
-            href={`/communities/${slug}/live/${y}`}
+            href={`/communities/${slug}/live/${y}${standingsQueryString({ group: page.categoryGroup })}`}
             className={`border px-3 py-1.5 text-sm tracking-wide transition-colors ${
               y === page.year
                 ? "border-accent text-accent"
@@ -188,7 +193,7 @@ export function CommunityLiveView({
             <div className="flex gap-2">
               {page.page > 1 ? (
                 <Link
-                  href={liveHref(slug, page.year, page.page - 1)}
+                  href={liveHref(slug, page.year, page.page - 1, page.categoryGroup)}
                   className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                 >
                   Previous
@@ -200,7 +205,7 @@ export function CommunityLiveView({
               )}
               {page.page < page.totalPages ? (
                 <Link
-                  href={liveHref(slug, page.year, page.page + 1)}
+                  href={liveHref(slug, page.year, page.page + 1, page.categoryGroup)}
                   className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                 >
                   Next
@@ -214,6 +219,11 @@ export function CommunityLiveView({
           </nav>
         ) : null}
       </section>
+
+      <AwardCategoryGroupNav
+        hrefBase={`/communities/${slug}/live/${page.year}`}
+        group={page.categoryGroup}
+      />
 
       {page.categories.map((block) => (
         <CategoryBlock

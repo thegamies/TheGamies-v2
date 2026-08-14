@@ -1,17 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
-import {
-  CategoryChapterHeader,
-  EditionCategoryPodiums,
-} from "@/components/communities/EditionCategoryResults";
-import { RankedStandingBillboard } from "@/components/communities/RankedStandingBillboard";
+import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import { EmptyStandingCard, StandingGameCard } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
-import { navItemClass } from "@/components/ui/navLevels";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionCategoryComparisonMatrix,
@@ -20,8 +15,6 @@ import type {
   MatrixVoiceColumn,
 } from "@/lib/communities/edition-results";
 import { editionVoterBallotHref } from "@/lib/communities/edition-results-href";
-
-type Layout = "podiums" | "ranked" | "comparison";
 
 /** Cell padding each side (`px-2`). Column: 103+16 → 119; lg 206+16 → 222. */
 const CELL_PAD_X = 8;
@@ -155,7 +148,7 @@ function CategoryComparisonStrip({
               <MatrixHeaderLabel>Community</MatrixHeaderLabel>
             </th>
             <th scope="col" className={`${LIST_COL} py-3`}>
-              <MatrixHeaderLabel>Voices</MatrixHeaderLabel>
+              <MatrixHeaderLabel>Hosts</MatrixHeaderLabel>
             </th>
             {voiceColumns.map((v) => (
               <th key={v.profileId} scope="col" className={`${LIST_COL} py-3`}>
@@ -243,7 +236,7 @@ function CategoryComparisonSections({
   );
 }
 
-/** Per-award Top 3 with Netflix-style numerals (same language as GOTY Ranked). */
+/** Per-award Top 3 on one line; overflow uses HorizontalScroll. */
 function CategoryRankedSections({
   categories,
 }: {
@@ -267,14 +260,38 @@ function CategoryRankedSections({
             description={cat.description}
             showRule={index > 0}
           />
-          <RankedStandingBillboard
-            className="mt-4"
-            items={cat.rows.map((row) => ({
-              ...row,
-              place: row.rank,
-            }))}
-            emptyMessage="No scores for this award yet."
-          />
+          {cat.rows.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">
+              No scores for this award yet.
+            </p>
+          ) : (
+            <HorizontalScroll
+              className="mt-4"
+              label={`${cat.label} ranked`}
+            >
+              <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
+                {cat.rows.map((row) => (
+                  <li
+                    key={row.gameId}
+                    className={
+                      row.rank === 1
+                        ? "w-[168px] shrink-0 sm:w-[190px]"
+                        : "w-[132px] shrink-0 sm:w-[148px]"
+                    }
+                  >
+                    <StandingGameCard
+                      place={row.rank}
+                      placeSize="lg"
+                      slug={row.slug}
+                      title={row.title}
+                      coverUrl={row.coverUrl}
+                      priority={row.rank === 1}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </HorizontalScroll>
+          )}
         </article>
       ))}
     </div>
@@ -282,8 +299,7 @@ function CategoryRankedSections({
 }
 
 /**
- * Highlights Categories: tertiary Podiums · Ranked · Comparison toggle.
- * Comparison keeps per-award chapters; each shows You · Community · Voices · Voices.
+ * Results Categories: ranked one-line strips or comparison chapters.
  */
 export function EditionCategoriesHighlights({
   slug,
@@ -292,6 +308,7 @@ export function EditionCategoriesHighlights({
   categoryPodiums,
   categoryComparison,
   youBallotHref = null,
+  layout = "ranked",
 }: {
   slug: string;
   year: number;
@@ -299,8 +316,8 @@ export function EditionCategoriesHighlights({
   categoryPodiums: EditionCategoryStandingBlock[];
   categoryComparison: EditionCategoryComparisonMatrix;
   youBallotHref?: string | null;
+  layout?: "ranked" | "comparison";
 }) {
-  const [layout, setLayout] = useState<Layout>("podiums");
   const categories = useEditionCategoryPodiums(categoryPodiums);
 
   if (categories.length === 0 && !categoryComparison.hasGames) {
@@ -311,39 +328,9 @@ export function EditionCategoriesHighlights({
     <section>
       <SectionRule className="mb-6" />
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2">
-          <h3 className="font-display text-3xl tracking-wide text-ink">
-            Categories
-          </h3>
-          <div
-            className="flex flex-wrap items-center gap-x-2"
-            aria-label="Categories layout"
-          >
-            {(
-              [
-                { id: "podiums" as const, label: "Podiums" },
-                { id: "ranked" as const, label: "Ranked" },
-                { id: "comparison" as const, label: "Comparison" },
-              ] as const
-            ).map((opt, i) => (
-              <span key={opt.id} className="contents">
-                {i > 0 ? (
-                  <span className="text-muted" aria-hidden>
-                    ·
-                  </span>
-                ) : null}
-                <button
-                  type="button"
-                  className={navItemClass("tertiary", layout === opt.id)}
-                  aria-pressed={layout === opt.id}
-                  onClick={() => setLayout(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
+        <h3 className="font-display text-3xl tracking-wide text-ink">
+          Categories
+        </h3>
         <Link
           href={categoriesHref}
           className="text-sm text-accent hover:underline"
@@ -352,11 +339,7 @@ export function EditionCategoriesHighlights({
         </Link>
       </div>
 
-      {layout === "podiums" ? (
-        <EditionCategoryPodiums categories={categories} />
-      ) : layout === "ranked" ? (
-        <CategoryRankedSections categories={categories} />
-      ) : (
+      {layout === "comparison" ? (
         <CategoryComparisonSections
           matrix={categoryComparison}
           categoryPodiums={categories}
@@ -364,6 +347,8 @@ export function EditionCategoriesHighlights({
           year={year}
           youBallotHref={youBallotHref}
         />
+      ) : (
+        <CategoryRankedSections categories={categories} />
       )}
     </section>
   );

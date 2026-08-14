@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes } from "react";
 
-type Variant = "accent" | "bordered" | "quiet";
+type Variant = "accent" | "bordered" | "quiet" | "danger" | "danger-bordered";
 type Size = "md" | "sm";
 
 const variantClass: Record<Variant, string> = {
@@ -9,6 +9,10 @@ const variantClass: Record<Variant, string> = {
   bordered:
     "border border-line text-ink hover:border-accent bg-transparent",
   quiet: "border border-transparent text-muted hover:text-ink",
+  danger:
+    "bg-danger text-white hover:opacity-90 border border-transparent",
+  "danger-bordered":
+    "border border-danger text-danger hover:bg-danger hover:text-white bg-transparent",
 };
 
 const sizeClass: Record<Size, string> = {
@@ -27,7 +31,7 @@ export function Button({
 }) {
   return (
     <button
-      className={`inline-flex items-center justify-center rounded-[var(--radius-control)] font-semibold tracking-wide transition-[opacity,color,border-color] duration-[var(--motion-fast)] disabled:opacity-40 ${sizeClass[size]} ${variantClass[variant]} ${className}`}
+      className={`inline-flex items-center justify-center rounded-[var(--radius-control)] font-semibold tracking-wide transition-[opacity,color,border-color,background-color] duration-[var(--motion-fast)] disabled:opacity-40 ${sizeClass[size]} ${variantClass[variant]} ${className}`}
       {...props}
     />
   );

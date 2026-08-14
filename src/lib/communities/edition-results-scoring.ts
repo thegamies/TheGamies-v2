@@ -12,14 +12,22 @@ export type EditionResultMode = "combined" | "community" | "voices";
 /** Public UI modes until weighted Combined exists. */
 export type EditionResultsPublicMode = "community" | "voices";
 
-/** Ceremony narrative, full GOTY board, category awards, voters, or the viewer's ballot. */
+/** Public name for a results board. `?mode=voices` stays in the URL. */
+export function editionBoardLabel(
+  mode: EditionResultsPublicMode,
+): "Community" | "Hosts" {
+  return mode === "voices" ? "Hosts" : "Community";
+}
+
+/** Ceremony narrative, full GOTY board, category awards, voters, viewer ballot, or host settings. */
 export type EditionResultsViewId =
   | "reveal"
   | "overview"
   | "standings"
   | "categories"
   | "voters"
-  | "ballot";
+  | "ballot"
+  | "settings";
 
 /** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
@@ -39,11 +47,12 @@ export function parseEditionResultMode(
 export function parseEditionResultsView(
   raw: string | undefined,
 ): EditionResultsViewId {
-  if (raw === "overview") return "overview";
+  if (raw === "overview" || raw === "results") return "overview";
   if (raw === "standings") return "standings";
   if (raw === "categories") return "categories";
   if (raw === "voters") return "voters";
   if (raw === "ballot") return "ballot";
+  if (raw === "settings") return "settings";
   if (raw === "reveal") return "reveal";
   return "reveal";
 }

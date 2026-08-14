@@ -8,6 +8,10 @@ import {
   pointsForRank,
   sumContribForProfiles,
 } from "./scoring";
+import {
+  browseInputForCategoryEligibility,
+  categoryEligibilityError,
+} from "./category-eligibility";
 import { gotyEligibilityError } from "@/lib/lists/rules";
 import { redactStandingsPage, clampStandingsPage, type StandingsPage } from "./service";
 import { withDisplayRanksOnPage } from "@/lib/standings/shared-rank";
@@ -94,33 +98,73 @@ describe("sumContribForProfiles", () => {
 });
 
 describe("GOTY category vote eligibility", () => {
-  it("reuses list GOTY rules for year / adult / edition / upcoming", () => {
-    const year = 2026;
-    const now = new Date("2026-08-01");
-    const base = {
-      id: "g1",
-      year: 2026,
-      firstReleaseDate: new Date("2026-03-01"),
-      versionParentIgdbId: null,
-      isAdult: false,
-    };
+  const year = 2026;
+  const now = new Date("2026-08-01");
+  const base = {
+    id: "g1",
+    year: 2026,
+    firstReleaseDate: new Date("2026-03-01"),
+    versionParentIgdbId: null,
+    isAdult: false,
+  };
+
+  it("reuses list GOTY rules for current-year categories", () => {
     expect(gotyEligibilityError(base, year, now)).toBeNull();
-    expect(gotyEligibilityError({ ...base, year: 2025 }, year, now)).toMatch(
-      /2026/,
-    );
     expect(
-      gotyEligibilityError({ ...base, isAdult: true }, year, now),
-    ).toMatch(/Adult/);
+      categoryEligibilityError(base, year, "current_year", { now }),
+    ).toBeNull();
     expect(
-      gotyEligibilityError({ ...base, versionParentIgdbId: 1 }, year, now),
-    ).toMatch(/Edition/);
-    expect(
-      gotyEligibilityError(
-        { ...base, firstReleaseDate: new Date("2026-12-01") },
-        year,
+      categoryEligibilityError({ ...base, year: 2025 }, year, "current_year", {
         now,
+      }),
+    ).toMatch(/2026/);
+  });
+
+  it("allows earlier released titles for current-or-active", () => {
+    expect(
+      categoryEligibilityError({ ...base, year: 2024 }, year, "current_or_active", {
+        now,
+      }),
+    ).toBeNull();
+  });
+
+  it("allows remake editions when the category permits them", () => {
+    expect(
+      categoryEligibilityError(
+        { ...base, versionParentIgdbId: 1 },
+        year,
+        "current_year",
+        { now, allowEditions: true },
       ),
-    ).toMatch(/Upcoming/);
+    ).toBeNull();
+  });
+
+  it("requires later years for upcoming eligibility, not this year", () => {
+    expect(
+      categoryEligibilityError(base, year, "upcoming", { now }),
+    ).toMatch(/later years/i);
+    expect(
+      categoryEligibilityError(
+        {
+          ...base,
+          firstReleaseDate: new Date("2026-12-01"),
+        },
+        year,
+        "upcoming",
+        { now },
+      ),
+    ).toMatch(/later years/i);
+    expect(
+      categoryEligibilityError(
+        { ...base, year: 2027, firstReleaseDate: new Date("2027-03-01") },
+        year,
+        "upcoming",
+        { now },
+      ),
+    ).toBeNull();
+    expect(browseInputForCategoryEligibility(year, "upcoming", false)).toEqual(
+      expect.objectContaining({ yearKnownAtLeast: 2027 }),
+    );
   });
 });
 
@@ -181,7 +225,7 @@ describe("redactStandingsPage", () => {
     categories: [
       {
         categoryId: "narrative",
-        label: "Best Narrative",
+        label: "Best Story",
         description: null,
         rows: [
           {
@@ -195,6 +239,7 @@ describe("redactStandingsPage", () => {
         ],
       },
     ],
+    categoryGroup: "premier",
   };
 
   it("hides scores but keeps ranks when unrevealed", () => {

@@ -10,7 +10,7 @@ const extraDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
 
 /** Current machine IPv4s so a phone can load `/_next` after DHCP changes. */
 function lanDevOrigins(): string[] {
-  const hosts = new Set<string>(["127.0.0.1"]);
+  const hosts = new Set<string>(["127.0.0.1", "192.168.1.123"]);
   for (const addrs of Object.values(os.networkInterfaces())) {
     for (const addr of addrs ?? []) {
       if (addr.family === "IPv4" && !addr.internal) hosts.add(addr.address);

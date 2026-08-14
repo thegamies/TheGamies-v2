@@ -107,14 +107,14 @@ type Layer = {
 };
 
 /**
- * Tied Community / Voices in one strip-card footprint.
+ * Tied Community / Hosts in one strip-card footprint.
  * Two persistent layers crossfade so the visible stack never remounts mid-fade.
  * Optional `className` / title fit for denser boards (e.g. Reveal summary).
  */
 export function CompactTieStack({
   games,
   className = "w-[103px] lg:w-[206px]",
-  titleMaxPx = 14,
+  titleMaxPx = 18,
   titleMinPx = 12,
 }: {
   games: TieGame[];

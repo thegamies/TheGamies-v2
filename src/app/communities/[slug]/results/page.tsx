@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 type Params = Promise<{ slug: string }>;
 
-/** Old Results URL → unified Edition tab. */
+/** Old Results URL → unified Events tab. */
 export default async function CommunityResultsRedirect({
   params,
 }: {

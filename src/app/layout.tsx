@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: "%s · The Gamies",
   },
   description:
-    "Community Game of the Year awards, Voices, and personal ranked lists.",
+    "Community Game of the Year awards, Hosts, and personal ranked lists.",
 };
 
 /** Keep iOS Safari on a real phone width (no ~980px desktop layout). */

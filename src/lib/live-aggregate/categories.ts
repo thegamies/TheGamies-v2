@@ -16,6 +16,10 @@ export async function listActiveAwardCategories(
       id: awardCategories.id,
       label: awardCategories.label,
       description: awardCategories.description,
+      sortOrder: awardCategories.sortOrder,
+      categoryGroup: awardCategories.categoryGroup,
+      eligibility: awardCategories.eligibility,
+      allowEditions: awardCategories.allowEditions,
     })
     .from(awardCategories)
     .where(eq(awardCategories.active, true))
