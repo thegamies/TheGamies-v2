@@ -75,10 +75,15 @@ export function categoryRevealGridCell(
 export function applyCategoryRevealGridColumns(
   grid: HTMLElement,
   viewportWidth: number,
+  maxColPx?: number,
 ): void {
   const cell = categoryRevealGridCell(grid);
   if (!cell) return;
-  const colPx = categoryRevealColPx(cell, viewportWidth);
+  const preferred = categoryRevealColPx(cell, viewportWidth);
+  const colPx =
+    maxColPx == null
+      ? preferred
+      : Math.min(preferred, Math.max(1, maxColPx));
   grid.style.setProperty("display", "grid");
   grid.style.setProperty("grid-auto-flow", "column");
   grid.style.setProperty("grid-auto-columns", `${colPx}px`, "important");

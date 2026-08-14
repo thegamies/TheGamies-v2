@@ -55,6 +55,25 @@ describe("categoryRevealColPx", () => {
     );
   });
 
+  it("caps mosaic tracks with an optional max column width", () => {
+    const props = new Map<string, string>();
+    const grid = {
+      classList: {
+        contains: (name: string) =>
+          name === "category-reveal-grid--dense" ||
+          name === "category-reveal-grid",
+      },
+      style: {
+        setProperty: (name: string, value: string) => {
+          props.set(name, value);
+        },
+      },
+    } as unknown as HTMLElement;
+
+    applyCategoryRevealGridColumns(grid, 900, 70);
+    expect(props.get("grid-auto-columns")).toBe("70px");
+  });
+
   it("forces literal px tracks on mosaic grids", () => {
     const props = new Map<string, string>();
     const grid = {

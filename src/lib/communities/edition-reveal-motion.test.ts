@@ -66,6 +66,20 @@ describe("gotyRevealNumberShift", () => {
     expect(Math.abs(shift.y - (GOTY_REVEAL_TIED_PARK_Y_VH / 100) * frame.height)).toBeLessThan(2);
   });
 
+  it("uses a fitted park Y when the stage is short", () => {
+    const parked = gotyRevealNumber(0.5, gotyRevealRankUnits(1));
+    const frame = {
+      width: 800,
+      height: 600,
+      topInset: 8,
+      sideInset: 16,
+      parkY: -210,
+    };
+    const box = { width: 220, height: 240 };
+    const shift = gotyRevealNumberShift(parked, box, frame);
+    expect(shift.y).toBeCloseTo(-210, 0);
+  });
+
   it("keeps a wide glyph on-screen on a narrow phone frame", () => {
     const parked = gotyRevealNumber(0.55, gotyRevealRankUnits(1));
     const frame = { width: 360, height: 640, topInset: 96, sideInset: 12 };
@@ -90,6 +104,12 @@ describe("gotyRevealTied", () => {
     expect(mid.opacity).toBeGreaterThan(0.5);
     expect(up.yVh).toBeLessThan(mid.yVh);
     expect(up.yVh).toBeCloseTo(GOTY_REVEAL_TIED_PARK_Y_VH, 0);
+  });
+
+  it("lifts to a fitted park rest when one is passed", () => {
+    const units = gotyRevealRankUnits(2);
+    const up = gotyRevealTied(0.75 / units, true, units, -32);
+    expect(up.yVh).toBeCloseTo(-32, 0);
   });
 });
 

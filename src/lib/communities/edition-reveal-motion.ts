@@ -106,6 +106,8 @@ export function gotyRevealNumberShift(
     height: number;
     topInset: number;
     sideInset: number;
+    /** Parked Y from stage center (px). Defaults to −24vh. */
+    parkY?: number;
   },
 ): { x: number; y: number; scale: number } {
   const peakScale = Math.max(0.01, motion.scale);
@@ -123,7 +125,8 @@ export function gotyRevealNumberShift(
   const w = Math.max(1, box.width * scale);
   const h = Math.max(1, box.height * scale);
   const parkedX = frame.width / 2 - side - w / 2;
-  const tiedY = (GOTY_REVEAL_TIED_PARK_Y_VH / 100) * frame.height;
+  const tiedY =
+    frame.parkY ?? (GOTY_REVEAL_TIED_PARK_Y_VH / 100) * frame.height;
   let x = (1 - motion.enter) * frame.width * -0.58 + motion.park * parkedX;
   let y = motion.park * tiedY;
 
@@ -145,6 +148,7 @@ export function gotyRevealTied(
   t: number,
   tied: boolean,
   rankUnits = 1,
+  parkYVh = GOTY_REVEAL_TIED_PARK_Y_VH,
 ): { opacity: number; yVh: number } {
   if (!tied) return { opacity: 0, yVh: 12 };
   const u = rankU(t, rankUnits);
@@ -155,7 +159,7 @@ export function gotyRevealTied(
   const live = u >= TIED_ENTER_AT - 0.06 && u <= rankUnits + 0.1;
   return {
     opacity: live ? enter * (1 - exit) : 0,
-    yVh: (1 - enter) * 12 + up * GOTY_REVEAL_TIED_PARK_Y_VH,
+    yVh: (1 - enter) * 12 + up * parkYVh,
   };
 }
 

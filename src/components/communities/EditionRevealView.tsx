@@ -20,6 +20,8 @@ import {
   applyCategoryRevealGridColumns,
   CATEGORY_REVEAL_EXIT_AT,
   CATEGORY_REVEAL_EXIT_DUR,
+  categoryRevealColPx,
+  categoryRevealGridCell,
   categoryRevealAwardLocalT,
   categoryRevealAwardScrollUnits,
   categoryRevealGridOffscreenLead,
@@ -29,6 +31,18 @@ import {
   categoryRevealPlaceTranslateX,
   categoryRevealSlotDensity,
 } from "@/lib/communities/edition-reveal-category-ties";
+import {
+  CATEGORY_REVEAL_FIT,
+  categoryRevealAwardFit,
+  categoryRevealSoloPreferredW,
+  categoryRevealTitleBlockH,
+  GOTY_REVEAL_FIT,
+  gotyRevealCoverFloor,
+  gotyRevealFit,
+  gotyRevealPreferredCoverW,
+  type CategoryRevealPlaceFitInput,
+  type GotyRevealFit,
+} from "@/lib/communities/edition-reveal-fit";
 import { ceremonyProgress, documentOffsetTop } from "@/lib/communities/edition-reveal-scrub";
 import {
   gotyRevealGameLocal,
@@ -36,7 +50,6 @@ import {
   gotyRevealLocalT,
   gotyRevealNumber,
   gotyRevealNumberShift,
-  GOTY_REVEAL_TIED_PARK_Y_VH,
   gotyRevealRankUnits,
   gotyRevealTied,
 } from "@/lib/communities/edition-reveal-motion";
@@ -49,6 +62,153 @@ function clamp(n: number, min: number, max: number) {
 function easeInOut(t: number) {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
+
+type RevealStageBox = {
+  headH: number;
+  frameW: number;
+  frameH: number;
+  stageH: number;
+};
+
+function revealStageBox(
+  frame: HTMLElement,
+  boxEl?: HTMLElement | null,
+): RevealStageBox {
+  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
+  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 108);
+  const box = boxEl ?? frame;
+  const frameW = Math.max(1, box.clientWidth || frame.clientWidth);
+  const frameH = Math.max(1, box.clientHeight || frame.clientHeight);
+  return {
+    headH,
+    frameW,
+    frameH,
+    stageH: Math.max(1, frameH - headH),
+  };
+}
+
+function gotyLayerFit(
+  layer: HTMLElement,
+  stage: RevealStageBox,
+): GotyRevealFit {
+  const featured = layer.dataset.featured === "1";
+  const num = layer.querySelector<HTMLElement>("[data-c-num]");
+  const tied = layer.querySelector<HTMLElement>("[data-c-tied]");
+  const box = {
+    width: Math.max(1, num?.offsetWidth ?? 120),
+    height: Math.max(1, num?.offsetHeight ?? 120),
+  };
+  const parkedShift = gotyRevealNumberShift(
+    { enter: 1, park: 1, scale: 0.57 },
+    box,
+    {
+      width: stage.frameW,
+      height: stage.stageH,
+      topInset: GOTY_REVEAL_FIT.topInset,
+      sideInset: 16,
+    },
+  );
+  return gotyRevealFit({
+    stageH: stage.stageH,
+    preferredCoverW: gotyRevealPreferredCoverW(featured, stage.frameW),
+    parkedGlyphH: box.height * parkedShift.scale,
+    tiedH: tied?.offsetHeight ?? 0,
+    coverFloor: gotyRevealCoverFloor(featured),
+    topInset: GOTY_REVEAL_FIT.topInset,
+  });
+}
+
+function applyGotyCoverWidth(layer: HTMLElement, coverW: number) {
+  layer.querySelectorAll<HTMLElement>("[data-c-cover]").forEach((el) => {
+    el.style.width = `${coverW}px`;
+    el.style.minWidth = `${coverW}px`;
+  });
+}
+
+function categoryStackRows(value: string | undefined): 1 | 2 | 3 {
+  const n = Number(value || "1");
+  if (n >= 3) return 3;
+  if (n >= 2) return 2;
+  return 1;
+}
+
+function categoryPlaceFitInput(
+  placeEl: HTMLElement,
+  viewportWidth: number,
+): CategoryRevealPlaceFitInput {
+  const stackRows = categoryStackRows(placeEl.dataset.stackRows);
+  const hero = placeEl.dataset.hero === "1";
+  const showTitles = placeEl.dataset.showTitles !== "0";
+  const mosaic = stackRows > 1;
+  const preferredW = mosaic
+    ? categoryRevealColPx(
+        stackRows === 2 ? "editorial" : "dense",
+        viewportWidth,
+      )
+    : categoryRevealSoloPreferredW(hero, viewportWidth);
+  const titleKind = mosaic ? "mosaic" : hero ? "hero" : "solo";
+  const floor = hero
+    ? CATEGORY_REVEAL_FIT.heroFloor
+    : mosaic
+      ? CATEGORY_REVEAL_FIT.mosaicFloor
+      : CATEGORY_REVEAL_FIT.soloFloor;
+  const rowGap =
+    stackRows === 3
+      ? CATEGORY_REVEAL_FIT.denseGap
+      : stackRows === 2
+        ? CATEGORY_REVEAL_FIT.editorialGap
+        : 0;
+  return {
+    stackRows,
+    preferredW,
+    showTitles,
+    hero,
+    rowGap,
+    titleBlockH: categoryRevealTitleBlockH(titleKind, viewportWidth),
+    floor,
+  };
+}
+
+function applyCategoryAwardFit(award: HTMLElement) {
+  const vw = window.innerWidth;
+  const body = award.querySelector<HTMLElement>("[data-c-award-body]");
+  const title = award.querySelector<HTMLElement>("[data-c-award-title]");
+  const stageWrap = award.querySelector<HTMLElement>("[data-c-board-stage]");
+  const placeEls = [
+    ...award.querySelectorAll<HTMLElement>("[data-c-place]"),
+  ];
+  const availableH = Math.max(1, body?.clientHeight ?? award.clientHeight);
+  const awardChromeH =
+    title && stageWrap
+      ? Math.max(0, stageWrap.offsetTop - title.offsetTop)
+      : (title?.offsetHeight ?? 0) + 20;
+  let placeHeadH = 0;
+  placeEls.forEach((el) => {
+    const head = el.querySelector<HTMLElement>("[data-c-place-head]");
+    placeHeadH = Math.max(placeHeadH, head?.offsetHeight ?? 0);
+  });
+  const fit = categoryRevealAwardFit({
+    availableH,
+    awardChromeH,
+    placeHeadH,
+    places: placeEls.map((el) => categoryPlaceFitInput(el, vw)),
+  });
+  if (body) body.style.justifyContent = fit.align;
+  placeEls.forEach((placeEl, i) => {
+    const w = fit.widths[i];
+    if (w == null) return;
+    const grid = placeEl.querySelector<HTMLElement>("[data-c-place-grid]");
+    if (!grid) return;
+    if (categoryRevealGridCell(grid)) {
+      applyCategoryRevealGridColumns(grid, vw, w);
+    } else {
+      grid.style.width = `${w}px`;
+      grid.style.maxWidth = `${w}px`;
+    }
+  });
+}
+
+type PaintFn = (progress: number, frame: HTMLElement) => void;
 
 const ReducedMotionCtx = createContext(false);
 
@@ -71,8 +231,6 @@ function ReducedMotionProvider({ children }: { children: ReactNode }) {
 function useReducedMotion() {
   return useContext(ReducedMotionCtx);
 }
-
-type PaintFn = (progress: number, frame: HTMLElement) => void;
 
 /**
  * One sticky viewport for the whole chapter (title + stage).
@@ -301,15 +459,12 @@ function paintGotyNumber(
   num: HTMLElement,
   frame: HTMLElement,
   motion: { opacity: number; enter: number; park: number; scale: number },
+  parkY?: number,
 ) {
-  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
-  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 72);
   const boxEl =
     (num.offsetParent instanceof HTMLElement ? num.offsetParent : null) ??
     frame;
-  const frameW = Math.max(1, boxEl.clientWidth || frame.clientWidth);
-  const frameH = Math.max(1, boxEl.clientHeight || frame.clientHeight);
-  const stageH = Math.max(1, frameH - headH);
+  const stage = revealStageBox(frame, boxEl);
   const shift = gotyRevealNumberShift(
     motion,
     {
@@ -317,16 +472,17 @@ function paintGotyNumber(
       height: Math.max(1, num.offsetHeight),
     },
     {
-      width: frameW,
-      height: stageH,
-      topInset: 8,
+      width: stage.frameW,
+      height: stage.stageH,
+      topInset: GOTY_REVEAL_FIT.topInset,
       sideInset: 16,
+      parkY,
     },
   );
   const bw = Math.max(1, num.offsetWidth);
   const bh = Math.max(1, num.offsetHeight);
-  const cx = frameW / 2 + shift.x;
-  const cy = headH + stageH / 2 + shift.y;
+  const cx = stage.frameW / 2 + shift.x;
+  const cy = stage.headH + stage.stageH / 2 + shift.y;
   // Pixel translate from top-left — avoids Chrome mobile bugs with
   // left/top 50% + translate(-50%, -50%) + scale.
   num.style.left = "0px";
@@ -343,21 +499,21 @@ function paintGotyTied(
   frame: HTMLElement,
   motion: { opacity: number; yVh: number },
 ) {
-  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
-  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 72);
   const boxEl =
     (tied.offsetParent instanceof HTMLElement ? tied.offsetParent : null) ??
     frame;
-  const frameW = Math.max(1, boxEl.clientWidth || frame.clientWidth);
-  const frameH = Math.max(1, boxEl.clientHeight || frame.clientHeight);
-  const stageH = Math.max(1, frameH - headH);
+  const stage = revealStageBox(frame, boxEl);
   const bw = Math.max(1, tied.offsetWidth);
   const bh = Math.max(1, tied.offsetHeight);
-  const cx = frameW / 2;
-  const cy = headH + stageH / 2 + (motion.yVh / 100) * stageH;
+  const cx = stage.frameW / 2;
+  const cy = stage.headH + stage.stageH / 2 + (motion.yVh / 100) * stage.stageH;
   // Keep “Tied” fully on-screen horizontally (wide tracking on mobile).
   const pad = 12;
-  const left = clamp(cx - bw / 2, pad, Math.max(pad, frameW - pad - bw));
+  const left = clamp(
+    cx - bw / 2,
+    pad,
+    Math.max(pad, stage.frameW - pad - bw),
+  );
   tied.style.left = "0px";
   tied.style.top = "0px";
   tied.style.right = "auto";
@@ -369,24 +525,32 @@ function paintGotyTied(
 
 function paintGotyReduced(frame: HTMLElement) {
   const layers = frame.querySelectorAll<HTMLElement>("[data-c-place]");
+  const stage = revealStageBox(frame);
   layers.forEach((layer, i) => {
     const on = i === 0;
+    const fit = gotyLayerFit(layer, stage);
+    applyGotyCoverWidth(layer, fit.coverW);
     const num = layer.querySelector<HTMLElement>("[data-c-num]");
     const tied = layer.querySelector<HTMLElement>("[data-c-tied]");
     const games = layer.querySelectorAll<HTMLElement>("[data-c-game]");
     if (num) {
-      paintGotyNumber(num, frame, {
-        opacity: on ? 1 : 0,
-        enter: 1,
-        park: 1,
-        scale: 0.57,
-      });
+      paintGotyNumber(
+        num,
+        frame,
+        {
+          opacity: on ? 1 : 0,
+          enter: 1,
+          park: 1,
+          scale: 0.57,
+        },
+        fit.parkY,
+      );
     }
     if (tied) {
       const show = on && games.length > 1;
       paintGotyTied(tied, frame, {
         opacity: show ? 1 : 0,
-        yVh: GOTY_REVEAL_TIED_PARK_Y_VH,
+        yVh: fit.parkYVh,
       });
     }
     games.forEach((game, gi) => {
@@ -416,8 +580,7 @@ function paintGotyCountdown(p: number, frame: HTMLElement) {
   const units = layers.map((layer) =>
     gotyRevealRankUnits(Number(layer.dataset.games ?? "1")),
   );
-  const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
-  const headH = Math.ceil(head?.getBoundingClientRect().height ?? 108);
+  const stage = revealStageBox(frame);
 
   layers.forEach((layer, i) => {
     const rankUnits = units[i] ?? 1;
@@ -426,15 +589,17 @@ function paintGotyCountdown(p: number, frame: HTMLElement) {
     const tied = gameEls.length > 1;
     const num = layer.querySelector<HTMLElement>("[data-c-num]");
     const tiedEl = layer.querySelector<HTMLElement>("[data-c-tied]");
+    const fit = gotyLayerFit(layer, stage);
+    applyGotyCoverWidth(layer, fit.coverW);
     const n = gotyRevealNumber(t, rankUnits);
-    const k = gotyRevealTied(t, tied, rankUnits);
+    const k = gotyRevealTied(t, tied, rankUnits, fit.parkYVh);
 
-    if (num) paintGotyNumber(num, frame, n);
+    if (num) paintGotyNumber(num, frame, n, fit.parkY);
     if (tiedEl) paintGotyTied(tiedEl, frame, k);
 
     let maxGame = 0;
     gameEls.forEach((game, gi) => {
-      game.style.paddingTop = `${headH}px`;
+      game.style.paddingTop = `${stage.headH}px`;
       const gT = gotyRevealGameLocal(
         t,
         gi,
@@ -490,6 +655,7 @@ function GotyCountdown({
               key={`${group.rank}-${group.rows[0]!.gameId}`}
               data-c-place
               data-games={group.rows.length}
+              data-featured={featured ? "1" : "0"}
               className="absolute inset-0 overflow-visible"
             >
               <p
@@ -537,6 +703,7 @@ function GotyCountdown({
                   <div className="relative mx-auto flex w-full max-w-[var(--page-max)] items-end gap-5 pr-[min(22vw,7rem)] sm:gap-10 md:gap-14">
                     <Link
                       href={`/games/${row.slug}`}
+                      data-c-cover
                       className="relative block shrink-0"
                       style={{
                         width: featured
@@ -629,10 +796,10 @@ function paintCategoriesCountdown(p: number, frame: HTMLElement) {
     const live = inWindow ? 1 - exit : 0;
 
     // Vertically center in the stage *below* the live ceremony head height.
-    const head = frame.parentElement?.querySelector<HTMLElement>("[data-c-head]");
-    const headH = Math.ceil(head?.getBoundingClientRect().height ?? 108);
-    award.style.paddingTop = `${headH}px`;
+    const stageBox = revealStageBox(frame);
+    award.style.paddingTop = `${stageBox.headH}px`;
     award.style.paddingBottom = "0px";
+    applyCategoryAwardFit(award);
 
     award.style.opacity = inWindow ? "1" : "0";
     award.style.pointerEvents =
@@ -663,8 +830,8 @@ function paintCategoriesCountdown(p: number, frame: HTMLElement) {
     const placeEls = award.querySelectorAll<HTMLElement>("[data-c-place]");
     const layouts = Array.from(placeEls).map((el) => ({
       place: Number(el.dataset.place ?? "0"),
-      left: Number(el.dataset.offsetLeft || "0"),
-      width: Number(el.dataset.fullWidth || "0"),
+      left: el.offsetLeft,
+      width: el.offsetWidth,
     }));
     const opens = categoryRevealPlaceOpens(t, layouts, reduced);
 
@@ -719,9 +886,6 @@ function paintCategoriesCountdown(p: number, frame: HTMLElement) {
         meta.style.transform = `translate3d(${(1 - labelEnter) * -3}vw, 0, 0)`;
       }
       if (grid) {
-        // Literal px every paint — CSS vars / stylesheet tracks were ignored on
-        // mobile and covers blew up to intrinsic image size.
-        applyCategoryRevealGridColumns(grid, window.innerWidth);
         // Park fully off-screen left during the label beat, then slide in.
         const gx = (1 - gridEnter) * -gridLead;
         grid.style.opacity = String(
@@ -762,10 +926,8 @@ function CategoryRevealBoard({
     if (!board || !stage) return;
 
     const measureLayout = () => {
-      const vw = window.innerWidth;
-      board
-        .querySelectorAll<HTMLElement>("[data-c-place-grid]")
-        .forEach((grid) => applyCategoryRevealGridColumns(grid, vw));
+      const award = board.closest("[data-c-award]");
+      if (award instanceof HTMLElement) applyCategoryAwardFit(award);
       stage.dataset.stageWidth = String(stage.clientWidth);
       board.querySelectorAll<HTMLElement>("[data-c-place]").forEach((el) => {
         el.dataset.offsetLeft = String(el.offsetLeft);
@@ -818,6 +980,7 @@ function CategoryRevealBoard({
   return (
     <div
       ref={stageRef}
+      data-c-board-stage
       className="relative mx-auto mt-5 w-full max-w-[var(--page-max)] overflow-hidden sm:mt-6"
     >
       <div
@@ -839,6 +1002,10 @@ function CategoryRevealBoard({
               key={place.rank}
               data-c-place
               data-place={place.rank}
+              data-stack-rows={density.stackRows}
+              data-hero={density.hero ? "1" : "0"}
+              data-band={density.band}
+              data-show-titles={density.showTitles ? "1" : "0"}
               className="shrink-0 overflow-hidden will-change-transform"
               style={{ opacity: 0 }}
             >
