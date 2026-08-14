@@ -7,7 +7,7 @@ Dual-host deployment: **Vercel** and **Cloudflare Workers (OpenNext)**. Both are
 1. One Next.js codebase; host adapters stay thin.
 2. Every PR into `develop` gets **both** preview URLs when CI secrets are configured.
 3. Every push to `develop` deploys a lasting **staging** site on both hosts.
-4. One **Neon branch per PR**; both previews use that connection string.
+4. One **Neon branch per PR**, parented from Neon **`develop`** (not production); both previews use that connection string.
 5. Never point previews/staging at the production database.
 
 ## Local commands
@@ -31,6 +31,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
 | `.github/workflows/ci.yml` | Lint, typecheck, build on PR/push |
 | `.github/workflows/preview.yml` | Neon branch + Vercel + Cloudflare PR previews |
+| `.github/workflows/branch-deploy.yml` | On-demand dual-host deploy for any git ref |
 | `.github/workflows/staging.yml` | Push to `develop` → lasting staging on both hosts |
 | `.github/workflows/production.yml` | Push to `main` → production on both hosts |
 
@@ -111,12 +112,62 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 ```text
 PR opened/updated
   → ci: lint + typecheck + build
-  → neon: create branch preview/pr-<n>
+  → neon: create branch preview/pr-<n> from Neon `develop` (unique Auth URL via get_auth_url)
   → migrate: pnpm db:migrate on that branch
   → vercel / cloudflare: deploy with Neon URL + GitHub ADMIN_SYNC_SECRET / IGDB_*
+  → register Vercel + Cloudflare origins as Neon Auth trusted domains on that branch
   → comment both URLs on the PR
   → on PR close: delete Neon branch + optional CF preview worker
 ```
+
+## Manual branch deploy (on demand)
+
+Same dual-host stack as PR previews, but you choose when it runs.
+
+```bash
+# Deploy the current branch (slug derived from the branch name)
+pnpm deploy:branch
+
+# Deploy a specific ref with an explicit slug
+pnpm deploy:branch -- cursor/my-feature-53d7 --slug my-feature
+
+# Tear down Neon + Cloudflare for that slug
+pnpm deploy:branch -- my-feature --slug my-feature --destroy
+```
+
+Or: GitHub → Actions → **Manual branch deploy** → Run workflow (`ref`, `slug`, `action`).
+
+Resources:
+
+| Resource | Name |
+|---|---|
+| Neon branch | `preview/manual-<slug>` |
+| Cloudflare Worker | `thegamies-v2-manual-<slug>` |
+| Vercel | Preview deployment URL for that commit |
+
+Destroy removes the Neon branch and CF worker. Vercel preview deployments are left alone (they expire on Vercel’s schedule).
+
+## Neon Auth URLs and domains
+
+Two different “URLs” matter:
+
+1. **Auth API URL (`NEON_AUTH_BASE_URL`)** — each Neon **database branch** gets its own Auth endpoint when Auth is enabled. CI reads it from `create-branch-action` (`get_auth_url: true`) and injects it into Vercel/Cloudflare. Tokens from one branch are not valid on another.
+2. **App origins (trusted domains)** — the hosts where the Next app runs (`*.vercel.app`, `*.workers.dev`, staging, production). Neon Auth will only redirect / accept CSRF origins that are allowlisted **on that Auth branch**.
+
+What CI does for previews and manual deploys:
+
+- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `db_url` + `auth_url` + `branch_id`
+- Deploys both hosts with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
+- POSTs each deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
+
+The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_URL` should point at). Rename in Neon or change `parent_branch` in the workflows if yours differs.
+
+What you still configure by hand for lasting environments:
+
+- Staging / production App URLs in Neon Console → Auth → Configuration → Domains (exact origins), or wildcards such as `https://*.vercel.app` / `https://*.workers.dev` if you want a broader preview allowlist
+- `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing
+
+You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
 
 ## Production flow
 

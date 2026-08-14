@@ -51,6 +51,22 @@ body {
   font-family: var(--font-archivo), system-ui, sans-serif;
 }
 
+/*
+ * iOS Safari zooms focused fields under 16px. Keep form controls at 16px on
+ * phone/tablet; desktop can stay denser via utility classes above this floor.
+ */
+@media (max-width: 1023px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+      [type="file"]
+    ):not([type="hidden"]):not([type="button"]):not([type="submit"]):not(
+      [type="reset"]
+    ):not([type="image"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 ::selection {
   background: var(--accent);
   color: #fff;
