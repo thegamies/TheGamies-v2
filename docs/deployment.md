@@ -156,9 +156,11 @@ Two different “URLs” matter:
 
 What CI does for previews and manual deploys:
 
-- Creates (or reuses) a Neon branch → gets `db_url` + `auth_url` + `branch_id`
+- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `db_url` + `auth_url` + `branch_id`
 - Deploys both hosts with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
 - POSTs each deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
+
+The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_URL` should point at). Rename in Neon or change `parent_branch` in the workflows if yours differs.
 
 What you still configure by hand for lasting environments:
 
@@ -166,6 +168,7 @@ What you still configure by hand for lasting environments:
 - `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing
 
 You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
+
 ## Production flow
 
 1. Promote `develop` → `main` via PR.

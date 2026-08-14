@@ -21,7 +21,7 @@ Work top to bottom.
 - [ ] Create Neon project for The Gamies v2
 - [ ] Copy project id → GitHub secret `NEON_PROJECT_ID`
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
-- [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local)
+- [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local). Neon branch name should be **`develop`** — PR/manual previews parent from it.
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
