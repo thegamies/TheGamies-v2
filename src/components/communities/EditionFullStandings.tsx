@@ -52,10 +52,10 @@ export function EditionFullStandings({
 
   useEffect(() => {
     let cancelled = false;
-    setRows([]);
-    setPage(0);
-    setError(null);
     startTransition(async () => {
+      setRows([]);
+      setPage(0);
+      setError(null);
       try {
         const data = await fetchPage(1);
         if (cancelled) return;

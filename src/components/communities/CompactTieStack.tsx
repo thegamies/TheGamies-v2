@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type MouseEvent,
 } from "react";
@@ -94,6 +95,12 @@ function CoverStack({
   );
 }
 
+const emptySubscribe = () => () => {};
+
+function useClientMounted() {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
 type Layer = {
   index: number;
   opacity: number;
@@ -122,16 +129,12 @@ export function CompactTieStack({
   /** Which layer sits on top during / after the last crossfade. */
   const [top, setTop] = useState<"a" | "b">("a");
   /** Avoid dual-layer SSR markup differing from the first client paint. */
-  const [mounted, setMounted] = useState(false);
+  const mounted = useClientMounted();
   const resumeAtRef = useRef(0);
   const skipRef = useRef(true);
   const busyRef = useRef(false);
   const pendingRef = useRef<number | null>(null);
   const topRef = useRef<"a" | "b">("a");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (count < 2) return;

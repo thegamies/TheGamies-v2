@@ -261,8 +261,11 @@ function CeremonyChapter({
   const stageRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLDivElement>(null);
   const paintRef = useRef(paint);
-  paintRef.current = paint;
   const reduced = useReducedMotion();
+
+  useLayoutEffect(() => {
+    paintRef.current = paint;
+  });
 
   useEffect(() => {
     const track = trackRef.current;
