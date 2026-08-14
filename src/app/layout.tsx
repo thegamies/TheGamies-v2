@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
 import { AppProviders } from "@/components/AppProviders";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -32,6 +32,13 @@ export const metadata: Metadata = {
     "Community Game of the Year awards, Voices, and personal ranked lists.",
 };
 
+/** Keep iOS Safari on a real phone width (no ~980px desktop layout). */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,7 +47,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable} h-full`}
+      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable} min-h-full`}
+      // Cursor / remote preview injects attributes on <html>; ignore those.
+      suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
         <AppProviders>

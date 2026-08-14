@@ -3,7 +3,7 @@ import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import {
-  MATRIX_COVER,
+  MATRIX_COVER_WIDE,
   PODIUM_COVER,
 } from "@/components/communities/coverSizes";
 
@@ -20,15 +20,21 @@ export type StandingGameCardProps = {
   priority?: boolean;
   /**
    * `md` — games-browse / Top 10 grid (full-width cover).
-   * `sm` — matrix / strip cards (half of 206×275).
+   * `sm` — Comparison / strip cards (`MATRIX_COVER`; `MATRIX_COVER_WIDE` from `lg`).
    */
   size?: "md" | "sm";
+  /**
+   * Place marker scale when `place` is set.
+   * `md` — standings default (~18px). `lg` — Ranked Highlights (display).
+   */
+  placeSize?: "md" | "lg";
 };
 
 /**
  * Same card language as games browse: GameCover + title (+ optional meta).
- * Rank (if any) sits in front of the title — not on the cover. Ballot matrix
- * omits place (uses the `#` column). Titles clamp to 3 lines and shrink toward a 12px floor.
+ * Rank (if any) sits in front of the title — not on the cover. Comparison
+ * strips omit place (column headers name the source). Titles reserve and clamp
+ * to 2 lines and shrink toward a 12px floor.
  */
 export function StandingGameCard({
   slug,
@@ -40,6 +46,7 @@ export function StandingGameCard({
   scoreUnit = "pts",
   priority = false,
   size = "md",
+  placeSize = "md",
 }: StandingGameCardProps) {
   const scoreLabel =
     points != null
@@ -50,23 +57,43 @@ export function StandingGameCard({
       ? `${scoreLabel} · ${year}`
       : (scoreLabel ?? (year != null ? String(year) : null));
 
+  const placeClass =
+    placeSize === "lg"
+      ? place != null && place <= 3
+        ? "text-[2rem] sm:text-[2.5rem] md:text-[2.75rem]"
+        : "text-[1.5rem] sm:text-[1.85rem] md:text-[2.1rem]"
+      : size === "sm"
+        ? "text-[14px] lg:text-[18px]"
+        : "text-[18px]";
+
   const titleBlock = (
-    <div className="mt-2 flex items-baseline gap-1">
+    <div
+      className={`mt-2 flex ${
+        placeSize === "lg" ? "items-start gap-2" : "items-baseline gap-1"
+      }`}
+    >
       {place != null ? (
         <span
-          className={`shrink-0 font-display leading-none tracking-wide text-accent ${
-            size === "sm" ? "text-[14px]" : "text-[18px]"
-          }`}
+          className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
           aria-label={`Rank ${place}`}
         >
           {place}
         </span>
       ) : null}
-      <div className="min-w-0 flex-1">
+      <div className={`min-w-0 flex-1 ${placeSize === "lg" ? "pt-1" : ""}`}>
         <FitDisplayTitle
           className="w-full group-hover:text-accent"
-          maxPx={size === "sm" ? 14 : 18}
+          maxPx={
+            placeSize === "lg"
+              ? place != null && place <= 3
+                ? 20
+                : 16
+              : size === "sm"
+                ? 14
+                : 18
+          }
           minPx={12}
+          lines={2}
         >
           {title}
         </FitDisplayTitle>
@@ -77,13 +104,18 @@ export function StandingGameCard({
 
   if (size === "sm") {
     return (
-      <Link href={`/games/${slug}`} className="group block w-[103px]" draggable={false}>
+      <Link
+        href={`/games/${slug}`}
+        className="group block w-[103px] lg:w-[206px]"
+        draggable={false}
+      >
         <GameCover
           title={title}
           imageUrl={coverUrl}
           priority={priority}
-          width={MATRIX_COVER.width}
-          height={MATRIX_COVER.height}
+          fluid
+          width={MATRIX_COVER_WIDE.width}
+          height={MATRIX_COVER_WIDE.height}
         />
         {titleBlock}
       </Link>
@@ -95,6 +127,34 @@ export function StandingGameCard({
       <GameCover title={title} imageUrl={coverUrl} priority={priority} />
       {titleBlock}
     </Link>
+  );
+}
+
+/** Same footprint as `StandingGameCard` sm — empty cover + reserved 2-line caption. */
+export function EmptyStandingCard({
+  label = "No pick",
+}: {
+  label?: string;
+}) {
+  return (
+    <div
+      className="w-[103px] lg:w-[206px]"
+      aria-label={label}
+    >
+      <div
+        className="aspect-[3/4] w-full rounded-[var(--radius-artwork)] border border-line bg-panel"
+        aria-hidden
+      />
+      <p
+        className="mt-2 line-clamp-2 font-display text-[14px] leading-snug tracking-wide text-muted lg:text-[14px]"
+        style={{
+          minHeight: Math.ceil(2 * 14 * 1.375),
+          lineHeight: 1.375,
+        }}
+      >
+        {label}
+      </p>
+    </div>
   );
 }
 
@@ -116,7 +176,8 @@ export type WinnerPodiumEntry = {
   slug: string;
   title: string;
   coverUrl: string | null;
-  meta: string;
+  /** Optional caption under the title (omit on Highlights). */
+  meta?: string;
 };
 
 /** #2/#3 relative to rank-1 — desktop max matches ~72% of podium art. */
@@ -125,7 +186,13 @@ const RUNNER_MAX = {
   height: Math.round(PODIUM_COVER.height * 0.72),
 } as const;
 
-function PodiumColumn({
+function podiumColClass(size: "winner" | "runner"): string {
+  return size === "winner"
+    ? "min-w-0 flex-[1.35] max-w-[206px]"
+    : "min-w-0 flex-1 max-w-[148px]";
+}
+
+function PodiumCoverStack({
   entry,
   size,
 }: {
@@ -133,19 +200,14 @@ function PodiumColumn({
   size: "winner" | "runner";
 }) {
   const isWinner = size === "winner";
-  const titleMax = isWinner ? 28 : 18;
-  const colClass = isWinner
-    ? "min-w-0 flex-[1.35] max-w-[206px]"
-    : "min-w-0 flex-1 max-w-[148px]";
-
   return (
-    <div className={`flex flex-col items-start text-left ${colClass}`}>
+    <div className={`flex flex-col items-start ${podiumColClass(size)}`}>
       <div className="flex h-8 items-end sm:h-12">
         <RankMarker rank={entry.place} size={isWinner ? "lg" : "md"} />
       </div>
       <Link
         href={`/games/${entry.slug}`}
-        className="group mt-2 block w-full min-w-0 sm:mt-3"
+        className="mt-2 block w-full min-w-0 sm:mt-3"
       >
         <GameCover
           title={entry.title}
@@ -155,22 +217,47 @@ function PodiumColumn({
           width={isWinner ? PODIUM_COVER.width : RUNNER_MAX.width}
           height={isWinner ? PODIUM_COVER.height : RUNNER_MAX.height}
         />
+      </Link>
+    </div>
+  );
+}
+
+function PodiumCaption({
+  entry,
+  size,
+}: {
+  entry: WinnerPodiumEntry;
+  size: "winner" | "runner";
+}) {
+  const isWinner = size === "winner";
+  const titleMax = isWinner ? 28 : 18;
+  return (
+    <div className={`flex flex-col items-start text-left ${podiumColClass(size)}`}>
+      <Link
+        href={`/games/${entry.slug}`}
+        className="group mt-2 block w-full min-w-0 sm:mt-3"
+      >
         <FitDisplayTitle
-          className="mt-2 group-hover:text-accent sm:mt-3"
+          className="group-hover:text-accent"
           maxPx={titleMax}
           minPx={12}
+          lines={2}
         >
           {entry.title}
         </FitDisplayTitle>
       </Link>
-      <p className="mt-1.5 text-xs text-muted sm:mt-2 sm:text-sm">{entry.meta}</p>
+      {entry.meta ? (
+        <p className="mt-1.5 text-xs text-muted sm:mt-2 sm:text-sm">
+          {entry.meta}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 /**
- * Awards podium: #1 · #2 · #3 left-aligned, tops aligned.
- * Scales to fit a 360px-wide viewport without horizontal scroll.
+ * Awards podium: #1 · #2 · #3 left-aligned; cover bottoms share a baseline
+ * so the larger winner stands taller. Fits 360px without horizontal scroll.
  */
 export function WinnerPodium({
   winner,
@@ -182,11 +269,11 @@ export function WinnerPodium({
   /** Optional section label (e.g. "Winner"). Omit when the parent already titles the block. */
   eyebrow?: string;
 }) {
-  const second =
-    runnersUp.find((r) => r.place === 2) ?? runnersUp[0] ?? null;
-  const third =
-    runnersUp.find((r) => r.place === 3) ??
-    (runnersUp.length > 1 ? runnersUp[1] : null);
+  const columns: { entry: WinnerPodiumEntry; size: "winner" | "runner" }[] =
+    [winner, ...runnersUp].map((entry) => ({
+      entry,
+      size: entry.place === 1 ? ("winner" as const) : ("runner" as const),
+    }));
 
   return (
     <section>
@@ -196,10 +283,15 @@ export function WinnerPodium({
         </p>
       ) : null}
       <div className={eyebrow ? "mt-6" : "mt-0"}>
+        <div className="flex w-full max-w-full items-end gap-2 sm:gap-4 md:gap-8">
+          {columns.map(({ entry, size }) => (
+            <PodiumCoverStack key={entry.gameId} entry={entry} size={size} />
+          ))}
+        </div>
         <div className="flex w-full max-w-full items-start gap-2 sm:gap-4 md:gap-8">
-          <PodiumColumn entry={winner} size="winner" />
-          {second ? <PodiumColumn entry={second} size="runner" /> : null}
-          {third ? <PodiumColumn entry={third} size="runner" /> : null}
+          {columns.map(({ entry, size }) => (
+            <PodiumCaption key={entry.gameId} entry={entry} size={size} />
+          ))}
         </div>
       </div>
     </section>

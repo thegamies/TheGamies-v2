@@ -1,6 +1,7 @@
 import type {
   EditionResultsPublicMode,
   EditionResultsViewId,
+  SharedRankMode,
 } from "@/lib/communities/edition-results-scoring";
 
 /** Build edition results URLs (`?view=` / `?mode=` / `?voter=`). */
@@ -14,18 +15,20 @@ export function editionResultsHref(
     q?: string;
     /** Frozen public ballot for this username (`?view=ballot&voter=`). */
     voter?: string;
+    rank?: SharedRankMode;
   } = {},
 ) {
   const params = new URLSearchParams();
   const mode = opts.mode ?? "community";
-  const view = opts.view ?? "overview";
+  const view = opts.view ?? "reveal";
   if (mode !== "community") params.set("mode", mode);
-  if (view !== "overview") params.set("view", view);
+  if (view !== "reveal") params.set("view", view);
   if (opts.votersPage && opts.votersPage > 1) {
     params.set("votersPage", String(opts.votersPage));
   }
   if (opts.q) params.set("q", opts.q);
   if (opts.voter) params.set("voter", opts.voter);
+  if (opts.rank && opts.rank !== "competition") params.set("rank", opts.rank);
   const qs = params.toString();
   return `/communities/${encodeURIComponent(slug)}/edition/${year}${qs ? `?${qs}` : ""}`;
 }

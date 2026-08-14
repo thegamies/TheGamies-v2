@@ -148,6 +148,8 @@ Use Playwright screenshots compared to approved references under `design-referen
 - `test:integration` (when present)
 - `test:visual` (when present)
 
+Category Reveal stress-test (dev only): on edition Results, beside Competition · Dense, use **Repeat** and **Cap** controls (local `next dev` only). Cap limits games per derived rank; Repeat clones each derived rank. No URL params; no-op in production.
+
 Catalog / IGDB sync unit coverage lives under `packages/igdb/src/*.test.ts` and `src/lib/admin-sync-schema.test.ts`. Integration tests against Neon remain a follow-up.
 
 ## App Router layouts and request data

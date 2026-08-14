@@ -1,8 +1,8 @@
 /**
  * Navigation level styles — Editorial Standings hierarchy.
  *
- * Primary: bordered chips (community section switcher).
- * Secondary: underline tabs (in-page views).
+ * Primary: bordered chips — community masthead section switcher (inside CommunityHeader).
+ * Secondary: underline tabs on a hairline — in-page views under a local heading only.
  * Tertiary: plain text toggle (board / filter).
  * Multi-year edition: EditionYearSelect beside the section heading (not nav levels).
  */

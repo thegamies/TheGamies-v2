@@ -22,6 +22,8 @@ type HorizontalScrollProps = {
    * (never drives it) — no nested vertical scrollport.
    */
   stickyHeader?: ReactNode;
+  /** Prev/next arrow buttons when content overflows. Off for now. */
+  showArrowControls?: boolean;
 };
 
 const DRAG_THRESHOLD_PX = 6;
@@ -40,6 +42,7 @@ export function HorizontalScroll({
   viewportClassName = "",
   label = "Horizontal list",
   stickyHeader,
+  showArrowControls = false,
 }: HorizontalScrollProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -159,7 +162,7 @@ export function HorizontalScroll({
     syncHeaderToBody();
   }
 
-  const showControls = canLeft || canRight;
+  const showControls = showArrowControls && (canLeft || canRight);
   const overflowClass = /overflow-/.test(viewportClassName)
     ? ""
     : "overflow-x-auto";
@@ -199,9 +202,8 @@ export function HorizontalScroll({
         <div className="sticky top-0 z-20 w-full min-w-0 border-b border-line bg-paper">
           <div
             ref={headerRef}
-            // Mirror only — not a second scroll driver (that was clamping jumps).
-            className="scrollbar-none w-full min-w-0 overflow-x-auto pointer-events-none"
-            aria-hidden
+            // Mirror body scroll; links stay clickable (container ignores pan).
+            className="scrollbar-none w-full min-w-0 overflow-x-auto pointer-events-none [&_a]:pointer-events-auto"
           >
             {stickyHeader}
           </div>

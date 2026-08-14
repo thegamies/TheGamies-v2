@@ -6,7 +6,7 @@ import {
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
 import type { EditionGotyStandingRow } from "@/lib/communities/edition-results";
-import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
+import type { EditionResultsPublicMode, SharedRankMode } from "@/lib/communities/edition-results-scoring";
 
 type StandingsPayload = {
   page: number;
@@ -20,11 +20,13 @@ export function EditionFullStandings({
   slug,
   year,
   mode,
+  rankMode = "competition",
   totalGames,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
+  rankMode?: SharedRankMode;
   totalGames: number;
 }) {
   const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
@@ -37,6 +39,7 @@ export function EditionFullStandings({
     const params = new URLSearchParams({
       mode,
       page: String(nextPage),
+      rank: rankMode,
     });
     const res = await fetch(
       `/api/communities/${encodeURIComponent(slug)}/edition/${year}/standings?${params}`,
@@ -49,10 +52,10 @@ export function EditionFullStandings({
 
   useEffect(() => {
     let cancelled = false;
-    setRows([]);
-    setPage(0);
-    setError(null);
     startTransition(async () => {
+      setRows([]);
+      setPage(0);
+      setError(null);
       try {
         const data = await fetchPage(1);
         if (cancelled) return;
@@ -69,7 +72,7 @@ export function EditionFullStandings({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- board identity only
-  }, [slug, year, mode]);
+  }, [slug, year, mode, rankMode]);
 
   function loadMore() {
     startTransition(async () => {
@@ -120,7 +123,7 @@ export function EditionFullStandings({
             {rows.map((row) => (
               <li key={row.gameId}>
                 <StandingGameCard
-                  place={row.place}
+                  place={row.rank}
                   slug={row.slug}
                   title={row.title}
                   coverUrl={row.coverUrl}

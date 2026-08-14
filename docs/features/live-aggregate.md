@@ -39,6 +39,8 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 
 Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisfy the sort.
 
+Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM would invalidate a stored place). Default **competition**: `1 + COUNT(score > first row on the page)`, then walk the page (same score → same rank; new score → offset + local index + 1). Pages stay **50 games**. Site live has no dense chooser. Category laterals walk the top 10 the same way. Community live (SUM + lock snapshots) uses the same numbering.
+
 ## Refresh (single-flight)
 
 - CAS lock via `refreshing` / `refreshStartedAt` on year stats (stale lock reclaim after 60s).

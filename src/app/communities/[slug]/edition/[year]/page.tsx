@@ -5,8 +5,8 @@ import { MembershipActions } from "@/app/communities/[slug]/MembershipActions";
 import { EditionBallotEditor } from "@/components/communities/EditionBallotEditor";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionResultsView } from "@/components/communities/EditionResultsView";
-import { CommunityNav } from "@/components/communities/CommunityNav";
-import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
+import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -19,31 +19,29 @@ import {
 import {
   ensurePublishedEditionResults,
   getEditionBallotMatrix,
-  getEditionCategoryPickStrips,
+  getEditionCategoryComparisonMatrix,
   getEditionCategoryResults,
   getEditionGotyPage,
   getEditionResultsMeta,
   getEditionVotersPage,
   getEditionVoterDetailByUsername,
   listEditionCategoryMeta,
+  parseEditionRankMode,
   parseEditionResultMode,
   parseEditionResultsView,
   type EditionBallotMatrix,
+  type EditionCategoryComparisonMatrix,
   type EditionCategoryMeta,
-  type EditionCategoryPickCard,
   type EditionCategoryStandingBlock,
 } from "@/lib/communities/edition-results";
+import { BALLOT_MATRIX_STANDINGS_FETCH } from "@/lib/communities/edition-ballot-matrix";
 import {
   getEditionByCommunityYear,
   listEditionsForCommunity,
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
-import {
-  editionStatusLabel,
-  showEditionNav,
-  type EditionStatus,
-} from "@/lib/communities/edition-status";
+import { showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
@@ -78,21 +76,6 @@ export async function generateMetadata({
   }
 }
 
-function editionIntroCopy(status: EditionStatus): string {
-  switch (status) {
-    case "scheduled":
-      return "This edition is coming soon. Voting has not opened yet.";
-    case "open":
-      return "Voting is open. Rank your Game of the Year and make category picks.";
-    case "closed":
-      return "Voting has closed. Final standings are not published yet.";
-    case "published":
-      return "Final results for this edition.";
-    case "draft":
-      return "This edition is not public yet.";
-  }
-}
-
 export default async function CommunityEditionYearPage({
   params,
   searchParams,
@@ -107,6 +90,7 @@ export default async function CommunityEditionYearPage({
 
   const sp = await searchParams;
   const mode = parseEditionResultMode(first(sp.mode));
+  const rankMode = parseEditionRankMode(first(sp.rank));
   const votersPageRaw = Number(first(sp.votersPage) ?? "1");
   const votersPageNum =
     Number.isFinite(votersPageRaw) && votersPageRaw >= 1
@@ -169,7 +153,7 @@ export default async function CommunityEditionYearPage({
     requestedView === "ballot" &&
     !(profile && isMember) &&
     !voterUsername
-      ? "overview"
+      ? "reveal"
       : requestedView;
 
   let submitters: Awaited<ReturnType<typeof listEditionBallotSubmitters>> = [];
@@ -185,7 +169,7 @@ export default async function CommunityEditionYearPage({
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyPage>>["rows"];
     categoryPodiums: EditionCategoryStandingBlock[];
-    categoryPickStrips: Record<string, EditionCategoryPickCard[]>;
+    categoryComparison: EditionCategoryComparisonMatrix;
     categoryMeta: EditionCategoryMeta[];
     voters: Awaited<ReturnType<typeof getEditionVotersPage>> & { q: string };
     matrix: EditionBallotMatrix;
@@ -231,6 +215,14 @@ export default async function CommunityEditionYearPage({
           hasGames: false,
           voiceColumns: [],
           rows: [],
+          rowsDense: [],
+          rowsSpan: [],
+        };
+        const emptyCategoryComparison: EditionCategoryComparisonMatrix = {
+          showYou: false,
+          hasGames: false,
+          voiceColumns: [],
+          rows: [],
         };
 
         if (view === "standings") {
@@ -238,7 +230,7 @@ export default async function CommunityEditionYearPage({
             meta,
             topTen: [],
             categoryPodiums: [],
-            categoryPickStrips: {},
+            categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
             voters: emptyVoters,
             matrix: emptyMatrix,
@@ -250,7 +242,7 @@ export default async function CommunityEditionYearPage({
             meta,
             topTen: [],
             categoryPodiums: [],
-            categoryPickStrips: {},
+            categoryComparison: emptyCategoryComparison,
             categoryMeta,
             voters: emptyVoters,
             matrix: emptyMatrix,
@@ -267,7 +259,7 @@ export default async function CommunityEditionYearPage({
             meta,
             topTen: [],
             categoryPodiums: [],
-            categoryPickStrips: {},
+            categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
             voters: { ...voters, q: votersQ },
             matrix: emptyMatrix,
@@ -321,7 +313,7 @@ export default async function CommunityEditionYearPage({
             meta,
             topTen: [],
             categoryPodiums: [],
-            categoryPickStrips: {},
+            categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
             voters: emptyVoters,
             matrix: emptyMatrix,
@@ -330,25 +322,28 @@ export default async function CommunityEditionYearPage({
         } else {
           const topTenPage = await getEditionGotyPage(edition.id, mode, {
             page: 1,
-            pageSize: 10,
+            pageSize: BALLOT_MATRIX_STANDINGS_FETCH,
+            rankMode,
           });
           const categoryPodiums = await getEditionCategoryResults(
             edition.id,
             mode,
-            { maxPlace: 3 },
+            { maxPlace: 3, rankMode },
           );
-          const categoryPickStrips = await getEditionCategoryPickStrips(
-            edition.id,
-            { viewerProfileId: profile?.id ?? null },
-          );
-          const matrix = await getEditionBallotMatrix(edition.id, {
-            viewerProfileId: profile?.id ?? null,
-          });
+          const [matrix, categoryComparison] = await Promise.all([
+            getEditionBallotMatrix(edition.id, {
+              viewerProfileId: profile?.id ?? null,
+            }),
+            getEditionCategoryComparisonMatrix(edition.id, {
+              viewerProfileId: profile?.id ?? null,
+              rankMode,
+            }),
+          ]);
           resultsBundle = {
             meta,
-            topTen: topTenPage.rows,
+            topTen: topTenPage.rows.filter((r) => r.rank <= 10),
             categoryPodiums,
-            categoryPickStrips,
+            categoryComparison,
             categoryMeta: [],
             voters: emptyVoters,
             matrix,
@@ -362,20 +357,9 @@ export default async function CommunityEditionYearPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted">
-        <Link href="/communities" className="hover:text-ink">
-          Communities
-        </Link>
-      </p>
-      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-        {community.name}
-      </h1>
-      <p className="mt-2 text-sm text-muted">
-        {edition.year} edition · {editionStatusLabel(edition.status)}
-      </p>
-
-      <CommunityNav
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
+      <CommunityHeader
+        name={community.name}
         slug={community.slug}
         liveEnabled={community.liveRankingsEnabled}
         canManage={canManage}
@@ -384,29 +368,24 @@ export default async function CommunityEditionYearPage({
       />
 
       {edition.status === "published" && resultsBundle ? (
-        <section className="mt-10 border-t border-line pt-8">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-            <h2 className="font-display text-3xl tracking-wide text-ink">
-              Results
-            </h2>
-            <EditionYearSelect
-              slug={community.slug}
-              year={edition.year}
-              years={yearOptions}
-            />
-          </div>
-          <p className="mt-4 max-w-xl text-muted">
-            {editionIntroCopy(edition.status)}
-          </p>
+        <section className="mt-8">
+          <EditionSectionHeader
+            status={edition.status}
+            slug={community.slug}
+            year={edition.year}
+            years={yearOptions}
+          />
           <EditionResultsView
             slug={community.slug}
             year={edition.year}
+            communityName={community.name}
             mode={mode}
+            rankMode={rankMode}
             view={view}
             meta={resultsBundle.meta}
             topTen={resultsBundle.topTen}
             categoryPodiums={resultsBundle.categoryPodiums}
-            categoryPickStrips={resultsBundle.categoryPickStrips}
+            categoryComparison={resultsBundle.categoryComparison}
             categoryMeta={resultsBundle.categoryMeta}
             voters={resultsBundle.voters}
             matrix={resultsBundle.matrix}
@@ -425,20 +404,13 @@ export default async function CommunityEditionYearPage({
           />
         </section>
       ) : (
-        <section className="mt-10 border-t border-line pt-8">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-            <h2 className="font-display text-3xl tracking-wide text-ink">
-              Game of the Year
-            </h2>
-            <EditionYearSelect
-              slug={community.slug}
-              year={edition.year}
-              years={yearOptions}
-            />
-          </div>
-          <p className="mt-4 max-w-xl text-muted">
-            {editionIntroCopy(edition.status)}
-          </p>
+        <section className="mt-8">
+          <EditionSectionHeader
+            status={edition.status}
+            slug={community.slug}
+            year={edition.year}
+            years={yearOptions}
+          />
 
           {canManage && submitters.length > 0 ? (
             <div className="mt-8 border border-line p-4">

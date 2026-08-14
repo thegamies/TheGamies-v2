@@ -43,8 +43,15 @@ describe("storageModeFor / parseEditionResultMode", () => {
 });
 
 describe("parseEditionResultsView", () => {
-  it("defaults to overview and accepts standings, categories, voters, and ballot", () => {
-    expect(parseEditionResultsView(undefined)).toBe("overview");
+  it("parses competition vs dense numbering", async () => {
+    const { parseEditionRankMode } = await import("./edition-results-scoring");
+    expect(parseEditionRankMode(undefined)).toBe("competition");
+    expect(parseEditionRankMode("dense")).toBe("dense");
+  });
+
+  it("defaults to reveal and accepts overview, standings, categories, voters, and ballot", () => {
+    expect(parseEditionResultsView(undefined)).toBe("reveal");
+    expect(parseEditionResultsView("reveal")).toBe("reveal");
     expect(parseEditionResultsView("overview")).toBe("overview");
     expect(parseEditionResultsView("standings")).toBe("standings");
     expect(parseEditionResultsView("categories")).toBe("categories");

@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gt, sql } from "drizzle-orm";
 import {
   communityLiveLockCategoryRows,
   communityLiveLockGoty,
@@ -15,6 +15,10 @@ import {
   type StandingsPage,
 } from "@/lib/live-aggregate/service";
 import { isCommunityLiveScoresRevealed } from "./live-reveal";
+import {
+  withDisplayRanks,
+  withDisplayRanksOnPage,
+} from "@/lib/standings/shared-rank";
 
 /** Max GOTY rows frozen into a lock snapshot. */
 const LOCK_SNAPSHOT_GOTY_CAP = 2000;
@@ -51,6 +55,7 @@ type BundleRow = {
   goty_total: unknown;
   page: unknown;
   total_pages: unknown;
+  higher_count: unknown;
   goty: unknown;
   categories: unknown;
 };
@@ -122,7 +127,11 @@ function groupCategoryBlocks(
       categoryId: block.categoryId,
       label: block.label,
       description: block.description,
-      rows: block.rows,
+      rows: withDisplayRanks(
+        block.rows,
+        (r) => r.voteCount ?? 0,
+        "competition",
+      ).map((r) => ({ ...r, place: r.rank })),
     }));
 }
 
@@ -189,6 +198,33 @@ async function queryCommunityLiveStandings(
       p.goty_total,
       p.page,
       p.total_pages,
+      (
+        select count(*)::int
+        from (
+          select sum(c.points)::int as score
+          from live_goty_contrib c
+          inner join community_members m
+            on m.profile_id = c.profile_id
+           and m.community_id = ${communityId}::uuid
+          where c.year = ${year}
+          group by c.game_id
+        ) totals
+        where totals.score > (
+          select agg.score
+          from (
+            select sum(c.points)::int as score
+            from live_goty_contrib c
+            inner join community_members m
+              on m.profile_id = c.profile_id
+             and m.community_id = ${communityId}::uuid
+            where c.year = ${year}
+            group by c.game_id
+            order by sum(c.points) desc, c.game_id asc
+            offset (p.page - 1) * ${pageSize}
+            limit 1
+          ) agg
+        )
+      ) as higher_count,
       coalesce(
         (
           select json_agg(row_to_json(row) order by row."place")
@@ -292,7 +328,7 @@ async function queryCommunityLiveStandings(
   const totalPages = Math.max(1, asInt(row.total_pages, 1));
   const page = clampStandingsPage(asInt(row.page, 1), totalPages);
 
-  const goty: StandingsGameRow[] = parseJsonArray<GotyJsonRow>(row.goty).map(
+  const gotyRaw: StandingsGameRow[] = parseJsonArray<GotyJsonRow>(row.goty).map(
     (g) => ({
       place: asInt(g.place),
       gameId: String(g.gameId),
@@ -305,6 +341,11 @@ async function queryCommunityLiveStandings(
       rankCounts: null,
     }),
   );
+  const goty = withDisplayRanksOnPage(gotyRaw, (r) => r.score ?? 0, {
+    offset: (page - 1) * pageSize,
+    firstGroupRank: asInt(row.higher_count) + 1,
+    mode: "competition",
+  }).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
   const byId = new Map<string, CategoryStandingsBlock>();
@@ -329,6 +370,13 @@ async function queryCommunityLiveStandings(
         voteCount: cat.voteCount == null ? null : asInt(cat.voteCount),
       });
     }
+  }
+  for (const block of byId.values()) {
+    block.rows = withDisplayRanks(
+      block.rows,
+      (r) => r.voteCount ?? 0,
+      "competition",
+    ).map((r) => ({ ...r, place: r.rank }));
   }
 
   return {
@@ -540,22 +588,43 @@ async function queryLockedStandingsPage(
       asc(communityLiveLockCategoryRows.place),
     );
 
+  const gotyMapped = gotyRows.map((row) => ({
+    place: row.place,
+    gameId: row.gameId,
+    slug: row.slug,
+    title: row.title,
+    year: row.gameYear,
+    coverUrl: row.coverUrl,
+    score: row.score,
+    listMentions: row.listMentions,
+    rankCounts: null,
+  }));
+  let firstGroupRank = 1;
+  if (gotyMapped[0]) {
+    const [higher] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityLiveLockGoty)
+      .where(
+        and(
+          eq(communityLiveLockGoty.communityId, communityId),
+          eq(communityLiveLockGoty.year, year),
+          gt(communityLiveLockGoty.score, gotyMapped[0].score),
+        ),
+      );
+    firstGroupRank = Number(higher?.n ?? 0) + 1;
+  }
+  const goty = withDisplayRanksOnPage(gotyMapped, (r) => r.score ?? 0, {
+    offset: gotyMapped[0] ? gotyMapped[0].place - 1 : 0,
+    firstGroupRank,
+    mode: "competition",
+  }).map((r) => ({ ...r, place: r.rank }));
+
   return {
     listCount: meta.listCount,
     gotyTotal: meta.gotyTotal,
     page,
     totalPages,
-    goty: gotyRows.map((row) => ({
-      place: row.place,
-      gameId: row.gameId,
-      slug: row.slug,
-      title: row.title,
-      year: row.gameYear,
-      coverUrl: row.coverUrl,
-      score: row.score,
-      listMentions: row.listMentions,
-      rankCounts: null,
-    })),
+    goty,
     categories: groupCategoryBlocks(categoryRows),
   };
 }
