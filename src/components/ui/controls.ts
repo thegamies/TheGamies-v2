@@ -32,7 +32,7 @@ export const stepperValueClass =
   "inline-flex h-full min-w-14 items-center justify-center gap-1 border-x border-line px-2 text-sm font-semibold text-ink transition-colors duration-[var(--motion-fast)] hover:text-accent";
 
 export const fieldInputClass =
-  "mt-1 block w-full border border-line bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)]";
+  "mt-1 block w-full border border-line bg-panel px-3 py-2 text-base text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)] lg:text-sm";
 
 /** Date / time picker trigger — button, not a text field. */
 export const pickerTriggerClass =

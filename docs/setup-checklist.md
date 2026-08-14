@@ -25,7 +25,8 @@ Work top to bottom.
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
-- [ ] Add trusted domains in Neon Auth for staging/production hosts (Console → Auth → Configuration → Domains). `localhost` ports are pre-approved; **LAN IPs are not** — for phone/device testing add the URL you open on the phone (e.g. `http://192.168.1.123:3000`). `next.config.ts` allowlists this machine’s current LAN IPs for `/_next` assets; restart `next dev` after a network change. Extra hostnames go in Doppler `ALLOWED_DEV_ORIGINS`.
+- [ ] Add trusted domains in Neon Auth for **staging and production** hosts (Console → Auth → Configuration → Domains). `localhost` ports are pre-approved; **LAN IPs are not** — for phone/device testing add the URL you open on the phone (e.g. `http://192.168.1.123:3000`). `next.config.ts` allowlists this machine’s current LAN IPs for `/_next` assets; restart `next dev` after a network change. Extra hostnames go in Doppler `ALLOWED_DEV_ORIGINS`.
+- [ ] PR / manual previews: CI creates a Neon branch with its own Auth URL and registers that deploy’s Vercel + Cloudflare origins as trusted domains on the branch — no manual domain entry per preview. Details: [deployment.md](./deployment.md#neon-auth-urls-and-domains).
 - [ ] `doppler run --config dev_personal -- pnpm db:migrate` (includes `profiles`; hits your personal Neon branch)
 
 ## 2. Vercel
