@@ -77,6 +77,7 @@ jobs:
         with:
           project_id: ${{ secrets.NEON_PROJECT_ID }}
           branch_name: ${{ needs.prepare.outputs.neon_name }}
+          parent_branch: develop
           api_key: ${{ secrets.NEON_API_KEY }}
           role: neondb_owner
           get_auth_url: true

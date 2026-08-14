@@ -7,7 +7,7 @@ Dual-host deployment: **Vercel** and **Cloudflare Workers (OpenNext)**. Both are
 1. One Next.js codebase; host adapters stay thin.
 2. Every PR into `develop` gets **both** preview URLs when CI secrets are configured.
 3. Every push to `develop` deploys a lasting **staging** site on both hosts.
-4. One **Neon branch per PR**; both previews use that connection string.
+4. One **Neon branch per PR**, parented from Neon **`develop`** (not production); both previews use that connection string.
 5. Never point previews/staging at the production database.
 
 ## Local commands
@@ -112,7 +112,7 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 ```text
 PR opened/updated
   → ci: lint + typecheck + build
-  → neon: create branch preview/pr-<n> (unique Auth URL via get_auth_url)
+  → neon: create branch preview/pr-<n> from Neon `develop` (unique Auth URL via get_auth_url)
   → migrate: pnpm db:migrate on that branch
   → vercel / cloudflare: deploy with Neon URL + GitHub ADMIN_SYNC_SECRET / IGDB_*
   → register Vercel + Cloudflare origins as Neon Auth trusted domains on that branch
