@@ -113,12 +113,10 @@ export function EditionBallotEditor({
 
   useEffect(() => {
     if (!state) return;
-    /* eslint-disable react-hooks/set-state-in-effect -- sync saved snapshot after the action returns */
     if (state.saved && submittedKeyRef.current) {
       setSavedKey(submittedKeyRef.current);
     }
     submittedKeyRef.current = null;
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, [state]);
 
   const isFull = items.length >= EDITION_BALLOT_MAX_ITEMS;

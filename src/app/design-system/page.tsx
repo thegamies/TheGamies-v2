@@ -227,7 +227,7 @@ export default function DesignSystemPage() {
           <code className="text-ink">TimePicker</code>,{" "}
           <code className="text-ink">DateTimePicker</code>.{" "}
           <code className="text-ink">Dialog</code> for create;{" "}
-          <code className="text-ink">tone="danger"</code> for delete.
+          <code className="text-ink">{`tone="danger"`}</code> for delete.
         </p>
         <DatePickerFixture />
       </Section>

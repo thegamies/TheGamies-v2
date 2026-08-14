@@ -120,6 +120,13 @@
       "when": 1786512000000,
       "tag": "0016_award_category_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786515000000,
+      "tag": "0017_award_category_copy",
+      "breakpoints": true
     }
   ]
 }

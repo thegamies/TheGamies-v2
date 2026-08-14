@@ -37,7 +37,7 @@ export function CategoryVotesEditorFixture() {
         {
           id: "narrative",
           label: "Best Story",
-          description: "Story, writing, and world.",
+          description: "The story you couldn't stop thinking about.",
           sortOrder: 3,
           categoryGroup: "premier",
           eligibility: "current_year",

@@ -12,7 +12,11 @@ describe("AWARD_CATEGORY_DEFS", () => {
     const orders = AWARD_CATEGORY_DEFS.map((d) => d.sortOrder);
     expect(orders).toEqual([...orders].sort((a, b) => a - b));
     expect(orders[0]).toBe(2);
-    expect(orders.at(-1)).toBe(64);
+    expect(orders.at(-1)).toBe(87);
+    expect(AWARD_CATEGORY_DEFS.every((d) => d.description.length > 0)).toBe(
+      true,
+    );
+    expect(AWARD_CATEGORY_DEFS).toHaveLength(86);
   });
 
   it("parses groups and standings query strings", () => {

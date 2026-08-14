@@ -4,7 +4,6 @@ import { liveGotyYearStats, type Db } from "@thegamies/db";
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
 import {
-  DEFAULT_AWARD_CATEGORY_GROUP,
   parseAwardCategoryGroup,
   type AwardCategoryGroup,
 } from "./award-category-defs";

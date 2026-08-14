@@ -77,22 +77,15 @@ export function CalendarPanel({
         }
         return today ?? { year: 2026, monthIndex: 0 };
       })();
+  const valueKey = selected
+    ? `${selected.year}-${selected.monthIndex}`
+    : `empty-${anchorYear ?? ""}`;
   const [month, setMonth] = useState(initialMonth);
-
-  useEffect(() => {
-    if (selected) {
-      setMonth({ year: selected.year, monthIndex: selected.monthIndex });
-      return;
-    }
-    if (anchorYear == null) return;
-    setMonth((current) => {
-      if (current.year === anchorYear) return current;
-      const today = parseIsoDate(todayIsoDate());
-      const monthIndex =
-        today && today.year === anchorYear ? today.monthIndex : 10;
-      return { year: anchorYear, monthIndex };
-    });
-  }, [selected?.year, selected?.monthIndex, anchorYear]);
+  const [seenKey, setSeenKey] = useState(valueKey);
+  if (seenKey !== valueKey) {
+    setSeenKey(valueKey);
+    setMonth(initialMonth);
+  }
 
   const days = useMemo(
     () => calendarMonthDays(month.year, month.monthIndex),

@@ -26,11 +26,12 @@ export function YearPanel({
   onPick: (year: number) => void;
 }) {
   const [start, setStart] = useState(() => yearGridStart(value));
-  const blocked = useMemo(() => new Set(disabledYears), [disabledYears]);
-
-  useEffect(() => {
+  const [seenValue, setSeenValue] = useState(value);
+  if (seenValue !== value) {
+    setSeenValue(value);
     setStart(yearGridStart(value));
-  }, [value]);
+  }
+  const blocked = useMemo(() => new Set(disabledYears), [disabledYears]);
 
   const years = yearGridYears(start);
   const currentYear = new Date().getFullYear();
