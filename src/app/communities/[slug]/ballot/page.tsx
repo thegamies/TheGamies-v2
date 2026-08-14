@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 type Params = Promise<{ slug: string }>;
 
-/** Old Ballot URL → unified Edition tab. */
+/** Old Ballot URL → unified Events tab. */
 export default async function CommunityBallotRedirect({
   params,
 }: {

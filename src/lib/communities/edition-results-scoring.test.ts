@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { editionResultsHref } from "./edition-results-href";
 import {
   aggregateEditionCategories,
   aggregateEditionGoty,
+  editionBoardLabel,
   parseEditionResultMode,
   parseEditionResultsView,
   storageModeFor,
@@ -31,6 +33,13 @@ const games = new Map<string, GameMeta>([
   ],
 ]);
 
+describe("editionBoardLabel", () => {
+  it("uses Hosts for the voices board", () => {
+    expect(editionBoardLabel("community")).toBe("Community");
+    expect(editionBoardLabel("voices")).toBe("Hosts");
+  });
+});
+
 describe("storageModeFor / parseEditionResultMode", () => {
   it("maps combined to community storage and hides combined in public parse", () => {
     expect(storageModeFor("combined")).toBe("community");
@@ -42,21 +51,42 @@ describe("storageModeFor / parseEditionResultMode", () => {
   });
 });
 
-describe("parseEditionResultsView", () => {
-  it("parses competition vs dense numbering", async () => {
+describe("parseEditionRankMode", () => {
+  it("parses stored competition vs dense numbering", async () => {
     const { parseEditionRankMode } = await import("./edition-results-scoring");
     expect(parseEditionRankMode(undefined)).toBe("competition");
     expect(parseEditionRankMode("dense")).toBe("dense");
   });
+});
 
-  it("defaults to reveal and accepts overview, standings, categories, voters, and ballot", () => {
+describe("editionResultsHref", () => {
+  it("serializes the Results tab as view=results", () => {
+    expect(editionResultsHref("demo", 2026, { view: "overview" })).toBe(
+      "/communities/demo/edition/2026?view=results",
+    );
+  });
+
+  it("keeps view and Voices mode when switching years", () => {
+    expect(
+      editionResultsHref("demo", 2025, {
+        view: "overview",
+        mode: "voices",
+      }),
+    ).toBe("/communities/demo/edition/2025?mode=voices&view=results");
+  });
+});
+
+describe("parseEditionResultsView", () => {
+  it("defaults to reveal and accepts results, overview, standings, categories, voters, ballot, and settings", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
     expect(parseEditionResultsView("reveal")).toBe("reveal");
     expect(parseEditionResultsView("overview")).toBe("overview");
+    expect(parseEditionResultsView("results")).toBe("overview");
     expect(parseEditionResultsView("standings")).toBe("standings");
     expect(parseEditionResultsView("categories")).toBe("categories");
     expect(parseEditionResultsView("voters")).toBe("voters");
     expect(parseEditionResultsView("ballot")).toBe("ballot");
+    expect(parseEditionResultsView("settings")).toBe("settings");
   });
 });
 

@@ -10,7 +10,7 @@ export default function HomePage() {
         Editorial Standings
       </h1>
       <p className="mt-6 max-w-xl font-serif text-lg leading-relaxed text-muted">
-        Community awards, Voices, and ranked lists — rebuilt with a restrained
+        Community awards, Hosts, and ranked lists — rebuilt with a restrained
         soft-brutal design system.
       </p>
       <div className="mt-10 flex flex-wrap gap-3">

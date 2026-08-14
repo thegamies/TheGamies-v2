@@ -301,6 +301,37 @@ describe("assembleBallotMatrixRows", () => {
     expect(rows[2]?.community).toEqual([]);
   });
 
+  it("keeps every Voices game in a rank-10 competition tie", () => {
+    const voices = [
+      ...Array.from({ length: 9 }, (_, i) => ({
+        place: i + 1,
+        points: 20 - i,
+        gameId: `u${i}`,
+        slug: `u${i}`,
+        title: `U${i}`,
+        coverUrl: null,
+      })),
+      ...Array.from({ length: 25 }, (_, i) => ({
+        place: 10 + i,
+        points: 5,
+        gameId: `t${i}`,
+        slug: `t${i}`,
+        title: `T${i}`,
+        coverUrl: null,
+      })),
+    ];
+    const rows = assembleBallotMatrixRows({
+      top: 10,
+      community: [],
+      voices,
+      voiceColumns: [],
+      voterRanks: [],
+      viewerProfileId: null,
+      includeYou: false,
+    });
+    expect(rows[9]?.voices).toHaveLength(25);
+  });
+
   it("omits You column data when includeYou is false", () => {
     const rows = assembleBallotMatrixRows({
       top: 2,

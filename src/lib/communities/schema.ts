@@ -4,6 +4,7 @@ export const COMMUNITY_SLUG_MIN = 3;
 export const COMMUNITY_SLUG_MAX = 32;
 export const COMMUNITY_NAME_MAX = 80;
 export const COMMUNITY_DESCRIPTION_MAX = 500;
+const COMMUNITY_SLUG_FALLBACK = "community";
 
 /** Reserved so `/communities/new` is never a community slug. */
 export const RESERVED_COMMUNITY_SLUGS = new Set(["new"]);
@@ -13,6 +14,31 @@ export type CommunityRole = (typeof COMMUNITY_ROLES)[number];
 
 export function normalizeCommunitySlug(raw: string): string {
   return raw.trim().toLowerCase();
+}
+
+/** URL slug from a community name (`kinda_funny`). Not shown as a form field. */
+export function slugifyCommunityName(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .replace(/_+/g, "_")
+    .slice(0, COMMUNITY_SLUG_MAX);
+  if (
+    base.length < COMMUNITY_SLUG_MIN ||
+    RESERVED_COMMUNITY_SLUGS.has(base)
+  ) {
+    return COMMUNITY_SLUG_FALLBACK;
+  }
+  return base;
+}
+
+export function communitySlugWithSuffix(base: string, n: number): string {
+  if (n <= 1) return base.slice(0, COMMUNITY_SLUG_MAX);
+  const suffix = `_${n}`;
+  const maxBase = Math.max(COMMUNITY_SLUG_MIN, COMMUNITY_SLUG_MAX - suffix.length);
+  return `${base.slice(0, maxBase)}${suffix}`.slice(0, COMMUNITY_SLUG_MAX);
 }
 
 export const communitySlugSchema = z
@@ -38,12 +64,13 @@ export const communityDescriptionSchema = z
   .max(COMMUNITY_DESCRIPTION_MAX);
 
 export const createCommunitySchema = z.object({
-  slug: communitySlugSchema,
   name: communityNameSchema,
   description: communityDescriptionSchema.optional().or(z.literal("")),
 });
 
-export type CreateCommunityInput = z.infer<typeof createCommunitySchema>;
+export type CreateCommunityInput = z.infer<typeof createCommunitySchema> & {
+  slug: string;
+};
 
 export function parseCreateCommunityInput(
   input: unknown,
@@ -53,5 +80,8 @@ export function parseCreateCommunityInput(
     const first = parsed.error.issues[0];
     return { error: first?.message ?? "Check the community details." };
   }
-  return parsed.data;
+  return {
+    ...parsed.data,
+    slug: slugifyCommunityName(parsed.data.name),
+  };
 }

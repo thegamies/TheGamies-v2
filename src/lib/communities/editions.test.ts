@@ -1,12 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
+  addCalendarDays,
   computeEditionStatus,
+  EDITION_PUBLIC_LABEL,
+  editionBallotCountCopy,
   editionDeckCopy,
+  editionDeleteConfirmMatches,
   editionOverviewLinkLabel,
-  editionSectionTitle,
+  editionOverviewStatusLabel,
+  editionOverviewTitle,
+  editionScheduleDateBounds,
+  editionScheduleSaveWarning,
   editionStatusLabel,
+  formatEditionDateInput,
   formatEditionDateTimeInput,
+  formatEditionScheduleTime,
+  parseEditionDateInput,
   parseEditionDateTimeInput,
+  parseEditionScheduleInput,
   parseEditionYear,
   showEditionNav,
   validateEditionSchedule,
@@ -65,7 +76,7 @@ describe("validateEditionSchedule", () => {
 });
 
 describe("edition nav gates", () => {
-  it("shows the Edition tab for any non-draft status", () => {
+  it("shows the Events tab for any non-draft status", () => {
     expect(showEditionNav("draft")).toBe(false);
     expect(showEditionNav("scheduled")).toBe(true);
     expect(showEditionNav("open")).toBe(true);
@@ -76,14 +87,52 @@ describe("edition nav gates", () => {
 
 describe("edition public copy", () => {
   it("uses product titles and decks without status jargon lines", () => {
-    expect(editionSectionTitle("published")).toBe("Results");
-    expect(editionSectionTitle("open")).toBe("Game of the Year");
+    expect(EDITION_PUBLIC_LABEL).toBe("Events");
+    expect(editionOverviewTitle(2026)).toBe("2026 Video Game Awards");
     expect(editionDeckCopy("published")).toBeNull();
     expect(editionDeckCopy("closed")).not.toMatch(/pending|published/i);
+    expect(editionDeckCopy("scheduled")).toMatch(/hasn’t opened/i);
+    expect(
+      editionDeckCopy("scheduled", {
+        opensAt: new Date("2026-11-01T18:00:00.000Z"),
+      }),
+    ).toMatch(/^Voting opens /);
+    expect(editionDeckCopy("open")).toMatch(/Game of the Year/i);
+    expect(
+      editionDeckCopy("open", {
+        closesAt: new Date("2026-12-15T18:00:00.000Z"),
+      }),
+    ).toMatch(/^Voting closes /);
+    expect(
+      editionDeckCopy("closed", {
+        publishesAt: new Date("2026-12-20T18:00:00.000Z"),
+      }),
+    ).toMatch(/^Results reveal /);
     expect(editionOverviewLinkLabel(2026, "published")).toBe("2026 results");
     expect(editionOverviewLinkLabel(2026, "open")).toBe("2026 · Voting open");
     expect(editionStatusLabel("published")).toBe("Results");
     expect(editionStatusLabel("closed")).toBe("Voting closed");
+  });
+
+  it("uses an awards title and Community vote kicker on overview", () => {
+    expect(editionOverviewTitle(2026)).toBe("2026 Video Game Awards");
+    expect(editionOverviewStatusLabel("published")).toBe("Results");
+    expect(editionOverviewStatusLabel("open")).toBe("Voting Open");
+    expect(editionOverviewStatusLabel("closed")).toBe("Voting Closed");
+    expect(editionOverviewStatusLabel("scheduled")).toBe("Coming Soon");
+    const stamp = new Date("2026-11-01T18:00:00.000Z");
+    expect(
+      editionOverviewStatusLabel("scheduled", { opensAt: stamp }),
+    ).toMatch(/^Opens /);
+    expect(
+      editionOverviewStatusLabel("open", { closesAt: stamp }),
+    ).toMatch(/^Closes /);
+    expect(
+      editionOverviewStatusLabel("closed", { publishesAt: stamp }),
+    ).toMatch(/^Reveals /);
+    expect(formatEditionScheduleTime(stamp, "UTC")).toBe(
+      "Nov 1, 2026, 6:00 PM",
+    );
   });
 });
 
@@ -103,6 +152,81 @@ describe("parseEditionYear / datetime", () => {
   });
 });
 
+describe("edition date inputs", () => {
+  it("parses and formats local calendar dates", () => {
+    const parsed = parseEditionDateInput("2026-11-01");
+    expect("ok" in parsed).toBe(true);
+    if ("ok" in parsed) {
+      expect(formatEditionDateInput(parsed.date)).toBe("2026-11-01");
+    }
+    expect(parseEditionDateInput("2026-13-01")).toEqual({
+      error: "Pick a valid date.",
+    });
+    expect(addCalendarDays("2026-11-01", 1)).toBe("2026-11-02");
+    expect(addCalendarDays("2026-11-01", -1)).toBe("2026-10-31");
+  });
+
+  it("accepts date, datetime-local, and ISO schedule values", () => {
+    expect("ok" in parseEditionScheduleInput("2026-11-01")).toBe(true);
+    expect("ok" in parseEditionScheduleInput("2026-11-01T18:30")).toBe(true);
+    expect("ok" in parseEditionScheduleInput("2026-11-01T18:30:00.000Z")).toBe(
+      true,
+    );
+    expect(parseEditionScheduleInput("nope")).toEqual({
+      error: "Pick a valid date.",
+    });
+  });
+
+  it("chains picker bounds so later instants cannot precede earlier ones", () => {
+    expect(
+      editionScheduleDateBounds({
+        opens: "2026-11-01T18:00",
+        closes: "2026-12-15T18:00",
+        publishes: "2026-12-20T18:00",
+      }),
+    ).toEqual({
+      opensMax: "2026-12-15T17:59",
+      closesMin: "2026-11-01T18:01",
+      closesMax: "2026-12-20T18:00",
+      publishesMin: "2026-12-15T18:00",
+    });
+  });
+});
+
+describe("editionScheduleSaveWarning", () => {
+  it("skips the normal first save to coming soon or already open", () => {
+    expect(editionScheduleSaveWarning("draft", "scheduled")).toBeNull();
+    expect(editionScheduleSaveWarning("draft", "open")).toBeNull();
+    expect(editionScheduleSaveWarning("open", "open")).toBeNull();
+  });
+
+  it("warns before reverting or jumping the live status", () => {
+    expect(editionScheduleSaveWarning("published", "closed")).toMatch(/hide results/i);
+    expect(editionScheduleSaveWarning("closed", "open")).toMatch(/reopen voting/i);
+    expect(editionScheduleSaveWarning("open", "closed")).toMatch(/close voting immediately/i);
+    expect(editionScheduleSaveWarning("scheduled", "open")).toMatch(/open voting immediately/i);
+    expect(editionScheduleSaveWarning("open", "published")).toMatch(/publish results immediately/i);
+  });
+});
+
+describe("editionDeleteConfirmMatches", () => {
+  it("requires the exact year", () => {
+    expect(editionDeleteConfirmMatches(2026, "2026")).toBe(true);
+    expect(editionDeleteConfirmMatches(2026, " 2026 ")).toBe(true);
+    expect(editionDeleteConfirmMatches(2026, "2025")).toBe(false);
+    expect(editionDeleteConfirmMatches(2026, "26")).toBe(false);
+    expect(editionDeleteConfirmMatches(2026, "")).toBe(false);
+  });
+});
+
+describe("editionBallotCountCopy", () => {
+  it("pluralizes submitted ballots", () => {
+    expect(editionBallotCountCopy(0)).toBe("0 ballots submitted");
+    expect(editionBallotCountCopy(1)).toBe("1 ballot submitted");
+    expect(editionBallotCountCopy(12)).toBe("12 ballots submitted");
+  });
+});
+
 describe("pickFeaturedEdition", () => {
   function edition(
     partial: Partial<CommunityEditionPublic> & {
@@ -116,6 +240,7 @@ describe("pickFeaturedEdition", () => {
       opensAt: null,
       closesAt: null,
       publishesAt: null,
+      rankMode: "competition",
       createdAt: new Date(),
       updatedAt: new Date(),
       ...partial,

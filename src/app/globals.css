@@ -8,6 +8,7 @@
   --muted: #aaa69e;
   --line: #2b2a28;
   --accent: #ff5a1f;
+  --danger: #c7372a;
 
   --radius-control: 2px;
   --radius-artwork: 0px;
@@ -31,6 +32,7 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-danger: var(--danger);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -168,4 +170,17 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Ccircle cx='7' cy='7' r='1' fill='%23ff5a1f' fill-opacity='0.42'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-position: center top;
+}
+
+/* Native date/time pickers: dark chrome + accent calendar/clock indicator. */
+.picker-time-input,
+.picker-datetime-input {
+  color-scheme: dark;
+}
+
+.picker-time-input::-webkit-calendar-picker-indicator,
+.picker-datetime-input::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 1;
+  filter: invert(42%) sepia(98%) saturate(2474%) hue-rotate(357deg) brightness(101%) contrast(104%);
 }

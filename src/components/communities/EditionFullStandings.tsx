@@ -6,7 +6,11 @@ import {
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
 import type { EditionGotyStandingRow } from "@/lib/communities/edition-results";
-import type { EditionResultsPublicMode, SharedRankMode } from "@/lib/communities/edition-results-scoring";
+import {
+  editionBoardLabel,
+  type EditionResultsPublicMode,
+  type SharedRankMode,
+} from "@/lib/communities/edition-results-scoring";
 
 type StandingsPayload = {
   page: number;
@@ -39,7 +43,6 @@ export function EditionFullStandings({
     const params = new URLSearchParams({
       mode,
       page: String(nextPage),
-      rank: rankMode,
     });
     const res = await fetch(
       `/api/communities/${encodeURIComponent(slug)}/edition/${year}/standings?${params}`,
@@ -108,7 +111,7 @@ export function EditionFullStandings({
       </h3>
       <p className="mt-2 text-sm text-muted">
         {totalGames} game{totalGames === 1 ? "" : "s"} on the{" "}
-        {mode === "voices" ? "Voices" : "Community"} board.
+        {editionBoardLabel(mode)} board.
       </p>
 
       {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}

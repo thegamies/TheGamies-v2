@@ -10,15 +10,32 @@ import { Button } from "@/components/ui/Button";
  * (`Native dialog overrides installed`), so native confirms never appear there.
  *
  * Requires `<NavigationGuardProvider>` in the root layout (see AppProviders).
+ * Tab close / refresh uses the browser’s own leave prompt.
  */
-export function useUnsavedChangesGuard(enabled: boolean) {
+export function useUnsavedChangesGuard(
+  enabled: boolean,
+  options?: { message?: string },
+) {
   const enabledRef = useRef(enabled);
   const bypassRef = useRef(false);
+  const message =
+    options?.message ??
+    "Leave without saving? Your latest edits won’t be kept.";
 
   useEffect(() => {
     enabledRef.current = enabled;
     if (!enabled) bypassRef.current = false;
   }, [enabled]);
+
+  useEffect(() => {
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (!enabledRef.current || bypassRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   const isEnabled = useCallback(
     () => enabledRef.current && !bypassRef.current,
@@ -44,9 +61,7 @@ export function useUnsavedChangesGuard(enabled: boolean) {
         >
           Unsaved changes
         </p>
-        <p className="mt-3 text-sm text-muted">
-          Leave without saving? Your latest edits won’t be kept on this list.
-        </p>
+        <p className="mt-3 text-sm text-muted">{message}</p>
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <Button
             type="button"

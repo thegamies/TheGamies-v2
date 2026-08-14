@@ -5,12 +5,20 @@ import {
   parseScoresVisibleDateInput,
 } from "./live-reveal";
 import { sliceLockGotyPage } from "./live-lock";
-import { canManageCommunity, leaveBlockedReason } from "./rules";
+import { COMMUNITY_MEMBERS_PAGE_SIZE, paginateCommunityMembers } from "./members-page";
+import {
+  canManageCommunity,
+  demoteHostBlockedReason,
+  leaveBlockedReason,
+  setCommunityRoleBlockedReason,
+} from "./rules";
 import {
   communitySlugSchema,
+  communitySlugWithSuffix,
   createCommunitySchema,
   normalizeCommunitySlug,
   parseCreateCommunityInput,
+  slugifyCommunityName,
 } from "./schema";
 
 describe("community slug", () => {
@@ -30,14 +38,31 @@ describe("community slug", () => {
     expect(communitySlugSchema.safeParse("has space").success).toBe(false);
     expect(communitySlugSchema.safeParse("a".repeat(33)).success).toBe(false);
   });
+
+  it("slugifies the community name", () => {
+    expect(slugifyCommunityName("  Kinda Funny! ")).toBe("kinda_funny");
+    expect(slugifyCommunityName("The Gamies")).toBe("the_gamies");
+    expect(slugifyCommunityName("new")).toBe("community");
+    expect(slugifyCommunityName("ab")).toBe("community");
+    expect(communitySlugWithSuffix("kinda_funny", 2)).toBe("kinda_funny_2");
+    expect(communitySlugWithSuffix("a".repeat(32), 2).length).toBe(32);
+  });
 });
 
 describe("createCommunitySchema", () => {
-  it("accepts a named community", () => {
+  it("accepts a named community and derives the slug", () => {
     expect(
       createCommunitySchema.parse({
-        slug: "Kinda_Funny",
         name: "  Kinda Funny  ",
+        description: "Awards crew.",
+      }),
+    ).toEqual({
+      name: "Kinda Funny",
+      description: "Awards crew.",
+    });
+    expect(
+      parseCreateCommunityInput({
+        name: "Kinda Funny",
         description: "Awards crew.",
       }),
     ).toEqual({
@@ -48,10 +73,7 @@ describe("createCommunitySchema", () => {
   });
 
   it("returns a friendly error via parser", () => {
-    const reserved = parseCreateCommunityInput({ slug: "new", name: "Crew" });
-    expect("error" in reserved).toBe(true);
     const emptyName = parseCreateCommunityInput({
-      slug: "ok_slug",
       name: "",
     });
     expect("error" in emptyName).toBe(true);
@@ -64,12 +86,12 @@ describe("leaveBlockedReason", () => {
     expect(leaveBlockedReason("member", 0)).toBeNull();
   });
 
-  it("lets extra hosts leave", () => {
+  it("lets extra admins leave", () => {
     expect(leaveBlockedReason("admin", 2)).toBeNull();
   });
 
-  it("blocks the last host", () => {
-    expect(leaveBlockedReason("admin", 1)).toMatch(/last host/i);
+  it("blocks the last admin", () => {
+    expect(leaveBlockedReason("admin", 1)).toMatch(/last admin/i);
   });
 });
 
@@ -78,6 +100,70 @@ describe("canManageCommunity", () => {
     expect(canManageCommunity("admin")).toBe(true);
     expect(canManageCommunity("member")).toBe(false);
     expect(canManageCommunity(null)).toBe(false);
+  });
+});
+
+describe("setCommunityRoleBlockedReason", () => {
+  it("blocks non-admins", () => {
+    expect(
+      setCommunityRoleBlockedReason({
+        actorCanManage: false,
+        targetIsMember: true,
+        targetRole: "member",
+        nextRole: "admin",
+        hostCount: 1,
+      }),
+    ).toMatch(/only admins/i);
+  });
+
+  it("blocks non-members", () => {
+    expect(
+      setCommunityRoleBlockedReason({
+        actorCanManage: true,
+        targetIsMember: false,
+        targetRole: "member",
+        nextRole: "admin",
+        hostCount: 1,
+      }),
+    ).toMatch(/members/i);
+  });
+
+  it("lets admins add another admin", () => {
+    expect(
+      setCommunityRoleBlockedReason({
+        actorCanManage: true,
+        targetIsMember: true,
+        targetRole: "member",
+        nextRole: "admin",
+        hostCount: 1,
+      }),
+    ).toBeNull();
+  });
+
+  it("lets extra admins be removed", () => {
+    expect(demoteHostBlockedReason(2)).toBeNull();
+    expect(
+      setCommunityRoleBlockedReason({
+        actorCanManage: true,
+        targetIsMember: true,
+        targetRole: "admin",
+        nextRole: "member",
+        hostCount: 2,
+      }),
+    ).toBeNull();
+  });
+
+  it("blocks removing the last admin", () => {
+    expect(demoteHostBlockedReason(1)).toMatch(/last admin/i);
+    expect(
+      setCommunityRoleBlockedReason({
+        actorCanManage: true,
+        targetIsMember: true,
+        targetRole: "admin",
+        nextRole: "member",
+        hostCount: 1,
+      }),
+    ).toMatch(/last admin/i);
   });
 });
 
@@ -137,5 +223,22 @@ describe("sliceLockGotyPage", () => {
       rows: [3, 4],
     });
     expect(sliceLockGotyPage(rows, 2, 99).page).toBe(3);
+  });
+});
+
+describe("paginateCommunityMembers", () => {
+  it("clamps page and computes offset for SQL LIMIT", () => {
+    expect(paginateCommunityMembers(1, 0)).toEqual({
+      page: 1,
+      offset: 0,
+      totalPages: 1,
+    });
+    expect(paginateCommunityMembers(2, 120)).toEqual({
+      page: 2,
+      offset: COMMUNITY_MEMBERS_PAGE_SIZE,
+      totalPages: 3,
+    });
+    expect(paginateCommunityMembers(99, 120).page).toBe(3);
+    expect(paginateCommunityMembers(0, 10, 10).page).toBe(1);
   });
 });

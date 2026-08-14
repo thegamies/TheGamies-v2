@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
@@ -20,7 +20,7 @@ import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
   assembleBallotMatrixRows,
   assembleCategoryComparisonRows,
-  BALLOT_MATRIX_STANDINGS_FETCH,
+  BALLOT_MATRIX_TOP,
   categoryComparisonHasGames,
   matrixHasAnyGames,
   type EditionBallotMatrixRow,
@@ -54,7 +54,6 @@ export {
 
 export {
   BALLOT_MATRIX_TOP,
-  BALLOT_MATRIX_STANDINGS_FETCH,
   type EditionBallotMatrixRow,
   type EditionCategoryComparisonRow,
   type MatrixGameCell,
@@ -545,31 +544,127 @@ export async function getEditionGotyPage(
   };
 }
 
+/**
+ * Every GOTY freeze row whose displayed rank is ≤ maxRank (default 10),
+ * including the full tie at the cutoff. Not a board-order LIMIT — that
+ * drops Voices (and Community) games that share rank 10 past the cap.
+ */
+export async function getEditionGotyThroughRank(
+  editionId: string,
+  mode: EditionResultMode,
+  opts: { maxRank?: number; rankMode?: SharedRankMode } = {},
+  db: Db = getDb(),
+): Promise<EditionGotyStandingRow[]> {
+  const storage = storageModeFor(mode);
+  const maxRank = Math.max(1, Math.floor(opts.maxRank ?? BALLOT_MATRIX_TOP));
+  const rankMode = opts.rankMode ?? "competition";
+
+  const baseWhere = and(
+    eq(communityEditionResultGoty.editionId, editionId),
+    eq(communityEditionResultGoty.mode, storage),
+  );
+
+  let cutoffPoints: number | undefined;
+  if (rankMode === "dense") {
+    const distinct = await db
+      .select({ points: communityEditionResultGoty.points })
+      .from(communityEditionResultGoty)
+      .where(baseWhere)
+      .groupBy(communityEditionResultGoty.points)
+      .orderBy(desc(communityEditionResultGoty.points))
+      .limit(maxRank);
+    if (distinct.length === 0) return [];
+    cutoffPoints = distinct[distinct.length - 1]!.points;
+  } else {
+    const [nth] = await db
+      .select({ points: communityEditionResultGoty.points })
+      .from(communityEditionResultGoty)
+      .where(baseWhere)
+      .orderBy(asc(communityEditionResultGoty.place))
+      .limit(1)
+      .offset(maxRank - 1);
+    if (nth) cutoffPoints = nth.points;
+  }
+
+  const rows = await db
+    .select()
+    .from(communityEditionResultGoty)
+    .where(
+      cutoffPoints != null
+        ? and(
+            baseWhere,
+            gte(communityEditionResultGoty.points, cutoffPoints),
+          )
+        : baseWhere,
+    )
+    .orderBy(asc(communityEditionResultGoty.place));
+
+  const mapped = rows.map((r) => ({
+    place: r.place,
+    gameId: r.gameId,
+    slug: r.slug,
+    title: r.title,
+    year: r.gameYear,
+    coverUrl: r.coverUrl,
+    points: r.points,
+    firstPlaceVotes: r.firstPlaceVotes,
+    appearances: r.appearances,
+  }));
+
+  return withDisplayRanks(mapped, (r) => r.points, rankMode).filter(
+    (r) => r.rank <= maxRank,
+  );
+}
+
+/**
+ * Every category freeze row whose displayed rank is ≤ maxRank, including
+ * the full tie at the cutoff. Ranked Results uses 3; Comparison uses 1.
+ * A `place <= N` cap (or loading only the first N board-order rows) drops
+ * Voices ties that share #1–#3 past that place.
+ */
 export async function getEditionCategoryResults(
   editionId: string,
   mode: EditionResultMode,
-  opts: { maxPlace?: number; rankMode?: SharedRankMode } = {},
+  opts: { maxRank?: number; rankMode?: SharedRankMode } = {},
   db: Db = getDb(),
 ): Promise<EditionCategoryStandingBlock[]> {
   const storage = storageModeFor(mode);
-  const maxPlace =
-    opts.maxPlace != null && Number.isFinite(opts.maxPlace)
-      ? Math.max(1, Math.floor(opts.maxPlace))
+  const maxRank =
+    opts.maxRank != null && Number.isFinite(opts.maxRank)
+      ? Math.max(1, Math.floor(opts.maxRank))
       : null;
   const rankMode = opts.rankMode ?? "competition";
 
-  // Load the full category board for this mode, then filter by *derived*
-  // rank. A SQL `place <= N` cap drops ties (e.g. 12 games tied for #1
-  // only need places 1–3 on the podium).
+  const baseWhere = and(
+    eq(communityEditionResultCategories.editionId, editionId),
+    eq(communityEditionResultCategories.mode, storage),
+  );
+
+  const rankThrough =
+    maxRank == null
+      ? undefined
+      : rankMode === "dense"
+        ? sql`(
+            select count(distinct c2.votes)::int
+            from community_edition_result_categories c2
+            where c2.edition_id = ${communityEditionResultCategories.editionId}
+              and c2.mode = ${communityEditionResultCategories.mode}
+              and c2.category_id = ${communityEditionResultCategories.categoryId}
+              and c2.votes > ${communityEditionResultCategories.votes}
+          ) < ${maxRank}`
+        : sql`(
+            select count(*)::int
+            from community_edition_result_categories c2
+            where c2.edition_id = ${communityEditionResultCategories.editionId}
+              and c2.mode = ${communityEditionResultCategories.mode}
+              and c2.category_id = ${communityEditionResultCategories.categoryId}
+              and c2.votes > ${communityEditionResultCategories.votes}
+          ) < ${maxRank}`;
+
   const rows = await db
     .select()
     .from(communityEditionResultCategories)
-    .where(
-      and(
-        eq(communityEditionResultCategories.editionId, editionId),
-        eq(communityEditionResultCategories.mode, storage),
-      ),
-    )
+    .where(rankThrough ? and(baseWhere, rankThrough) : baseWhere)
     .orderBy(
       asc(communityEditionResultCategories.sortOrder),
       asc(communityEditionResultCategories.place),
@@ -597,19 +692,17 @@ export async function getEditionCategoryResults(
       votes: row.votes,
     });
   }
-  const blocks = [...byId.values()].map((block) => {
+  return [...byId.values()].map((block) => {
     const ranked = withDisplayRanks(block.rows, (r) => r.votes, rankMode);
     return {
       ...block,
       rows:
-        maxPlace != null
-          ? ranked.filter((r) => r.rank <= maxPlace)
-          : ranked,
+        maxRank != null ? ranked.filter((r) => r.rank <= maxRank) : ranked,
     };
   });
-  return blocks;
 }
 
+export const CATEGORY_RANKED_TOP = 3;
 export const CATEGORY_RESULTS_PAGE_SIZE = 10;
 
 export type EditionCategoryMeta = {
@@ -828,36 +921,35 @@ export type EditionBallotMatrix = {
   showYou: boolean;
   hasGames: boolean;
   voiceColumns: MatrixVoiceColumn[];
-  /** Competition slots (1–1–3 skip). */
+  /** Official edition numbering (competition skip or dense). */
   rows: EditionBallotMatrixRow[];
-  /** Dense slots (1–1–2). */
-  rowsDense: EditionBallotMatrixRow[];
-  /** Board span: tie group repeats in every ordinal slot it occupies. */
-  rowsSpan: EditionBallotMatrixRow[];
 };
 
 /**
  * Parallel top-10 GOTY lists: rank rows × You / Community / Voices / each Voice.
- * Fixed 10 rows — no board pagination blob.
+ * Community and Voices each load every freeze row with displayed rank ≤ 10
+ * (full ties), not the first N board-order places.
  */
 export async function getEditionBallotMatrix(
   editionId: string,
   opts: {
     viewerProfileId?: string | null;
+    rankMode?: SharedRankMode;
   } = {},
   db: Db = getDb(),
 ): Promise<EditionBallotMatrix> {
-  const [communityPage, voicesPage] = await Promise.all([
-    getEditionGotyPage(
+  const rankMode = opts.rankMode ?? "competition";
+  const [communityRows, voicesRows] = await Promise.all([
+    getEditionGotyThroughRank(
       editionId,
       "community",
-      { page: 1, pageSize: BALLOT_MATRIX_STANDINGS_FETCH },
+      { maxRank: BALLOT_MATRIX_TOP, rankMode },
       db,
     ),
-    getEditionGotyPage(
+    getEditionGotyThroughRank(
       editionId,
       "voices",
-      { page: 1, pageSize: BALLOT_MATRIX_STANDINGS_FETCH },
+      { maxRank: BALLOT_MATRIX_TOP, rankMode },
       db,
     ),
   ]);
@@ -930,7 +1022,7 @@ export async function getEditionBallotMatrix(
   }
 
   const standingInput = {
-    community: communityPage.rows.map((r) => ({
+    community: communityRows.map((r) => ({
       place: r.place,
       points: r.points,
       gameId: r.gameId,
@@ -938,7 +1030,7 @@ export async function getEditionBallotMatrix(
       title: r.title,
       coverUrl: r.coverUrl,
     })),
-    voices: voicesPage.rows.map((r) => ({
+    voices: voicesRows.map((r) => ({
       place: r.place,
       points: r.points,
       gameId: r.gameId,
@@ -954,27 +1046,14 @@ export async function getEditionBallotMatrix(
 
   const rows = assembleBallotMatrixRows({
     ...standingInput,
-    tieMode: "competition",
-  });
-  const rowsDense = assembleBallotMatrixRows({
-    ...standingInput,
-    tieMode: "dense",
-  });
-  const rowsSpan = assembleBallotMatrixRows({
-    ...standingInput,
-    tieMode: "span",
+    tieMode: rankMode === "dense" ? "dense" : "competition",
   });
 
   return {
     showYou,
-    hasGames:
-      matrixHasAnyGames(rows) ||
-      matrixHasAnyGames(rowsDense) ||
-      matrixHasAnyGames(rowsSpan),
+    hasGames: matrixHasAnyGames(rows),
     voiceColumns,
     rows,
-    rowsDense,
-    rowsSpan,
   };
 }
 
@@ -1004,7 +1083,7 @@ function winnersByCategory(
 
 /**
  * Award rows × You / Community (#1) / Voices (#1) / each Voice pick.
- * Place-1 boards only — not full category tallies.
+ * Displayed rank ≤ 1 per award (full ties) — not full category tallies.
  */
 export async function getEditionCategoryComparisonMatrix(
   editionId: string,
@@ -1013,8 +1092,8 @@ export async function getEditionCategoryComparisonMatrix(
 ): Promise<EditionCategoryComparisonMatrix> {
   const rankMode = opts.rankMode ?? "competition";
   const [communityBlocks, voicesBlocks, voiceColumns] = await Promise.all([
-    getEditionCategoryResults(editionId, "community", { maxPlace: 1, rankMode }, db),
-    getEditionCategoryResults(editionId, "voices", { maxPlace: 1, rankMode }, db),
+    getEditionCategoryResults(editionId, "community", { maxRank: 1, rankMode }, db),
+    getEditionCategoryResults(editionId, "voices", { maxRank: 1, rankMode }, db),
     db
       .select({
         profileId: communityEditionResultVoters.profileId,

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   ensurePublishedEditionResults,
   getEditionGotyPage,
-  parseEditionRankMode,
   parseEditionResultMode,
 } from "@/lib/communities/edition-results";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
@@ -23,9 +22,6 @@ export async function GET(
 
   const url = new URL(request.url);
   const mode = parseEditionResultMode(url.searchParams.get("mode") ?? undefined);
-  const rankMode = parseEditionRankMode(
-    url.searchParams.get("rank") ?? undefined,
-  );
   const pageRaw = Number(url.searchParams.get("page") ?? "1");
   const page =
     Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
@@ -51,7 +47,7 @@ export async function GET(
       page,
       pageSize: STANDINGS_PAGE_SIZE,
       afterPlace,
-      rankMode,
+      rankMode: edition.rankMode,
     });
 
     return NextResponse.json(data);

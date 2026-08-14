@@ -25,7 +25,7 @@ export type StandingGameCardProps = {
   size?: "md" | "sm";
   /**
    * Place marker scale when `place` is set.
-   * `md` — standings default (~18px). `lg` — Ranked Highlights (display).
+   * `md` — standings default (~18px). `lg` — Ranked Results (display).
    */
   placeSize?: "md" | "lg";
 };
@@ -88,9 +88,7 @@ export function StandingGameCard({
               ? place != null && place <= 3
                 ? 20
                 : 16
-              : size === "sm"
-                ? 14
-                : 18
+              : 18
           }
           minPx={12}
           lines={2}
@@ -176,7 +174,7 @@ export type WinnerPodiumEntry = {
   slug: string;
   title: string;
   coverUrl: string | null;
-  /** Optional caption under the title (omit on Highlights). */
+  /** Optional caption under the title (omit on Results Ranked). */
   meta?: string;
 };
 

@@ -1,10 +1,35 @@
-/** Viewer numbering: competition = SQL RANK (1–1–3); dense = DENSE_RANK (1–1–2). */
+/** Displayed numbering: competition = SQL RANK (1–1–3); dense = DENSE_RANK (1–1–2). */
 export type SharedRankMode = "competition" | "dense";
 
 export function parseSharedRankMode(
   raw: string | undefined,
 ): SharedRankMode {
   return raw === "dense" ? "dense" : "competition";
+}
+
+/**
+ * Lowest score that still sits in displayed ranks 1…maxRank, for a
+ * best-first score list. Null when the list is empty.
+ *
+ * Used to fetch every tied game in the Top 10 — not only the first N
+ * board-order rows (a place cap drops Voices ties that start after that).
+ */
+export function scoreCutoffThroughRank(
+  scoresBestFirst: readonly number[],
+  maxRank: number,
+  mode: SharedRankMode,
+): number | null {
+  if (scoresBestFirst.length === 0) return null;
+  const cap = Math.max(1, Math.floor(maxRank));
+  if (mode === "dense") {
+    const distinct: number[] = [];
+    for (const score of scoresBestFirst) {
+      if (distinct[distinct.length - 1] !== score) distinct.push(score);
+      if (distinct.length >= cap) break;
+    }
+    return distinct[distinct.length - 1] ?? null;
+  }
+  return scoresBestFirst[Math.min(cap, scoresBestFirst.length) - 1] ?? null;
 }
 
 /**

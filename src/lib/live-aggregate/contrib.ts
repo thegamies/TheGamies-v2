@@ -19,6 +19,8 @@ import {
   type Db,
 } from "@thegamies/db";
 import { gotyEligibilityError } from "@/lib/lists/rules";
+import { parseAwardCategoryEligibility } from "./award-category-defs";
+import { categoryEligibilityError } from "./category-eligibility";
 import {
   buildGotyContribRows,
   mergeDirtyCategoryKeys,
@@ -281,7 +283,11 @@ export async function replaceCategoryVotesForList(
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
     const activeCats = await db
-      .select({ id: awardCategories.id })
+      .select({
+        id: awardCategories.id,
+        eligibility: awardCategories.eligibility,
+        allowEditions: awardCategories.allowEditions,
+      })
       .from(awardCategories)
       .where(
         and(
@@ -292,6 +298,7 @@ export async function replaceCategoryVotesForList(
     if (activeCats.length !== categoryIds.length) {
       return { error: "One or more categories are not available." };
     }
+    const catById = new Map(activeCats.map((c) => [c.id, c]));
 
     const gameIds = [...new Set(votes.map((v) => v.gameId))];
     const found = await db
@@ -314,7 +321,16 @@ export async function replaceCategoryVotesForList(
       if (!game) {
         return { error: "One or more games could not be found." };
       }
-      const err = gotyEligibilityError(game, year);
+      const cat = catById.get(vote.categoryId);
+      if (!cat) {
+        return { error: "One or more categories are not available." };
+      }
+      const err = categoryEligibilityError(
+        game,
+        year,
+        parseAwardCategoryEligibility(cat.eligibility),
+        { allowEditions: cat.allowEditions },
+      );
       if (err) return { error: err };
     }
   }

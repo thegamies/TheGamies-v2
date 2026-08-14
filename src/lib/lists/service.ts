@@ -182,6 +182,18 @@ export async function getOwnedGotyForYear(
   return row ?? null;
 }
 
+/** Ranked games from the signed-in profile's GOTY list for `year`, or null if none. */
+export async function getOwnedGotyItemsForYear(
+  profileId: string,
+  year: number,
+  opts: { limit?: number; db?: Db } = {},
+): Promise<Awaited<ReturnType<typeof loadListItems>> | null> {
+  const db = opts.db ?? getDb();
+  const list = await getOwnedGotyForYear(profileId, year, db);
+  if (!list) return null;
+  return loadListItems(list.id, db, { limit: opts.limit });
+}
+
 export async function getListByPublicId(
   publicId: string,
   db: Db = getDb(),
@@ -210,8 +222,12 @@ export async function getEditableList(
   return { list, items };
 }
 
-async function loadListItems(listId: string, db: Db) {
-  const rows = await db
+async function loadListItems(
+  listId: string,
+  db: Db,
+  opts: { limit?: number } = {},
+) {
+  const query = db
     .select({
       id: listItems.id,
       rank: listItems.rank,
@@ -228,6 +244,9 @@ async function loadListItems(listId: string, db: Db) {
     .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .where(eq(listItems.listId, listId))
     .orderBy(asc(listItems.rank));
+
+  const rows =
+    opts.limit != null ? await query.limit(opts.limit) : await query;
 
   return rows.map((r) => ({
     id: r.id,

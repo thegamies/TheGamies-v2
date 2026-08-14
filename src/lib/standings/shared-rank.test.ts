@@ -4,6 +4,7 @@ import {
   parseSharedRankMode,
   ranksForSortedPage,
   ranksForSortedScores,
+  scoreCutoffThroughRank,
   withDisplayRanks,
 } from "./shared-rank";
 
@@ -34,6 +35,34 @@ describe("ranksForSortedScores", () => {
     expect(ranksForSortedScores([40, 40, 40, 10], "dense")).toEqual([
       1, 1, 1, 2,
     ]);
+  });
+});
+
+describe("scoreCutoffThroughRank", () => {
+  it("keeps a competition tie that extends past the first 10 places", () => {
+    const scores = [20, 19, 18, 17, 16, 15, 14, 13, 12, ...Array(25).fill(5), 1];
+    expect(scoreCutoffThroughRank(scores, 10, "competition")).toBe(5);
+    expect(scores.filter((s) => s >= 5)).toHaveLength(34);
+  });
+
+  it("keeps dense ranks 1–10 when early groups are large ties", () => {
+    const groups = [100, 90, 80, 70, 60, 50, 40, 30, 20, 10, 1];
+    const scores = groups.flatMap((points, i) =>
+      Array(i === 9 ? 5 : 4).fill(points),
+    );
+    expect(scoreCutoffThroughRank(scores, 10, "dense")).toBe(10);
+    expect(scores.filter((s) => s >= 10)).toHaveLength(41);
+  });
+
+  it("returns the lowest score when there are fewer than maxRank rows", () => {
+    expect(scoreCutoffThroughRank([9, 8, 7], 10, "competition")).toBe(7);
+    expect(scoreCutoffThroughRank([9, 9, 8], 10, "dense")).toBe(8);
+  });
+
+  it("keeps a category Top 3 competition tie that extends past place 3", () => {
+    const votes = [12, 9, 4, 4, 4, 4, 1];
+    expect(scoreCutoffThroughRank(votes, 3, "competition")).toBe(4);
+    expect(votes.filter((v) => v >= 4)).toHaveLength(6);
   });
 });
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, isNull, lte, gte, or, sql } from "drizzle-orm";
 import { createDb, type Db } from "@thegamies/db";
 import {
   companies,
@@ -20,6 +20,10 @@ export type ReleaseStatus = "all" | "released" | "upcoming";
 export type BrowseGamesInput = {
   q?: string;
   year?: number;
+  yearAtMost?: number;
+  yearAtLeast?: number;
+  /** Inclusive lower bound; unknown years are excluded. */
+  yearKnownAtLeast?: number;
   sort?: BrowseSort;
   sortDir?: "asc" | "desc";
   releaseStatus?: ReleaseStatus;
@@ -38,6 +42,9 @@ export async function browseGames(input: BrowseGamesInput = {}) {
   const {
     q,
     year,
+    yearAtMost,
+    yearAtLeast,
+    yearKnownAtLeast,
     sort = "popularity",
     sortDir = "desc",
     releaseStatus = "all",
@@ -56,6 +63,15 @@ export async function browseGames(input: BrowseGamesInput = {}) {
   }
   if (year != null) {
     conditions.push(eq(games.year, year));
+  }
+  if (yearAtMost != null) {
+    conditions.push(or(isNull(games.year), lte(games.year, yearAtMost))!);
+  }
+  if (yearAtLeast != null) {
+    conditions.push(or(isNull(games.year), gte(games.year, yearAtLeast))!);
+  }
+  if (yearKnownAtLeast != null) {
+    conditions.push(gte(games.year, yearKnownAtLeast));
   }
   if (q?.trim()) {
     const term = `%${q.trim()}%`;

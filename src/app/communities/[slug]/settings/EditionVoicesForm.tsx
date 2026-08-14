@@ -26,11 +26,8 @@ function memberMatchesQuery(
 }
 
 function roleLabel(member: EditionVoiceMemberOption): string {
-  const parts: string[] = [];
-  if (member.role === "admin") parts.push("Host");
-  if (member.isVoice) parts.push("Voice");
-  if (parts.length === 0) parts.push("Member");
-  return parts.join(" · ");
+  if (member.isVoice || member.role === "admin") return "Host";
+  return "Member";
 }
 
 export function EditionVoicesForm({
@@ -58,7 +55,7 @@ export function EditionVoicesForm({
     if (trimmed) {
       return members.filter((m) => memberMatchesQuery(m, trimmed));
     }
-    // Default: hosts and Voices only — search to reach everyone else.
+    // Default: community hosts and current Hosts — search to reach everyone else.
     return members.filter((m) => m.role === "admin" || m.isVoice);
   }, [members, trimmed]);
 
@@ -67,16 +64,16 @@ export function EditionVoicesForm({
 
   return (
     <div className="mt-8 border-t border-line pt-6">
-      <h3 className="font-display text-2xl tracking-wide text-ink">Voices</h3>
+      <h3 className="font-display text-2xl tracking-wide text-ink">Hosts</h3>
       <p className="mt-2 max-w-xl text-sm text-muted">
-        Designate Voices for the {year} edition ({status}). Hosts and current
-        Voices are listed by default — search to find other members. Roster
-        locks when results publish.
+        Designate Hosts for the {year} event ({status}). Current Hosts are
+        listed by default — search to find other members. Roster locks when
+        results publish.
       </p>
 
       {locked ? (
         <p className="mt-4 text-sm text-muted">
-          Voices for this edition are locked.
+          Hosts for this event are locked.
         </p>
       ) : null}
 
@@ -101,7 +98,7 @@ export function EditionVoicesForm({
 
           {defaultEmpty ? (
             <p className="mt-4 text-sm text-muted">
-              No Voices designated yet. Search members to add one.
+              No Hosts designated yet. Search members to add one.
             </p>
           ) : null}
 
@@ -145,7 +142,7 @@ export function EditionVoicesForm({
                         disabled={pending}
                         className="text-sm"
                       >
-                        {member.isVoice ? "Remove Voice" : "Make Voice"}
+                        {member.isVoice ? "Remove Host" : "Make Host"}
                       </Button>
                     </form>
                   )}

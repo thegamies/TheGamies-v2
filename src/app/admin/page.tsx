@@ -26,7 +26,7 @@ const ADMIN_LINKS = [
     href: "/admin/communities",
     title: "Community seed",
     description:
-      "Seed community members, Voices, and edition ballots for ceremony QA.",
+      "Seed community members, Hosts, and edition ballots for ceremony QA.",
   },
 ] as const;
 

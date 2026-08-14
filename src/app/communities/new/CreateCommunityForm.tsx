@@ -23,20 +23,6 @@ export function CreateCommunityForm() {
         />
       </label>
       <label className="block text-sm text-muted">
-        Slug
-        <input
-          name="slug"
-          required
-          minLength={3}
-          maxLength={32}
-          pattern="[A-Za-z0-9_]+"
-          className={fieldInputClass}
-        />
-        <span className="mt-1 block text-xs text-muted">
-          Letters, numbers, and underscores. Used in the URL.
-        </span>
-      </label>
-      <label className="block text-sm text-muted">
         Description
         <textarea
           name="description"

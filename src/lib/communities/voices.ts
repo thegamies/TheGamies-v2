@@ -26,7 +26,7 @@ export function editionVoicesWriteBlockedReason(
   status: ReturnType<typeof computeEditionStatus>,
 ): string | null {
   if (status === "published") {
-    return "Voices are locked after results are published.";
+    return "Hosts are locked after results are published.";
   }
   return null;
 }
@@ -72,11 +72,11 @@ export async function setEditionVoice(
   const detail = await getCommunityBySlug(slug, actorProfileId, db);
   if (!detail) return { error: "Community not found." };
   if (!canManageCommunity(detail.viewerRole)) {
-    return { error: "Only hosts can designate Voices." };
+    return { error: "Only hosts can change the Hosts roster." };
   }
 
   const edition = await getEditionByCommunityYear(detail.id, year, db);
-  if (!edition) return { error: "Edition not found." };
+  if (!edition) return { error: "Event not found." };
 
   const blocked = editionVoicesWriteBlockedReason(edition.status);
   if (blocked) return { error: blocked };
@@ -92,7 +92,7 @@ export async function setEditionVoice(
     )
     .limit(1);
   if (!member) {
-    return { error: "Only community members can be Voices." };
+    return { error: "Only community members can be Hosts." };
   }
 
   if (isVoice) {

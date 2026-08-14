@@ -4,12 +4,10 @@ import { useEffect, useState, useTransition } from "react";
 import {
   StandingGameCard,
   StandingGameCardGrid,
-  WinnerPodium,
 } from "@/components/communities/StandingGameCard";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionCategoryMeta,
-  EditionCategoryStandingBlock,
   EditionCategoryStandingRow,
 } from "@/lib/communities/edition-results";
 import type { EditionResultsPublicMode, SharedRankMode } from "@/lib/communities/edition-results-scoring";
@@ -69,50 +67,6 @@ function CategoryChapterHeader({
 
 export { CategoryChapterHeader };
 
-function CategoryPodiumBlock({
-  cat,
-  index,
-}: {
-  cat: EditionCategoryStandingBlock;
-  index: number;
-}) {
-  const winner = cat.rows.filter((r) => r.rank <= 3)[0] ?? null;
-  const podium = cat.rows.filter((r) => r.rank <= 3).slice(1);
-
-  return (
-    <article className={index === 0 ? undefined : "mt-8 sm:mt-10"}>
-      <CategoryChapterHeader
-        label={cat.label}
-        description={cat.description}
-        showRule={index > 0}
-      />
-
-      {winner ? (
-        <div className="mt-4">
-          <WinnerPodium
-            winner={{
-              place: winner.rank,
-              gameId: winner.gameId,
-              slug: winner.slug,
-              title: winner.title,
-              coverUrl: winner.coverUrl,
-            }}
-            runnersUp={podium.map((row) => ({
-              place: row.rank,
-              gameId: row.gameId,
-              slug: row.slug,
-              title: row.title,
-              coverUrl: row.coverUrl,
-            }))}
-          />
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-muted">No picks for this category.</p>
-      )}
-    </article>
-  );
-}
-
 function CategoryFullBoard({
   slug,
   year,
@@ -139,7 +93,6 @@ function CategoryFullBoard({
       mode,
       categoryId: category.categoryId,
       page: String(nextPage),
-      rank: rankMode,
     });
     const res = await fetch(
       `/api/communities/${encodeURIComponent(slug)}/edition/${year}/categories?${params}`,
@@ -234,26 +187,6 @@ function CategoryFullBoard({
         </>
       ) : null}
     </article>
-  );
-}
-
-/** Overview: podium Top 3 per award (no pick strips). */
-export function EditionCategoryPodiums({
-  categories,
-}: {
-  categories: EditionCategoryStandingBlock[];
-}) {
-  if (categories.length === 0) return null;
-  return (
-    <div className="mt-6">
-      {categories.map((cat, index) => (
-        <CategoryPodiumBlock
-          key={cat.categoryId}
-          cat={cat}
-          index={index}
-        />
-      ))}
-    </div>
   );
 }
 

@@ -1,3 +1,4 @@
+import { AwardCategoryGroupNav } from "@/components/live-aggregate/AwardCategoryGroupNav";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { GameCover } from "@/components/ui/GameCover";
 import type {
@@ -5,11 +6,18 @@ import type {
   StandingsGameRow,
   StandingsPage,
 } from "@/lib/live-aggregate/service";
+import {
+  DEFAULT_AWARD_CATEGORY_GROUP,
+  standingsQueryString,
+} from "@/lib/live-aggregate/award-category-defs";
 import Link from "next/link";
 
-function standingsHref(year: number, page: number): string {
-  if (page <= 1) return `/game-of-the-year/${year}`;
-  return `/game-of-the-year/${year}?page=${page}`;
+function standingsHref(
+  year: number,
+  page: number,
+  group = DEFAULT_AWARD_CATEGORY_GROUP,
+): string {
+  return `/game-of-the-year/${year}${standingsQueryString({ page, group })}`;
 }
 
 function StandingsRow({
@@ -113,7 +121,7 @@ function GotyPager({ page }: { page: StandingsPage }) {
       <div className="flex gap-2">
         {page.page > 1 ? (
           <Link
-            href={standingsHref(page.year, page.page - 1)}
+            href={standingsHref(page.year, page.page - 1, page.categoryGroup)}
             className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
           >
             Previous
@@ -125,7 +133,7 @@ function GotyPager({ page }: { page: StandingsPage }) {
         )}
         {page.page < page.totalPages ? (
           <Link
-            href={standingsHref(page.year, page.page + 1)}
+            href={standingsHref(page.year, page.page + 1, page.categoryGroup)}
             className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
           >
             Next
@@ -179,7 +187,7 @@ export function LiveStandingsView({
         {yearOptions.map((y) => (
           <Link
             key={y}
-            href={`/game-of-the-year/${y}`}
+            href={`/game-of-the-year/${y}${standingsQueryString({ group: page.categoryGroup })}`}
             className={`border px-3 py-1.5 text-sm tracking-wide transition-colors ${
               y === page.year
                 ? "border-accent text-accent"
@@ -213,6 +221,11 @@ export function LiveStandingsView({
         )}
         <GotyPager page={page} />
       </section>
+
+      <AwardCategoryGroupNav
+        hrefBase={`/game-of-the-year/${page.year}`}
+        group={page.categoryGroup}
+      />
 
       {page.categories.map((block) => (
         <CategoryBlock key={block.categoryId} block={block} revealed={revealed} />

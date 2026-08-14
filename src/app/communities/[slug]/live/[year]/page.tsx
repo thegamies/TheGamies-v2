@@ -12,6 +12,10 @@ import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
+import {
+  DEFAULT_AWARD_CATEGORY_GROUP,
+  parseAwardCategoryGroup,
+} from "@/lib/live-aggregate/award-category-defs";
 
 type Params = Promise<{ slug: string; year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -29,16 +33,16 @@ export async function generateMetadata({
   const year = Number(yearRaw);
   try {
     const community = await getCommunityBySlug(slug);
-    if (!community) return { title: "Live standings" };
+    if (!community) return { title: "Live Rankings" };
     if (!Number.isFinite(year)) {
-      return { title: `${community.name} live standings` };
+      return { title: `${community.name} Live Rankings` };
     }
     return {
-      title: `${community.name} ${Math.floor(year)} live standings`,
+      title: `${community.name} ${Math.floor(year)} Live Rankings`,
       description: `Live Game of the Year standings for ${community.name}.`,
     };
   } catch {
-    return { title: "Live standings" };
+    return { title: "Live Rankings" };
   }
 }
 
@@ -58,6 +62,7 @@ export default async function CommunityLiveYearPage({
   const pageRaw = Number(first(sp.page) ?? "1");
   const requestedPage =
     Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
+  const categoryGroup = parseAwardCategoryGroup(first(sp.group));
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -95,6 +100,7 @@ export default async function CommunityLiveYearPage({
       pageSize: STANDINGS_PAGE_SIZE,
       scoresVisibleFrom: community.liveScoresVisibleFrom,
       locked: community.liveRankingsLocked,
+      categoryGroup,
     });
   } catch {
     standings = {
@@ -111,6 +117,7 @@ export default async function CommunityLiveYearPage({
       totalPages: 1,
       goty: [],
       categories: [],
+      categoryGroup: DEFAULT_AWARD_CATEGORY_GROUP,
     };
   }
 

@@ -2,18 +2,39 @@
 
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
+import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import { editionResultsHref } from "@/lib/communities/edition-results-href";
+import type {
+  EditionResultsPublicMode,
+  EditionResultsViewId,
+} from "@/lib/communities/edition-results-scoring";
 
 type Props = {
   slug: string;
   year: number;
   years: number[];
+  view?: EditionResultsViewId;
+  mode?: EditionResultsPublicMode;
+  /** Settings Events stays on community settings; default is the event page. */
+  links?: "results" | "settings";
+  /** Show the year even when there is only one (no menu). */
+  alwaysShow?: boolean;
 };
 
 /**
  * Compact year switcher for edition pages — sits beside the section heading.
- * Only renders when there are 2+ public years.
+ * Public Events: only when 2+ years. Community Settings: alwaysShow.
+ * Default links keep the current view and Community / Hosts board.
  */
-export function EditionYearSelect({ slug, year, years }: Props) {
+export function EditionYearSelect({
+  slug,
+  year,
+  years,
+  view = "reveal",
+  mode = "community",
+  links = "results",
+  alwaysShow = false,
+}: Props) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const listId = useId();
@@ -39,7 +60,16 @@ export function EditionYearSelect({ slug, year, years }: Props) {
     };
   }, [open]);
 
-  if (years.length <= 1) return null;
+  if (years.length === 0) return null;
+  if (years.length === 1 && !alwaysShow) return null;
+
+  if (years.length === 1) {
+    return (
+      <p className="font-display text-2xl tracking-wide text-ink" aria-label="Event year">
+        {year}
+      </p>
+    );
+  }
 
   return (
     <div ref={rootRef} className="relative">
@@ -64,7 +94,7 @@ export function EditionYearSelect({ slug, year, years }: Props) {
         <ul
           id={listId}
           role="listbox"
-          aria-label="Edition year"
+          aria-label="Event year"
           className="absolute right-0 z-20 mt-2 min-w-[7.5rem] border border-line bg-paper py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
         >
           {years.map((y) => {
@@ -72,7 +102,11 @@ export function EditionYearSelect({ slug, year, years }: Props) {
             return (
               <li key={y} role="option" aria-selected={active}>
                 <Link
-                  href={`/communities/${encodeURIComponent(slug)}/edition/${y}`}
+                  href={
+                    links === "settings"
+                      ? communitySettingsHref(slug, { tab: "events", year: y })
+                      : editionResultsHref(slug, y, { view, mode })
+                  }
                   className={`block px-3 py-2 text-sm tracking-wide ${
                     active
                       ? "text-accent"

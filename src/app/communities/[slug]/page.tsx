@@ -5,13 +5,18 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import { CommunityEventsOverview } from "@/components/communities/CommunityEventsOverview";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { SectionRule } from "@/components/ui/SectionRule";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
 import {
-  getFeaturedEditionForCommunity,
+  listEditionsForCommunity,
+  pickFeaturedEdition,
+  type CommunityEditionPublic,
 } from "@/lib/communities/editions";
-import { editionOverviewLinkLabel } from "@/lib/communities/edition-status";
+import { EDITION_PUBLIC_LABEL } from "@/lib/communities/edition-status";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { CreateEditionForm } from "./settings/CreateEditionForm";
 import { MembershipActions } from "./MembershipActions";
 
 type Params = Promise<{ slug: string }>;
@@ -54,23 +59,25 @@ export default async function CommunityHomePage({
   }
   if (!community) notFound();
 
-  const adminCount = community.members.filter((m) => m.role === "admin").length;
   const canLeave =
     community.viewerRole != null &&
-    leaveBlockedReason(community.viewerRole, adminCount) == null;
+    leaveBlockedReason(community.viewerRole, community.hostCount) == null;
   const canManage = canManageCommunity(community.viewerRole);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}`;
+  const membersHref = `/communities/${encodeURIComponent(community.slug)}/members`;
 
-  let featuredEdition = null;
+  let editions: CommunityEditionPublic[] = [];
   try {
-    featuredEdition = await getFeaturedEditionForCommunity(community.id);
+    editions = await listEditionsForCommunity(community.id);
   } catch {
-    featuredEdition = null;
+    editions = [];
   }
+  const featuredEdition = pickFeaturedEdition(editions);
   const publicEdition =
     featuredEdition && featuredEdition.status !== "draft"
       ? featuredEdition
       : null;
+  const showCreateEvent = canManage && editions.length === 0;
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -83,71 +90,71 @@ export default async function CommunityHomePage({
         active="overview"
       />
 
-      <p className="mt-8 text-sm text-muted">
-        {community.memberCount}{" "}
-        {community.memberCount === 1 ? "member" : "members"}
-      </p>
-      {community.description ? (
-        <p className="mt-4 max-w-2xl font-serif text-lg leading-relaxed text-muted">
-          {community.description}
-        </p>
-      ) : null}
       {publicEdition ? (
-        <p className="mt-4 text-sm text-ink" role="status">
-          <Link
-            href={`/communities/${community.slug}/edition/${publicEdition.year}`}
-            className="hover:text-accent"
-          >
-            {editionOverviewLinkLabel(
-              publicEdition.year,
-              publicEdition.status,
-            )}
+        <div className="mt-10">
+          <CommunityEventsOverview
+            slug={community.slug}
+            year={publicEdition.year}
+            status={publicEdition.status}
+            opensAt={publicEdition.opensAt}
+            closesAt={publicEdition.closesAt}
+            publishesAt={publicEdition.publishesAt}
+          />
+        </div>
+      ) : showCreateEvent ? (
+        <section className="mt-10">
+          <h2 className="font-display text-3xl tracking-wide text-ink">
+            {EDITION_PUBLIC_LABEL}
+          </h2>
+          <p className="mt-4 max-w-xl text-sm text-muted">
+            Create an event to open a yearly awards vote.
+          </p>
+          <CreateEditionForm
+            slug={community.slug}
+            defaultYear={new Date().getUTCFullYear()}
+            existingYears={[]}
+          />
+        </section>
+      ) : null}
+
+      {publicEdition || showCreateEvent ? (
+        <SectionRule className="mt-14 mb-8" />
+      ) : null}
+
+      <section className={publicEdition || showCreateEvent ? "" : "mt-10"}>
+        <h2 className="font-display text-3xl tracking-wide text-ink">About</h2>
+        {community.description ? (
+          <p className="mt-4 max-w-2xl font-serif text-lg leading-relaxed text-muted">
+            {community.description}
+          </p>
+        ) : null}
+        <p className="mt-4 text-sm text-muted">
+          <Link href={membersHref} className="hover:text-ink">
+            {community.memberCount}{" "}
+            {community.memberCount === 1 ? "member" : "members"}
           </Link>
         </p>
-      ) : null}
-
-      {profile ? (
-        <MembershipActions
-          slug={community.slug}
-          isMember={community.viewerRole != null}
-          canLeave={canLeave}
-        />
-      ) : user ? (
-        <p className="mt-6 text-sm text-muted">
-          <Link href="/account" className="text-accent hover:underline">
-            Finish your profile
-          </Link>{" "}
-          to join this community.
-        </p>
-      ) : (
-        <p className="mt-6 text-sm text-muted">
-          <Link href={signInHref} className="text-accent hover:underline">
-            Sign in
-          </Link>{" "}
-          to join this community.
-        </p>
-      )}
-
-      <section className="mt-14 border-t border-line pt-8">
-        <h2 className="font-display text-3xl tracking-wide text-ink">
-          Members
-        </h2>
-        {community.members.length === 0 ? (
-          <p className="mt-4 text-muted">No members yet.</p>
+        {profile ? (
+          <MembershipActions
+            slug={community.slug}
+            isMember={community.viewerRole != null}
+            canLeave={canLeave}
+            isHost={canManage}
+          />
+        ) : user ? (
+          <p className="mt-6 text-sm text-muted">
+            <Link href="/account" className="text-accent hover:underline">
+              Finish your profile
+            </Link>{" "}
+            to join this community.
+          </p>
         ) : (
-          <ul className="mt-6 divide-y divide-line border-y border-line">
-            {community.members.map((member) => (
-              <li key={member.profileId} className="py-4">
-                <Link
-                  href={`/u/${member.username}`}
-                  className="text-ink hover:text-accent"
-                >
-                  {member.displayName}
-                </Link>
-                <p className="text-sm text-muted">@{member.username}</p>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-6 text-sm text-muted">
+            <Link href={signInHref} className="text-accent hover:underline">
+              Sign in
+            </Link>{" "}
+            to join this community.
+          </p>
         )}
       </section>
     </main>

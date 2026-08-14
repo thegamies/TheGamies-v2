@@ -6,7 +6,8 @@ import {
 } from "@thegamies/db";
 import {
   computeEditionStatus,
-  parseEditionDateTimeInput,
+  editionDeleteConfirmMatches,
+  parseEditionScheduleInput,
   parseEditionYear,
   type EditionStatus,
   validateEditionSchedule,
@@ -125,16 +126,35 @@ export async function getEditionByCommunityYear(
 export async function createCommunityEdition(
   slug: string,
   profileId: string,
-  yearRaw: unknown,
+  input: {
+    year: unknown;
+    opensAt: string;
+    closesAt: string;
+    publishesAt: string;
+  },
   db: Db = getDb(),
 ): Promise<CommunityEditionPublic | { error: string }> {
-  const yearParsed = parseEditionYear(yearRaw);
+  const yearParsed = parseEditionYear(input.year);
   if ("error" in yearParsed) return yearParsed;
+
+  const opens = parseEditionScheduleInput(input.opensAt);
+  if ("error" in opens) return { error: opens.error };
+  const closes = parseEditionScheduleInput(input.closesAt);
+  if ("error" in closes) return { error: closes.error };
+  const publishes = parseEditionScheduleInput(input.publishesAt);
+  if ("error" in publishes) return { error: publishes.error };
+
+  const scheduleError = validateEditionSchedule(
+    opens.date,
+    closes.date,
+    publishes.date,
+  );
+  if (scheduleError) return { error: scheduleError };
 
   const detail = await getCommunityBySlug(slug, profileId, db);
   if (!detail) return { error: "Community not found." };
   if (!canManageCommunity(detail.viewerRole)) {
-    return { error: "Only hosts can create editions." };
+    return { error: "Only hosts can create events." };
   }
 
   const existing = await getEditionByCommunityYear(
@@ -143,7 +163,7 @@ export async function createCommunityEdition(
     db,
   );
   if (existing) {
-    return { error: "That year already has an edition." };
+    return { error: "That year already has an event." };
   }
 
   try {
@@ -152,12 +172,15 @@ export async function createCommunityEdition(
       .values({
         communityId: detail.id,
         year: yearParsed.year,
+        opensAt: opens.date,
+        closesAt: closes.date,
+        publishesAt: publishes.date,
       })
       .returning();
-    if (!created) return { error: "Could not create that edition." };
-    return withStatus(created);
+    if (!created) return { error: "Could not create that event." };
+    return afterEditionWrite(created, db);
   } catch {
-    return { error: "Could not create that edition." };
+    return { error: "Could not create that event." };
   }
 }
 
@@ -175,11 +198,11 @@ export async function setCommunityEditionSchedule(
   const yearParsed = parseEditionYear(input.year);
   if ("error" in yearParsed) return yearParsed;
 
-  const opens = parseEditionDateTimeInput(input.opensAt);
+  const opens = parseEditionScheduleInput(input.opensAt);
   if ("error" in opens) return { error: opens.error };
-  const closes = parseEditionDateTimeInput(input.closesAt);
+  const closes = parseEditionScheduleInput(input.closesAt);
   if ("error" in closes) return { error: closes.error };
-  const publishes = parseEditionDateTimeInput(input.publishesAt);
+  const publishes = parseEditionScheduleInput(input.publishesAt);
   if ("error" in publishes) return { error: publishes.error };
 
   const scheduleError = validateEditionSchedule(
@@ -218,7 +241,7 @@ export async function setCommunityEditionSchedule(
     )
     .returning();
 
-  if (!updated) return { error: "Edition not found." };
+  if (!updated) return { error: "Event not found." };
   return afterEditionWrite(updated, db, new Date(), previousStatus);
 }
 
@@ -245,7 +268,7 @@ export async function setCommunityEditionTimestampNow(
     yearParsed.year,
     db,
   );
-  if (!edition) return { error: "Edition not found." };
+  if (!edition) return { error: "Event not found." };
 
   const previousStatus = edition.status;
   const now = new Date();
@@ -277,4 +300,87 @@ export async function setCommunityEditionTimestampNow(
 
   if (!updated) return { error: "Could not update that edition." };
   return afterEditionWrite(updated, db, now, previousStatus);
+}
+
+export async function setCommunityEditionRankMode(
+  slug: string,
+  profileId: string,
+  input: {
+    year: unknown;
+    rankMode: unknown;
+  },
+  db: Db = getDb(),
+): Promise<CommunityEditionPublic | { error: string }> {
+  const yearParsed = parseEditionYear(input.year);
+  if ("error" in yearParsed) return yearParsed;
+
+  const rankMode =
+    input.rankMode === "dense" || input.rankMode === "competition"
+      ? input.rankMode
+      : null;
+  if (!rankMode) {
+    return { error: "Choose how tied games are numbered." };
+  }
+
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can update editions." };
+  }
+
+  const edition = await getEditionByCommunityYear(
+    detail.id,
+    yearParsed.year,
+    db,
+  );
+  if (!edition) return { error: "Event not found." };
+
+  const [updated] = await db
+    .update(communityEditions)
+    .set({
+      rankMode,
+      updatedAt: new Date(),
+    })
+    .where(eq(communityEditions.id, edition.id))
+    .returning();
+
+  if (!updated) return { error: "Could not update that edition." };
+  return withStatus(updated);
+}
+
+export async function deleteCommunityEdition(
+  slug: string,
+  profileId: string,
+  input: { year: unknown; confirmYear: unknown },
+  db: Db = getDb(),
+): Promise<{ ok: true; year: number } | { error: string }> {
+  const yearParsed = parseEditionYear(input.year);
+  if ("error" in yearParsed) return yearParsed;
+  if (!editionDeleteConfirmMatches(yearParsed.year, input.confirmYear)) {
+    return { error: "Type the event year to confirm." };
+  }
+
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can delete events." };
+  }
+
+  const existing = await getEditionByCommunityYear(
+    detail.id,
+    yearParsed.year,
+    db,
+  );
+  if (!existing) return { error: "Event not found." };
+
+  try {
+    const deleted = await db
+      .delete(communityEditions)
+      .where(eq(communityEditions.id, existing.id))
+      .returning({ id: communityEditions.id });
+    if (deleted.length === 0) return { error: "Could not delete that event." };
+    return { ok: true, year: yearParsed.year };
+  } catch {
+    return { error: "Could not delete that event." };
+  }
 }

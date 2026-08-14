@@ -4,9 +4,10 @@ Ballots belong to **editions** only (not live rankings).
 
 ## Game of the Year (edition ballot)
 
-- Ranked list aligned with personal GOTY capacity (up to 100 on personal lists)
-- Edition **scoring defaults to top 10**; full-list degrading scores are a configurable future/scoring-engine option
-- Artwork-forward layout; one editorial ranking composition (not ten dashboard cards)
+- Ranked **top 10** (scoring uses the same window via `pointsForRank`)
+- Personal GOTY lists still hold up to 100; **Import your Game of the Year list** copies the top 10 onto the ballot (warns first if games are already ranked)
+- Artwork-forward cover grid while voting is open **and** after close (same `BallotRankGrid`)
+- After an edit, **Save ballot** pins to the bottom (`PinnedSaveBar`). Leaving the page prompts **Unsaved changes**
 - Reordering must feel direct and stable
 - States: empty, partial, review, submitted, locked (after deadline / close)
 
@@ -22,12 +23,14 @@ Tables `community_edition_ballots` + `community_edition_ballot_items` — **not*
 
 - Live alongside the main GOTY ballot; remain conceptually separate
 - **Edition ballots:** site `award_categories` **single-choice** only
+- Empty categories show overlay search; a pick uses `CategoryPickCard` (large cover). **Clear** restores the search field
+- Voters add awards from a **searchable square grid** with a scrolling Show all / group tab bar. Show all is a single board with a group tag in each tile. Eligibility is shown only when it is not current year.
 - Per-community / multi / ranked edition category modes deferred
 - **Site live** categories (owned GOTY lists): single-choice locked — see [live-aggregate.md](./live-aggregate.md) / decisions
 
-## Voices
+## Hosts
 
-Hosts designate Voices **per edition** (Settings). Historical rosters stay with the year; locked after publish.
+Community hosts designate **Hosts** **per edition** (Settings). Historical rosters stay with the year; locked after publish. Public UI says Host / Hosts; code stays Voice.
 
 ## Open decisions that still block polish
 

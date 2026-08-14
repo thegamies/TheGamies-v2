@@ -81,7 +81,7 @@ export function useEditionCategoryPodiums(
 }
 
 /**
- * Dev-only tertiary controls beside Competition · Dense.
+ * Dev-only tertiary controls beside Community · Hosts.
  * No URL params — local stress-test for category Reveal mosaics.
  */
 export function EditionCategoryDebugBar() {

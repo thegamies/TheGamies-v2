@@ -34,5 +34,19 @@ export const stepperValueClass =
 export const fieldInputClass =
   "mt-1 block w-full border border-line bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)]";
 
+/** Date / time picker trigger — button, not a text field. */
+export const pickerTriggerClass =
+  "flex h-9 w-full min-w-0 items-center gap-2 rounded-[var(--radius-control)] border border-line bg-panel px-3 text-left text-sm outline-none transition-colors duration-[var(--motion-fast)] hover:border-accent focus-visible:border-accent disabled:opacity-40";
+
+/**
+ * Native radio, restyled. Unchecked: `--line` ring. Checked: `--accent` fill.
+ * Circle so it does not read as a checkbox (`--radius-control` stays on inputs).
+ */
+export const radioControlClass =
+  "mt-0.5 size-4 shrink-0 appearance-none rounded-full border border-line bg-paper align-top transition-colors duration-[var(--motion-fast)] checked:border-accent checked:bg-accent focus-visible:outline-none focus-visible:border-accent disabled:opacity-40";
+
+export const radioOptionClass =
+  "flex cursor-pointer gap-3 text-sm text-ink";
+
 /** Match `Button` sm height in toolbars. */
 export const toolbarButtonClass = "h-9 px-3 text-xs";

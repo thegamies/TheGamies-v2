@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  createContext,
   useCallback,
+  useContext,
   useEffect,
   useRef,
   useState,
@@ -27,6 +29,67 @@ type HorizontalScrollProps = {
 };
 
 const DRAG_THRESHOLD_PX = 6;
+
+type ScrollSyncGroup = {
+  members: Set<HTMLElement>;
+  applying: boolean;
+};
+
+const scrollSyncGroups = new Map<string, ScrollSyncGroup>();
+const HorizontalScrollGroupContext = createContext<string | null>(null);
+
+/**
+ * Sibling `HorizontalScroll` strips share one horizontal position.
+ * Used for GOTY Comparison so #1–#10 stay on the same columns.
+ */
+export function HorizontalScrollGroup({
+  groupId,
+  children,
+}: {
+  groupId: string;
+  children: ReactNode;
+}) {
+  return (
+    <HorizontalScrollGroupContext.Provider value={groupId}>
+      {children}
+    </HorizontalScrollGroupContext.Provider>
+  );
+}
+
+function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
+  let group = scrollSyncGroups.get(id);
+  if (!group) {
+    group = { members: new Set(), applying: false };
+    scrollSyncGroups.set(id, group);
+  }
+  const peer = group.members.values().next().value as HTMLElement | undefined;
+  group.members.add(el);
+  if (peer && peer.scrollLeft !== el.scrollLeft) {
+    el.scrollLeft = peer.scrollLeft;
+  }
+  return () => {
+    const cur = scrollSyncGroups.get(id);
+    if (!cur) return;
+    cur.members.delete(el);
+    if (cur.members.size === 0) scrollSyncGroups.delete(id);
+  };
+}
+
+function broadcastScrollSync(id: string, source: HTMLElement) {
+  const group = scrollSyncGroups.get(id);
+  if (!group || group.applying) return;
+  group.applying = true;
+  try {
+    const left = source.scrollLeft;
+    for (const el of group.members) {
+      if (el !== source && el.scrollLeft !== left) {
+        el.scrollLeft = left;
+      }
+    }
+  } finally {
+    group.applying = false;
+  }
+}
 
 /**
  * Horizontal strip for matrices / pick rows.
@@ -55,6 +118,7 @@ export function HorizontalScroll({
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const syncGroupId = useContext(HorizontalScrollGroupContext);
 
   const syncHeaderToBody = useCallback(() => {
     const body = bodyRef.current;
@@ -71,16 +135,27 @@ export function HorizontalScroll({
   useEffect(() => {
     const body = bodyRef.current;
     if (!body) return;
-    syncHeaderToBody();
-    body.addEventListener("scroll", syncHeaderToBody, { passive: true });
-    const ro = new ResizeObserver(syncHeaderToBody);
+
+    const leaveGroup = syncGroupId
+      ? joinScrollSyncGroup(syncGroupId, body)
+      : undefined;
+
+    const onScroll = () => {
+      syncHeaderToBody();
+      if (syncGroupId) broadcastScrollSync(syncGroupId, body);
+    };
+
+    onScroll();
+    body.addEventListener("scroll", onScroll, { passive: true });
+    const ro = new ResizeObserver(onScroll);
     ro.observe(body);
 
     return () => {
-      body.removeEventListener("scroll", syncHeaderToBody);
+      body.removeEventListener("scroll", onScroll);
       ro.disconnect();
+      leaveGroup?.();
     };
-  }, [syncHeaderToBody, children, stickyHeader]);
+  }, [syncHeaderToBody, children, stickyHeader, syncGroupId]);
 
   function scrollByPage(direction: -1 | 1) {
     const el = bodyRef.current;
