@@ -104,14 +104,6 @@ export default async function CreateGotyPage({
     }[];
   } | null = null;
   let loadError: string | null = error;
-  let ownedYears: number[] = [];
-
-  if (signedIn && profileId) {
-    const owned = await listOwnedForProfile(profileId).catch(() => []);
-    ownedYears = owned
-      .filter((row) => row.listType === "goty" && row.year != null)
-      .map((row) => row.year as number);
-  }
 
   if (publicId) {
     const cookie = await readListEditCookie();
