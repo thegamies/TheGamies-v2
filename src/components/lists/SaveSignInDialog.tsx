@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { buildSignUpHref } from "@/lib/auth/return-to";
 import { buildListSignInHref } from "@/lib/lists/auth-intent";
 
 export function SaveSignInDialog({
@@ -25,7 +26,12 @@ export function SaveSignInDialog({
         <Link href={buildListSignInHref(returnPath, "save")}>
           <Button type="button">Sign in &amp; save</Button>
         </Link>
-        <Button type="button" variant="bordered" onClick={onClose}>
+        <Link href={buildSignUpHref({ next: returnPath, intent: "save" })}>
+          <Button type="button" variant="bordered">
+            Create account &amp; save
+          </Button>
+        </Link>
+        <Button type="button" variant="quiet" onClick={onClose}>
           Keep editing
         </Button>
       </div>
