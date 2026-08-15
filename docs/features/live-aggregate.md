@@ -68,10 +68,18 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## URLs
 
+- `/` — homepage Top 5 strips for featured years (default: current + previous; admin override on `/admin/rankings`)
+- `/standings` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
 - `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`); category boards by group (`?group=genre`)
 - `/admin` — ops index (sync, rankings, seed)
-- `/admin/rankings`
+- `/admin/rankings` — reveal / refresh / rebuild + homepage year override
+
+## Homepage / all-years highlights
+
+- Depth is **Top 5** (competition ranking); ties at the cutoff are included in full.
+- Strip UI matches community event Comparison language: cover row in `HorizontalScroll` (scrolls on mobile or when ties overflow).
+- Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 
 ## Non-goals
 

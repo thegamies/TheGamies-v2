@@ -5,6 +5,11 @@ import { isAdminAuthorized } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
 import { rebuildYear, tryRefreshYear } from "@/lib/live-aggregate/refresh";
 import { setYearRevealed } from "@/lib/live-aggregate/reveal";
+import {
+  getSiteSettings,
+  parseLandingYearsInput,
+  setLandingStandingsYears,
+} from "@/lib/site-settings/service";
 
 async function requireAdmin() {
   if (!(await isAdminAuthorized())) {
@@ -22,6 +27,8 @@ export async function setRevealAction(
   if (!Number.isFinite(year)) return { error: "Invalid year." };
   await setYearRevealed(Math.floor(year), revealed);
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidatePath("/");
+  revalidatePath("/standings");
   revalidatePath("/admin/rankings");
   return { ok: true };
 }
@@ -40,6 +47,8 @@ export async function rebuildYearAction(
     };
   }
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidatePath("/");
+  revalidatePath("/standings");
   revalidatePath("/admin/rankings");
   return { ok: true };
 }
@@ -52,6 +61,8 @@ export async function refreshYearAction(
   if (!Number.isFinite(year)) return { error: "Invalid year." };
   const result = await tryRefreshYear(Math.floor(year));
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidatePath("/");
+  revalidatePath("/standings");
   revalidatePath("/admin/rankings");
   return { ok: true, reason: result.reason };
 }
@@ -73,4 +84,37 @@ export async function loadYearStatsAction(year: number) {
       refreshing: stats.refreshing,
     },
   };
+}
+
+export async function loadLandingYearsAction() {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const settings = await getSiteSettings();
+  return {
+    ok: true as const,
+    landingStandingsYears: settings.landingStandingsYears,
+  };
+}
+
+export async function saveLandingYearsAction(
+  raw: string,
+): Promise<{
+  error?: string;
+  ok?: boolean;
+  landingStandingsYears?: number[] | null;
+}> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  try {
+    const years = parseLandingYearsInput(raw);
+    const saved = await setLandingStandingsYears(years);
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/admin/rankings");
+    return { ok: true, landingStandingsYears: saved.landingStandingsYears };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Could not save years.",
+    };
+  }
 }

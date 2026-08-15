@@ -1,12 +1,24 @@
-import { eq, sql } from "drizzle-orm";
-import { withDisplayRanks, withDisplayRanksOnPage } from "@/lib/standings/shared-rank";
-import { liveGotyYearStats, type Db } from "@thegamies/db";
+import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import {
+  withDisplayRanks,
+  withDisplayRanksOnPage,
+} from "@/lib/standings/shared-rank";
+import {
+  covers,
+  games,
+  liveGotyScores,
+  liveGotyYearStats,
+  type Db,
+} from "@thegamies/db";
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
 import {
   parseAwardCategoryGroup,
   type AwardCategoryGroup,
 } from "./award-category-defs";
+
+/** Top-N highlight depth for homepage / all-years standings strips. */
+export const TOP_STANDINGS_RANK = 5;
 
 /** GOTY standings rows per page on `/game-of-the-year/[year]`. */
 export const STANDINGS_PAGE_SIZE = 50;
@@ -483,4 +495,138 @@ export async function getStandingsPage(
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });
+}
+
+/**
+ * Every site GOTY score row whose displayed rank is ≤ maxRank (default 5),
+ * including the full tie at the cutoff. Not a board-order LIMIT.
+ */
+export async function getGotyThroughRank(
+  year: number,
+  opts: {
+    maxRank?: number;
+    forceReveal?: boolean;
+  } = {},
+  db: Db = getLiveAggregateDb(),
+): Promise<{
+  year: number;
+  detailedStatsRevealed: boolean;
+  listCount: number;
+  rows: StandingsGameRow[];
+}> {
+  const maxRank = Math.max(
+    1,
+    Math.floor(opts.maxRank ?? TOP_STANDINGS_RANK),
+  );
+  const stats = await getYearStats(year, db);
+
+  const [nth] = await db
+    .select({ score: liveGotyScores.score })
+    .from(liveGotyScores)
+    .where(eq(liveGotyScores.year, year))
+    .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
+    .limit(1)
+    .offset(maxRank - 1);
+
+  const scoreRows =
+    nth == null
+      ? await db
+          .select({
+            gameId: liveGotyScores.gameId,
+            slug: games.slug,
+            title: games.title,
+            gameYear: games.year,
+            coverImageId: covers.imageId,
+            score: liveGotyScores.score,
+            listMentions: liveGotyScores.listMentions,
+          })
+          .from(liveGotyScores)
+          .innerJoin(games, eq(games.id, liveGotyScores.gameId))
+          .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+          .where(eq(liveGotyScores.year, year))
+          .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
+      : await db
+          .select({
+            gameId: liveGotyScores.gameId,
+            slug: games.slug,
+            title: games.title,
+            gameYear: games.year,
+            coverImageId: covers.imageId,
+            score: liveGotyScores.score,
+            listMentions: liveGotyScores.listMentions,
+          })
+          .from(liveGotyScores)
+          .innerJoin(games, eq(games.id, liveGotyScores.gameId))
+          .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+          .where(
+            and(
+              eq(liveGotyScores.year, year),
+              gte(liveGotyScores.score, nth.score),
+            ),
+          )
+          .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId));
+
+  const ranked = withDisplayRanks(
+    scoreRows.map((r) => ({
+      place: 0,
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      year: r.gameYear,
+      coverUrl: coverUrlFrom(r.coverImageId),
+      score: r.score,
+      listMentions: r.listMentions,
+      rankCounts: null as number[] | null,
+    })),
+    (r) => r.score ?? 0,
+    "competition",
+  )
+    .filter((r) => r.rank <= maxRank)
+    .map((r) => ({ ...r, place: r.rank }));
+
+  const reveal = opts.forceReveal === true || stats.detailedStatsRevealed;
+  return {
+    year,
+    detailedStatsRevealed: stats.detailedStatsRevealed,
+    listCount: stats.listCount,
+    rows: reveal
+      ? ranked
+      : ranked.map((row) => ({
+          ...row,
+          score: null,
+          listMentions: null,
+          rankCounts: null,
+        })),
+  };
+}
+
+/** Years that have live GOTY score rows, newest first. */
+export async function listYearsWithGotyScores(
+  db: Db = getLiveAggregateDb(),
+): Promise<number[]> {
+  const rows = await db
+    .selectDistinct({ year: liveGotyScores.year })
+    .from(liveGotyScores)
+    .orderBy(desc(liveGotyScores.year));
+  return rows.map((r) => r.year);
+}
+
+export async function getGotyThroughRankForYears(
+  years: readonly number[],
+  opts: { maxRank?: number; forceReveal?: boolean } = {},
+  db: Db = getLiveAggregateDb(),
+): Promise<
+  Array<{
+    year: number;
+    detailedStatsRevealed: boolean;
+    listCount: number;
+    rows: StandingsGameRow[];
+  }>
+> {
+  const unique = [...new Set(years.map((y) => Math.floor(y)))].filter((y) =>
+    Number.isFinite(y),
+  );
+  return Promise.all(
+    unique.map((year) => getGotyThroughRank(year, opts, db)),
+  );
 }
