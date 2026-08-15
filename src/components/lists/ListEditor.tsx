@@ -721,6 +721,38 @@ export function ListEditor({
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {showCategoryTabs ? (
+        <div
+          className="flex flex-wrap gap-5 border-b border-line pb-0"
+          role="tablist"
+          aria-label="List sections"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "goty"}
+            onClick={() => {
+              setEditorView("goty");
+            }}
+            className={navItemClass("secondary", editorView === "goty")}
+          >
+            Game of the Year
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "categories"}
+            onClick={() => {
+              setPanelOpen(false);
+              setEditorView("categories");
+            }}
+            className={navItemClass("secondary", editorView === "categories")}
+          >
+            Categories
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
         <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
           Title
@@ -959,38 +991,6 @@ export function ListEditor({
           </p>
         ) : null}
       </div>
-
-      {showCategoryTabs ? (
-        <div
-          className="flex flex-wrap gap-5 border-b border-line pb-0"
-          role="tablist"
-          aria-label="List sections"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={editorView === "goty"}
-            onClick={() => {
-              setEditorView("goty");
-            }}
-            className={navItemClass("secondary", editorView === "goty")}
-          >
-            Game of the Year
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={editorView === "categories"}
-            onClick={() => {
-              setPanelOpen(false);
-              setEditorView("categories");
-            }}
-            className={navItemClass("secondary", editorView === "categories")}
-          >
-            Categories
-          </button>
-        </div>
-      ) : null}
 
       {showCategoryTabs && editorView === "categories" ? (
         <div className="mx-auto w-full max-w-[var(--page-max)] pb-24">

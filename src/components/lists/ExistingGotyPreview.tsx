@@ -1,7 +1,11 @@
 import Link from "next/link";
+import {
+  StandingGameCard,
+  standingStripColClass,
+  standingStripListClass,
+} from "@/components/communities/StandingGameCard";
 import { Button } from "@/components/ui/Button";
-import { GameCover } from "@/components/ui/GameCover";
-import { RankMarker } from "@/components/ui/RankMarker";
+import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { existingGotyEditHref } from "@/lib/lists/existing-goty";
 
 export type ExistingGotyPreviewItem = {
@@ -26,7 +30,7 @@ export function ExistingGotyPreview({
   const topFive = items.slice(0, 5);
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="space-y-6">
       <div>
         <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
           {year}
@@ -39,24 +43,26 @@ export function ExistingGotyPreview({
       {topFive.length === 0 ? (
         <p className="text-sm text-muted">No games ranked yet.</p>
       ) : (
-        <ol className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {topFive.map((item) => (
-            <li key={item.gameId} className="min-w-0">
-              <div className="mb-1.5">
-                <RankMarker rank={item.rank} size="sm" />
-              </div>
-              <GameCover
-                title={item.title}
-                imageUrl={item.coverUrl}
-                fluid
-                width={120}
-              />
-              <p className="mt-2 truncate text-sm font-semibold text-ink">
-                {item.title}
-              </p>
-            </li>
-          ))}
-        </ol>
+        <HorizontalScroll label={`${year} top five`}>
+          <ol className={standingStripListClass}>
+            {topFive.map((item) => (
+              <li
+                key={item.gameId}
+                className={standingStripColClass(item.rank === 1)}
+              >
+                <StandingGameCard
+                  place={item.rank}
+                  placeSize="lg"
+                  slug={item.slug}
+                  title={item.title}
+                  coverUrl={item.coverUrl}
+                  priority={item.rank === 1}
+                  pinCover
+                />
+              </li>
+            ))}
+          </ol>
+        </HorizontalScroll>
       )}
 
       <Link href={existingGotyEditHref(publicId)}>
