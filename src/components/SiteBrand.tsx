@@ -16,7 +16,7 @@ export function SiteBrand() {
   return (
     <Link
       href="/"
-      className="font-display text-3xl tracking-wide text-ink hover:text-accent"
+      className="font-display text-3xl tracking-wide text-accent transition-opacity hover:opacity-90"
     >
       The Gamies
     </Link>

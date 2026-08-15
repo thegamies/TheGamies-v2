@@ -42,14 +42,14 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-16 sm:py-20">
-      <h1 className="font-display text-6xl leading-none tracking-wide text-ink sm:text-8xl">
+    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-8 sm:py-10">
+      <h1 className="font-display text-5xl leading-none tracking-wide text-accent sm:text-7xl">
         The Gamies
       </h1>
-      <p className="mt-5 max-w-md font-serif text-lg leading-relaxed text-muted">
+      <p className="mt-2 max-w-md font-serif text-base leading-snug text-muted sm:text-lg">
         Personal GOTY lists and community awards.
       </p>
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="mt-4 flex flex-wrap gap-3">
         <Link
           href="/games"
           className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
@@ -64,7 +64,7 @@ export default async function HomePage() {
         </Link>
       </div>
 
-      <section className="mt-16 border-t border-line pt-12 sm:mt-20 sm:pt-14">
+      <section className="mt-10 border-t border-line pt-8 sm:mt-12 sm:pt-10">
         <YearTopFiveSections sections={sections} allYearsHref="/standings" />
       </section>
     </main>
