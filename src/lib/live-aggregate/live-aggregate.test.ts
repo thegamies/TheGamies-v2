@@ -253,6 +253,7 @@ describe("redactStandingsPage", () => {
     expect(redacted.goty[0]?.score).toBeNull();
     expect(redacted.goty[0]?.rankCounts).toBeNull();
     expect(redacted.categories[0]?.rows[0]?.voteCount).toBeNull();
+    expect(redacted.categories[0]?.totalVotes).toBe(2);
   });
 
   it("keeps scores when revealed", () => {

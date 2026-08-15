@@ -8,6 +8,7 @@ import {
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
+import { SectionRule } from "@/components/ui/SectionRule";
 import type { CategoryStandingsBlock } from "@/lib/live-aggregate/service";
 import {
   AWARD_CATEGORY_GROUPS,
@@ -18,11 +19,8 @@ import {
   type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
 
-function voteCountLabel(
-  totalVotes: number | null,
-  revealed: boolean,
-): string {
-  if (!revealed || totalVotes == null) return "—";
+function voteCountLabel(totalVotes: number | null): string | null {
+  if (totalVotes == null) return null;
   return `${totalVotes} vote${totalVotes === 1 ? "" : "s"}`;
 }
 
@@ -45,23 +43,21 @@ function CategoryChapter({
     view: "category",
     category: block.categoryId,
   })}`;
+  const votesLabel =
+    block.totalVotes != null
+      ? `${block.totalVotes} vote${block.totalVotes === 1 ? "" : "s"}`
+      : null;
 
   return (
     <article className={index === 0 ? undefined : "mt-6 sm:mt-7"}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <Link href={detailHref} className="group block">
-            <CategoryChapterHeader
-              label={block.label}
-              description={block.description}
-              showRule={index > 0}
-              compact
-            />
-          </Link>
-          <p className="mt-1 text-sm text-muted">
-            {voteCountLabel(block.totalVotes, revealed)}
-          </p>
-        </div>
+      {index > 0 ? <SectionRule variant="bar" className="mb-3" /> : null}
+
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <Link href={detailHref} className="min-w-0 flex-1 group">
+          <h3 className="line-clamp-2 font-display text-2xl leading-none tracking-wide text-ink group-hover:text-accent sm:text-3xl">
+            {block.label}
+          </h3>
+        </Link>
         <Link
           href={detailHref}
           className="shrink-0 border border-line px-3 py-1.5 text-xs tracking-wide text-muted transition-colors hover:border-accent hover:text-ink"
@@ -69,6 +65,15 @@ function CategoryChapter({
           Full standings
         </Link>
       </div>
+
+      {block.description ? (
+        <p className="mt-1.5 line-clamp-2 max-w-xl font-serif text-sm leading-relaxed text-muted">
+          {block.description}
+        </p>
+      ) : null}
+      {votesLabel ? (
+        <p className="mt-1 text-sm text-muted">{votesLabel}</p>
+      ) : null}
 
       <HorizontalScroll className="mt-3" label={`${block.label} top ranks`}>
         <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
@@ -319,10 +324,14 @@ export function LiveCategoryDetailPanel({
           description={block.description}
         />
         <p className="mt-2 text-sm text-muted">
-          {voteCountLabel(block.totalVotes, revealed)}
-          {gameTotal > 0
-            ? ` · ${gameTotal} game${gameTotal === 1 ? "" : "s"}`
-            : null}
+          {[
+            voteCountLabel(block.totalVotes),
+            gameTotal > 0
+              ? `${gameTotal} game${gameTotal === 1 ? "" : "s"}`
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
 

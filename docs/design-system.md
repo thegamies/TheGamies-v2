@@ -110,7 +110,7 @@ Rules:
 
 ## Section rule
 
-`SectionRule` — accent tick + hairline. Chapter breaks between Results blocks and between category awards. Prefer this over a plain `border-t` when the break should feel ceremonial.
+`SectionRule` — accent tick + muted hairline (`variant="tick"`, default) for edition chapter breaks. Live category chapters use `variant="bar"` — a full-width accent rule. Prefer this over a plain `border-t` when the break should feel ceremonial.
 
 ## Standing cards + rank
 

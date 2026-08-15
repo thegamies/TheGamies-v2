@@ -145,7 +145,8 @@ export function redactStandingsPage(
     })),
     categories: page.categories.map((block) => ({
       ...block,
-      totalVotes: null,
+      // Category totals stay public (list-count style meta). Per-game
+      // vote counts on rows stay hidden until reveal.
       rows: block.rows.map((row) => ({
         ...row,
         voteCount: null,
