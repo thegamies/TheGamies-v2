@@ -3,11 +3,14 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
+import { RadioOption } from "@/components/ui/Radio";
+import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import {
   loadYearStatsAction,
   rebuildYearAction,
   refreshYearAction,
   saveLandingYearsAction,
+  saveRankModeAction,
   setRevealAction,
 } from "./actions";
 
@@ -21,11 +24,29 @@ type YearStats = {
   refreshing: boolean;
 };
 
+const RANK_MODE_OPTIONS: Array<{
+  id: SharedRankMode;
+  label: string;
+  hint: string;
+}> = [
+  {
+    id: "competition",
+    label: "Competition",
+    hint: "Tied games share a place. The next place skips (1 · 1 · 3).",
+  },
+  {
+    id: "dense",
+    label: "Dense",
+    hint: "Tied games share a place. The next place is the next number (1 · 1 · 2).",
+  },
+];
+
 type Props = {
   authorized: boolean;
   initialYear: number;
   initialStats: YearStats | null;
   initialLandingYears: number[] | null;
+  initialRankMode: SharedRankMode;
 };
 
 export function AdminRankingsClient({
@@ -33,6 +54,7 @@ export function AdminRankingsClient({
   initialYear,
   initialStats,
   initialLandingYears,
+  initialRankMode,
 }: Props) {
   const [authorized, setAuthorized] = useState(initiallyAuthorized);
   const [secret, setSecret] = useState("");
@@ -44,6 +66,7 @@ export function AdminRankingsClient({
   const [landingYearsSaved, setLandingYearsSaved] = useState<number[] | null>(
     initialLandingYears,
   );
+  const [rankMode, setRankMode] = useState<SharedRankMode>(initialRankMode);
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -174,6 +197,53 @@ export function AdminRankingsClient({
             ? "none (current + previous)"
             : landingYearsSaved.join(", ")}
         </p>
+      </section>
+
+      <section className="space-y-4 border-b border-line pb-10">
+        <h2 className="font-display text-2xl tracking-wide text-ink">
+          Tie numbering
+        </h2>
+        <p className="text-sm text-muted">
+          How site live boards number ties. Changing this does not rescore
+          lists.
+        </p>
+        <fieldset className="space-y-3">
+          <legend className="sr-only">Tie numbering</legend>
+          {RANK_MODE_OPTIONS.map((opt) => (
+            <RadioOption
+              key={opt.id}
+              name="siteRankMode"
+              value={opt.id}
+              checked={rankMode === opt.id}
+              onChange={() => setRankMode(opt.id)}
+              hint={opt.hint}
+            >
+              {opt.label}
+            </RadioOption>
+          ))}
+        </fieldset>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result = await saveRankModeAction(rankMode);
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.rankMode) setRankMode(result.rankMode);
+              setMessage(
+                result.rankMode === "dense"
+                  ? "Dense numbering is on for site live boards."
+                  : "Competition numbering is on for site live boards.",
+              );
+            })
+          }
+        >
+          Save numbering
+        </Button>
       </section>
 
       <section className="space-y-6">

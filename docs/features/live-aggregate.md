@@ -39,7 +39,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 
 Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisfy the sort.
 
-Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM would invalidate a stored place). Default **competition**: `1 + COUNT(score > first row on the page)`, then walk the page (same score → same rank; new score → offset + local index + 1). Pages stay **50 games**. Site live has no dense chooser. Category laterals walk the top 10 the same way. Community live (SUM + lock snapshots) uses the same numbering.
+Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM would invalidate a stored place). Numbering follows the site **tie numbering** setting on `/admin/rankings` (`site_settings.rank_mode`): default **competition** (`1 + COUNT(score > first row on the page)`, then walk the page — same score → same rank; new score → offset + local index + 1) or **dense** (`1 + COUNT(DISTINCT score > first)`, then walk without skips). Pages stay **50 games**. Not a public URL chooser. Category laterals walk the same way. Community live (SUM + lock snapshots) stays competition only for now.
 
 ## Refresh (single-flight)
 
@@ -71,13 +71,17 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - `/` — homepage Top 5 strips for featured years (default: current + previous; admin override on `/admin/rankings`)
 - `/standings` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
-- `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`); category boards by group (`?group=genre`)
+- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes
+- Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
+- Year switching uses the shared top-right `YearSelect` (not a button row)
+- Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights
+
 - `/admin` — ops index (sync, rankings, seed)
-- `/admin/rankings` — reveal / refresh / rebuild + homepage year override
+- `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense)
 
 ## Homepage / all-years highlights
 
-- Depth is **Top 5** (competition ranking); ties at the cutoff are included in full.
+- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full.
 - Strip UI matches community event Comparison language: cover row in `HorizontalScroll` (scrolls on mobile or when ties overflow).
 - Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 
@@ -90,12 +94,14 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 ## Ops: standings seed
 
 `/admin/seed` (same unlock as other admin tools) creates synthetic profiles
-(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
+(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists
+**and** category votes (from each list’s ranked picks, top-rank weighted).
 
 - Up to **1000** seed indices; UI batches of 50
 - **Reseed** rewrites rankings for existing seed voters in range
 - **Keep adding until stopped** continues from max index
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
+- Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
 - Ends with one year score rebuild (or after Stop)
 
 Community / edition ceremony seeding is separate: `/admin/communities` — see [community.md](./community.md).

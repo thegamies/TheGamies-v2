@@ -2,7 +2,7 @@
 export function SectionRule({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex items-center gap-0 ${className}`}
+      className={`flex w-full items-center gap-0 ${className}`}
       aria-hidden="true"
     >
       <span className="h-0.5 w-10 shrink-0 bg-accent sm:w-14" />

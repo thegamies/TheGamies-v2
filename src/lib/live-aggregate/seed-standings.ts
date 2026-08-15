@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
 import {
   createDb,
   games,
+  listCategoryVotes,
   listItems,
   lists,
   liveCategoryContrib,
@@ -9,6 +10,7 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
+import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 import { buildGotyContribRows } from "@/lib/live-aggregate/scoring";
 import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
@@ -76,6 +78,45 @@ export function weightedSample<T>(
   });
   keyed.sort((a, b) => b.key - a.key);
   return keyed.slice(0, k).map((row) => row.item);
+}
+
+/**
+ * Weight for choosing a GOTY-ranked game as a category pick.
+ * Higher ranks (#1…) dominate so category leaders separate instead of tying.
+ * Default power ~2.4 → rank 1 is ~5× rank 2 and ~13× rank 3.
+ */
+export function weightForTopRank(rank: number, power = 2.4): number {
+  const r = Math.max(1, Math.floor(rank));
+  return 1 / r ** power;
+}
+
+/**
+ * Pick category votes from a voter's ranked GOTY list.
+ * Participation defaults high; game choice is top-rank weighted.
+ */
+export function buildSeedCategoryVotes(
+  categories: Array<{ id: string }>,
+  rankedPicks: Array<{ id: string }>,
+  opts: { participationRate?: number; rankPower?: number } = {},
+): Array<{ categoryId: string; gameId: string }> {
+  if (categories.length === 0 || rankedPicks.length === 0) return [];
+  const participationRate = opts.participationRate ?? 0.88;
+  const rankPower = opts.rankPower ?? 2.4;
+  const ranked = rankedPicks.map((game, index) => ({
+    gameId: game.id,
+    rank: index + 1,
+  }));
+
+  const votes: Array<{ categoryId: string; gameId: string }> = [];
+  for (const cat of categories) {
+    if (Math.random() >= participationRate) continue;
+    const [choice] = weightedSample(ranked, 1, (row) =>
+      weightForTopRank(row.rank, rankPower),
+    );
+    if (!choice) continue;
+    votes.push({ categoryId: cat.id, gameId: choice.gameId });
+  }
+  return votes;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -327,8 +368,12 @@ export async function seedStandingsVoters(
   const allLists = activeProfiles.map((p) => listByProfile.get(p.id)!);
   const listIds = allLists.map((l) => l.id);
   const updatedLists = allLists.length - listsToCreate.length;
+  const categories = await listActiveAwardCategories(db);
 
   await db.delete(listItems).where(inArray(listItems.listId, listIds));
+  await db
+    .delete(listCategoryVotes)
+    .where(inArray(listCategoryVotes.listId, listIds));
 
   const itemRows: {
     listId: string;
@@ -343,6 +388,18 @@ export async function seedStandingsVoters(
     year: number;
     rank: number;
     points: number;
+  }[] = [];
+  const categoryVoteRows: {
+    listId: string;
+    categoryId: string;
+    gameId: string;
+  }[] = [];
+  const categoryContribRows: {
+    listId: string;
+    categoryId: string;
+    profileId: string;
+    year: number;
+    gameId: string;
   }[] = [];
 
   for (const list of allLists) {
@@ -375,10 +432,29 @@ export async function seedStandingsVoters(
         points: row.points,
       });
     }
+
+    const catVotes = buildSeedCategoryVotes(categories, picks);
+    for (const vote of catVotes) {
+      categoryVoteRows.push({
+        listId: list.id,
+        categoryId: vote.categoryId,
+        gameId: vote.gameId,
+      });
+      categoryContribRows.push({
+        listId: list.id,
+        categoryId: vote.categoryId,
+        profileId: list.profileId!,
+        year,
+        gameId: vote.gameId,
+      });
+    }
   }
 
   if (itemRows.length > 0) {
     await db.insert(listItems).values(itemRows);
+  }
+  if (categoryVoteRows.length > 0) {
+    await db.insert(listCategoryVotes).values(categoryVoteRows);
   }
 
   await db
@@ -389,6 +465,9 @@ export async function seedStandingsVoters(
     .where(inArray(liveCategoryContrib.listId, listIds));
   if (contribRows.length > 0) {
     await db.insert(liveGotyContrib).values(contribRows);
+  }
+  if (categoryContribRows.length > 0) {
+    await db.insert(liveCategoryContrib).values(categoryContribRows);
   }
 
   await db

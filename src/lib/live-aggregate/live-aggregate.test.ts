@@ -227,6 +227,7 @@ describe("redactStandingsPage", () => {
         categoryId: "narrative",
         label: "Best Story",
         description: null,
+        totalVotes: 2,
         rows: [
           {
             place: 1,
@@ -240,6 +241,9 @@ describe("redactStandingsPage", () => {
       },
     ],
     categoryGroup: "premier",
+    view: "goty",
+    categoryId: null,
+    categoryGameTotal: 0,
   };
 
   it("hides scores but keeps ranks when unrevealed", () => {
@@ -249,6 +253,7 @@ describe("redactStandingsPage", () => {
     expect(redacted.goty[0]?.score).toBeNull();
     expect(redacted.goty[0]?.rankCounts).toBeNull();
     expect(redacted.categories[0]?.rows[0]?.voteCount).toBeNull();
+    expect(redacted.categories[0]?.totalVotes).toBe(2);
   });
 
   it("keeps scores when revealed", () => {
@@ -273,5 +278,18 @@ describe("live page competition rank", () => {
       { offset: 50, firstGroupRank: 49, mode: "competition" },
     ).map((r) => ({ ...r, place: r.rank }));
     expect(numbered.map((r) => r.place)).toEqual([49, 49, 53]);
+  });
+
+  it("continues a dense split tie then increments without skipping", () => {
+    const numbered = withDisplayRanksOnPage(
+      [
+        { gameId: "a", score: 40 },
+        { gameId: "b", score: 40 },
+        { gameId: "c", score: 30 },
+      ],
+      (r) => r.score,
+      { offset: 50, firstGroupRank: 12, mode: "dense" },
+    ).map((r) => ({ ...r, place: r.rank }));
+    expect(numbered.map((r) => r.place)).toEqual([12, 12, 13]);
   });
 });

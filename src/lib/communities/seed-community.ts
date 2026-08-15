@@ -13,6 +13,7 @@ import {
 } from "@thegamies/db";
 import {
   loadSeedGamePool,
+  buildSeedCategoryVotes,
   weightForRatedGame,
   weightedSample,
 } from "@/lib/live-aggregate/seed-standings";
@@ -479,18 +480,15 @@ export async function seedCommunityEditionBallots(
     }
 
     if (categories.length > 0 && picked.length > 0) {
-      const catVotes = categories
-        .filter(() => Math.random() < 0.7)
-        .map((cat) => {
-          const game = picked[Math.floor(Math.random() * picked.length)]!;
-          return {
-            ballotId,
-            categoryId: cat.id,
-            gameId: game.id,
-          };
-        });
+      const catVotes = buildSeedCategoryVotes(categories, picked);
       if (catVotes.length > 0) {
-        await db.insert(communityEditionBallotCategoryVotes).values(catVotes);
+        await db.insert(communityEditionBallotCategoryVotes).values(
+          catVotes.map((vote) => ({
+            ballotId,
+            categoryId: vote.categoryId,
+            gameId: vote.gameId,
+          })),
+        );
       }
     }
   }

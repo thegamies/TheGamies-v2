@@ -7,6 +7,7 @@ export type RankedStandingItem = {
   slug: string;
   title: string;
   coverUrl: string | null;
+  points?: number | null;
 };
 
 function categoryColClass(place: number): string {
@@ -16,9 +17,30 @@ function categoryColClass(place: number): string {
   return "min-w-0 flex-1 max-w-[128px] sm:max-w-[148px] md:max-w-[168px]";
 }
 
+function RankedCard({
+  row,
+  priority,
+}: {
+  row: RankedStandingItem;
+  priority: boolean;
+}) {
+  return (
+    <StandingGameCard
+      place={row.place}
+      placeSize="lg"
+      slug={row.slug}
+      title={row.title}
+      coverUrl={row.coverUrl}
+      points={row.points}
+      priority={priority}
+    />
+  );
+}
+
 /**
  * Ranked GOTY layout. Place sits in front of the title with a larger
- * display marker. GOTY Top 10: even wrapping grid.
+ * display marker; pts hug the last title line when provided. GOTY Top 10:
+ * even wrapping grid.
  */
 export function RankedStandingBillboard({
   items,
@@ -43,14 +65,7 @@ export function RankedStandingBillboard({
       >
         {items.map((row) => (
           <li key={row.gameId} className={categoryColClass(row.place)}>
-            <StandingGameCard
-              place={row.place}
-              placeSize="lg"
-              slug={row.slug}
-              title={row.title}
-              coverUrl={row.coverUrl}
-              priority={row.place === 1}
-            />
+            <RankedCard row={row} priority={row.place === 1} />
           </li>
         ))}
       </ul>
@@ -61,14 +76,7 @@ export function RankedStandingBillboard({
     <ul className={`${className} ${ballotRankGridClass}`}>
       {items.map((row) => (
         <li key={row.gameId} className="min-w-0">
-          <StandingGameCard
-            place={row.place}
-            placeSize="lg"
-            slug={row.slug}
-            title={row.title}
-            coverUrl={row.coverUrl}
-            priority={row.place <= 3}
-          />
+          <RankedCard row={row} priority={row.place <= 3} />
         </li>
       ))}
     </ul>

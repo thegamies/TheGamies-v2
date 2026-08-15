@@ -5,7 +5,12 @@ import { type CSSProperties, type ReactNode } from "react";
 import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
-import { EmptyStandingCard, StandingGameCard } from "@/components/communities/StandingGameCard";
+import {
+  EmptyStandingCard,
+  StandingGameCard,
+  standingStripColClass,
+  standingStripListClass,
+} from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
@@ -269,15 +274,11 @@ function CategoryRankedSections({
               className="mt-4"
               label={`${cat.label} ranked`}
             >
-              <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
+              <ul className={standingStripListClass}>
                 {cat.rows.map((row) => (
                   <li
                     key={row.gameId}
-                    className={
-                      row.rank === 1
-                        ? "w-[168px] shrink-0 sm:w-[190px]"
-                        : "w-[132px] shrink-0 sm:w-[148px]"
-                    }
+                    className={standingStripColClass(row.rank === 1)}
                   >
                     <StandingGameCard
                       place={row.rank}
@@ -285,7 +286,10 @@ function CategoryRankedSections({
                       slug={row.slug}
                       title={row.title}
                       coverUrl={row.coverUrl}
+                      points={row.votes}
+                      scoreUnit="votes"
                       priority={row.rank === 1}
+                      pinCover
                     />
                   </li>
                 ))}

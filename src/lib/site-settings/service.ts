@@ -1,5 +1,9 @@
 import { eq } from "drizzle-orm";
 import { createDb, siteSettings, type Db } from "@thegamies/db";
+import {
+  parseSharedRankMode,
+  type SharedRankMode,
+} from "@/lib/standings/shared-rank";
 import { resolveLandingStandingsYears } from "./landing-years";
 
 export {
@@ -16,6 +20,7 @@ function getDb(): Db {
 
 export type SiteSettingsRow = {
   landingStandingsYears: number[] | null;
+  rankMode: SharedRankMode;
 };
 
 export async function getSiteSettings(
@@ -24,6 +29,7 @@ export async function getSiteSettings(
   const [row] = await db
     .select({
       landingStandingsYears: siteSettings.landingStandingsYears,
+      rankMode: siteSettings.rankMode,
     })
     .from(siteSettings)
     .where(eq(siteSettings.id, SETTINGS_ID))
@@ -31,6 +37,7 @@ export async function getSiteSettings(
 
   return {
     landingStandingsYears: row?.landingStandingsYears ?? null,
+    rankMode: parseSharedRankMode(row?.rankMode),
   };
 }
 
@@ -40,6 +47,13 @@ export async function getLandingStandingsYears(
 ): Promise<number[]> {
   const settings = await getSiteSettings(db);
   return resolveLandingStandingsYears(settings.landingStandingsYears, now);
+}
+
+export async function getSiteRankMode(
+  db: Db = getDb(),
+): Promise<SharedRankMode> {
+  const settings = await getSiteSettings(db);
+  return settings.rankMode;
 }
 
 /**
@@ -69,5 +83,33 @@ export async function setLandingStandingsYears(
       },
     });
 
-  return { landingStandingsYears: normalized };
+  return getSiteSettings(db);
+}
+
+/**
+ * Persist site live tie numbering (competition vs dense). Displayed ranks
+ * are derived at read — changing this does not rescore lists.
+ */
+export async function setSiteRankMode(
+  mode: SharedRankMode,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const rankMode = parseSharedRankMode(mode);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      rankMode,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        rankMode,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
 }

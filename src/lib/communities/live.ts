@@ -11,13 +11,20 @@ import {
   STANDINGS_PAGE_SIZE,
   clampStandingsPage,
   redactStandingsPage,
+  takeTopDisplayRanks,
   type CategoryStandingsBlock,
   type StandingsGameRow,
   type StandingsPage,
 } from "@/lib/live-aggregate/service";
 import {
-  parseAwardCategoryGroup,
-  type AwardCategoryGroup,
+  CATEGORY_DETAIL_PAGE_SIZE,
+  CATEGORY_LIST_TOP_RANKS,
+  DEFAULT_LIVE_STANDINGS_VIEW,
+  DEFAULT_STANDINGS_CATEGORY_GROUP,
+  parseLiveStandingsView,
+  parseStandingsCategoryGroup,
+  type LiveStandingsViewId,
+  type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
 import { isCommunityLiveScoresRevealed } from "./live-reveal";
 import {
@@ -81,6 +88,7 @@ type CategoryJsonRow = {
   label: string;
   description: string | null;
   sortOrder: number;
+  totalVotes?: number;
   place: number | null;
   gameId: string | null;
   slug: string | null;
@@ -103,7 +111,7 @@ function groupCategoryBlocks(
     voteCount: number;
   }>,
 ): CategoryStandingsBlock[] {
-  type Acc = CategoryStandingsBlock & { sortOrder: number };
+  type Acc = CategoryStandingsBlock & { sortOrder: number; totalVotes: number };
   const byId = new Map<string, Acc>();
   for (const row of rows) {
     let block = byId.get(row.categoryId);
@@ -113,10 +121,12 @@ function groupCategoryBlocks(
         label: row.label,
         description: row.description,
         sortOrder: row.sortOrder,
+        totalVotes: 0,
         rows: [],
       };
       byId.set(row.categoryId, block);
     }
+    block.totalVotes += row.voteCount;
     block.rows.push({
       place: row.place,
       gameId: row.gameId,
@@ -127,26 +137,46 @@ function groupCategoryBlocks(
     });
   }
   return [...byId.values()]
-    .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+    .sort(
+      (a, b) =>
+        b.totalVotes - a.totalVotes ||
+        a.label.localeCompare(b.label) ||
+        a.sortOrder - b.sortOrder,
+    )
     .map((block) => ({
       categoryId: block.categoryId,
       label: block.label,
       description: block.description,
-      rows: withDisplayRanks(
-        block.rows,
-        (r) => r.voteCount ?? 0,
-        "competition",
-      ).map((r) => ({ ...r, place: r.rank })),
+      totalVotes: block.totalVotes,
+      rows: takeTopDisplayRanks(
+        withDisplayRanks(
+          block.rows,
+          (r) => r.voteCount ?? 0,
+          "competition",
+        ).map((r) => ({ ...r, place: r.rank })),
+        CATEGORY_LIST_TOP_RANKS,
+      ),
     }));
 }
 
 /**
  * Live SUM board (unredacted). Never reads live_*_scores.
+ * Categories ordered by total member votes (most first).
  */
 async function queryCommunityLiveStandings(
   communityId: string,
   year: number,
-  opts: { page: number; pageSize: number; categoryGroup?: AwardCategoryGroup },
+  opts: {
+    page: number;
+    pageSize: number;
+    categoryGroup?: StandingsCategoryGroupFilter;
+    categoryId?: string | null;
+    includeGoty?: boolean;
+    includeCategories?: boolean;
+    trimTopRanks?: boolean;
+    categoryGameLimit?: number;
+    categoryOffset?: number;
+  },
   db: Db,
 ): Promise<{
   listCount: number;
@@ -156,7 +186,24 @@ async function queryCommunityLiveStandings(
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
 }> {
-  const { pageSize, page: requestedPage, categoryGroup } = opts;
+  const {
+    pageSize,
+    page: requestedPage,
+    categoryGroup = "all",
+    categoryId = null,
+    includeGoty = true,
+    includeCategories = true,
+    trimTopRanks = true,
+    categoryGameLimit = Math.max(12, CATEGORY_LIST_TOP_RANKS * 4),
+    categoryOffset = 0,
+  } = opts;
+  const groupFilter =
+    !categoryGroup || categoryGroup === "all"
+      ? sql``
+      : sql`and ac.category_group = ${categoryGroup}`;
+  const categoryIdFilter = categoryId
+    ? sql`and ac.id = ${categoryId}`
+    : sql``;
 
   const result = await db.execute(sql`
     with bounds as (
@@ -203,19 +250,9 @@ async function queryCommunityLiveStandings(
       p.goty_total,
       p.page,
       p.total_pages,
-      (
-        select count(*)::int
-        from (
-          select sum(c.points)::int as score
-          from live_goty_contrib c
-          inner join community_members m
-            on m.profile_id = c.profile_id
-           and m.community_id = ${communityId}::uuid
-          where c.year = ${year}
-          group by c.game_id
-        ) totals
-        where totals.score > (
-          select agg.score
+      case
+        when ${includeGoty} then (
+          select count(*)::int
           from (
             select sum(c.points)::int as score
             from live_goty_contrib c
@@ -224,32 +261,11 @@ async function queryCommunityLiveStandings(
              and m.community_id = ${communityId}::uuid
             where c.year = ${year}
             group by c.game_id
-            order by sum(c.points) desc, c.game_id asc
-            offset (p.page - 1) * ${pageSize}
-            limit 1
-          ) agg
-        )
-      ) as higher_count,
-      coalesce(
-        (
-          select json_agg(row_to_json(row) order by row."place")
-          from (
-            select
-              ((p.page - 1) * ${pageSize} + row_number() over (
-                order by agg.score desc, agg.game_id asc
-              ))::int as "place",
-              agg.game_id as "gameId",
-              g.slug as "slug",
-              g.title as "title",
-              g.year as "year",
-              cov.image_id as "coverImageId",
-              agg.score as "score",
-              agg.list_mentions as "listMentions"
+          ) totals
+          where totals.score > (
+            select agg.score
             from (
-              select
-                c.game_id,
-                sum(c.points)::int as score,
-                count(*)::int as list_mentions
+              select sum(c.points)::int as score
               from live_goty_contrib c
               inner join community_members m
                 on m.profile_id = c.profile_id
@@ -257,68 +273,130 @@ async function queryCommunityLiveStandings(
               where c.year = ${year}
               group by c.game_id
               order by sum(c.points) desc, c.game_id asc
-              limit ${pageSize}
               offset (p.page - 1) * ${pageSize}
+              limit 1
             ) agg
-            inner join games g on g.id = agg.game_id
-            left join covers cov on cov.igdb_id = g.cover_igdb_id
-          ) row
-        ),
-        '[]'::json
-      ) as goty,
-      coalesce(
-        (
-          select json_agg(row_to_json(cat) order by cat."sortOrder", cat."label", cat."place" nulls last)
-          from (
-            select
-              ac.id as "categoryId",
-              ac.label as "label",
-              ac.description as "description",
-              ac.sort_order as "sortOrder",
-              r.place as "place",
-              r.game_id as "gameId",
-              r.slug as "slug",
-              r.title as "title",
-              r.cover_image_id as "coverImageId",
-              r.vote_count as "voteCount"
-            from award_categories ac
-            left join lateral (
+          )
+        )
+        else 0
+      end as higher_count,
+      case
+        when ${includeGoty} then coalesce(
+          (
+            select json_agg(row_to_json(row) order by row."place")
+            from (
               select
-                row_number() over (
-                  order by tallies.vote_count desc, tallies.game_id asc
-                )::int as place,
-                tallies.game_id,
-                g.slug,
-                g.title,
-                cov.image_id as cover_image_id,
-                tallies.vote_count
+                ((p.page - 1) * ${pageSize} + row_number() over (
+                  order by agg.score desc, agg.game_id asc
+                ))::int as "place",
+                agg.game_id as "gameId",
+                g.slug as "slug",
+                g.title as "title",
+                g.year as "year",
+                cov.image_id as "coverImageId",
+                agg.score as "score",
+                agg.list_mentions as "listMentions"
               from (
                 select
                   c.game_id,
-                  count(*)::int as vote_count
-                from live_category_contrib c
+                  sum(c.points)::int as score,
+                  count(*)::int as list_mentions
+                from live_goty_contrib c
                 inner join community_members m
                   on m.profile_id = c.profile_id
                  and m.community_id = ${communityId}::uuid
                 where c.year = ${year}
-                  and c.category_id = ac.id
                 group by c.game_id
-              ) tallies
-              inner join games g on g.id = tallies.game_id
+                order by sum(c.points) desc, c.game_id asc
+                limit ${pageSize}
+                offset (p.page - 1) * ${pageSize}
+              ) agg
+              inner join games g on g.id = agg.game_id
               left join covers cov on cov.igdb_id = g.cover_igdb_id
-              order by tallies.vote_count desc, tallies.game_id asc
-              limit 10
-            ) r on true
-            where ac.active = true
-              ${
-                categoryGroup
-                  ? sql`and ac.category_group = ${categoryGroup}`
-                  : sql``
-              }
-          ) cat
-        ),
-        '[]'::json
-      ) as categories
+            ) row
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as goty,
+      case
+        when ${includeCategories} then coalesce(
+          (
+            select json_agg(
+              row_to_json(cat)
+              order by cat."totalVotes" desc, cat."label", cat."place" nulls last
+            )
+            from (
+              select
+                ac.id as "categoryId",
+                ac.label as "label",
+                ac.description as "description",
+                ac.sort_order as "sortOrder",
+                coalesce(
+                  (
+                    select count(*)::int
+                    from live_category_contrib c
+                    inner join community_members m
+                      on m.profile_id = c.profile_id
+                     and m.community_id = ${communityId}::uuid
+                    where c.year = ${year}
+                      and c.category_id = ac.id
+                  ),
+                  0
+                ) as "totalVotes",
+                r.place as "place",
+                r.game_id as "gameId",
+                r.slug as "slug",
+                r.title as "title",
+                r.cover_image_id as "coverImageId",
+                r.vote_count as "voteCount"
+              from award_categories ac
+              left join lateral (
+                select
+                  row_number() over (
+                    order by tallies.vote_count desc, tallies.game_id asc
+                  )::int as place,
+                  tallies.game_id,
+                  g.slug,
+                  g.title,
+                  cov.image_id as cover_image_id,
+                  tallies.vote_count
+                from (
+                  select
+                    c.game_id,
+                    count(*)::int as vote_count
+                  from live_category_contrib c
+                  inner join community_members m
+                    on m.profile_id = c.profile_id
+                   and m.community_id = ${communityId}::uuid
+                  where c.year = ${year}
+                    and c.category_id = ac.id
+                  group by c.game_id
+                ) tallies
+                inner join games g on g.id = tallies.game_id
+                left join covers cov on cov.igdb_id = g.cover_igdb_id
+                order by tallies.vote_count desc, tallies.game_id asc
+                limit ${categoryGameLimit}
+                offset ${categoryOffset}
+              ) r on true
+              where ac.active = true
+                ${groupFilter}
+                ${categoryIdFilter}
+                and exists (
+                  select 1
+                  from live_category_contrib c
+                  inner join community_members m
+                    on m.profile_id = c.profile_id
+                   and m.community_id = ${communityId}::uuid
+                  where c.year = ${year}
+                    and c.category_id = ac.id
+                )
+            ) cat
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as categories
     from paged p
   `);
 
@@ -358,7 +436,8 @@ async function queryCommunityLiveStandings(
   }).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
-  const byId = new Map<string, CategoryStandingsBlock>();
+  type CatAcc = CategoryStandingsBlock & { _total: number };
+  const byId = new Map<string, CatAcc>();
   for (const cat of categoryRows) {
     let block = byId.get(cat.categoryId);
     if (!block) {
@@ -366,6 +445,8 @@ async function queryCommunityLiveStandings(
         categoryId: cat.categoryId,
         label: cat.label,
         description: cat.description,
+        totalVotes: asInt((cat as { totalVotes?: number }).totalVotes),
+        _total: asInt((cat as { totalVotes?: number }).totalVotes),
         rows: [],
       };
       byId.set(cat.categoryId, block);
@@ -381,12 +462,22 @@ async function queryCommunityLiveStandings(
       });
     }
   }
+  const categories: CategoryStandingsBlock[] = [];
   for (const block of byId.values()) {
-    block.rows = withDisplayRanks(
+    const ranked = withDisplayRanks(
       block.rows,
       (r) => r.voteCount ?? 0,
       "competition",
     ).map((r) => ({ ...r, place: r.rank }));
+    categories.push({
+      categoryId: block.categoryId,
+      label: block.label,
+      description: block.description,
+      totalVotes: block.totalVotes,
+      rows: trimTopRanks
+        ? takeTopDisplayRanks(ranked, CATEGORY_LIST_TOP_RANKS)
+        : ranked,
+    });
   }
 
   return {
@@ -395,9 +486,10 @@ async function queryCommunityLiveStandings(
     page,
     totalPages,
     goty,
-    categories: [...byId.values()],
+    categories,
   };
 }
+
 
 async function clearLockYear(
   communityId: string,
@@ -557,7 +649,8 @@ async function queryLockedStandingsPage(
   year: number,
   pageSize: number,
   requestedPage: number,
-  categoryGroup: AwardCategoryGroup,
+  categoryGroup: StandingsCategoryGroupFilter,
+  view: LiveStandingsViewId,
   db: Db,
 ): Promise<{
   listCount: number;
@@ -571,49 +664,57 @@ async function queryLockedStandingsPage(
   const totalPages = Math.max(1, Math.ceil(meta.gotyTotal / pageSize) || 1);
   const page = clampStandingsPage(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
+  const includeGoty = view === "goty";
+  const includeCategories = view === "categories" || view === "category";
 
-  const gotyRows = await db
-    .select()
-    .from(communityLiveLockGoty)
-    .where(
-      and(
-        eq(communityLiveLockGoty.communityId, communityId),
-        eq(communityLiveLockGoty.year, year),
-      ),
-    )
-    .orderBy(asc(communityLiveLockGoty.place))
-    .limit(pageSize)
-    .offset(offset);
+  const gotyRows = includeGoty
+    ? await db
+        .select()
+        .from(communityLiveLockGoty)
+        .where(
+          and(
+            eq(communityLiveLockGoty.communityId, communityId),
+            eq(communityLiveLockGoty.year, year),
+          ),
+        )
+        .orderBy(asc(communityLiveLockGoty.place))
+        .limit(pageSize)
+        .offset(offset)
+    : [];
 
-  const categoryRows = await db
-    .select({
-      categoryId: communityLiveLockCategoryRows.categoryId,
-      label: communityLiveLockCategoryRows.label,
-      description: communityLiveLockCategoryRows.description,
-      sortOrder: communityLiveLockCategoryRows.sortOrder,
-      place: communityLiveLockCategoryRows.place,
-      gameId: communityLiveLockCategoryRows.gameId,
-      slug: communityLiveLockCategoryRows.slug,
-      title: communityLiveLockCategoryRows.title,
-      coverUrl: communityLiveLockCategoryRows.coverUrl,
-      voteCount: communityLiveLockCategoryRows.voteCount,
-    })
-    .from(communityLiveLockCategoryRows)
-    .innerJoin(
-      awardCategories,
-      eq(awardCategories.id, communityLiveLockCategoryRows.categoryId),
-    )
-    .where(
-      and(
-        eq(communityLiveLockCategoryRows.communityId, communityId),
-        eq(communityLiveLockCategoryRows.year, year),
-        eq(awardCategories.categoryGroup, categoryGroup),
-      ),
-    )
-    .orderBy(
-      asc(communityLiveLockCategoryRows.sortOrder),
-      asc(communityLiveLockCategoryRows.place),
-    );
+  const categoryRows = includeCategories
+    ? await db
+        .select({
+          categoryId: communityLiveLockCategoryRows.categoryId,
+          label: communityLiveLockCategoryRows.label,
+          description: communityLiveLockCategoryRows.description,
+          sortOrder: communityLiveLockCategoryRows.sortOrder,
+          place: communityLiveLockCategoryRows.place,
+          gameId: communityLiveLockCategoryRows.gameId,
+          slug: communityLiveLockCategoryRows.slug,
+          title: communityLiveLockCategoryRows.title,
+          coverUrl: communityLiveLockCategoryRows.coverUrl,
+          voteCount: communityLiveLockCategoryRows.voteCount,
+        })
+        .from(communityLiveLockCategoryRows)
+        .innerJoin(
+          awardCategories,
+          eq(awardCategories.id, communityLiveLockCategoryRows.categoryId),
+        )
+        .where(
+          and(
+            eq(communityLiveLockCategoryRows.communityId, communityId),
+            eq(communityLiveLockCategoryRows.year, year),
+            ...(categoryGroup === "all"
+              ? []
+              : [eq(awardCategories.categoryGroup, categoryGroup)]),
+          ),
+        )
+        .orderBy(
+          asc(communityLiveLockCategoryRows.sortOrder),
+          asc(communityLiveLockCategoryRows.place),
+        )
+    : [];
 
   const gotyMapped = gotyRows.map((row) => ({
     place: row.place,
@@ -627,7 +728,7 @@ async function queryLockedStandingsPage(
     rankCounts: null,
   }));
   let firstGroupRank = 1;
-  if (gotyMapped[0]) {
+  if (includeGoty && gotyMapped[0]) {
     const [higher] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(communityLiveLockGoty)
@@ -652,7 +753,7 @@ async function queryLockedStandingsPage(
     page,
     totalPages,
     goty,
-    categories: groupCategoryBlocks(categoryRows),
+    categories: includeCategories ? groupCategoryBlocks(categoryRows) : [],
   };
 }
 
@@ -669,16 +770,25 @@ export async function getCommunityLiveStandings(
     pageSize?: number;
     scoresVisibleFrom?: Date | null;
     locked?: boolean;
-    categoryGroup?: AwardCategoryGroup;
+    categoryGroup?: StandingsCategoryGroupFilter;
+    view?: LiveStandingsViewId;
+    categoryId?: string | null;
   } = {},
   db: Db = getDb(),
 ): Promise<StandingsPage> {
+  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryId =
+    view === "category" && opts.categoryId ? String(opts.categoryId) : null;
+  const defaultPageSize =
+    view === "category" ? CATEGORY_DETAIL_PAGE_SIZE : STANDINGS_PAGE_SIZE;
   const pageSize = Math.min(
     200,
-    Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
+    Math.max(1, Math.floor(opts.pageSize ?? defaultPageSize)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
-  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
+  const categoryGroup = parseStandingsCategoryGroup(
+    opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
+  );
   const revealed = isCommunityLiveScoresRevealed(
     opts.scoresVisibleFrom ?? null,
   );
@@ -690,8 +800,16 @@ export async function getCommunityLiveStandings(
       pageSize,
       requestedPage,
       categoryGroup,
+      view,
       db,
     );
+    let categories = locked.categories.map((block) => ({
+      ...block,
+      totalVotes: block.totalVotes ?? null,
+    }));
+    if (view === "category" && categoryId) {
+      categories = categories.filter((c) => c.categoryId === categoryId);
+    }
     return redactStandingsPage({
       year,
       listCount: locked.listCount,
@@ -703,15 +821,31 @@ export async function getCommunityLiveStandings(
       gotyTotal: locked.gotyTotal,
       totalPages: locked.totalPages,
       goty: locked.goty,
-      categories: locked.categories,
+      categories,
       categoryGroup,
+      view,
+      categoryId,
+      categoryGameTotal: categories[0]?.rows.length ?? 0,
     });
   }
 
   const live = await queryCommunityLiveStandings(
     communityId,
     year,
-    { page: requestedPage, pageSize, categoryGroup },
+    {
+      page: requestedPage,
+      pageSize,
+      categoryGroup,
+      categoryId,
+      includeGoty: view === "goty",
+      includeCategories: view === "categories" || view === "category",
+      trimTopRanks: view === "categories",
+      categoryGameLimit:
+        view === "category"
+          ? pageSize
+          : Math.max(12, CATEGORY_LIST_TOP_RANKS * 4),
+      categoryOffset: view === "category" ? (requestedPage - 1) * pageSize : 0,
+    },
     db,
   );
 
@@ -728,5 +862,9 @@ export async function getCommunityLiveStandings(
     goty: live.goty,
     categories: live.categories,
     categoryGroup,
+    view,
+    categoryId,
+    categoryGameTotal:
+      view === "category" ? (live.categories[0]?.rows.length ?? 0) : 0,
   });
 }

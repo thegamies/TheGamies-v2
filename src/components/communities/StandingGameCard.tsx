@@ -6,6 +6,13 @@ import {
   MATRIX_COVER_WIDE,
   PODIUM_COVER,
 } from "@/components/communities/coverSizes";
+import {
+  DEFAULT_RANK_SCORE_LAYOUT,
+  standingCardChrome,
+  type RankScoreLayout,
+} from "@/components/communities/standingCardLayout";
+
+export type { RankScoreLayout };
 
 export type StandingGameCardProps = {
   slug: string;
@@ -28,13 +35,27 @@ export type StandingGameCardProps = {
    * `md` — standings default (~18px). `lg` — Ranked Results (display).
    */
   placeSize?: "md" | "lg";
+  /**
+   * Where rank + score sit when `points` is set. Product default is
+   * `votes-under-title`. Other values stay on `/design-system`.
+   */
+  rankScoreLayout?: RankScoreLayout;
+  /**
+   * Pin the cover to a shared baseline in a 2-row subgrid strip so a taller
+   * caption (wrapped title) cannot lift the art. Parent `li` must use
+   * `standingStripColClass`.
+   */
+  pinCover?: boolean;
 };
 
 /**
  * Same card language as games browse: GameCover + title (+ optional meta).
- * Rank (if any) sits in front of the title — not on the cover. Comparison
- * strips omit place (column headers name the source). Titles reserve and clamp
- * to 2 lines and shrink toward a 12px floor.
+ * When scores are hidden, rank (if any) sits in front of the title — never on
+ * the cover. When `points` is set, rank stays in front of the title and the
+ * score hugs the last title line (no reserved 2-line block). Comparison strips
+ * omit place (column headers name the source). Titles clamp to 2 lines and
+ * shrink toward a 12px floor; score layouts reserve 2-line height except
+ * `votes-under-title`.
  */
 export function StandingGameCard({
   slug,
@@ -47,15 +68,26 @@ export function StandingGameCard({
   priority = false,
   size = "md",
   placeSize = "md",
+  rankScoreLayout = DEFAULT_RANK_SCORE_LAYOUT,
+  pinCover = false,
 }: StandingGameCardProps) {
+  const chrome = standingCardChrome(rankScoreLayout, points != null);
   const scoreLabel =
     points != null
       ? `${points} ${scoreUnit === "votes" ? (points === 1 ? "vote" : "votes") : "pts"}`
       : null;
   const meta =
-    scoreLabel && year != null
-      ? `${scoreLabel} · ${year}`
-      : (scoreLabel ?? (year != null ? String(year) : null));
+    chrome.votesUnderTitle
+      ? [scoreLabel, year != null ? String(year) : null]
+          .filter(Boolean)
+          .join(" · ") || null
+      : chrome.placeBeforeTitle
+        ? scoreLabel && year != null
+          ? `${scoreLabel} · ${year}`
+          : (scoreLabel ?? (year != null ? String(year) : null))
+        : year != null
+          ? String(year)
+          : null;
 
   const placeClass =
     placeSize === "lg"
@@ -66,13 +98,42 @@ export function StandingGameCard({
         ? "text-[14px] lg:text-[18px]"
         : "text-[18px]";
 
+  const rankScoreRow =
+    chrome.row && (place != null || scoreLabel) ? (
+      <div
+        className={`${chrome.rowGapClass} flex items-end justify-between gap-2`}
+      >
+        {place != null ? (
+          <span
+            className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
+            aria-label={`Rank ${place}`}
+          >
+            {place}
+          </span>
+        ) : (
+          <span />
+        )}
+        {scoreLabel ? (
+          <span
+            className={`shrink-0 text-right text-xs tracking-wide text-muted tabular-nums sm:text-sm ${
+              chrome.tightRow ? "leading-none" : "pb-0.5"
+            }`}
+          >
+            {scoreLabel}
+          </span>
+        ) : null}
+      </div>
+    ) : null;
+
   const titleBlock = (
     <div
-      className={`mt-2 flex ${
-        placeSize === "lg" ? "items-start gap-2" : "items-baseline gap-1"
+      className={`${chrome.titleOffsetClass} flex ${
+        chrome.placeBeforeTitle && placeSize === "lg"
+          ? "items-start gap-2"
+          : "items-baseline gap-1"
       }`}
     >
-      {place != null ? (
+      {chrome.placeBeforeTitle && place != null ? (
         <span
           className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
           aria-label={`Rank ${place}`}
@@ -80,7 +141,11 @@ export function StandingGameCard({
           {place}
         </span>
       ) : null}
-      <div className={`min-w-0 flex-1 ${placeSize === "lg" ? "pt-1" : ""}`}>
+      <div
+        className={`min-w-0 flex-1 ${
+          chrome.placeBeforeTitle && placeSize === "lg" ? "pt-1" : ""
+        }`}
+      >
         <FitDisplayTitle
           className="w-full group-hover:text-accent"
           maxPx={
@@ -92,38 +157,63 @@ export function StandingGameCard({
           }
           minPx={12}
           lines={2}
+          reserve={chrome.reserveTitle}
         >
           {title}
         </FitDisplayTitle>
-        {meta ? <p className="mt-1 text-xs text-muted">{meta}</p> : null}
+        {meta ? (
+          <p
+            className={`text-xs text-muted ${
+              chrome.votesUnderTitle
+                ? "mt-0.5 leading-none tracking-wide tabular-nums"
+                : "mt-1"
+            }`}
+          >
+            {meta}
+          </p>
+        ) : null}
       </div>
     </div>
   );
 
-  if (size === "sm") {
-    return (
-      <Link
-        href={`/games/${slug}`}
-        className="group block w-[103px] lg:w-[206px]"
-        draggable={false}
-      >
-        <GameCover
-          title={title}
-          imageUrl={coverUrl}
-          priority={priority}
-          fluid
-          width={MATRIX_COVER_WIDE.width}
-          height={MATRIX_COVER_WIDE.height}
-        />
-        {titleBlock}
-      </Link>
+  const cover =
+    size === "sm" ? (
+      <GameCover
+        title={title}
+        imageUrl={coverUrl}
+        priority={priority}
+        fluid
+        width={MATRIX_COVER_WIDE.width}
+        height={MATRIX_COVER_WIDE.height}
+      />
+    ) : (
+      <GameCover title={title} imageUrl={coverUrl} priority={priority} />
     );
-  }
+
+  const pinnedCover = pinCover ? (
+    <div className="w-full self-end">{cover}</div>
+  ) : (
+    cover
+  );
+
+  const body = (
+    <>
+      {chrome.row === "above" ? rankScoreRow : null}
+      {pinnedCover}
+      {chrome.row === "below" ? rankScoreRow : null}
+      {titleBlock}
+    </>
+  );
+
+  const linkClass = pinCover
+    ? "contents"
+    : size === "sm"
+      ? "group block w-[103px] lg:w-[206px]"
+      : "group block";
 
   return (
-    <Link href={`/games/${slug}`} className="group block" draggable={false}>
-      <GameCover title={title} imageUrl={coverUrl} priority={priority} />
-      {titleBlock}
+    <Link href={`/games/${slug}`} className={linkClass} draggable={false}>
+      {body}
     </Link>
   );
 }
@@ -158,14 +248,35 @@ export function EmptyStandingCard({
 
 export function StandingGameCardGrid({
   children,
+  density = "default",
 }: {
   children: React.ReactNode;
+  /** `tight` — live standings boards (same row/column gap, slightly denser). */
+  density?: "default" | "tight";
 }) {
   return (
-    <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <ul
+      className={
+        density === "tight"
+          ? "mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+          : "mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+      }
+    >
       {children}
     </ul>
   );
+}
+
+/** Horizontal rank strip: cover row + caption row so art shares a bottom edge. */
+export const standingStripListClass =
+  "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] gap-x-4";
+
+export function standingStripColClass(featured: boolean): string {
+  return `group row-span-2 grid grid-rows-subgrid ${
+    featured
+      ? "w-[168px] shrink-0 sm:w-[190px]"
+      : "w-[132px] shrink-0 sm:w-[148px]"
+  }`;
 }
 
 export type WinnerPodiumEntry = {

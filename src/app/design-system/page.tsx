@@ -4,6 +4,7 @@ import {
   GameSearchFieldFixture,
 } from "@/app/design-system/BallotFixtures";
 import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
+import { StandingCardLayoutFixture } from "@/app/design-system/StandingCardLayoutFixture";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
@@ -13,6 +14,7 @@ import { Button } from "@/components/ui/Button";
 import { Radio, RadioOption } from "@/components/ui/Radio";
 import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { GameCover } from "@/components/ui/GameCover";
+import { YearSelect } from "@/components/ui/YearSelect";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { navItemClass } from "@/components/ui/navLevels";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
@@ -292,8 +294,9 @@ export default function DesignSystemPage() {
               Year select
             </p>
             <p className="mt-2 max-w-xl text-sm text-muted">
-              Pop-open beside the awards title when 2+ public years exist —
-              not a second underline strip.
+              Pop-open beside the section title — editions when 2+ public years;
+              live standings always show the control. Not a second underline
+              strip.
             </p>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
               <h3 className="font-display text-3xl tracking-wide text-ink">
@@ -303,6 +306,21 @@ export default function DesignSystemPage() {
                 slug="example"
                 year={2026}
                 years={[2026, 2025, 2024]}
+              />
+            </div>
+            <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
+              <h3 className="font-display text-3xl tracking-wide text-ink">
+                2026 Game of the Year
+              </h3>
+              <YearSelect
+                year={2026}
+                options={[
+                  { year: 2026, href: "/game-of-the-year/2026" },
+                  { year: 2025, href: "/game-of-the-year/2025" },
+                  { year: 2024, href: "/game-of-the-year/2024" },
+                ]}
+                alwaysShow
+                label="Standings year"
               />
             </div>
           </div>
@@ -383,7 +401,9 @@ export default function DesignSystemPage() {
       <Section title="Rank + cover">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           Podium / matrix use large or column ranks. Standing cards never put
-          rank on the art — optional place sits in front of the title.
+          rank on the art — when scores show, place sits in front of the title
+          and votes hug the last line; otherwise place sits in front of the
+          title.
         </p>
         <div className="flex flex-wrap items-end gap-6">
           <div className="flex items-end gap-3">
@@ -403,9 +423,11 @@ export default function DesignSystemPage() {
       <Section title="Standing cards">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           <code className="text-ink">StandingGameCard</code> — cover + title (+
-          meta). Place before title when needed; omit for Comparison strip cells.
+          meta). When scores show, rank sits in front of the title and votes
+          hug the last line. Otherwise place before title. Omit place for
+          Comparison strip cells.
         </p>
-        <ul className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           <li>
             <StandingGameCard
               place={4}
@@ -435,6 +457,15 @@ export default function DesignSystemPage() {
             />
           </li>
         </ul>
+      </Section>
+
+      <Section title="Rank · votes · title">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Settings to compare how rank, votes, and title sit around the cover.
+          Live standings still use Votes under title. Eight cards in two rows
+          mix short and long titles so stacking tightness is obvious.
+        </p>
+        <StandingCardLayoutFixture />
       </Section>
 
       <Section title="Horizontal scroll">

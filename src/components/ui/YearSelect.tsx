@@ -1,0 +1,118 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
+
+export type YearSelectOption = {
+  year: number;
+  href: string;
+};
+
+type Props = {
+  year: number;
+  /** Precomputed year links — serializable for Server → Client boundaries. */
+  options: YearSelectOption[];
+  /** Show the year even when there is only one (no menu). */
+  alwaysShow?: boolean;
+  /** Accessible name for the control / listbox. */
+  label?: string;
+};
+
+/**
+ * Compact pop-open year switcher — sits to the right of a section heading.
+ * Shared by live standings and edition results (via EditionYearSelect).
+ * Pass `options` (year + href) rather than a function so Server Components
+ * can render this Client Component without RSC serialization errors.
+ */
+export function YearSelect({
+  year,
+  options,
+  alwaysShow = false,
+  label = "Year",
+}: Props) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onPointerDown(event: MouseEvent | PointerEvent) {
+      const el = rootRef.current;
+      if (!el || el.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  if (options.length === 0) return null;
+  if (options.length === 1 && !alwaysShow) return null;
+
+  if (options.length === 1) {
+    return (
+      <p className="font-display text-2xl tracking-wide text-ink" aria-label={label}>
+        {year}
+      </p>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        className="inline-flex items-baseline gap-1.5 font-display text-2xl tracking-wide text-ink hover:text-accent"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={listId}
+        aria-label={label}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span>{year}</span>
+        <span
+          className={`text-sm text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          aria-hidden
+        >
+          ▾
+        </span>
+      </button>
+
+      {open ? (
+        <ul
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          className="absolute right-0 z-20 mt-2 min-w-[7.5rem] border border-line bg-paper py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+        >
+          {options.map((opt) => {
+            const active = opt.year === year;
+            return (
+              <li key={opt.year} role="option" aria-selected={active}>
+                <Link
+                  href={opt.href}
+                  className={`block px-3 py-2 text-sm tracking-wide ${
+                    active
+                      ? "text-accent"
+                      : "text-ink hover:bg-[color-mix(in_oklab,var(--ink)_4%,transparent)]"
+                  }`}
+                  onClick={() => setOpen(false)}
+                >
+                  {opt.year}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}

@@ -13,8 +13,10 @@ import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
-  DEFAULT_AWARD_CATEGORY_GROUP,
-  parseAwardCategoryGroup,
+  DEFAULT_LIVE_STANDINGS_VIEW,
+  DEFAULT_STANDINGS_CATEGORY_GROUP,
+  parseLiveStandingsView,
+  parseStandingsCategoryGroup,
 } from "@/lib/live-aggregate/award-category-defs";
 
 type Params = Promise<{ slug: string; year: string }>;
@@ -62,7 +64,9 @@ export default async function CommunityLiveYearPage({
   const pageRaw = Number(first(sp.page) ?? "1");
   const requestedPage =
     Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
-  const categoryGroup = parseAwardCategoryGroup(first(sp.group));
+  const categoryGroup = parseStandingsCategoryGroup(first(sp.group));
+  const view = parseLiveStandingsView(first(sp.view));
+  const categoryId = first(sp.category) ?? null;
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -101,6 +105,8 @@ export default async function CommunityLiveYearPage({
       scoresVisibleFrom: community.liveScoresVisibleFrom,
       locked: community.liveRankingsLocked,
       categoryGroup,
+      view,
+      categoryId,
     });
   } catch {
     standings = {
@@ -117,7 +123,10 @@ export default async function CommunityLiveYearPage({
       totalPages: 1,
       goty: [],
       categories: [],
-      categoryGroup: DEFAULT_AWARD_CATEGORY_GROUP,
+      categoryGroup: DEFAULT_STANDINGS_CATEGORY_GROUP,
+      view: DEFAULT_LIVE_STANDINGS_VIEW,
+      categoryId: null,
+      categoryGameTotal: 0,
     };
   }
 

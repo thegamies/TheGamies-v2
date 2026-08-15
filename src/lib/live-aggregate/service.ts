@@ -1,7 +1,10 @@
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { getSiteRankMode } from "@/lib/site-settings/service";
 import {
+  parseSharedRankMode,
   withDisplayRanks,
   withDisplayRanksOnPage,
+  type SharedRankMode,
 } from "@/lib/standings/shared-rank";
 import {
   covers,
@@ -13,8 +16,14 @@ import {
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
 import {
-  parseAwardCategoryGroup,
-  type AwardCategoryGroup,
+  CATEGORY_DETAIL_PAGE_SIZE,
+  CATEGORY_LIST_TOP_RANKS,
+  DEFAULT_LIVE_STANDINGS_VIEW,
+  DEFAULT_STANDINGS_CATEGORY_GROUP,
+  parseLiveStandingsView,
+  parseStandingsCategoryGroup,
+  type LiveStandingsViewId,
+  type StandingsCategoryGroupFilter,
 } from "./award-category-defs";
 
 /** Top-N highlight depth for homepage / all-years standings strips. */
@@ -48,6 +57,8 @@ export type CategoryStandingsBlock = {
   categoryId: string;
   label: string;
   description: string | null;
+  /** Sum of votes in the category; null when scores are hidden. */
+  totalVotes: number | null;
   rows: CategoryStandingRow[];
 };
 
@@ -57,15 +68,30 @@ export type StandingsPage = {
   detailedStatsRevealed: boolean;
   standingsVersion: number;
   scoresFresh: boolean;
-  /** 1-based page of GOTY rows. */
+  /** 1-based page of GOTY rows (or category detail rows). */
   page: number;
   pageSize: number;
   gotyTotal: number;
   totalPages: number;
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
-  categoryGroup: AwardCategoryGroup;
+  categoryGroup: StandingsCategoryGroupFilter;
+  /** Game of the Year grid vs Categories index vs one full category. */
+  view: LiveStandingsViewId;
+  /** Set when `view === "category"`. */
+  categoryId: string | null;
+  /** Games on the full category board (detail view). */
+  categoryGameTotal: number;
 };
+
+/** Keep rows whose displayed rank is within the top N places (ties included). */
+export function takeTopDisplayRanks<T extends { place: number }>(
+  rows: T[],
+  maxRank: number,
+): T[] {
+  const cap = Math.max(1, Math.floor(maxRank));
+  return rows.filter((row) => row.place <= cap);
+}
 
 /** Clamp a requested page number to a valid 1-based index. */
 export function clampStandingsPage(
@@ -122,6 +148,8 @@ export function redactStandingsPage(
     })),
     categories: page.categories.map((block) => ({
       ...block,
+      // Category totals stay public (list-count style meta). Per-game
+      // vote counts on rows stay hidden until reveal.
       rows: block.rows.map((row) => ({
         ...row,
         voteCount: null,
@@ -193,28 +221,63 @@ type CategoryJsonRow = {
   label: string;
   description: string | null;
   sortOrder: number;
+  totalVotes: number;
   place: number | null;
   gameId: string | null;
   slug: string | null;
   title: string | null;
   coverImageId: string | null;
   voteCount: number | null;
+  categoryGameTotal?: number;
 };
 
 /**
  * One Neon round-trip for the public GOTY rankings board:
- * year stats + total + page of scores + category tallies.
+ * year stats + total + (GOTY page and/or category tallies by view).
+ * Categories index: ordered by total votes; games trimmed to top ranks.
+ * Category detail: one award, paginated game rows.
  */
 async function fetchStandingsBundle(
   year: number,
   requestedPage: number,
   pageSize: number,
-  categoryGroup: AwardCategoryGroup,
+  categoryGroup: StandingsCategoryGroupFilter,
+  view: LiveStandingsViewId,
+  categoryId: string | null,
+  rankMode: SharedRankMode,
   db: Db,
-): Promise<Omit<StandingsPage, "year" | "pageSize" | "scoresFresh"> & {
-  contribGeneration: number;
-  scoresGeneration: number;
-}> {
+): Promise<
+  Omit<
+    StandingsPage,
+    "year" | "pageSize" | "scoresFresh" | "view" | "categoryId"
+  > & {
+    contribGeneration: number;
+    scoresGeneration: number;
+  }
+> {
+  const includeGoty = view === "goty";
+  const includeCategoryIndex = view === "categories";
+  const includeCategoryDetail = view === "category" && Boolean(categoryId);
+  const includeCategories = includeCategoryIndex || includeCategoryDetail;
+  const categoryGameLimit = includeCategoryDetail
+    ? pageSize
+    : Math.max(12, CATEGORY_LIST_TOP_RANKS * 4);
+  const categoryOffset = includeCategoryDetail
+    ? (Math.max(1, requestedPage) - 1) * pageSize
+    : 0;
+  const groupFilter =
+    categoryGroup === "all"
+      ? sql``
+      : sql`and ac.category_group = ${categoryGroup}`;
+  const categoryIdFilter =
+    includeCategoryDetail && categoryId
+      ? sql`and ac.id = ${categoryId}`
+      : sql``;
+  const higherCountSelect =
+    rankMode === "dense"
+      ? sql`count(distinct hs.score)::int`
+      : sql`count(*)::int`;
+
   const result = await db.execute(sql`
     with meta as (
       select
@@ -256,95 +319,133 @@ async function fetchStandingsBundle(
       b.goty_total,
       b.page,
       b.total_pages,
-      (
-        select count(*)::int
-        from live_goty_scores hs
-        where hs.year = ${year}
-          and hs.score > (
-            select s0.score
-            from live_goty_scores s0
-            where s0.year = ${year}
-            order by s0.score desc, s0.game_id asc
-            offset (b.page - 1) * ${pageSize}
-            limit 1
-          )
-      ) as higher_count,
-      coalesce(
-        (
-          select json_agg(row_to_json(p) order by p."place")
-          from (
-            select
-              ((b.page - 1) * ${pageSize} + row_number() over (
-                order by s.score desc, s.game_id asc
-              ))::int as "place",
-              s.game_id as "gameId",
-              g.slug as "slug",
-              g.title as "title",
-              g.year as "year",
-              c.image_id as "coverImageId",
-              s.score as "score",
-              s.list_mentions as "listMentions",
-              s.rank_1_count as "rank1Count",
-              s.rank_2_count as "rank2Count",
-              s.rank_3_count as "rank3Count",
-              s.rank_4_count as "rank4Count",
-              s.rank_5_count as "rank5Count",
-              s.rank_6_count as "rank6Count",
-              s.rank_7_count as "rank7Count",
-              s.rank_8_count as "rank8Count",
-              s.rank_9_count as "rank9Count",
-              s.rank_10_count as "rank10Count"
-            from live_goty_scores s
-            inner join games g on g.id = s.game_id
-            left join covers c on c.igdb_id = g.cover_igdb_id
-            where s.year = ${year}
-            order by s.score desc, s.game_id asc
-            limit ${pageSize}
-            offset (b.page - 1) * ${pageSize}
-          ) p
-        ),
-        '[]'::json
-      ) as goty,
-      coalesce(
-        (
-          select json_agg(row_to_json(cat) order by cat."sortOrder", cat."label", cat."place" nulls last)
-          from (
-            select
-              ac.id as "categoryId",
-              ac.label as "label",
-              ac.description as "description",
-              ac.sort_order as "sortOrder",
-              r.place as "place",
-              r.game_id as "gameId",
-              r.slug as "slug",
-              r.title as "title",
-              r.cover_image_id as "coverImageId",
-              r.vote_count as "voteCount"
-            from award_categories ac
-            left join lateral (
+      case
+        when ${includeGoty} then (
+          select ${higherCountSelect}
+          from live_goty_scores hs
+          where hs.year = ${year}
+            and hs.score > (
+              select s0.score
+              from live_goty_scores s0
+              where s0.year = ${year}
+              order by s0.score desc, s0.game_id asc
+              offset (b.page - 1) * ${pageSize}
+              limit 1
+            )
+        )
+        else 0
+      end as higher_count,
+      case
+        when ${includeGoty} then coalesce(
+          (
+            select json_agg(row_to_json(p) order by p."place")
+            from (
               select
-                row_number() over (
-                  order by s.vote_count desc, s.game_id asc
-                )::int as place,
-                s.game_id,
-                g.slug,
-                g.title,
-                cov.image_id as cover_image_id,
-                s.vote_count
-              from live_category_scores s
+                ((b.page - 1) * ${pageSize} + row_number() over (
+                  order by s.score desc, s.game_id asc
+                ))::int as "place",
+                s.game_id as "gameId",
+                g.slug as "slug",
+                g.title as "title",
+                g.year as "year",
+                c.image_id as "coverImageId",
+                s.score as "score",
+                s.list_mentions as "listMentions",
+                s.rank_1_count as "rank1Count",
+                s.rank_2_count as "rank2Count",
+                s.rank_3_count as "rank3Count",
+                s.rank_4_count as "rank4Count",
+                s.rank_5_count as "rank5Count",
+                s.rank_6_count as "rank6Count",
+                s.rank_7_count as "rank7Count",
+                s.rank_8_count as "rank8Count",
+                s.rank_9_count as "rank9Count",
+                s.rank_10_count as "rank10Count"
+              from live_goty_scores s
               inner join games g on g.id = s.game_id
-              left join covers cov on cov.igdb_id = g.cover_igdb_id
+              left join covers c on c.igdb_id = g.cover_igdb_id
               where s.year = ${year}
-                and s.category_id = ac.id
-              order by s.vote_count desc, s.game_id asc
-              limit 10
-            ) r on true
-            where ac.active = true
-              and ac.category_group = ${categoryGroup}
-          ) cat
-        ),
-        '[]'::json
-      ) as categories
+              order by s.score desc, s.game_id asc
+              limit ${pageSize}
+              offset (b.page - 1) * ${pageSize}
+            ) p
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as goty,
+      case
+        when ${includeCategories} then coalesce(
+          (
+            select json_agg(
+              row_to_json(cat)
+              order by cat."totalVotes" desc, cat."label", cat."place" nulls last
+            )
+            from (
+              select
+                ac.id as "categoryId",
+                ac.label as "label",
+                ac.description as "description",
+                ac.sort_order as "sortOrder",
+                coalesce(
+                  (
+                    select sum(s.vote_count)::int
+                    from live_category_scores s
+                    where s.year = ${year}
+                      and s.category_id = ac.id
+                  ),
+                  0
+                ) as "totalVotes",
+                coalesce(
+                  (
+                    select count(*)::int
+                    from live_category_scores s
+                    where s.year = ${year}
+                      and s.category_id = ac.id
+                  ),
+                  0
+                ) as "categoryGameTotal",
+                r.place as "place",
+                r.game_id as "gameId",
+                r.slug as "slug",
+                r.title as "title",
+                r.cover_image_id as "coverImageId",
+                r.vote_count as "voteCount"
+              from award_categories ac
+              left join lateral (
+                select
+                  (${categoryOffset} + row_number() over (
+                    order by s.vote_count desc, s.game_id asc
+                  ))::int as place,
+                  s.game_id,
+                  g.slug,
+                  g.title,
+                  cov.image_id as cover_image_id,
+                  s.vote_count
+                from live_category_scores s
+                inner join games g on g.id = s.game_id
+                left join covers cov on cov.igdb_id = g.cover_igdb_id
+                where s.year = ${year}
+                  and s.category_id = ac.id
+                order by s.vote_count desc, s.game_id asc
+                limit ${categoryGameLimit}
+                offset ${categoryOffset}
+              ) r on true
+              where ac.active = true
+                ${groupFilter}
+                ${categoryIdFilter}
+                and exists (
+                  select 1
+                  from live_category_scores s
+                  where s.year = ${year}
+                    and s.category_id = ac.id
+                )
+            ) cat
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as categories
     from bounds b
   `);
 
@@ -362,6 +463,7 @@ async function fetchStandingsBundle(
       goty: [],
       categories: [],
       categoryGroup,
+      categoryGameTotal: 0,
     };
   }
 
@@ -396,12 +498,12 @@ async function fetchStandingsBundle(
     {
       offset: (page - 1) * pageSize,
       firstGroupRank: asInt(row.higher_count) + 1,
-      mode: "competition",
+      mode: rankMode,
     },
   ).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
-  const byId = new Map<string, CategoryStandingsBlock>();
+  const byId = new Map<string, CategoryStandingsBlock & { categoryGameTotal: number }>();
   for (const cat of categoryRows) {
     let block = byId.get(cat.categoryId);
     if (!block) {
@@ -409,6 +511,8 @@ async function fetchStandingsBundle(
         categoryId: cat.categoryId,
         label: cat.label,
         description: cat.description,
+        totalVotes: asInt(cat.totalVotes),
+        categoryGameTotal: asInt(cat.categoryGameTotal),
         rows: [],
       };
       byId.set(cat.categoryId, block);
@@ -424,13 +528,33 @@ async function fetchStandingsBundle(
       });
     }
   }
+
+  let categoryGameTotal = 0;
+  const categories: CategoryStandingsBlock[] = [];
   for (const block of byId.values()) {
-    block.rows = withDisplayRanks(
+    const ranked = withDisplayRanks(
       block.rows,
       (r) => r.voteCount ?? 0,
-      "competition",
+      rankMode,
     ).map((r) => ({ ...r, place: r.rank }));
+    categoryGameTotal = Math.max(categoryGameTotal, block.categoryGameTotal);
+    categories.push({
+      categoryId: block.categoryId,
+      label: block.label,
+      description: block.description,
+      totalVotes: block.totalVotes,
+      rows: includeCategoryDetail
+        ? ranked
+        : takeTopDisplayRanks(ranked, CATEGORY_LIST_TOP_RANKS),
+    });
   }
+
+  const detailTotalPages = includeCategoryDetail
+    ? Math.max(1, Math.ceil(categoryGameTotal / pageSize) || 1)
+    : asInt(row.total_pages, 1);
+  const detailPage = includeCategoryDetail
+    ? clampStandingsPage(requestedPage, detailTotalPages)
+    : page;
 
   return {
     listCount: asInt(row.list_count),
@@ -438,12 +562,13 @@ async function fetchStandingsBundle(
     standingsVersion: asInt(row.standings_version),
     contribGeneration: asInt(row.contrib_generation),
     scoresGeneration: asInt(row.scores_generation),
-    page,
+    page: detailPage,
     gotyTotal: asInt(row.goty_total),
-    totalPages: asInt(row.total_pages, 1),
+    totalPages: detailTotalPages,
     goty,
-    categories: [...byId.values()],
+    categories,
     categoryGroup,
+    categoryGameTotal: includeCategoryDetail ? categoryGameTotal : 0,
   };
 }
 
@@ -454,7 +579,11 @@ export async function getStandingsPage(
     forceReveal?: boolean;
     page?: number;
     pageSize?: number;
-    categoryGroup?: AwardCategoryGroup;
+    categoryGroup?: StandingsCategoryGroupFilter;
+    view?: LiveStandingsViewId;
+    categoryId?: string | null;
+    /** Override site setting (tests). */
+    rankMode?: SharedRankMode;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<StandingsPage> {
@@ -464,18 +593,30 @@ export async function getStandingsPage(
     await ensureScoresFresh(year, db);
   }
 
+  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryId =
+    view === "category" && opts.categoryId ? String(opts.categoryId) : null;
+  const defaultPageSize =
+    view === "category" ? CATEGORY_DETAIL_PAGE_SIZE : STANDINGS_PAGE_SIZE;
   const pageSize = Math.min(
     200,
-    Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
+    Math.max(1, Math.floor(opts.pageSize ?? defaultPageSize)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
-  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
+  const categoryGroup = parseStandingsCategoryGroup(
+    opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
+  );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
 
   const bundle = await fetchStandingsBundle(
     year,
     requestedPage,
     pageSize,
     categoryGroup,
+    view,
+    categoryId,
+    rankMode,
     db,
   );
 
@@ -492,6 +633,9 @@ export async function getStandingsPage(
     goty: bundle.goty,
     categories: bundle.categories,
     categoryGroup: bundle.categoryGroup,
+    view,
+    categoryId,
+    categoryGameTotal: bundle.categoryGameTotal,
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });
@@ -506,6 +650,8 @@ export async function getGotyThroughRank(
   opts: {
     maxRank?: number;
     forceReveal?: boolean;
+    /** Override site setting (tests). */
+    rankMode?: SharedRankMode;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<{
@@ -518,18 +664,33 @@ export async function getGotyThroughRank(
     1,
     Math.floor(opts.maxRank ?? TOP_STANDINGS_RANK),
   );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
   const stats = await getYearStats(year, db);
 
-  const [nth] = await db
-    .select({ score: liveGotyScores.score })
-    .from(liveGotyScores)
-    .where(eq(liveGotyScores.year, year))
-    .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
-    .limit(1)
-    .offset(maxRank - 1);
+  let cutoffScore: number | undefined;
+  if (rankMode === "dense") {
+    const distinct = await db
+      .select({ score: liveGotyScores.score })
+      .from(liveGotyScores)
+      .where(eq(liveGotyScores.year, year))
+      .groupBy(liveGotyScores.score)
+      .orderBy(desc(liveGotyScores.score))
+      .limit(maxRank);
+    cutoffScore = distinct[distinct.length - 1]?.score;
+  } else {
+    const [nth] = await db
+      .select({ score: liveGotyScores.score })
+      .from(liveGotyScores)
+      .where(eq(liveGotyScores.year, year))
+      .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
+      .limit(1)
+      .offset(maxRank - 1);
+    cutoffScore = nth?.score;
+  }
 
   const scoreRows =
-    nth == null
+    cutoffScore == null
       ? await db
           .select({
             gameId: liveGotyScores.gameId,
@@ -561,7 +722,7 @@ export async function getGotyThroughRank(
           .where(
             and(
               eq(liveGotyScores.year, year),
-              gte(liveGotyScores.score, nth.score),
+              gte(liveGotyScores.score, cutoffScore),
             ),
           )
           .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId));
@@ -579,7 +740,7 @@ export async function getGotyThroughRank(
       rankCounts: null as number[] | null,
     })),
     (r) => r.score ?? 0,
-    "competition",
+    rankMode,
   )
     .filter((r) => r.rank <= maxRank)
     .map((r) => ({ ...r, place: r.rank }));
@@ -613,7 +774,11 @@ export async function listYearsWithGotyScores(
 
 export async function getGotyThroughRankForYears(
   years: readonly number[],
-  opts: { maxRank?: number; forceReveal?: boolean } = {},
+  opts: {
+    maxRank?: number;
+    forceReveal?: boolean;
+    rankMode?: SharedRankMode;
+  } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<
   Array<{
@@ -626,7 +791,11 @@ export async function getGotyThroughRankForYears(
   const unique = [...new Set(years.map((y) => Math.floor(y)))].filter((y) =>
     Number.isFinite(y),
   );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
   return Promise.all(
-    unique.map((year) => getGotyThroughRank(year, opts, db)),
+    unique.map((year) =>
+      getGotyThroughRank(year, { ...opts, rankMode }, db),
+    ),
   );
 }

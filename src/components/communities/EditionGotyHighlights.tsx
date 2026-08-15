@@ -204,6 +204,7 @@ function GotyRankedBillboard({
       items={topTen.filter((r) => r.rank <= 10).map((row) => ({
         ...row,
         place: row.rank,
+        points: row.points,
       }))}
       emptyMessage="No Game of the Year scores for this mode."
     />
