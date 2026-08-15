@@ -159,7 +159,7 @@ Open voting uses the same primitives on events and personal GOTY lists.
 | GOTY ranking | Wrapping cover grid (`BallotRankGrid`); place in front of the title; drag to reorder while open; cap 10. Closed / Your ballot uses the same grid |
 | `CategoryVoteHeading` | Display category name (`text-2xl`) + optional description |
 | `CategoryPickCard` | Large cover (`w-28` / `sm:w-32`) + heading + picked title + optional **Clear** |
-| `CategoryVotesEditor` | Added awards: empty heading + `GameSearchField`, or `CategoryPickCard`. Catalog: search + scrolling **Show all / group** secondary tabs, then a dense **square grid**. Show all is one board with a group tag in each tile. Eligibility copy only when it is not current year. |
+| `CategoryVotesEditor` | Added awards: search + standings-style group filter + **Add category** (top and bottom). Empty heading + `GameSearchField`, or `CategoryPickCard`. Catalog grid opens in a `Dialog` with its own search + group filter. Eligibility copy only when it is not current year. |
 | `PinnedSaveBar` | After an edit: `--panel` band pinned to the viewport bottom with Save. Hidden when clean |
 | Leave guard | `useUnsavedChangesGuard` — in-app **Unsaved changes** dialog (Stay / Leave). Tab close uses the browser prompt |
 
