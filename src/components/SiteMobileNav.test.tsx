@@ -20,6 +20,11 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/game-of-the-year/2026",
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock("@/app/auth/sign-out/actions", () => ({
   signOutAction: vi.fn(),
 }));
@@ -55,7 +60,10 @@ describe("SiteMobileNav", () => {
     ).toHaveAttribute("href", "/communities");
     expect(
       within(drawer).getByRole("link", { name: "Sign in" }),
-    ).toHaveAttribute("href", "/auth/sign-in");
+    ).toHaveAttribute(
+      "href",
+      "/auth/sign-in?next=%2Fgame-of-the-year%2F2026",
+    );
     expect(document.body.style.overflow).toBe("hidden");
   });
 

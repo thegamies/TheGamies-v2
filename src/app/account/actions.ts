@@ -16,7 +16,7 @@ export async function saveAccountProfile(
   const { data: session } = await auth.getSession();
   const userId = session?.user?.id;
   if (!userId) {
-    redirect("/auth/sign-in");
+    redirect("/auth/sign-in?next=/account");
   }
 
   const username = String(formData.get("username") ?? "");

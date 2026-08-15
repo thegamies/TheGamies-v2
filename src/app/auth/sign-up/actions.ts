@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 
 export async function signUpWithEmail(
@@ -12,6 +13,10 @@ export async function signUpWithEmail(
   const password = String(formData.get("password") ?? "");
   const name = String(formData.get("displayName") ?? "").trim();
   const username = String(formData.get("username") ?? "").trim();
+  const next = resolvePostAuthRedirect(
+    formData.get("next"),
+    formData.get("intent"),
+  );
 
   if (!email || !password || !name || !username) {
     return { error: "Fill in all fields." };
@@ -42,5 +47,5 @@ export async function signUpWithEmail(
     return { error: ensured.error };
   }
 
-  redirect("/account");
+  redirect(next);
 }

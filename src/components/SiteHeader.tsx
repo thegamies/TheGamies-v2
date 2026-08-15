@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { signOutAction } from "@/app/auth/sign-out/actions";
+import { SignInLink } from "@/components/auth/SignInLink";
 import { Button } from "@/components/ui/Button";
 import { SiteBrand } from "@/components/SiteBrand";
 import { SiteMobileNav } from "@/components/SiteMobileNav";
@@ -61,9 +63,15 @@ export async function SiteHeader() {
               </form>
             </>
           ) : (
-            <Link href="/auth/sign-in" className="hover:text-ink">
-              Sign in
-            </Link>
+            <Suspense
+              fallback={
+                <Link href="/auth/sign-in" className="hover:text-ink">
+                  Sign in
+                </Link>
+              }
+            >
+              <SignInLink className="hover:text-ink" />
+            </Suspense>
           )}
         </nav>
         <SiteMobileNav links={links} account={account} />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/Button";
+import { buildSignUpHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signInWithEmail } from "./actions";
 
@@ -50,6 +51,20 @@ function SignInForm() {
   );
 }
 
+function CreateAccountLink() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const intent = parseListAuthIntent(searchParams.get("intent"));
+  return (
+    <Link
+      href={buildSignUpHref({ next, intent })}
+      className="text-ink underline"
+    >
+      Create an account
+    </Link>
+  );
+}
+
 export default function SignInPage() {
   return (
     <main className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-[var(--gutter)] py-12">
@@ -65,9 +80,15 @@ export default function SignInPage() {
 
       <p className="mt-6 text-sm text-muted">
         New here?{" "}
-        <Link href="/auth/sign-up" className="text-ink underline">
-          Create an account
-        </Link>
+        <Suspense
+          fallback={
+            <Link href="/auth/sign-up" className="text-ink underline">
+              Create an account
+            </Link>
+          }
+        >
+          <CreateAccountLink />
+        </Suspense>
       </p>
     </main>
   );
