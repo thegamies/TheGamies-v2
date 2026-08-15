@@ -176,32 +176,71 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
 
 export const DEFAULT_AWARD_CATEGORY_GROUP: AwardCategoryGroup = "premier";
 
-/** Live standings board: Game of the Year grid vs Categories chapters. */
-export const LIVE_STANDINGS_VIEWS = ["goty", "categories"] as const;
+/** Live Categories filter — includes an All bucket across groups. */
+export type StandingsCategoryGroupFilter = AwardCategoryGroup | "all";
+export const DEFAULT_STANDINGS_CATEGORY_GROUP: StandingsCategoryGroupFilter =
+  "all";
+
+export const STANDINGS_CATEGORY_GROUP_LABEL: Record<
+  StandingsCategoryGroupFilter,
+  string
+> = {
+  all: "All",
+  ...AWARD_CATEGORY_GROUP_LABEL,
+};
+
+/** Live standings board: GOTY grid, Categories index, or one full category. */
+export const LIVE_STANDINGS_VIEWS = ["goty", "categories", "category"] as const;
 export type LiveStandingsViewId = (typeof LIVE_STANDINGS_VIEWS)[number];
 export const DEFAULT_LIVE_STANDINGS_VIEW: LiveStandingsViewId = "goty";
 
+/** Categories index: games with displayed rank ≤ this. */
+export const CATEGORY_LIST_TOP_RANKS = 3;
+/** Categories index: chapters shown before Load more. */
+export const CATEGORY_LIST_PAGE_SIZE = 10;
+/** Full category board: game rows per page. */
+export const CATEGORY_DETAIL_PAGE_SIZE = 50;
+
 export function parseLiveStandingsView(raw: unknown): LiveStandingsViewId {
-  if (raw === "categories") return "categories";
+  if (raw === "categories" || raw === "category") return raw;
   return DEFAULT_LIVE_STANDINGS_VIEW;
+}
+
+export function parseStandingsCategoryGroup(
+  raw: unknown,
+): StandingsCategoryGroupFilter {
+  if (raw === "all" || raw == null || raw === "") {
+    return DEFAULT_STANDINGS_CATEGORY_GROUP;
+  }
+  if (
+    typeof raw === "string" &&
+    (AWARD_CATEGORY_GROUPS as readonly string[]).includes(raw)
+  ) {
+    return raw as AwardCategoryGroup;
+  }
+  return DEFAULT_STANDINGS_CATEGORY_GROUP;
 }
 
 export function standingsQueryString(opts: {
   page?: number;
-  group?: AwardCategoryGroup;
+  group?: StandingsCategoryGroupFilter;
   view?: LiveStandingsViewId;
+  category?: string | null;
 }): string {
   const params = new URLSearchParams();
   if (opts.page != null && opts.page > 1) {
     params.set("page", String(opts.page));
   }
-  const group = opts.group ?? DEFAULT_AWARD_CATEGORY_GROUP;
-  if (group !== DEFAULT_AWARD_CATEGORY_GROUP) {
+  const group = opts.group ?? DEFAULT_STANDINGS_CATEGORY_GROUP;
+  if (group !== DEFAULT_STANDINGS_CATEGORY_GROUP) {
     params.set("group", group);
   }
   const view = opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW;
   if (view !== DEFAULT_LIVE_STANDINGS_VIEW) {
     params.set("view", view);
+  }
+  if (opts.category) {
+    params.set("category", opts.category);
   }
   const q = params.toString();
   return q ? `?${q}` : "";

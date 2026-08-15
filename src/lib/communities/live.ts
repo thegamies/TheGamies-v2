@@ -11,16 +11,20 @@ import {
   STANDINGS_PAGE_SIZE,
   clampStandingsPage,
   redactStandingsPage,
+  takeTopDisplayRanks,
   type CategoryStandingsBlock,
   type StandingsGameRow,
   type StandingsPage,
 } from "@/lib/live-aggregate/service";
 import {
+  CATEGORY_DETAIL_PAGE_SIZE,
+  CATEGORY_LIST_TOP_RANKS,
   DEFAULT_LIVE_STANDINGS_VIEW,
-  parseAwardCategoryGroup,
+  DEFAULT_STANDINGS_CATEGORY_GROUP,
   parseLiveStandingsView,
-  type AwardCategoryGroup,
+  parseStandingsCategoryGroup,
   type LiveStandingsViewId,
+  type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
 import { isCommunityLiveScoresRevealed } from "./live-reveal";
 import {
@@ -84,6 +88,7 @@ type CategoryJsonRow = {
   label: string;
   description: string | null;
   sortOrder: number;
+  totalVotes?: number;
   place: number | null;
   gameId: string | null;
   slug: string | null;
@@ -142,11 +147,15 @@ function groupCategoryBlocks(
       categoryId: block.categoryId,
       label: block.label,
       description: block.description,
-      rows: withDisplayRanks(
-        block.rows,
-        (r) => r.voteCount ?? 0,
-        "competition",
-      ).map((r) => ({ ...r, place: r.rank })),
+      totalVotes: block.totalVotes,
+      rows: takeTopDisplayRanks(
+        withDisplayRanks(
+          block.rows,
+          (r) => r.voteCount ?? 0,
+          "competition",
+        ).map((r) => ({ ...r, place: r.rank })),
+        CATEGORY_LIST_TOP_RANKS,
+      ),
     }));
 }
 
@@ -160,9 +169,13 @@ async function queryCommunityLiveStandings(
   opts: {
     page: number;
     pageSize: number;
-    categoryGroup?: AwardCategoryGroup;
+    categoryGroup?: StandingsCategoryGroupFilter;
+    categoryId?: string | null;
     includeGoty?: boolean;
     includeCategories?: boolean;
+    trimTopRanks?: boolean;
+    categoryGameLimit?: number;
+    categoryOffset?: number;
   },
   db: Db,
 ): Promise<{
@@ -176,10 +189,21 @@ async function queryCommunityLiveStandings(
   const {
     pageSize,
     page: requestedPage,
-    categoryGroup,
+    categoryGroup = "all",
+    categoryId = null,
     includeGoty = true,
     includeCategories = true,
+    trimTopRanks = true,
+    categoryGameLimit = Math.max(12, CATEGORY_LIST_TOP_RANKS * 4),
+    categoryOffset = 0,
   } = opts;
+  const groupFilter =
+    !categoryGroup || categoryGroup === "all"
+      ? sql``
+      : sql`and ac.category_group = ${categoryGroup}`;
+  const categoryIdFilter = categoryId
+    ? sql`and ac.id = ${categoryId}`
+    : sql``;
 
   const result = await db.execute(sql`
     with bounds as (
@@ -352,14 +376,12 @@ async function queryCommunityLiveStandings(
                 inner join games g on g.id = tallies.game_id
                 left join covers cov on cov.igdb_id = g.cover_igdb_id
                 order by tallies.vote_count desc, tallies.game_id asc
-                limit 10
+                limit ${categoryGameLimit}
+                offset ${categoryOffset}
               ) r on true
               where ac.active = true
-                ${
-                  categoryGroup
-                    ? sql`and ac.category_group = ${categoryGroup}`
-                    : sql``
-                }
+                ${groupFilter}
+                ${categoryIdFilter}
                 and exists (
                   select 1
                   from live_category_contrib c
@@ -414,7 +436,8 @@ async function queryCommunityLiveStandings(
   }).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
-  const byId = new Map<string, CategoryStandingsBlock>();
+  type CatAcc = CategoryStandingsBlock & { _total: number };
+  const byId = new Map<string, CatAcc>();
   for (const cat of categoryRows) {
     let block = byId.get(cat.categoryId);
     if (!block) {
@@ -422,6 +445,8 @@ async function queryCommunityLiveStandings(
         categoryId: cat.categoryId,
         label: cat.label,
         description: cat.description,
+        totalVotes: asInt((cat as { totalVotes?: number }).totalVotes),
+        _total: asInt((cat as { totalVotes?: number }).totalVotes),
         rows: [],
       };
       byId.set(cat.categoryId, block);
@@ -437,12 +462,22 @@ async function queryCommunityLiveStandings(
       });
     }
   }
+  const categories: CategoryStandingsBlock[] = [];
   for (const block of byId.values()) {
-    block.rows = withDisplayRanks(
+    const ranked = withDisplayRanks(
       block.rows,
       (r) => r.voteCount ?? 0,
       "competition",
     ).map((r) => ({ ...r, place: r.rank }));
+    categories.push({
+      categoryId: block.categoryId,
+      label: block.label,
+      description: block.description,
+      totalVotes: block.totalVotes,
+      rows: trimTopRanks
+        ? takeTopDisplayRanks(ranked, CATEGORY_LIST_TOP_RANKS)
+        : ranked,
+    });
   }
 
   return {
@@ -451,7 +486,7 @@ async function queryCommunityLiveStandings(
     page,
     totalPages,
     goty,
-    categories: [...byId.values()],
+    categories,
   };
 }
 
@@ -614,7 +649,7 @@ async function queryLockedStandingsPage(
   year: number,
   pageSize: number,
   requestedPage: number,
-  categoryGroup: AwardCategoryGroup,
+  categoryGroup: StandingsCategoryGroupFilter,
   view: LiveStandingsViewId,
   db: Db,
 ): Promise<{
@@ -630,7 +665,7 @@ async function queryLockedStandingsPage(
   const page = clampStandingsPage(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
   const includeGoty = view === "goty";
-  const includeCategories = view === "categories";
+  const includeCategories = view === "categories" || view === "category";
 
   const gotyRows = includeGoty
     ? await db
@@ -670,7 +705,9 @@ async function queryLockedStandingsPage(
           and(
             eq(communityLiveLockCategoryRows.communityId, communityId),
             eq(communityLiveLockCategoryRows.year, year),
-            eq(awardCategories.categoryGroup, categoryGroup),
+            ...(categoryGroup === "all"
+              ? []
+              : [eq(awardCategories.categoryGroup, categoryGroup)]),
           ),
         )
         .orderBy(
@@ -733,18 +770,25 @@ export async function getCommunityLiveStandings(
     pageSize?: number;
     scoresVisibleFrom?: Date | null;
     locked?: boolean;
-    categoryGroup?: AwardCategoryGroup;
+    categoryGroup?: StandingsCategoryGroupFilter;
     view?: LiveStandingsViewId;
+    categoryId?: string | null;
   } = {},
   db: Db = getDb(),
 ): Promise<StandingsPage> {
+  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryId =
+    view === "category" && opts.categoryId ? String(opts.categoryId) : null;
+  const defaultPageSize =
+    view === "category" ? CATEGORY_DETAIL_PAGE_SIZE : STANDINGS_PAGE_SIZE;
   const pageSize = Math.min(
     200,
-    Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
+    Math.max(1, Math.floor(opts.pageSize ?? defaultPageSize)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
-  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
-  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryGroup = parseStandingsCategoryGroup(
+    opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
+  );
   const revealed = isCommunityLiveScoresRevealed(
     opts.scoresVisibleFrom ?? null,
   );
@@ -759,6 +803,13 @@ export async function getCommunityLiveStandings(
       view,
       db,
     );
+    let categories = locked.categories.map((block) => ({
+      ...block,
+      totalVotes: block.totalVotes ?? null,
+    }));
+    if (view === "category" && categoryId) {
+      categories = categories.filter((c) => c.categoryId === categoryId);
+    }
     return redactStandingsPage({
       year,
       listCount: locked.listCount,
@@ -770,9 +821,11 @@ export async function getCommunityLiveStandings(
       gotyTotal: locked.gotyTotal,
       totalPages: locked.totalPages,
       goty: locked.goty,
-      categories: locked.categories,
+      categories,
       categoryGroup,
       view,
+      categoryId,
+      categoryGameTotal: categories[0]?.rows.length ?? 0,
     });
   }
 
@@ -783,8 +836,15 @@ export async function getCommunityLiveStandings(
       page: requestedPage,
       pageSize,
       categoryGroup,
+      categoryId,
       includeGoty: view === "goty",
-      includeCategories: view === "categories",
+      includeCategories: view === "categories" || view === "category",
+      trimTopRanks: view === "categories",
+      categoryGameLimit:
+        view === "category"
+          ? pageSize
+          : Math.max(12, CATEGORY_LIST_TOP_RANKS * 4),
+      categoryOffset: view === "category" ? (requestedPage - 1) * pageSize : 0,
     },
     db,
   );
@@ -803,5 +863,8 @@ export async function getCommunityLiveStandings(
     categories: live.categories,
     categoryGroup,
     view,
+    categoryId,
+    categoryGameTotal:
+      view === "category" ? (live.categories[0]?.rows.length ?? 0) : 0,
   });
 }

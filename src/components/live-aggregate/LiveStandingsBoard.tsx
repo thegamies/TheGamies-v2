@@ -4,7 +4,10 @@ import {
   StandingGameCard,
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
-import { LiveCategoriesPanel } from "@/components/live-aggregate/LiveCategoriesPanel";
+import {
+  LiveCategoriesPanel,
+  LiveCategoryDetailPanel,
+} from "@/components/live-aggregate/LiveCategoriesPanel";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { navItemClass } from "@/components/ui/navLevels";
 import type {
@@ -14,14 +17,16 @@ import type {
 import {
   standingsQueryString,
   type LiveStandingsViewId,
+  type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
 
 export function liveStandingsHref(
   basePath: string,
   opts: {
     page?: number;
-    group?: StandingsPage["categoryGroup"];
+    group?: StandingsCategoryGroupFilter;
     view?: LiveStandingsViewId;
+    category?: string | null;
   } = {},
 ): string {
   return `${basePath}${standingsQueryString(opts)}`;
@@ -126,21 +131,27 @@ function LiveStandingsViewNav({
     { id: "goty", label: "Game of the Year" },
     { id: "categories", label: "Categories" },
   ];
+  const categoriesActive =
+    page.view === "categories" || page.view === "category";
 
   return (
     <div className="mt-5 flex flex-wrap gap-5 border-b border-line pb-0">
-      {views.map((v) => (
-        <Link
-          key={v.id}
-          href={liveStandingsHref(basePath, {
-            group: page.categoryGroup,
-            view: v.id,
-          })}
-          className={navItemClass("secondary", page.view === v.id)}
-        >
-          {v.label}
-        </Link>
-      ))}
+      {views.map((v) => {
+        const active =
+          v.id === "categories" ? categoriesActive : page.view === v.id;
+        return (
+          <Link
+            key={v.id}
+            href={liveStandingsHref(basePath, {
+              group: page.categoryGroup,
+              view: v.id,
+            })}
+            className={navItemClass("secondary", active)}
+          >
+            {v.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }
@@ -189,9 +200,11 @@ export function LiveStandingsBoard({
     href: liveStandingsHref(yearBase(y), {
       group: page.categoryGroup,
       view: page.view,
+      category: page.categoryId,
     }),
   }));
   const Heading = headingLevel;
+  const detailBlock = page.categories[0] ?? null;
 
   return (
     <>
@@ -219,9 +232,24 @@ export function LiveStandingsBoard({
 
       <LiveStandingsViewNav basePath={basePath} page={page} />
 
-      {page.view === "categories" ? (
+      {page.view === "category" ? (
+        <section className="mt-6">
+          <LiveCategoryDetailPanel
+            hrefBase={basePath}
+            group={page.categoryGroup}
+            block={detailBlock}
+            revealed={revealed}
+            page={page.page}
+            pageSize={page.pageSize}
+            totalPages={page.totalPages}
+            gameTotal={page.categoryGameTotal}
+            empty={emptyCategories}
+          />
+        </section>
+      ) : page.view === "categories" ? (
         <section className="mt-6">
           <LiveCategoriesPanel
+            key={`${page.categoryGroup}-${page.year}`}
             hrefBase={basePath}
             group={page.categoryGroup}
             categories={page.categories}

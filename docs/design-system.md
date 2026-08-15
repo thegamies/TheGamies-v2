@@ -92,7 +92,7 @@ Rules:
 - Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
 - Community Settings Events uses the same year select (shown even for a single year) plus **Open event**, which opens that year on the event page with Settings selected.
-- Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY. Category group filter is a single pop-open button (not a link row); search filters chapters by name.
+- Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY. Category group filter is a single pop-open button with an **All** option; search filters chapters by name. Each chapter shows top-3 ranks in a horizontal strip, vote totals, and links to full category standings (`?view=category&category=`).
 
 ## Controls
 

@@ -227,6 +227,7 @@ describe("redactStandingsPage", () => {
         categoryId: "narrative",
         label: "Best Story",
         description: null,
+        totalVotes: 2,
         rows: [
           {
             place: 1,
@@ -241,6 +242,8 @@ describe("redactStandingsPage", () => {
     ],
     categoryGroup: "premier",
     view: "goty",
+    categoryId: null,
+    categoryGameTotal: 0,
   };
 
   it("hides scores but keeps ranks when unrevealed", () => {

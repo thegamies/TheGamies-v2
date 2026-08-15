@@ -13,11 +13,14 @@ import {
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
 import {
+  CATEGORY_DETAIL_PAGE_SIZE,
+  CATEGORY_LIST_TOP_RANKS,
   DEFAULT_LIVE_STANDINGS_VIEW,
-  parseAwardCategoryGroup,
+  DEFAULT_STANDINGS_CATEGORY_GROUP,
   parseLiveStandingsView,
-  type AwardCategoryGroup,
+  parseStandingsCategoryGroup,
   type LiveStandingsViewId,
+  type StandingsCategoryGroupFilter,
 } from "./award-category-defs";
 
 /** Top-N highlight depth for homepage / all-years standings strips. */
@@ -51,6 +54,8 @@ export type CategoryStandingsBlock = {
   categoryId: string;
   label: string;
   description: string | null;
+  /** Sum of votes in the category; null when scores are hidden. */
+  totalVotes: number | null;
   rows: CategoryStandingRow[];
 };
 
@@ -60,17 +65,30 @@ export type StandingsPage = {
   detailedStatsRevealed: boolean;
   standingsVersion: number;
   scoresFresh: boolean;
-  /** 1-based page of GOTY rows. */
+  /** 1-based page of GOTY rows (or category detail rows). */
   page: number;
   pageSize: number;
   gotyTotal: number;
   totalPages: number;
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
-  categoryGroup: AwardCategoryGroup;
-  /** Game of the Year grid vs Categories chapters. */
+  categoryGroup: StandingsCategoryGroupFilter;
+  /** Game of the Year grid vs Categories index vs one full category. */
   view: LiveStandingsViewId;
+  /** Set when `view === "category"`. */
+  categoryId: string | null;
+  /** Games on the full category board (detail view). */
+  categoryGameTotal: number;
 };
+
+/** Keep rows whose displayed rank is within the top N places (ties included). */
+export function takeTopDisplayRanks<T extends { place: number }>(
+  rows: T[],
+  maxRank: number,
+): T[] {
+  const cap = Math.max(1, Math.floor(maxRank));
+  return rows.filter((row) => row.place <= cap);
+}
 
 /** Clamp a requested page number to a valid 1-based index. */
 export function clampStandingsPage(
@@ -127,6 +145,7 @@ export function redactStandingsPage(
     })),
     categories: page.categories.map((block) => ({
       ...block,
+      totalVotes: null,
       rows: block.rows.map((row) => ({
         ...row,
         voteCount: null,
@@ -198,32 +217,57 @@ type CategoryJsonRow = {
   label: string;
   description: string | null;
   sortOrder: number;
+  totalVotes: number;
   place: number | null;
   gameId: string | null;
   slug: string | null;
   title: string | null;
   coverImageId: string | null;
   voteCount: number | null;
+  categoryGameTotal?: number;
 };
 
 /**
  * One Neon round-trip for the public GOTY rankings board:
  * year stats + total + (GOTY page and/or category tallies by view).
- * Categories are ordered by total votes (most first).
+ * Categories index: ordered by total votes; games trimmed to top ranks.
+ * Category detail: one award, paginated game rows.
  */
 async function fetchStandingsBundle(
   year: number,
   requestedPage: number,
   pageSize: number,
-  categoryGroup: AwardCategoryGroup,
+  categoryGroup: StandingsCategoryGroupFilter,
   view: LiveStandingsViewId,
+  categoryId: string | null,
   db: Db,
-): Promise<Omit<StandingsPage, "year" | "pageSize" | "scoresFresh" | "view"> & {
-  contribGeneration: number;
-  scoresGeneration: number;
-}> {
+): Promise<
+  Omit<
+    StandingsPage,
+    "year" | "pageSize" | "scoresFresh" | "view" | "categoryId"
+  > & {
+    contribGeneration: number;
+    scoresGeneration: number;
+  }
+> {
   const includeGoty = view === "goty";
-  const includeCategories = view === "categories";
+  const includeCategoryIndex = view === "categories";
+  const includeCategoryDetail = view === "category" && Boolean(categoryId);
+  const includeCategories = includeCategoryIndex || includeCategoryDetail;
+  const categoryGameLimit = includeCategoryDetail
+    ? pageSize
+    : Math.max(12, CATEGORY_LIST_TOP_RANKS * 4);
+  const categoryOffset = includeCategoryDetail
+    ? (Math.max(1, requestedPage) - 1) * pageSize
+    : 0;
+  const groupFilter =
+    categoryGroup === "all"
+      ? sql``
+      : sql`and ac.category_group = ${categoryGroup}`;
+  const categoryIdFilter =
+    includeCategoryDetail && categoryId
+      ? sql`and ac.id = ${categoryId}`
+      : sql``;
 
   const result = await db.execute(sql`
     with meta as (
@@ -343,6 +387,15 @@ async function fetchStandingsBundle(
                   ),
                   0
                 ) as "totalVotes",
+                coalesce(
+                  (
+                    select count(*)::int
+                    from live_category_scores s
+                    where s.year = ${year}
+                      and s.category_id = ac.id
+                  ),
+                  0
+                ) as "categoryGameTotal",
                 r.place as "place",
                 r.game_id as "gameId",
                 r.slug as "slug",
@@ -352,9 +405,9 @@ async function fetchStandingsBundle(
               from award_categories ac
               left join lateral (
                 select
-                  row_number() over (
+                  (${categoryOffset} + row_number() over (
                     order by s.vote_count desc, s.game_id asc
-                  )::int as place,
+                  ))::int as place,
                   s.game_id,
                   g.slug,
                   g.title,
@@ -366,10 +419,12 @@ async function fetchStandingsBundle(
                 where s.year = ${year}
                   and s.category_id = ac.id
                 order by s.vote_count desc, s.game_id asc
-                limit 10
+                limit ${categoryGameLimit}
+                offset ${categoryOffset}
               ) r on true
               where ac.active = true
-                and ac.category_group = ${categoryGroup}
+                ${groupFilter}
+                ${categoryIdFilter}
                 and exists (
                   select 1
                   from live_category_scores s
@@ -399,6 +454,7 @@ async function fetchStandingsBundle(
       goty: [],
       categories: [],
       categoryGroup,
+      categoryGameTotal: 0,
     };
   }
 
@@ -438,7 +494,7 @@ async function fetchStandingsBundle(
   ).map((r) => ({ ...r, place: r.rank }));
 
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
-  const byId = new Map<string, CategoryStandingsBlock>();
+  const byId = new Map<string, CategoryStandingsBlock & { categoryGameTotal: number }>();
   for (const cat of categoryRows) {
     let block = byId.get(cat.categoryId);
     if (!block) {
@@ -446,6 +502,8 @@ async function fetchStandingsBundle(
         categoryId: cat.categoryId,
         label: cat.label,
         description: cat.description,
+        totalVotes: asInt(cat.totalVotes),
+        categoryGameTotal: asInt(cat.categoryGameTotal),
         rows: [],
       };
       byId.set(cat.categoryId, block);
@@ -461,13 +519,33 @@ async function fetchStandingsBundle(
       });
     }
   }
+
+  let categoryGameTotal = 0;
+  const categories: CategoryStandingsBlock[] = [];
   for (const block of byId.values()) {
-    block.rows = withDisplayRanks(
+    const ranked = withDisplayRanks(
       block.rows,
       (r) => r.voteCount ?? 0,
       "competition",
     ).map((r) => ({ ...r, place: r.rank }));
+    categoryGameTotal = Math.max(categoryGameTotal, block.categoryGameTotal);
+    categories.push({
+      categoryId: block.categoryId,
+      label: block.label,
+      description: block.description,
+      totalVotes: block.totalVotes,
+      rows: includeCategoryDetail
+        ? ranked
+        : takeTopDisplayRanks(ranked, CATEGORY_LIST_TOP_RANKS),
+    });
   }
+
+  const detailTotalPages = includeCategoryDetail
+    ? Math.max(1, Math.ceil(categoryGameTotal / pageSize) || 1)
+    : asInt(row.total_pages, 1);
+  const detailPage = includeCategoryDetail
+    ? clampStandingsPage(requestedPage, detailTotalPages)
+    : page;
 
   return {
     listCount: asInt(row.list_count),
@@ -475,12 +553,13 @@ async function fetchStandingsBundle(
     standingsVersion: asInt(row.standings_version),
     contribGeneration: asInt(row.contrib_generation),
     scoresGeneration: asInt(row.scores_generation),
-    page,
+    page: detailPage,
     gotyTotal: asInt(row.goty_total),
-    totalPages: asInt(row.total_pages, 1),
+    totalPages: detailTotalPages,
     goty,
-    categories: [...byId.values()],
+    categories,
     categoryGroup,
+    categoryGameTotal: includeCategoryDetail ? categoryGameTotal : 0,
   };
 }
 
@@ -491,8 +570,9 @@ export async function getStandingsPage(
     forceReveal?: boolean;
     page?: number;
     pageSize?: number;
-    categoryGroup?: AwardCategoryGroup;
+    categoryGroup?: StandingsCategoryGroupFilter;
     view?: LiveStandingsViewId;
+    categoryId?: string | null;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<StandingsPage> {
@@ -502,13 +582,19 @@ export async function getStandingsPage(
     await ensureScoresFresh(year, db);
   }
 
+  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryId =
+    view === "category" && opts.categoryId ? String(opts.categoryId) : null;
+  const defaultPageSize =
+    view === "category" ? CATEGORY_DETAIL_PAGE_SIZE : STANDINGS_PAGE_SIZE;
   const pageSize = Math.min(
     200,
-    Math.max(1, Math.floor(opts.pageSize ?? STANDINGS_PAGE_SIZE)),
+    Math.max(1, Math.floor(opts.pageSize ?? defaultPageSize)),
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
-  const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
-  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
+  const categoryGroup = parseStandingsCategoryGroup(
+    opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
+  );
 
   const bundle = await fetchStandingsBundle(
     year,
@@ -516,6 +602,7 @@ export async function getStandingsPage(
     pageSize,
     categoryGroup,
     view,
+    categoryId,
     db,
   );
 
@@ -533,6 +620,8 @@ export async function getStandingsPage(
     categories: bundle.categories,
     categoryGroup: bundle.categoryGroup,
     view,
+    categoryId,
+    categoryGameTotal: bundle.categoryGameTotal,
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });
