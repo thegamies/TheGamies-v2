@@ -10,6 +10,7 @@ import {
 import {
   clearListDraftCookie,
 } from "@/lib/lists/draft-cookie";
+import { existingGotyPreviewHref } from "@/lib/lists/existing-goty";
 import {
   claimList,
   createDraft,
@@ -61,9 +62,7 @@ export async function startGotyDraftAction(formData: FormData) {
     await clearListDraftCookie();
     const existing = await getOwnedGotyForYear(profileId, y);
     if (existing) {
-      redirect(
-        `/create/goty?id=${existing.publicId}&existing=1`,
-      );
+      redirect(existingGotyPreviewHref(y));
     }
     const result = await createDraft(
       { listType: "goty", year: y },

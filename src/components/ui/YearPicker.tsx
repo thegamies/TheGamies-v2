@@ -18,15 +18,19 @@ export function YearPanel({
   max = YEAR_PICKER_MAX,
   disabledYears = [],
   onPick,
+  autoFocusSelected = false,
 }: {
   value: number;
   min?: number;
   max?: number;
   disabledYears?: number[];
   onPick: (year: number) => void;
+  /** Focus the selected year cell when the panel mounts / value changes. */
+  autoFocusSelected?: boolean;
 }) {
   const [start, setStart] = useState(() => yearGridStart(value));
   const [seenValue, setSeenValue] = useState(value);
+  const selectedRef = useRef<HTMLButtonElement>(null);
   if (seenValue !== value) {
     setSeenValue(value);
     setStart(yearGridStart(value));
@@ -38,6 +42,12 @@ export function YearPanel({
   const end = start + years.length - 1;
   const canPrev = start > min;
   const canNext = end < max;
+
+  useEffect(() => {
+    if (!autoFocusSelected) return;
+    if (!years.includes(value)) return;
+    selectedRef.current?.focus();
+  }, [autoFocusSelected, start, value, years]);
 
   return (
     <div>
@@ -79,6 +89,7 @@ export function YearPanel({
           return (
             <button
               key={year}
+              ref={isSelected ? selectedRef : undefined}
               type="button"
               role="gridcell"
               aria-selected={isSelected}
@@ -202,6 +213,7 @@ export function YearPicker({
             min={min}
             max={max}
             disabledYears={disabledYears}
+            autoFocusSelected
             onPick={(year) => {
               onChange(year);
               setOpen(false);

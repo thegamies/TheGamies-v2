@@ -22,6 +22,7 @@ Lists have **no draft/published status**. If a row exists in Postgres, it is sha
 2. GOTY: if the profile already has that year, stay on the year picker and show that list’s top 5 with **Edit list**. On entry, the default selected year is fetched immediately (picker stays closed).
 3. Cookie drafts are not used (except one-shot restore after sign-in with `intent`). **Save** updates rankings. **Share** opens a menu: **Share as image** (client JPEG) or **Share with a link** (publish → `/u/[username]/[slug]`).
 
+
 ### Signed out
 
 1. Start GOTY or custom → builder opens **without** a database row.

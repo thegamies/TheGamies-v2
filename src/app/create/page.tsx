@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
@@ -40,6 +41,7 @@ export default async function CreateChooserPage() {
 
   return (
     <div className="w-full">
+      <CreatePageHeader />
       {draft ? (
         <div className="mb-8 w-full border border-line bg-panel p-5">
           <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
