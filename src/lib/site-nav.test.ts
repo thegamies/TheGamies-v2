@@ -50,7 +50,7 @@ describe("buildPrimarySiteNavLinks", () => {
   it("includes the core routes and admin", () => {
     expect(buildPrimarySiteNavLinks({ includeDesignSystem: false })).toEqual([
       { href: "/games", label: "Games" },
-      { href: "/game-of-the-year", label: "Standings" },
+      { href: "/standings", label: "Standings" },
       { href: "/communities", label: "Communities" },
       { href: "/create", label: "Create" },
       { href: "/admin", label: "Admin" },
@@ -61,7 +61,7 @@ describe("buildPrimarySiteNavLinks", () => {
     const links = buildPrimarySiteNavLinks({ includeDesignSystem: true });
     expect(links.map((link) => link.href)).toEqual([
       "/games",
-      "/game-of-the-year",
+      "/standings",
       "/communities",
       "/create",
       "/design-system",

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
+import { getSiteSettings } from "@/lib/site-settings/service";
 import { AdminRankingsClient } from "./AdminRankingsClient";
 
 export const metadata: Metadata = {
@@ -13,6 +14,7 @@ export default async function AdminRankingsPage() {
   const authorized = await isAdminAuthorized();
   const year = new Date().getUTCFullYear();
   let initialStats = null;
+  let initialLandingYears: number[] | null = null;
   if (authorized) {
     try {
       const stats = await getYearStats(year);
@@ -28,6 +30,12 @@ export default async function AdminRankingsPage() {
     } catch {
       initialStats = null;
     }
+    try {
+      const settings = await getSiteSettings();
+      initialLandingYears = settings.landingStandingsYears;
+    } catch {
+      initialLandingYears = null;
+    }
   }
 
   return (
@@ -42,14 +50,15 @@ export default async function AdminRankingsPage() {
           Live standings
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
-          Reveal detailed scores for a year, refresh dirty rollups, or rebuild
-          the year cache from contribution facts.
+          Reveal detailed scores for a year, refresh dirty rollups, rebuild the
+          year cache, or choose which years appear on the homepage.
         </p>
         <div className="mt-10">
           <AdminRankingsClient
             authorized={authorized}
             initialYear={year}
             initialStats={initialStats}
+            initialLandingYears={initialLandingYears}
           />
         </div>
       </main>

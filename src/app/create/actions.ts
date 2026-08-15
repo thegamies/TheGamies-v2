@@ -203,6 +203,8 @@ export async function saveOwnedListAction(
   if (result.list.year != null) {
     revalidatePath(`/game-of-the-year/${result.list.year}`);
   }
+  revalidatePath("/");
+  revalidatePath("/standings");
   const share = await getListShareTarget(result.list);
   revalidatePath(share.path);
   revalidatePath(`/l/${result.list.publicId}`);

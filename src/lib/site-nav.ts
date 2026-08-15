@@ -29,7 +29,7 @@ export function buildPrimarySiteNavLinks(options: {
 }): SiteNavLink[] {
   const links: SiteNavLink[] = [
     { href: "/games", label: "Games" },
-    { href: "/game-of-the-year", label: "Standings" },
+    { href: "/standings", label: "Standings" },
     { href: "/communities", label: "Communities" },
     { href: "/create", label: "Create" },
   ];

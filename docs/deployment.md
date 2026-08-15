@@ -113,13 +113,14 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 PR opened/updated
   → ci: lint + typecheck + build
   → neon: create branch preview/pr-<n> from Neon `develop` (unique Auth URL via get_auth_url)
-  → migrate: pnpm db:migrate on that branch
-  → vercel / cloudflare: deploy with Neon URL + GitHub ADMIN_SYNC_SECRET / IGDB_*
+  → migrate / vercel / cloudflare: each job re-fetches DATABASE_URL via Neon API + branch_id
+       (create-branch-action’s db_url cannot cross jobs — GitHub strips secret-bearing outputs)
   → register Vercel + Cloudflare origins as Neon Auth trusted domains on that branch
   → comment both URLs on the PR
   → on PR close: delete Neon branch + optional CF preview worker
 ```
 
+Helper: `scripts/ci/neon-database-url.sh <branch_id>` (pooled URI by default).
 ## Manual branch deploy (on demand)
 
 Same dual-host stack as PR previews, but you choose when it runs.
@@ -156,7 +157,8 @@ Two different “URLs” matter:
 
 What CI does for previews and manual deploys:
 
-- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `db_url` + `auth_url` + `branch_id`
+- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `auth_url` + `branch_id`
+- Downstream jobs resolve `DATABASE_URL` with `scripts/ci/neon-database-url.sh` (job outputs cannot carry the masked `db_url`)
 - Deploys both hosts with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
 - POSTs each deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
 

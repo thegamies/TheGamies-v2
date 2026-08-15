@@ -808,3 +808,13 @@ export const liveCategoryDirty = pgTable(
   },
   (t) => [primaryKey({ columns: [t.year, t.categoryId, t.gameId] })],
 );
+
+/**
+ * Singleton site ops settings (landing featured standings years, etc.).
+ * `landingStandingsYears` null/empty → default current + previous calendar year.
+ */
+export const siteSettings = pgTable("site_settings", {
+  id: text("id").primaryKey().default("default"),
+  landingStandingsYears: integer("landing_standings_years").array(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});

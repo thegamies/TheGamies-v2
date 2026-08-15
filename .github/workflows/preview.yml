@@ -14,7 +14,7 @@ jobs:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
     outputs:
-      database_url: ${{ steps.branch.outputs.db_url }}
+      # db_url cannot be a job output — GitHub strips secret-bearing outputs.
       auth_url: ${{ steps.branch.outputs.auth_url }}
       branch_id: ${{ steps.branch.outputs.branch_id }}
       skipped: ${{ steps.guard.outputs.skipped }}
@@ -47,9 +47,9 @@ jobs:
     steps:
       - id: guard
         run: |
-          if [ "${{ needs.neon.outputs.skipped }}" = "true" ] || [ -z "${{ needs.neon.outputs.database_url }}" ]; then
+          if [ "${{ needs.neon.outputs.skipped }}" = "true" ] || [ -z "${{ needs.neon.outputs.branch_id }}" ]; then
             echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "No Neon branch URL; skipping migrate."
+            echo "No Neon branch; skipping migrate."
           else
             echo "skipped=false" >> "$GITHUB_OUTPUT"
           fi
@@ -67,8 +67,19 @@ jobs:
       - if: steps.guard.outputs.skipped == 'false'
         run: pnpm install --frozen-lockfile
       - if: steps.guard.outputs.skipped == 'false'
+        id: db
         env:
-          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
+        run: |
+          chmod +x scripts/ci/neon-database-url.sh
+          URL=$(scripts/ci/neon-database-url.sh "$BRANCH_ID")
+          echo "::add-mask::$URL"
+          echo "database_url=$URL" >> "$GITHUB_OUTPUT"
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
         run: pnpm db:migrate
 
   vercel:
@@ -100,19 +111,34 @@ jobs:
           cache: pnpm
       - if: steps.guard.outputs.skipped == 'false'
         run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false' && needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
+        id: db
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
+        run: |
+          chmod +x scripts/ci/neon-database-url.sh
+          URL=$(scripts/ci/neon-database-url.sh "$BRANCH_ID")
+          echo "::add-mask::$URL"
+          echo "database_url=$URL" >> "$GITHUB_OUTPUT"
       - if: steps.guard.outputs.skipped == 'false'
         id: deploy
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
         run: |
+          if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is empty for Neon preview branch; refusing to deploy." >&2
+            exit 1
+          fi
           mkdir -p .vercel
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
@@ -156,12 +182,23 @@ jobs:
           cache: pnpm
       - if: steps.guard.outputs.skipped == 'false'
         run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false' && needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
+        id: db
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
+        run: |
+          chmod +x scripts/ci/neon-database-url.sh
+          URL=$(scripts/ci/neon-database-url.sh "$BRANCH_ID")
+          echo "::add-mask::$URL"
+          echo "database_url=$URL" >> "$GITHUB_OUTPUT"
       - if: steps.guard.outputs.skipped == 'false'
         id: deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DATABASE_URL: ${{ needs.neon.outputs.database_url }}
+          DATABASE_URL: ${{ steps.db.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
@@ -169,6 +206,10 @@ jobs:
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL is empty for Neon preview branch; refusing to deploy." >&2
+            exit 1
+          fi
           WORKER="thegamies-v2-pr-${PR_NUMBER}"
           node -e "
             const fs=require('fs');
