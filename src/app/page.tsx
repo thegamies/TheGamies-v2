@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
+import { SectionRule } from "@/components/ui/SectionRule";
 import {
   getGotyThroughRankForYears,
   TOP_STANDINGS_RANK,
@@ -42,12 +43,12 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-8 sm:py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-6 sm:py-8">
       <h1 className="font-display text-5xl leading-none tracking-wide text-accent sm:text-7xl">
         The Gamies
       </h1>
-      <p className="mt-2 max-w-md font-serif text-base leading-snug text-muted sm:text-lg">
-        Personal GOTY lists and community awards.
+      <p className="mt-3 max-w-lg font-serif text-xl leading-snug text-muted sm:text-2xl">
+        Personal Game of the Year lists and community awards.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
         <Link
@@ -64,7 +65,9 @@ export default async function HomePage() {
         </Link>
       </div>
 
-      <section className="mt-10 border-t border-line pt-8 sm:mt-12 sm:pt-10">
+      <SectionRule className="mt-8 sm:mt-10" />
+
+      <section className="pt-4 sm:pt-5">
         <YearTopFiveSections sections={sections} allYearsHref="/standings" />
       </section>
     </main>

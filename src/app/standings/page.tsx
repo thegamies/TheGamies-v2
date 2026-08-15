@@ -49,28 +49,29 @@ export default async function StandingsLandingPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted">Live GOTY</p>
-      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-7xl">
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-8 sm:py-10">
+      <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
         Standings
       </h1>
-      <p className="mt-3 max-w-xl text-muted">
+      <p className="mt-2 max-w-xl text-muted">
         Top {TOP_STANDINGS_RANK} for every year with site standings. Open a year
         for the full board.
       </p>
 
       {error ? (
-        <p className="mt-10 text-muted">Standings could not be loaded right now.</p>
+        <p className="mt-8 text-muted">Standings could not be loaded right now.</p>
       ) : sections.length === 0 ? (
-        <p className="mt-10 text-muted">
+        <p className="mt-8 text-muted">
           No standings yet.{" "}
           <Link href="/create" className="text-ink underline">
-            Build a GOTY list
+            Build a Game of the Year list
           </Link>{" "}
           to get on the board.
         </p>
       ) : (
-        <YearTopFiveSections sections={sections} />
+        <div className="mt-6">
+          <YearTopFiveSections sections={sections} />
+        </div>
       )}
     </main>
   );

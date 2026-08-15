@@ -19,7 +19,7 @@ const outlinedLinkClass =
 
 /**
  * One year of Top 5 — community event Comparison strip language.
- * Year + Standings share a ruled header bar (outlined control, not a float).
+ * Year + Standings share a ruled header bar; covers sit tight under it.
  */
 export function YearTopFiveStrip({
   year,
@@ -33,8 +33,8 @@ export function YearTopFiveStrip({
   showRule?: boolean;
 }) {
   return (
-    <article className={showRule ? "mt-8 sm:mt-10" : undefined}>
-      <div className="flex items-end justify-between gap-4 border-b border-line pb-3">
+    <article className={showRule ? "mt-5 sm:mt-6" : undefined}>
+      <div className="flex items-end justify-between gap-4 border-b border-line pb-2">
         <h3 className="font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl">
           {year}
         </h3>
@@ -44,9 +44,9 @@ export function YearTopFiveStrip({
       </div>
 
       {rows.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">No rankings for this year yet.</p>
+        <p className="mt-2 text-sm text-muted">No rankings for this year yet.</p>
       ) : (
-        <HorizontalScroll className="mt-4" label={`${year} top five`}>
+        <HorizontalScroll className="mt-2" label={`${year} top five`}>
           <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
             {rows.map((row) => (
               <li
@@ -88,15 +88,15 @@ export function YearTopFiveSections({
 }) {
   if (sections.length === 0) {
     return (
-      <p className="mt-6 text-sm text-muted">No standings years to show yet.</p>
+      <p className="mt-3 text-sm text-muted">No standings years to show yet.</p>
     );
   }
 
   return (
-    <div className="mt-6 space-y-0">
+    <div>
       {allYearsHref ? (
-        <div className="mb-8 flex items-end justify-between gap-4 border-b border-line pb-3 sm:mb-10">
-          <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+        <div className="mb-3 flex items-end justify-between gap-4 border-b border-line pb-2 sm:mb-4">
+          <h2 className="font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
             Game of the Year
           </h2>
           <Link href={allYearsHref} className={outlinedLinkClass}>
