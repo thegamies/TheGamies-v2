@@ -44,7 +44,6 @@ export function StartGotyForm({
           name="year"
           value={year}
           required
-          defaultOpen={!hasExistingForYear}
           className="mt-1"
           aria-label="Year"
           onChange={(next) => {

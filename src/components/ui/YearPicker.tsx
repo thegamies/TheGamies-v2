@@ -129,7 +129,6 @@ export function YearPicker({
   placeholder = "Pick a year",
   className = "",
   "aria-label": ariaLabel,
-  defaultOpen = false,
   onChange,
 }: {
   id?: string;
@@ -143,15 +142,13 @@ export function YearPicker({
   placeholder?: string;
   className?: string;
   "aria-label"?: string;
-  /** Open the year grid on mount (create-list year entry). */
-  defaultOpen?: boolean;
   onChange: (next: number) => void;
 }) {
   const generatedId = useId();
   const triggerId = id ?? generatedId;
   const gridId = `${triggerId}-grid`;
   const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(defaultOpen);
+  const [open, setOpen] = useState(false);
   const selected = typeof value === "number" ? value : null;
   const label = selected != null ? String(selected) : placeholder;
   const panelYear = selected ?? new Date().getFullYear();

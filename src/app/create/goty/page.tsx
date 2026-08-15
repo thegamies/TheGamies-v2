@@ -210,9 +210,10 @@ export default async function CreateGotyPage({
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
-  } else if (signedIn && profileId && yearParam) {
-    const year = Number(yearParam);
-    if (!Number.isFinite(year)) {
+  } else if (signedIn && profileId && !resume) {
+    // Use ?year= when present; otherwise fetch for the picker's default year.
+    const year = yearParam ? Number(yearParam) : currentYear;
+    if (yearParam && !Number.isFinite(year)) {
       loadError = "Pick a valid year.";
     } else {
       const y = Math.floor(year);

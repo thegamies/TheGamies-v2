@@ -19,7 +19,7 @@ Lists have **no draft/published status**. If a row exists in Postgres, it is sha
 ### Signed in
 
 1. Start GOTY or custom → **creates and attaches a list to the account immediately** (profile + slug).
-2. GOTY: if the profile already has that year, stay on the year picker and show that list’s top 5 with **Edit list**.
+2. GOTY: if the profile already has that year, stay on the year picker and show that list’s top 5 with **Edit list**. On entry, the default selected year is fetched immediately (picker stays closed).
 3. Cookie drafts are not used. Save updates rankings; Share opens `/u/[username]/[slug]`; Export is client-side.
 
 ### Signed out
