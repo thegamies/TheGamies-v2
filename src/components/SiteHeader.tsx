@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/session";
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { Button } from "@/components/ui/Button";
+import { SiteBrand } from "@/components/SiteBrand";
 import { SiteMobileNav } from "@/components/SiteMobileNav";
 import {
   buildPrimarySiteNavLinks,
@@ -35,12 +36,7 @@ export async function SiteHeader() {
   return (
     <header className="border-b border-line">
       <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-5">
-        <Link
-          href="/"
-          className="font-display text-3xl tracking-wide text-ink hover:text-accent"
-        >
-          The Gamies
-        </Link>
+        <SiteBrand />
         <nav
           className="hidden flex-wrap items-center gap-5 text-sm text-muted lg:flex"
           aria-label="Site"

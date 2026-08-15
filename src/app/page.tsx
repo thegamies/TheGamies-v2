@@ -7,7 +7,6 @@ import {
 import { getLandingStandingsYears } from "@/lib/site-settings/service";
 
 export default async function HomePage() {
-  let years: number[] = [];
   let sections: Array<{
     year: number;
     rows: Array<{
@@ -22,7 +21,7 @@ export default async function HomePage() {
   }> = [];
 
   try {
-    years = await getLandingStandingsYears();
+    const years = await getLandingStandingsYears();
     const boards = await getGotyThroughRankForYears(years, {
       maxRank: TOP_STANDINGS_RANK,
     });
@@ -39,29 +38,18 @@ export default async function HomePage() {
       })),
     }));
   } catch {
-    years = [];
     sections = [];
   }
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-16 sm:py-20">
-      <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+      <h1 className="font-display text-6xl leading-none tracking-wide text-ink sm:text-8xl">
         The Gamies
-      </p>
-      <h1 className="mt-4 font-display text-6xl leading-none tracking-wide text-ink sm:text-8xl">
-        Editorial Standings
       </h1>
-      <p className="mt-6 max-w-xl font-serif text-lg leading-relaxed text-muted">
-        Community awards, Hosts, and ranked lists — rebuilt with a restrained
-        soft-brutal design system.
+      <p className="mt-5 max-w-md font-serif text-lg leading-relaxed text-muted">
+        Personal GOTY lists and community awards.
       </p>
-      <div className="mt-10 flex flex-wrap gap-3">
-        <Link
-          href="/standings"
-          className="rounded-[var(--radius-control)] bg-accent px-5 py-3 text-sm font-semibold tracking-wide text-white transition-opacity hover:opacity-90"
-        >
-          View all years
-        </Link>
+      <div className="mt-8 flex flex-wrap gap-3">
         <Link
           href="/games"
           className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
@@ -78,19 +66,9 @@ export default async function HomePage() {
 
       <section className="mt-16 border-t border-line pt-12 sm:mt-20 sm:pt-14">
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-muted">
-              Live GOTY
-            </p>
-            <h2 className="mt-2 font-display text-4xl tracking-wide text-ink sm:text-5xl">
-              Top {TOP_STANDINGS_RANK}
-            </h2>
-            <p className="mt-2 max-w-xl text-muted">
-              {years.length > 0
-                ? `Site standings for ${years.join(" · ")}.`
-                : "Site standings from signed-in lists."}
-            </p>
-          </div>
+          <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+            Game of the Year
+          </h2>
           <Link
             href="/standings"
             className="text-sm text-accent hover:underline"
