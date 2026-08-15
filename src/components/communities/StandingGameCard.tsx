@@ -32,9 +32,10 @@ export type StandingGameCardProps = {
 
 /**
  * Same card language as games browse: GameCover + title (+ optional meta).
- * Rank (if any) sits in front of the title — not on the cover. Comparison
- * strips omit place (column headers name the source). Titles reserve and clamp
- * to 2 lines and shrink toward a 12px floor.
+ * When scores are hidden, rank (if any) sits in front of the title — never on
+ * the cover. When `points` is set, rank moves above the cover with the score
+ * on the right. Comparison strips omit place (column headers name the source).
+ * Titles reserve and clamp to 2 lines and shrink toward a 12px floor.
  */
 export function StandingGameCard({
   slug,
@@ -52,10 +53,16 @@ export function StandingGameCard({
     points != null
       ? `${points} ${scoreUnit === "votes" ? (points === 1 ? "vote" : "votes") : "pts"}`
       : null;
+  /** Scores revealed: rank overhead + score right; otherwise place before title. */
+  const scoreOverhead = points != null;
   const meta =
-    scoreLabel && year != null
+    !scoreOverhead && scoreLabel && year != null
       ? `${scoreLabel} · ${year}`
-      : (scoreLabel ?? (year != null ? String(year) : null));
+      : !scoreOverhead
+        ? (scoreLabel ?? (year != null ? String(year) : null))
+        : year != null
+          ? String(year)
+          : null;
 
   const placeClass =
     placeSize === "lg"
@@ -66,13 +73,36 @@ export function StandingGameCard({
         ? "text-[14px] lg:text-[18px]"
         : "text-[18px]";
 
+  const scoreOverheadRow =
+    scoreOverhead && (place != null || scoreLabel) ? (
+      <div className="mb-2 flex items-end justify-between gap-2">
+        {place != null ? (
+          <span
+            className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
+            aria-label={`Rank ${place}`}
+          >
+            {place}
+          </span>
+        ) : (
+          <span />
+        )}
+        {scoreLabel ? (
+          <span className="shrink-0 pb-0.5 text-right text-xs tracking-wide text-muted tabular-nums sm:text-sm">
+            {scoreLabel}
+          </span>
+        ) : null}
+      </div>
+    ) : null;
+
   const titleBlock = (
     <div
       className={`mt-2 flex ${
-        placeSize === "lg" ? "items-start gap-2" : "items-baseline gap-1"
+        !scoreOverhead && placeSize === "lg"
+          ? "items-start gap-2"
+          : "items-baseline gap-1"
       }`}
     >
-      {place != null ? (
+      {!scoreOverhead && place != null ? (
         <span
           className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
           aria-label={`Rank ${place}`}
@@ -80,7 +110,11 @@ export function StandingGameCard({
           {place}
         </span>
       ) : null}
-      <div className={`min-w-0 flex-1 ${placeSize === "lg" ? "pt-1" : ""}`}>
+      <div
+        className={`min-w-0 flex-1 ${
+          !scoreOverhead && placeSize === "lg" ? "pt-1" : ""
+        }`}
+      >
         <FitDisplayTitle
           className="w-full group-hover:text-accent"
           maxPx={
@@ -107,6 +141,7 @@ export function StandingGameCard({
         className="group block w-[103px] lg:w-[206px]"
         draggable={false}
       >
+        {scoreOverheadRow}
         <GameCover
           title={title}
           imageUrl={coverUrl}
@@ -122,6 +157,7 @@ export function StandingGameCard({
 
   return (
     <Link href={`/games/${slug}`} className="group block" draggable={false}>
+      {scoreOverheadRow}
       <GameCover title={title} imageUrl={coverUrl} priority={priority} />
       {titleBlock}
     </Link>

@@ -50,9 +50,9 @@ function CategoryChapter({
 
   return (
     <article className={index === 0 ? undefined : "mt-6 sm:mt-7"}>
-      {index > 0 ? <SectionRule variant="bar" className="mb-3" /> : null}
+      {index > 0 ? <SectionRule className="mb-3" /> : null}
 
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+      <div className="flex items-end justify-between gap-x-4 gap-y-1">
         <Link href={detailHref} className="min-w-0 flex-1 group">
           <h3 className="line-clamp-2 font-display text-2xl leading-none tracking-wide text-ink group-hover:text-accent sm:text-3xl">
             {block.label}
@@ -60,7 +60,7 @@ function CategoryChapter({
         </Link>
         <Link
           href={detailHref}
-          className="shrink-0 border border-line px-3 py-1.5 text-xs tracking-wide text-muted transition-colors hover:border-accent hover:text-ink"
+          className="mb-0.5 shrink-0 text-xs tracking-wide text-muted transition-colors hover:text-accent sm:text-sm"
         >
           Full standings
         </Link>

@@ -400,7 +400,8 @@ export default function DesignSystemPage() {
       <Section title="Rank + cover">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           Podium / matrix use large or column ranks. Standing cards never put
-          rank on the art — optional place sits in front of the title.
+          rank on the art — when scores show, place sits above the cover with
+          the score on the right; otherwise place sits in front of the title.
         </p>
         <div className="flex flex-wrap items-end gap-6">
           <div className="flex items-end gap-3">
@@ -420,7 +421,8 @@ export default function DesignSystemPage() {
       <Section title="Standing cards">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           <code className="text-ink">StandingGameCard</code> — cover + title (+
-          meta). Place before title when needed; omit for Comparison strip cells.
+          meta). When scores show, rank above cover with score on the right;
+          otherwise place before title. Omit place for Comparison strip cells.
         </p>
         <ul className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
           <li>

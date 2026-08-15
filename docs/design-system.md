@@ -110,11 +110,13 @@ Rules:
 
 ## Section rule
 
-`SectionRule` — accent tick + muted hairline (`variant="tick"`, default) for edition chapter breaks. Live category chapters use `variant="bar"` — a full-width accent rule. Prefer this over a plain `border-t` when the break should feel ceremonial.
+`SectionRule` — accent tick + muted hairline spanning the full content width (tick shrink-0, hairline `flex-1`). Used for edition and live category chapter breaks. Prefer this over a plain `border-t` when the break should feel ceremonial. Place the rule at article/section width — not inside a narrow flex column — so the hairline reads full-bleed within the page rail.
 
 ## Standing cards + rank
 
 `StandingGameCard` — cover + title (+ optional pts/year meta). Equal scores share a **displayed rank** from the event’s numbering setting (competition 1–1–3 or dense 1–1–2). Stored freeze `place` is board order only.
+
+When **scores are shown** (`points`), rank sits **above** the cover with the score (pts/votes) on the **right** of that row; year (if any) stays under the title. When scores are hidden, accent place stays **in front of the title** — never a badge on the art.
 
 | Context | Rank treatment |
 |---|---|
@@ -123,7 +125,8 @@ Rules:
 | GOTY Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title. GOTY Top 10 even grid |
 | GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Titles start at **18px** (same as standings cards) and shrink toward 12px. Tie stacks follow the event’s competition or dense numbering |
 | Category Ranked | One line per award; `HorizontalScroll` when displayed rank ≤ 3 overflows (full ties). Place in front of the title; #1 slightly wider than #2/#3 |
-| Rest of Top 10 / Full standings / Categories / Live GOTY | Accent place **in front of the title** (tight `gap-1`), meta aligned under the title — **never** a badge on the art. Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. |
+| Rest of Top 10 / Full standings / Live (scores hidden) | Accent place **in front of the title** (tight `gap-1`). Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. |
+| Live GOTY / Categories (scores revealed) | Rank **above** cover; pts/votes on the **right** of that row. Category chapters: tick+hairline rule, title + quiet “Full standings” link on one baseline row. |
 
 Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
 
