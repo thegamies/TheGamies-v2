@@ -9,18 +9,28 @@ type FitDisplayTitleProps = {
   maxPx: number;
   /** Smallest allowed display size (px). */
   minPx?: number;
-  /** Max lines before clamp. Also reserves this many lines of height. */
+  /** Max lines before clamp. Also reserves this many lines of height when `reserve` is true. */
   lines?: number;
+  /**
+   * When true (default), the wrapper keeps `lines` of height so neighbors don’t
+   * jump. Set false so following meta (votes) sits tight under the last line.
+   */
+  reserve?: boolean;
 };
 
 /** Matches Tailwind `leading-snug` used on the title. */
-const LINE_HEIGHT = 1.375;
+export const FIT_DISPLAY_LINE_HEIGHT = 1.375;
+
+export function fitDisplayReservePx(lines: number, maxPx: number): number {
+  return Math.ceil(lines * maxPx * FIT_DISPLAY_LINE_HEIGHT);
+}
 
 /**
  * Display title that shrinks between maxPx → minPx until it fits in `lines`,
- * then clamps. A wrapper reserves `lines`×maxPx so layout doesn’t jump; the
- * text itself uses `max-height: N * line-height em` so it cannot exceed N lines
- * even when the font shrinks.
+ * then clamps. By default a wrapper reserves `lines`×maxPx so layout doesn’t
+ * jump; pass `reserve={false}` to size to the rendered lines. The text itself
+ * uses `max-height: N * line-height em` so it cannot exceed N lines even when
+ * the font shrinks.
  *
  * Observes the wrapper (not the text node) and skips no-op font updates so
  * ResizeObserver can’t loop on mobile Safari.
@@ -31,10 +41,11 @@ export function FitDisplayTitle({
   maxPx,
   minPx = 12,
   lines = 3,
+  reserve = true,
 }: FitDisplayTitleProps) {
   const wrapRef = useRef<HTMLSpanElement>(null);
   const ref = useRef<HTMLParagraphElement>(null);
-  const reservedPx = Math.ceil(lines * maxPx * LINE_HEIGHT);
+  const reservedPx = fitDisplayReservePx(lines, maxPx);
   const clampClass = lines <= 2 ? "line-clamp-2" : "line-clamp-3";
 
   useLayoutEffect(() => {
@@ -77,18 +88,22 @@ export function FitDisplayTitle({
       if (raf) cancelAnimationFrame(raf);
       ro.disconnect();
     };
-  }, [children, maxPx, minPx, lines]);
+  }, [children, maxPx, minPx, lines, reserve]);
 
   return (
-    <span ref={wrapRef} className="block w-full" style={{ minHeight: reservedPx }}>
+    <span
+      ref={wrapRef}
+      className="block w-full"
+      style={reserve ? { minHeight: reservedPx } : undefined}
+    >
       <p
         ref={ref}
         title={children}
         className={`font-display tracking-wide text-ink overflow-hidden ${clampClass} ${className}`}
         style={{
           fontSize: maxPx,
-          lineHeight: LINE_HEIGHT,
-          maxHeight: `calc(${lines} * ${LINE_HEIGHT}em)`,
+          lineHeight: FIT_DISPLAY_LINE_HEIGHT,
+          maxHeight: `calc(${lines} * ${FIT_DISPLAY_LINE_HEIGHT}em)`,
         }}
       >
         {children}

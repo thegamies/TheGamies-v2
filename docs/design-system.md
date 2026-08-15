@@ -12,7 +12,7 @@ Visual cues were mined from the local `goty` prototype (`references/visual-proto
 
 Internal catalog: [`/design-system`](/design-system)
 
-Shows tokens, type, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, horizontal scroll, covers, rank markers, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
+Shows tokens, type, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
 
 **Dev nav:** Site header includes a **Design system** link in local development and Vercel preview. Hidden on production (`VERCEL_ENV=production`). Other hosts can opt in with `SHOW_DESIGN_SYSTEM=1`.
 
@@ -116,19 +116,21 @@ Rules:
 
 `StandingGameCard` — cover + title (+ optional pts/year meta). Equal scores share a **displayed rank** from the event’s numbering setting (competition 1–1–3 or dense 1–1–2). Stored freeze `place` is board order only.
 
-When **scores are shown** (`points`), rank sits **above** the cover with the score (pts/votes) on the **right** of that row; year (if any) stays under the title. When scores are hidden, accent place stays **in front of the title** — never a badge on the art.
+When **scores are shown** (`points`), accent place stays **in front of the title** and pts/votes **hug the last title line** (no reserved 2-line block). Year (if any) sits on that same meta line. When scores are hidden, accent place stays **in front of the title** — never a badge on the art.
 
 | Context | Rank treatment |
 |---|---|
 | GOTY podium | Large `RankMarker` **above** cover; cover **bottoms** share a baseline (all rank-1 games use winner size) |
 | GOTY / category Reveal | Sticky scroll ceremony (default tab). GOTY #10→#1: number parks right on the Tied row; **tied ranks share one stage** — Tied lifts, then each cover in turn. Categories: `#1 · #2 · #3` columns in one board; each slides in from off-screen left (**#3→#2→#1**) and packs so earlier ranks push right; multi-row tied mosaics with titles. Short viewports raise the parked rank/Tied and scale covers so tiles stay below the chapter header. Not standings cards. `prefers-reduced-motion` skips scrubbing |
-| GOTY Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title. GOTY Top 10 even grid |
+| GOTY Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title; pts hug the last title line. GOTY Top 10 even grid. Row gap matches column gap. |
 | GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Titles start at **18px** (same as standings cards) and shrink toward 12px. Tie stacks follow the event’s competition or dense numbering |
-| Category Ranked | One line per award; `HorizontalScroll` when displayed rank ≤ 3 overflows (full ties). Place in front of the title; #1 slightly wider than #2/#3 |
-| Rest of Top 10 / Full standings / Live (scores hidden) | Accent place **in front of the title** (tight `gap-1`). Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. |
-| Live GOTY / Categories (scores revealed) | Rank **above** cover; pts/votes on the **right** of that row. Category chapters: tick+hairline rule, title + quiet “Full standings” link on one baseline row. |
+| Category Ranked | One line per award; `HorizontalScroll` when displayed rank ≤ 3 overflows (full ties). Place in front of the title; votes hug the last title line; #1 slightly wider than #2/#3. Cover **bottoms** share a baseline (a wrapped title cannot lift the art). |
+| Rest of Top 10 / Full standings / Live (scores hidden) | Accent place **in front of the title** (tight `gap-1`). Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. Row gap matches column gap. |
+| Live GOTY / Categories (scores revealed) | Rank in front of the title; pts/votes hug the last title line. Category chapters: tick+hairline rule, title + quiet “Full standings” link on one baseline row. |
 
-Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
+Titles use `FitDisplayTitle` (clamp to 2 lines; shrink toward 12px). Score cards use `reserve={false}` so pts/votes sit tight under a 1- or 2-line title. Wrapping cover grids use equal row and column gap (`gap-4`, or `gap-3` on tight live boards and ballot/ranked grids).
+
+Gallery **Rank · votes · title** lets you compare score layouts on `StandingGameCard` (`rankScoreLayout`). Product ships **Votes under title**. A **Year** setting hides the release year.
 
 ## Horizontal scroll
 

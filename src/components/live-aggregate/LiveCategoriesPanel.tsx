@@ -6,6 +6,8 @@ import { CategoryChapterHeader } from "@/components/communities/EditionCategoryR
 import {
   StandingGameCard,
   StandingGameCardGrid,
+  standingStripColClass,
+  standingStripListClass,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
@@ -76,15 +78,11 @@ function CategoryChapter({
       ) : null}
 
       <HorizontalScroll className="mt-3" label={`${block.label} top ranks`}>
-        <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
+        <ul className={standingStripListClass}>
           {block.rows.map((row) => (
             <li
               key={`${block.categoryId}-${row.gameId}`}
-              className={
-                row.place === 1
-                  ? "w-[168px] shrink-0 sm:w-[190px]"
-                  : "w-[132px] shrink-0 sm:w-[148px]"
-              }
+              className={standingStripColClass(row.place === 1)}
             >
               <StandingGameCard
                 place={row.place}
@@ -95,6 +93,7 @@ function CategoryChapter({
                 points={revealed ? row.voteCount : null}
                 scoreUnit="votes"
                 priority={row.place === 1}
+                pinCover
               />
             </li>
           ))}

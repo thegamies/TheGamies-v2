@@ -4,6 +4,7 @@ import {
   GameSearchFieldFixture,
 } from "@/app/design-system/BallotFixtures";
 import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
+import { StandingCardLayoutFixture } from "@/app/design-system/StandingCardLayoutFixture";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
@@ -400,8 +401,9 @@ export default function DesignSystemPage() {
       <Section title="Rank + cover">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           Podium / matrix use large or column ranks. Standing cards never put
-          rank on the art — when scores show, place sits above the cover with
-          the score on the right; otherwise place sits in front of the title.
+          rank on the art — when scores show, place sits in front of the title
+          and votes hug the last line; otherwise place sits in front of the
+          title.
         </p>
         <div className="flex flex-wrap items-end gap-6">
           <div className="flex items-end gap-3">
@@ -421,10 +423,11 @@ export default function DesignSystemPage() {
       <Section title="Standing cards">
         <p className="mb-4 max-w-2xl text-sm text-muted">
           <code className="text-ink">StandingGameCard</code> — cover + title (+
-          meta). When scores show, rank above cover with score on the right;
-          otherwise place before title. Omit place for Comparison strip cells.
+          meta). When scores show, rank sits in front of the title and votes
+          hug the last line. Otherwise place before title. Omit place for
+          Comparison strip cells.
         </p>
-        <ul className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           <li>
             <StandingGameCard
               place={4}
@@ -454,6 +457,15 @@ export default function DesignSystemPage() {
             />
           </li>
         </ul>
+      </Section>
+
+      <Section title="Rank · votes · title">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Settings to compare how rank, votes, and title sit around the cover.
+          Live standings still use Votes under title. Eight cards in two rows
+          mix short and long titles so stacking tightness is obvious.
+        </p>
+        <StandingCardLayoutFixture />
       </Section>
 
       <Section title="Horizontal scroll">

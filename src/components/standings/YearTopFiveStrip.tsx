@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { StandingGameCard } from "@/components/communities/StandingGameCard";
+import {
+  StandingGameCard,
+  standingStripColClass,
+  standingStripListClass,
+} from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 
 export type YearTopFiveRow = {
@@ -47,15 +51,11 @@ export function YearTopFiveStrip({
         <p className="mt-2 text-sm text-muted">No rankings for this year yet.</p>
       ) : (
         <HorizontalScroll className="mt-2" label={`${year} top five`}>
-          <ul className="flex w-max min-w-full flex-nowrap items-end gap-4">
+          <ul className={standingStripListClass}>
             {rows.map((row) => (
               <li
                 key={row.gameId}
-                className={
-                  row.place === 1
-                    ? "w-[168px] shrink-0 sm:w-[190px]"
-                    : "w-[132px] shrink-0 sm:w-[148px]"
-                }
+                className={standingStripColClass(row.place === 1)}
               >
                 <StandingGameCard
                   place={row.place}
@@ -65,6 +65,7 @@ export function YearTopFiveStrip({
                   coverUrl={row.coverUrl}
                   points={row.score}
                   priority={row.place === 1}
+                  pinCover
                 />
               </li>
             ))}
