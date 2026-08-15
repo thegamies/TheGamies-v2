@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   useCallback,
   useEffect,
@@ -30,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
+  completeListAuthIntentAction,
   saveOwnedListAction,
   shareListAction,
   syncSharedListAction,
@@ -46,6 +47,9 @@ import {
   type ExportRankStyle,
 } from "@/components/list-export/rankChrome";
 import { PosterBuilder } from "@/components/lists/PosterBuilder";
+import { SaveSignInDialog } from "@/components/lists/SaveSignInDialog";
+import { ShareLinkSignInDialog } from "@/components/lists/ShareLinkSignInDialog";
+import { ShareMenuDialog } from "@/components/lists/ShareMenuDialog";
 import { Button } from "@/components/ui/Button";
 import {
   controlGroupClass,
@@ -71,6 +75,7 @@ import {
   type AwardCategoryOption,
   type CategoryVoteSelection,
 } from "@/components/lists/CategoryVotesEditor";
+import { type ListAuthIntent } from "@/lib/lists/auth-intent";
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
@@ -101,6 +106,10 @@ type ListEditorProps = {
   initialShowSuffix?: boolean;
   signedIn?: boolean;
   error?: string | null;
+  /** Complete Save/Share after returning from /auth/sign-in. */
+  authIntent?: ListAuthIntent | null;
+  /** Path to return to after sign-in (include year/title query; no intent). */
+  returnPath?: string;
   awardCategories?: AwardCategoryOption[];
   initialCategoryVotes?: CategoryVoteSelection[];
 };
@@ -145,13 +154,19 @@ export function ListEditor({
   initialShowSuffix = false,
   signedIn = false,
   error = null,
+  authIntent = null,
+  returnPath: returnPathProp,
   awardCategories = [],
   initialCategoryVotes = [],
 }: ListEditorProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const returnPath = returnPathProp ?? pathname;
   const currentYear = new Date().getUTCFullYear();
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const shareFormRef = useRef<HTMLFormElement>(null);
+  const authIntentHandled = useRef(false);
   const committedYearRef = useRef(initialYear ?? currentYear);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     persistSnapshot({
@@ -201,13 +216,18 @@ export function ListEditor({
   const [saveError, setSaveError] = useState<string | null>(error);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [savedFlash, setSavedFlash] = useState(false);
-  const [draftReady, setDraftReady] = useState(() => signedIn);
+  const [draftReady, setDraftReady] = useState(
+    () => signedIn && !authIntent,
+  );
   const [pending, startTransition] = useTransition();
   const [searchPending, startSearch] = useTransition();
   const [panelOpen, setPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [slotPickerOpen, setSlotPickerOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [saveSignInOpen, setSaveSignInOpen] = useState(false);
+  const [shareLinkSignInOpen, setShareLinkSignInOpen] = useState(false);
   const [pendingTrim, setPendingTrim] = useState<number | null>(null);
   const [pendingYearTrim, setPendingYearTrim] = useState<{
     year: number;
@@ -222,13 +242,18 @@ export function ListEditor({
   const selectedIds = new Set(items.map((i) => i.gameId));
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
   const emptySlots = Math.max(0, slotCount - items.length);
-  const signInHref = `/auth/sign-in?next=${encodeURIComponent(pathname)}`;
+  const signInHref = `/auth/sign-in?next=${encodeURIComponent(returnPath)}`;
   const dirty =
     signedIn &&
     persistSnapshot({ listType, title, year, items }) !== savedSnapshot;
   const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
     message: "Leave without saving? Your latest edits won’t be kept on this list.",
   });
+  const authIntentEmptyError =
+    signedIn && authIntent && draftReady && items.length === 0
+      ? "Add at least one game before saving or sharing."
+      : null;
+  const displayError = saveError ?? authIntentEmptyError;
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -245,10 +270,11 @@ export function ListEditor({
   }, [query, yearNum, listType]);
 
   // Restore anon draft BEFORE any cookie write — remounting an empty editor
-  // used to wipe the saved draft on back/forward.
+  // used to wipe the saved draft on back/forward. Also restore once after
+  // sign-in when completing Save/Share intent.
   useLayoutEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- sync restore from device storage before paint */
-    if (signedIn) {
+    if (signedIn && !authIntent) {
       setDraftReady(true);
       return;
     }
@@ -345,7 +371,54 @@ export function ListEditor({
     /* eslint-enable react-hooks/set-state-in-effect */
     // Only on mount / list identity change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn, listType, yearNum]);
+  }, [signedIn, listType, yearNum, authIntent]);
+
+  useEffect(() => {
+    if (!signedIn || !authIntent || !draftReady) return;
+    if (authIntentHandled.current) return;
+    if (items.length === 0) return;
+    authIntentHandled.current = true;
+    allowLeave();
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("draftJson", draftJson(true));
+      fd.set("intent", authIntent);
+      if (listType === "goty") {
+        fd.set(
+          "categoryVotesJson",
+          JSON.stringify(
+            categoryVotes.map((v) => ({
+              categoryId: v.categoryId,
+              gameId: v.gameId,
+            })),
+          ),
+        );
+      }
+      const result = await completeListAuthIntentAction(fd);
+      // intent=share redirects server-side
+      if (result.error) {
+        setSaveError(result.error);
+        authIntentHandled.current = false;
+        return;
+      }
+      if (result.publicId) {
+        setPublicId(result.publicId);
+        setSavedSnapshot(
+          persistSnapshot({
+            listType,
+            title,
+            year,
+            items,
+          }),
+        );
+        setSaveError(null);
+        setSavedFlash(true);
+        window.setTimeout(() => setSavedFlash(false), 2000);
+        router.replace(`/create/${listType}?id=${encodeURIComponent(result.publicId)}`);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot post-auth completion
+  }, [signedIn, authIntent, draftReady, items.length]);
 
   useEffect(() => {
     if (signedIn || !draftReady) return;
@@ -649,9 +722,8 @@ export function ListEditor({
 
   function save() {
     if (!signedIn) {
-      setSaveNotice(
-        "Sign in to save this list to your account. Your ranking is already kept on this device.",
-      );
+      setSaveSignInOpen(true);
+      setSaveNotice(null);
       setSavedFlash(false);
       return;
     }
@@ -689,6 +761,20 @@ export function ListEditor({
       setSavedFlash(true);
       window.setTimeout(() => setSavedFlash(false), 2000);
     });
+  }
+
+  function openShareMenu() {
+    if (items.length === 0) return;
+    setShareMenuOpen(true);
+  }
+
+  function shareWithLink() {
+    if (!signedIn) {
+      setShareLinkSignInOpen(true);
+      return;
+    }
+    allowLeave();
+    shareFormRef.current?.requestSubmit();
   }
 
   const trimMessage = (() => {
@@ -940,8 +1026,18 @@ export function ListEditor({
           >
             {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
           </Button>
+          <Button
+            type="button"
+            size="sm"
+            disabled={items.length === 0 || pending}
+            onClick={openShareMenu}
+          >
+            Share
+          </Button>
           <form
+            ref={shareFormRef}
             action={shareListAction}
+            className="hidden"
             onSubmit={() => {
               allowLeave();
             }}
@@ -951,19 +1047,7 @@ export function ListEditor({
               name="draftJson"
               value={draftJson(signedIn)}
             />
-            <Button type="submit" size="sm" disabled={items.length === 0}>
-              Share
-            </Button>
           </form>
-          <Button
-            type="button"
-            variant="bordered"
-            size="sm"
-            onClick={() => setExportOpen(true)}
-            disabled={items.length === 0}
-          >
-            Export
-          </Button>
         </div>
 
         {signedIn && dirty ? (
@@ -985,9 +1069,9 @@ export function ListEditor({
           </p>
         ) : null}
 
-        {saveError ? (
+        {displayError ? (
           <p className="w-full text-sm text-accent" role="alert">
-            {saveError}
+            {displayError}
           </p>
         ) : null}
       </div>
@@ -1187,6 +1271,26 @@ export function ListEditor({
         rankFormat={rankFormat}
         showYearBadge={showYearBadge}
         showTopCount={showTopCount}
+      />
+
+      <ShareMenuDialog
+        open={shareMenuOpen}
+        onClose={() => setShareMenuOpen(false)}
+        onShareAsImage={() => setExportOpen(true)}
+        onShareWithLink={shareWithLink}
+      />
+
+      <SaveSignInDialog
+        open={saveSignInOpen}
+        onClose={() => setSaveSignInOpen(false)}
+        returnPath={returnPath}
+      />
+
+      <ShareLinkSignInDialog
+        open={shareLinkSignInOpen}
+        onClose={() => setShareLinkSignInOpen(false)}
+        onShareAsImage={() => setExportOpen(true)}
+        returnPath={returnPath}
       />
 
       <SlotPickerDialog

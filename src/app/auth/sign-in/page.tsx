@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/Button";
+import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signInWithEmail } from "./actions";
 
 const fieldClass =
@@ -12,11 +13,13 @@ const fieldClass =
 function SignInForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "";
+  const intent = parseListAuthIntent(searchParams.get("intent"));
   const [state, formAction, pending] = useActionState(signInWithEmail, null);
 
   return (
     <form action={formAction} className="mt-10 space-y-4">
       {next ? <input type="hidden" name="next" value={next} /> : null}
+      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
       <label className="block text-sm text-muted">
         Email
         <input
