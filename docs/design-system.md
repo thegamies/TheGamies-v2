@@ -75,7 +75,7 @@ Stacking identical treatments is forbidden — each level must read quieter than
 | Level | Role | Look | Use |
 |---|---|---|---|
 | **Primary** | Community section switcher | Bordered chips inside `CommunityHeader` (`--panel` band) | Overview · Live Rankings · Events · Members · Settings |
-| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Community |
+| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Community. Site GOTY + community Live: Game of the Year · Categories |
 | **Tertiary** | Board / filter | Plain text + middots, muted / active accent | Community · Hosts. Results boards: Ranked · Comparison |
 
 Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.
@@ -92,6 +92,7 @@ Rules:
 - Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
 - Community Settings Events uses the same year select (shown even for a single year) plus **Open event**, which opens that year on the event page with Settings selected.
+- Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY.
 
 ## Controls
 
@@ -122,7 +123,7 @@ Rules:
 | GOTY Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title. GOTY Top 10 even grid |
 | GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Titles start at **18px** (same as standings cards) and shrink toward 12px. Tie stacks follow the event’s competition or dense numbering |
 | Category Ranked | One line per award; `HorizontalScroll` when displayed rank ≤ 3 overflows (full ties). Place in front of the title; #1 slightly wider than #2/#3 |
-| Rest of Top 10 / Full standings / Categories | Accent place **in front of the title** (tight `gap-1`), meta aligned under the title — **never** a badge on the art |
+| Rest of Top 10 / Full standings / Categories / Live GOTY | Accent place **in front of the title** (tight `gap-1`), meta aligned under the title — **never** a badge on the art. Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. |
 
 Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
 
@@ -138,7 +139,7 @@ Titles use `FitDisplayTitle` (2-line reserved + clamp; shrink toward 12px).
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`.
 
 Planned: `EventNavigation`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 

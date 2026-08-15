@@ -7,7 +7,9 @@ import {
 } from "@/lib/live-aggregate/service";
 import {
   DEFAULT_AWARD_CATEGORY_GROUP,
+  DEFAULT_LIVE_STANDINGS_VIEW,
   parseAwardCategoryGroup,
+  parseLiveStandingsView,
 } from "@/lib/live-aggregate/award-category-defs";
 
 type Params = Promise<{ year: string }>;
@@ -49,6 +51,7 @@ export default async function GameOfTheYearYearPage({
   const requestedPage =
     Number.isFinite(pageRaw) && pageRaw >= 1 ? Math.floor(pageRaw) : 1;
   const categoryGroup = parseAwardCategoryGroup(first(sp.group));
+  const view = parseLiveStandingsView(first(sp.view));
 
   const current = new Date().getUTCFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => current - i);
@@ -59,6 +62,7 @@ export default async function GameOfTheYearYearPage({
       page: requestedPage,
       pageSize: STANDINGS_PAGE_SIZE,
       categoryGroup,
+      view,
     });
   } catch {
     page = {
@@ -74,6 +78,7 @@ export default async function GameOfTheYearYearPage({
       goty: [],
       categories: [],
       categoryGroup: DEFAULT_AWARD_CATEGORY_GROUP,
+      view: DEFAULT_LIVE_STANDINGS_VIEW,
     };
   }
 

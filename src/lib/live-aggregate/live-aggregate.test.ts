@@ -240,6 +240,7 @@ describe("redactStandingsPage", () => {
       },
     ],
     categoryGroup: "premier",
+    view: "goty",
   };
 
   it("hides scores but keeps ranks when unrevealed", () => {

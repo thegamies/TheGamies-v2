@@ -13,8 +13,11 @@ import {
 import { getLiveAggregateDb } from "./contrib";
 import { ensureScoresFresh } from "./refresh";
 import {
+  DEFAULT_LIVE_STANDINGS_VIEW,
   parseAwardCategoryGroup,
+  parseLiveStandingsView,
   type AwardCategoryGroup,
+  type LiveStandingsViewId,
 } from "./award-category-defs";
 
 /** Top-N highlight depth for homepage / all-years standings strips. */
@@ -65,6 +68,8 @@ export type StandingsPage = {
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
   categoryGroup: AwardCategoryGroup;
+  /** Game of the Year grid vs Categories chapters. */
+  view: LiveStandingsViewId;
 };
 
 /** Clamp a requested page number to a valid 1-based index. */
@@ -203,18 +208,23 @@ type CategoryJsonRow = {
 
 /**
  * One Neon round-trip for the public GOTY rankings board:
- * year stats + total + page of scores + category tallies.
+ * year stats + total + (GOTY page and/or category tallies by view).
+ * Categories are ordered by total votes (most first).
  */
 async function fetchStandingsBundle(
   year: number,
   requestedPage: number,
   pageSize: number,
   categoryGroup: AwardCategoryGroup,
+  view: LiveStandingsViewId,
   db: Db,
-): Promise<Omit<StandingsPage, "year" | "pageSize" | "scoresFresh"> & {
+): Promise<Omit<StandingsPage, "year" | "pageSize" | "scoresFresh" | "view"> & {
   contribGeneration: number;
   scoresGeneration: number;
 }> {
+  const includeGoty = view === "goty";
+  const includeCategories = view === "categories";
+
   const result = await db.execute(sql`
     with meta as (
       select
@@ -256,95 +266,122 @@ async function fetchStandingsBundle(
       b.goty_total,
       b.page,
       b.total_pages,
-      (
-        select count(*)::int
-        from live_goty_scores hs
-        where hs.year = ${year}
-          and hs.score > (
-            select s0.score
-            from live_goty_scores s0
-            where s0.year = ${year}
-            order by s0.score desc, s0.game_id asc
-            offset (b.page - 1) * ${pageSize}
-            limit 1
-          )
-      ) as higher_count,
-      coalesce(
-        (
-          select json_agg(row_to_json(p) order by p."place")
-          from (
-            select
-              ((b.page - 1) * ${pageSize} + row_number() over (
-                order by s.score desc, s.game_id asc
-              ))::int as "place",
-              s.game_id as "gameId",
-              g.slug as "slug",
-              g.title as "title",
-              g.year as "year",
-              c.image_id as "coverImageId",
-              s.score as "score",
-              s.list_mentions as "listMentions",
-              s.rank_1_count as "rank1Count",
-              s.rank_2_count as "rank2Count",
-              s.rank_3_count as "rank3Count",
-              s.rank_4_count as "rank4Count",
-              s.rank_5_count as "rank5Count",
-              s.rank_6_count as "rank6Count",
-              s.rank_7_count as "rank7Count",
-              s.rank_8_count as "rank8Count",
-              s.rank_9_count as "rank9Count",
-              s.rank_10_count as "rank10Count"
-            from live_goty_scores s
-            inner join games g on g.id = s.game_id
-            left join covers c on c.igdb_id = g.cover_igdb_id
-            where s.year = ${year}
-            order by s.score desc, s.game_id asc
-            limit ${pageSize}
-            offset (b.page - 1) * ${pageSize}
-          ) p
-        ),
-        '[]'::json
-      ) as goty,
-      coalesce(
-        (
-          select json_agg(row_to_json(cat) order by cat."sortOrder", cat."label", cat."place" nulls last)
-          from (
-            select
-              ac.id as "categoryId",
-              ac.label as "label",
-              ac.description as "description",
-              ac.sort_order as "sortOrder",
-              r.place as "place",
-              r.game_id as "gameId",
-              r.slug as "slug",
-              r.title as "title",
-              r.cover_image_id as "coverImageId",
-              r.vote_count as "voteCount"
-            from award_categories ac
-            left join lateral (
+      case
+        when ${includeGoty} then (
+          select count(*)::int
+          from live_goty_scores hs
+          where hs.year = ${year}
+            and hs.score > (
+              select s0.score
+              from live_goty_scores s0
+              where s0.year = ${year}
+              order by s0.score desc, s0.game_id asc
+              offset (b.page - 1) * ${pageSize}
+              limit 1
+            )
+        )
+        else 0
+      end as higher_count,
+      case
+        when ${includeGoty} then coalesce(
+          (
+            select json_agg(row_to_json(p) order by p."place")
+            from (
               select
-                row_number() over (
-                  order by s.vote_count desc, s.game_id asc
-                )::int as place,
-                s.game_id,
-                g.slug,
-                g.title,
-                cov.image_id as cover_image_id,
-                s.vote_count
-              from live_category_scores s
+                ((b.page - 1) * ${pageSize} + row_number() over (
+                  order by s.score desc, s.game_id asc
+                ))::int as "place",
+                s.game_id as "gameId",
+                g.slug as "slug",
+                g.title as "title",
+                g.year as "year",
+                c.image_id as "coverImageId",
+                s.score as "score",
+                s.list_mentions as "listMentions",
+                s.rank_1_count as "rank1Count",
+                s.rank_2_count as "rank2Count",
+                s.rank_3_count as "rank3Count",
+                s.rank_4_count as "rank4Count",
+                s.rank_5_count as "rank5Count",
+                s.rank_6_count as "rank6Count",
+                s.rank_7_count as "rank7Count",
+                s.rank_8_count as "rank8Count",
+                s.rank_9_count as "rank9Count",
+                s.rank_10_count as "rank10Count"
+              from live_goty_scores s
               inner join games g on g.id = s.game_id
-              left join covers cov on cov.igdb_id = g.cover_igdb_id
+              left join covers c on c.igdb_id = g.cover_igdb_id
               where s.year = ${year}
-                and s.category_id = ac.id
-              order by s.vote_count desc, s.game_id asc
-              limit 10
-            ) r on true
-            where ac.active = true
-              and ac.category_group = ${categoryGroup}
-          ) cat
-        ),
-        '[]'::json
-      ) as categories
+              order by s.score desc, s.game_id asc
+              limit ${pageSize}
+              offset (b.page - 1) * ${pageSize}
+            ) p
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as goty,
+      case
+        when ${includeCategories} then coalesce(
+          (
+            select json_agg(
+              row_to_json(cat)
+              order by cat."totalVotes" desc, cat."label", cat."place" nulls last
+            )
+            from (
+              select
+                ac.id as "categoryId",
+                ac.label as "label",
+                ac.description as "description",
+                ac.sort_order as "sortOrder",
+                coalesce(
+                  (
+                    select sum(s.vote_count)::int
+                    from live_category_scores s
+                    where s.year = ${year}
+                      and s.category_id = ac.id
+                  ),
+                  0
+                ) as "totalVotes",
+                r.place as "place",
+                r.game_id as "gameId",
+                r.slug as "slug",
+                r.title as "title",
+                r.cover_image_id as "coverImageId",
+                r.vote_count as "voteCount"
+              from award_categories ac
+              left join lateral (
+                select
+                  row_number() over (
+                    order by s.vote_count desc, s.game_id asc
+                  )::int as place,
+                  s.game_id,
+                  g.slug,
+                  g.title,
+                  cov.image_id as cover_image_id,
+                  s.vote_count
+                from live_category_scores s
+                inner join games g on g.id = s.game_id
+                left join covers cov on cov.igdb_id = g.cover_igdb_id
+                where s.year = ${year}
+                  and s.category_id = ac.id
+                order by s.vote_count desc, s.game_id asc
+                limit 10
+              ) r on true
+              where ac.active = true
+                and ac.category_group = ${categoryGroup}
+                and exists (
+                  select 1
+                  from live_category_scores s
+                  where s.year = ${year}
+                    and s.category_id = ac.id
+                )
+            ) cat
+          ),
+          '[]'::json
+        )
+        else '[]'::json
+      end as categories
     from bounds b
   `);
 
@@ -455,6 +492,7 @@ export async function getStandingsPage(
     page?: number;
     pageSize?: number;
     categoryGroup?: AwardCategoryGroup;
+    view?: LiveStandingsViewId;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<StandingsPage> {
@@ -470,12 +508,14 @@ export async function getStandingsPage(
   );
   const requestedPage = Math.max(1, Math.floor(opts.page ?? 1));
   const categoryGroup = parseAwardCategoryGroup(opts.categoryGroup);
+  const view = parseLiveStandingsView(opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW);
 
   const bundle = await fetchStandingsBundle(
     year,
     requestedPage,
     pageSize,
     categoryGroup,
+    view,
     db,
   );
 
@@ -492,6 +532,7 @@ export async function getStandingsPage(
     goty: bundle.goty,
     categories: bundle.categories,
     categoryGroup: bundle.categoryGroup,
+    view,
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });

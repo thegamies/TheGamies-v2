@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   AWARD_CATEGORY_DEFS,
   parseAwardCategoryGroup,
+  parseLiveStandingsView,
   standingsQueryString,
 } from "./award-category-defs";
 
@@ -26,5 +27,18 @@ describe("AWARD_CATEGORY_DEFS", () => {
     expect(standingsQueryString({ page: 2, group: "fun" })).toBe(
       "?page=2&group=fun",
     );
+    expect(standingsQueryString({ view: "categories" })).toBe(
+      "?view=categories",
+    );
+    expect(
+      standingsQueryString({ page: 2, group: "fun", view: "categories" }),
+    ).toBe("?page=2&group=fun&view=categories");
+  });
+
+  it("parses live standings views", () => {
+    expect(parseLiveStandingsView("categories")).toBe("categories");
+    expect(parseLiveStandingsView("goty")).toBe("goty");
+    expect(parseLiveStandingsView("nope")).toBe("goty");
+    expect(parseLiveStandingsView(undefined)).toBe("goty");
   });
 });

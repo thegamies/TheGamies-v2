@@ -176,9 +176,20 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
 
 export const DEFAULT_AWARD_CATEGORY_GROUP: AwardCategoryGroup = "premier";
 
+/** Live standings board: Game of the Year grid vs Categories chapters. */
+export const LIVE_STANDINGS_VIEWS = ["goty", "categories"] as const;
+export type LiveStandingsViewId = (typeof LIVE_STANDINGS_VIEWS)[number];
+export const DEFAULT_LIVE_STANDINGS_VIEW: LiveStandingsViewId = "goty";
+
+export function parseLiveStandingsView(raw: unknown): LiveStandingsViewId {
+  if (raw === "categories") return "categories";
+  return DEFAULT_LIVE_STANDINGS_VIEW;
+}
+
 export function standingsQueryString(opts: {
   page?: number;
   group?: AwardCategoryGroup;
+  view?: LiveStandingsViewId;
 }): string {
   const params = new URLSearchParams();
   if (opts.page != null && opts.page > 1) {
@@ -187,6 +198,10 @@ export function standingsQueryString(opts: {
   const group = opts.group ?? DEFAULT_AWARD_CATEGORY_GROUP;
   if (group !== DEFAULT_AWARD_CATEGORY_GROUP) {
     params.set("group", group);
+  }
+  const view = opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW;
+  if (view !== DEFAULT_LIVE_STANDINGS_VIEW) {
+    params.set("view", view);
   }
   const q = params.toString();
   return q ? `?${q}` : "";

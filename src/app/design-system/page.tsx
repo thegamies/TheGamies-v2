@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Radio, RadioOption } from "@/components/ui/Radio";
 import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { GameCover } from "@/components/ui/GameCover";
+import { YearSelect } from "@/components/ui/YearSelect";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { navItemClass } from "@/components/ui/navLevels";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
@@ -292,8 +293,9 @@ export default function DesignSystemPage() {
               Year select
             </p>
             <p className="mt-2 max-w-xl text-sm text-muted">
-              Pop-open beside the awards title when 2+ public years exist —
-              not a second underline strip.
+              Pop-open beside the section title — editions when 2+ public years;
+              live standings always show the control. Not a second underline
+              strip.
             </p>
             <div className="mt-3 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
               <h3 className="font-display text-3xl tracking-wide text-ink">
@@ -303,6 +305,18 @@ export default function DesignSystemPage() {
                 slug="example"
                 year={2026}
                 years={[2026, 2025, 2024]}
+              />
+            </div>
+            <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
+              <h3 className="font-display text-3xl tracking-wide text-ink">
+                2026 Game of the Year
+              </h3>
+              <YearSelect
+                year={2026}
+                years={[2026, 2025, 2024]}
+                alwaysShow
+                label="Standings year"
+                hrefForYear={(y) => `/game-of-the-year/${y}`}
               />
             </div>
           </div>

@@ -71,7 +71,9 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - `/` — homepage Top 5 strips for featured years (default: current + previous; admin override on `/admin/rankings`)
 - `/standings` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
-- `/game-of-the-year/[year]` — GOTY board paginated **50 per page** (`?page=2`); category boards by group (`?group=genre`)
+- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters by group (`?group=genre`), ordered by most votes
+- Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
+- Year switching uses the shared top-right `YearSelect` (not a button row)
 - `/admin` — ops index (sync, rankings, seed)
 - `/admin/rankings` — reveal / refresh / rebuild + homepage year override
 
