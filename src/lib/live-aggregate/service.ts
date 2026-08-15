@@ -1,7 +1,10 @@
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { getSiteRankMode } from "@/lib/site-settings/service";
 import {
+  parseSharedRankMode,
   withDisplayRanks,
   withDisplayRanksOnPage,
+  type SharedRankMode,
 } from "@/lib/standings/shared-rank";
 import {
   covers,
@@ -241,6 +244,7 @@ async function fetchStandingsBundle(
   categoryGroup: StandingsCategoryGroupFilter,
   view: LiveStandingsViewId,
   categoryId: string | null,
+  rankMode: SharedRankMode,
   db: Db,
 ): Promise<
   Omit<
@@ -269,6 +273,10 @@ async function fetchStandingsBundle(
     includeCategoryDetail && categoryId
       ? sql`and ac.id = ${categoryId}`
       : sql``;
+  const higherCountSelect =
+    rankMode === "dense"
+      ? sql`count(distinct hs.score)::int`
+      : sql`count(*)::int`;
 
   const result = await db.execute(sql`
     with meta as (
@@ -313,7 +321,7 @@ async function fetchStandingsBundle(
       b.total_pages,
       case
         when ${includeGoty} then (
-          select count(*)::int
+          select ${higherCountSelect}
           from live_goty_scores hs
           where hs.year = ${year}
             and hs.score > (
@@ -490,7 +498,7 @@ async function fetchStandingsBundle(
     {
       offset: (page - 1) * pageSize,
       firstGroupRank: asInt(row.higher_count) + 1,
-      mode: "competition",
+      mode: rankMode,
     },
   ).map((r) => ({ ...r, place: r.rank }));
 
@@ -527,7 +535,7 @@ async function fetchStandingsBundle(
     const ranked = withDisplayRanks(
       block.rows,
       (r) => r.voteCount ?? 0,
-      "competition",
+      rankMode,
     ).map((r) => ({ ...r, place: r.rank }));
     categoryGameTotal = Math.max(categoryGameTotal, block.categoryGameTotal);
     categories.push({
@@ -574,6 +582,8 @@ export async function getStandingsPage(
     categoryGroup?: StandingsCategoryGroupFilter;
     view?: LiveStandingsViewId;
     categoryId?: string | null;
+    /** Override site setting (tests). */
+    rankMode?: SharedRankMode;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<StandingsPage> {
@@ -596,6 +606,8 @@ export async function getStandingsPage(
   const categoryGroup = parseStandingsCategoryGroup(
     opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
   );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
 
   const bundle = await fetchStandingsBundle(
     year,
@@ -604,6 +616,7 @@ export async function getStandingsPage(
     categoryGroup,
     view,
     categoryId,
+    rankMode,
     db,
   );
 
@@ -637,6 +650,8 @@ export async function getGotyThroughRank(
   opts: {
     maxRank?: number;
     forceReveal?: boolean;
+    /** Override site setting (tests). */
+    rankMode?: SharedRankMode;
   } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<{
@@ -649,18 +664,33 @@ export async function getGotyThroughRank(
     1,
     Math.floor(opts.maxRank ?? TOP_STANDINGS_RANK),
   );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
   const stats = await getYearStats(year, db);
 
-  const [nth] = await db
-    .select({ score: liveGotyScores.score })
-    .from(liveGotyScores)
-    .where(eq(liveGotyScores.year, year))
-    .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
-    .limit(1)
-    .offset(maxRank - 1);
+  let cutoffScore: number | undefined;
+  if (rankMode === "dense") {
+    const distinct = await db
+      .select({ score: liveGotyScores.score })
+      .from(liveGotyScores)
+      .where(eq(liveGotyScores.year, year))
+      .groupBy(liveGotyScores.score)
+      .orderBy(desc(liveGotyScores.score))
+      .limit(maxRank);
+    cutoffScore = distinct[distinct.length - 1]?.score;
+  } else {
+    const [nth] = await db
+      .select({ score: liveGotyScores.score })
+      .from(liveGotyScores)
+      .where(eq(liveGotyScores.year, year))
+      .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId))
+      .limit(1)
+      .offset(maxRank - 1);
+    cutoffScore = nth?.score;
+  }
 
   const scoreRows =
-    nth == null
+    cutoffScore == null
       ? await db
           .select({
             gameId: liveGotyScores.gameId,
@@ -692,7 +722,7 @@ export async function getGotyThroughRank(
           .where(
             and(
               eq(liveGotyScores.year, year),
-              gte(liveGotyScores.score, nth.score),
+              gte(liveGotyScores.score, cutoffScore),
             ),
           )
           .orderBy(desc(liveGotyScores.score), asc(liveGotyScores.gameId));
@@ -710,7 +740,7 @@ export async function getGotyThroughRank(
       rankCounts: null as number[] | null,
     })),
     (r) => r.score ?? 0,
-    "competition",
+    rankMode,
   )
     .filter((r) => r.rank <= maxRank)
     .map((r) => ({ ...r, place: r.rank }));
@@ -744,7 +774,11 @@ export async function listYearsWithGotyScores(
 
 export async function getGotyThroughRankForYears(
   years: readonly number[],
-  opts: { maxRank?: number; forceReveal?: boolean } = {},
+  opts: {
+    maxRank?: number;
+    forceReveal?: boolean;
+    rankMode?: SharedRankMode;
+  } = {},
   db: Db = getLiveAggregateDb(),
 ): Promise<
   Array<{
@@ -757,7 +791,11 @@ export async function getGotyThroughRankForYears(
   const unique = [...new Set(years.map((y) => Math.floor(y)))].filter((y) =>
     Number.isFinite(y),
   );
+  const rankMode =
+    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
   return Promise.all(
-    unique.map((year) => getGotyThroughRank(year, opts, db)),
+    unique.map((year) =>
+      getGotyThroughRank(year, { ...opts, rankMode }, db),
+    ),
   );
 }

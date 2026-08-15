@@ -279,4 +279,17 @@ describe("live page competition rank", () => {
     ).map((r) => ({ ...r, place: r.rank }));
     expect(numbered.map((r) => r.place)).toEqual([49, 49, 53]);
   });
+
+  it("continues a dense split tie then increments without skipping", () => {
+    const numbered = withDisplayRanksOnPage(
+      [
+        { gameId: "a", score: 40 },
+        { gameId: "b", score: 40 },
+        { gameId: "c", score: 30 },
+      ],
+      (r) => r.score,
+      { offset: 50, firstGroupRank: 12, mode: "dense" },
+    ).map((r) => ({ ...r, place: r.rank }));
+    expect(numbered.map((r) => r.place)).toEqual([12, 12, 13]);
+  });
 });

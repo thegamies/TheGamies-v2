@@ -9,7 +9,9 @@ import {
   getSiteSettings,
   parseLandingYearsInput,
   setLandingStandingsYears,
+  setSiteRankMode,
 } from "@/lib/site-settings/service";
+import { parseSharedRankMode } from "@/lib/standings/shared-rank";
 
 async function requireAdmin() {
   if (!(await isAdminAuthorized())) {
@@ -115,6 +117,29 @@ export async function saveLandingYearsAction(
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Could not save years.",
+    };
+  }
+}
+
+export async function saveRankModeAction(
+  raw: string,
+): Promise<{ error?: string; ok?: boolean; rankMode?: "competition" | "dense" }> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const rankMode = parseSharedRankMode(raw);
+  if (raw !== "competition" && raw !== "dense") {
+    return { error: "Choose competition or dense numbering." };
+  }
+  try {
+    const saved = await setSiteRankMode(rankMode);
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
+    revalidatePath("/admin/rankings");
+    return { ok: true, rankMode: saved.rankMode };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Could not save numbering.",
     };
   }
 }

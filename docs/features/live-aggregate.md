@@ -39,7 +39,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 
 Ordered by `score DESC, game_id` so `live_goty_scores_year_score_idx` can satisfy the sort.
 
-Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM would invalidate a stored place). Default **competition**: `1 + COUNT(score > first row on the page)`, then walk the page (same score → same rank; new score → offset + local index + 1). Pages stay **50 games**. Site live has no dense chooser. Category laterals walk the top 10 the same way. Community live (SUM + lock snapshots) uses the same numbering.
+Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM would invalidate a stored place). Numbering follows the site **tie numbering** setting on `/admin/rankings` (`site_settings.rank_mode`): default **competition** (`1 + COUNT(score > first row on the page)`, then walk the page — same score → same rank; new score → offset + local index + 1) or **dense** (`1 + COUNT(DISTINCT score > first)`, then walk without skips). Pages stay **50 games**. Not a public URL chooser. Category laterals walk the same way. Community live (SUM + lock snapshots) stays competition only for now.
 
 ## Refresh (single-flight)
 
@@ -77,11 +77,11 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights
 
 - `/admin` — ops index (sync, rankings, seed)
-- `/admin/rankings` — reveal / refresh / rebuild + homepage year override
+- `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense)
 
 ## Homepage / all-years highlights
 
-- Depth is **Top 5** (competition ranking); ties at the cutoff are included in full.
+- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full.
 - Strip UI matches community event Comparison language: cover row in `HorizontalScroll` (scrolls on mobile or when ties overflow).
 - Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 

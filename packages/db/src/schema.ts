@@ -810,11 +810,16 @@ export const liveCategoryDirty = pgTable(
 );
 
 /**
- * Singleton site ops settings (landing featured standings years, etc.).
+ * Singleton site ops settings (landing featured standings years, tie numbering).
  * `landingStandingsYears` null/empty → default current + previous calendar year.
+ * `rankMode` — competition (1–1–3) or dense (1–1–2) for site live boards.
  */
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey().default("default"),
   landingStandingsYears: integer("landing_standings_years").array(),
+  rankMode: text("rank_mode")
+    .notNull()
+    .default("competition")
+    .$type<"competition" | "dense">(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
 import { getSiteSettings } from "@/lib/site-settings/service";
+import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { AdminRankingsClient } from "./AdminRankingsClient";
 
 export const metadata: Metadata = {
@@ -15,6 +16,7 @@ export default async function AdminRankingsPage() {
   const year = new Date().getUTCFullYear();
   let initialStats = null;
   let initialLandingYears: number[] | null = null;
+  let initialRankMode: SharedRankMode = "competition";
   if (authorized) {
     try {
       const stats = await getYearStats(year);
@@ -33,8 +35,10 @@ export default async function AdminRankingsPage() {
     try {
       const settings = await getSiteSettings();
       initialLandingYears = settings.landingStandingsYears;
+      initialRankMode = settings.rankMode;
     } catch {
       initialLandingYears = null;
+      initialRankMode = "competition";
     }
   }
 
@@ -51,7 +55,8 @@ export default async function AdminRankingsPage() {
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
           Reveal detailed scores for a year, refresh dirty rollups, rebuild the
-          year cache, or choose which years appear on the homepage.
+          year cache, choose homepage years, or set how ties are numbered on
+          the public boards.
         </p>
         <div className="mt-10">
           <AdminRankingsClient
@@ -59,6 +64,7 @@ export default async function AdminRankingsPage() {
             initialYear={year}
             initialStats={initialStats}
             initialLandingYears={initialLandingYears}
+            initialRankMode={initialRankMode}
           />
         </div>
       </main>
