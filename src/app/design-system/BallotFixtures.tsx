@@ -61,7 +61,7 @@ export function CategoryVotesEditorFixture() {
       ]}
       value={value}
       onChange={setValue}
-      description="Choose awards from the grid. Search filters the catalog."
+      description="Add awards from the dialog. Search and filter your picks on this page."
     />
   );
 }

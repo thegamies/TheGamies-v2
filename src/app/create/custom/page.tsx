@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { startCustomDraftAction } from "@/app/create/actions";
+import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
+import { StartCustomForm } from "@/components/lists/StartCustomForm";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import {
@@ -188,6 +189,7 @@ export default async function CreateCustomPage({
       if (year != null) params.set("year", String(year));
       return (
         <div>
+          <CreatePageHeader />
           <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
             Custom list
           </p>
@@ -227,19 +229,9 @@ export default async function CreateCustomPage({
     }
   }
 
-  return (
-    <div>
-      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
-        Custom list
-      </p>
-
-      {loadError ? (
-        <p className="mb-6 text-sm text-accent" role="alert">
-          {loadError}
-        </p>
-      ) : null}
-
-      {editor ? (
+  if (editor) {
+    return (
+      <div>
         <ListEditor
           publicId={editor.publicId}
           listType="custom"
@@ -253,28 +245,24 @@ export default async function CreateCustomPage({
           signedIn={signedIn}
           error={error}
         />
-      ) : (
-        <form action={startCustomDraftAction} className="max-w-sm space-y-4">
-          <label className="block text-sm tracking-wide text-muted">
-            Title
-            <input
-              name="title"
-              required
-              placeholder="All-time favorites"
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <label className="block text-sm tracking-wide text-muted">
-            Year (optional)
-            <input
-              name="year"
-              type="number"
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <Button type="submit">Start custom list</Button>
-        </form>
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <CreatePageHeader />
+      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+        Custom list
+      </p>
+
+      {loadError ? (
+        <p className="mb-6 text-sm text-accent" role="alert">
+          {loadError}
+        </p>
+      ) : null}
+
+      <StartCustomForm error={error} />
     </div>
   );
 }

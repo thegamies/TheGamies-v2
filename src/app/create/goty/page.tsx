@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { startGotyDraftAction } from "@/app/create/actions";
+import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
+import { ExistingGotyPreview } from "@/components/lists/ExistingGotyPreview";
 import { ListEditor } from "@/components/lists/ListEditor";
+import { StartGotyForm } from "@/components/lists/StartGotyForm";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import {
@@ -12,6 +14,8 @@ import {
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import {
+  getOwnedGotyForYear,
+  getOwnedGotyItemsForYear,
   getEditableList,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
@@ -55,7 +59,6 @@ export default async function CreateGotyPage({
   const publicId = first(params.id);
   const yearParam = first(params.year);
   const resume = first(params.resume) === "1";
-  const existingNotice = first(params.existing) === "1";
   const error = first(params.error) ?? null;
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
@@ -88,10 +91,19 @@ export default async function CreateGotyPage({
       coverUrl: string | null;
     }[];
   } | null = null;
+  let existingList: {
+    publicId: string;
+    title: string;
+    year: number;
+    items: {
+      gameId: string;
+      slug: string;
+      title: string;
+      coverUrl: string | null;
+      rank: number;
+    }[];
+  } | null = null;
   let loadError: string | null = error;
-  const info: string | null = existingNotice
-    ? "You already have a Game of the Year list for this year. Continue editing it here."
-    : null;
 
   if (publicId) {
     const cookie = await readListEditCookie();
@@ -198,6 +210,33 @@ export default async function CreateGotyPage({
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
+  } else if (signedIn && profileId && !resume) {
+    // Use ?year= when present; otherwise fetch for the picker's default year.
+    const year = yearParam ? Number(yearParam) : currentYear;
+    if (yearParam && !Number.isFinite(year)) {
+      loadError = "Pick a valid year.";
+    } else {
+      const y = Math.floor(year);
+      const list = await getOwnedGotyForYear(profileId, y).catch(() => null);
+      if (list) {
+        const items =
+          (await getOwnedGotyItemsForYear(profileId, y, { limit: 5 }).catch(
+            () => null,
+          )) ?? [];
+        existingList = {
+          publicId: list.publicId,
+          title: list.title,
+          year: y,
+          items: items.map((item) => ({
+            gameId: item.gameId,
+            slug: item.slug,
+            title: item.title,
+            coverUrl: item.coverUrl,
+            rank: item.rank,
+          })),
+        };
+      }
+    }
   } else if (!signedIn && yearParam) {
     const year = Number(yearParam);
     if (!Number.isFinite(year)) {
@@ -210,6 +249,7 @@ export default async function CreateGotyPage({
       } else if (existingDraft) {
         return (
           <div>
+            <CreatePageHeader />
             <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
               Game of the Year
             </p>
@@ -248,25 +288,9 @@ export default async function CreateGotyPage({
     }
   }
 
-  return (
-    <div>
-      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
-        Game of the Year
-      </p>
-
-      {loadError ? (
-        <p className="mb-6 text-sm text-accent" role="alert">
-          {loadError}
-        </p>
-      ) : null}
-
-      {info ? (
-        <p className="mb-6 text-sm text-muted" role="status">
-          {info}
-        </p>
-      ) : null}
-
-      {editor ? (
+  if (editor) {
+    return (
+      <div>
         <ListEditor
           publicId={editor.publicId}
           listType="goty"
@@ -282,21 +306,47 @@ export default async function CreateGotyPage({
           awardCategories={awardCategories}
           initialCategoryVotes={editor.categoryVotes ?? []}
         />
-      ) : (
-        <form action={startGotyDraftAction} className="max-w-sm space-y-4">
-          <label className="block text-sm tracking-wide text-muted">
-            Year
-            <input
-              name="year"
-              type="number"
-              required
-              defaultValue={currentYear}
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <Button type="submit">Start GOTY list</Button>
-        </form>
-      )}
+      </div>
+    );
+  }
+
+  const formYear =
+    existingList?.year ??
+    (yearParam && Number.isFinite(Number(yearParam))
+      ? Math.floor(Number(yearParam))
+      : currentYear);
+
+  return (
+    <div>
+      <CreatePageHeader />
+      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+        Game of the Year
+      </p>
+
+      {loadError ? (
+        <p className="mb-6 text-sm text-accent" role="alert">
+          {loadError}
+        </p>
+      ) : null}
+
+      <StartGotyForm
+        key={formYear}
+        defaultYear={formYear}
+        syncYearInUrl={signedIn}
+        hasExistingForYear={Boolean(existingList)}
+        error={error}
+      />
+
+      {existingList ? (
+        <div className="mt-8">
+          <ExistingGotyPreview
+            year={existingList.year}
+            publicId={existingList.publicId}
+            title={existingList.title}
+            items={existingList.items}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

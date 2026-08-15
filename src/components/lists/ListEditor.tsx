@@ -51,7 +51,6 @@ import {
   controlGroupClass,
   controlGroupFullClass,
   controlLabelClass,
-  fieldInputClass,
   iconControlClass,
   segmentBtnClass,
   stepperBtnClass,
@@ -59,6 +58,8 @@ import {
 } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
+import { YearPicker } from "@/components/ui/YearPicker";
+import { navItemClass } from "@/components/ui/navLevels";
 import {
   buildListDraftPayload,
   draftMatchesEditor,
@@ -177,6 +178,9 @@ export function ListEditor({
   const [draftYear, setDraftYear] = useState(initialYear ?? currentYear);
   const [categoryVotes, setCategoryVotes] =
     useState<CategoryVoteSelection[]>(initialCategoryVotes);
+  const showCategoryTabs =
+    signedIn && listType === "goty" && awardCategories.length > 0;
+  const [editorView, setEditorView] = useState<"goty" | "categories">("goty");
   const [items, setItems] = useState<EditorItem[]>(() =>
     withRanks(
       initialItems.map((item) => ({
@@ -717,6 +721,38 @@ export function ListEditor({
 
   return (
     <div className="space-y-6 pb-20 lg:pb-0">
+      {showCategoryTabs ? (
+        <div
+          className="flex flex-wrap gap-5 border-b border-line pb-0"
+          role="tablist"
+          aria-label="List sections"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "goty"}
+            onClick={() => {
+              setEditorView("goty");
+            }}
+            className={navItemClass("secondary", editorView === "goty")}
+          >
+            Game of the Year
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={editorView === "categories"}
+            onClick={() => {
+              setPanelOpen(false);
+              setEditorView("categories");
+            }}
+            className={navItemClass("secondary", editorView === "categories")}
+          >
+            Categories
+          </button>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
         <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
           Title
@@ -840,16 +876,18 @@ export function ListEditor({
                   </button>
                 </div>
                 {listType === "goty" ? (
-                  <label className={`mt-2 block ${controlLabelClass}`}>
+                  <div className={`mt-2 ${controlLabelClass}`}>
                     Year
-                    <input
-                      type="number"
+                    <YearPicker
                       value={Number.isFinite(draftYear) ? draftYear : ""}
-                      onChange={(e) => setDraftYear(Number(e.target.value))}
-                      onBlur={() => requestYearTrim(draftYear, "goty")}
-                      className={fieldInputClass}
+                      className="mt-1"
+                      aria-label="Year"
+                      onChange={(next) => {
+                        setDraftYear(next);
+                        requestYearTrim(next, "goty");
+                      }}
                     />
-                  </label>
+                  </div>
                 ) : null}
               </div>
 
@@ -954,6 +992,17 @@ export function ListEditor({
         ) : null}
       </div>
 
+      {showCategoryTabs && editorView === "categories" ? (
+        <div className="mx-auto w-full max-w-[var(--page-max)] pb-24">
+          <CategoryVotesEditor
+            key={yearNum}
+            categories={awardCategories}
+            value={categoryVotes}
+            onChange={setCategoryVotes}
+            year={yearNum}
+          />
+        </div>
+      ) : (
       <div className="grid items-start gap-8 lg:grid-cols-[340px_minmax(0,1fr)]">
         <aside className="hidden lg:sticky lg:top-16 lg:block lg:self-start">
           <SearchGamesPanelBody
@@ -1075,20 +1124,9 @@ export function ListEditor({
           )}
         </section>
       </div>
+      )}
 
-      {signedIn && listType === "goty" && awardCategories.length > 0 ? (
-        <div className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-24">
-          <CategoryVotesEditor
-            key={yearNum}
-            categories={awardCategories}
-            value={categoryVotes}
-            onChange={setCategoryVotes}
-            year={yearNum}
-          />
-        </div>
-      ) : null}
-
-      {panelOpen ? (
+      {editorView === "goty" && panelOpen ? (
         <aside className="fixed inset-x-0 top-0 bottom-14 z-40 flex flex-col bg-paper lg:hidden">
           <div className="flex items-center justify-between border-b border-line px-3 py-3">
             <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-ink">
@@ -1119,6 +1157,7 @@ export function ListEditor({
         </aside>
       ) : null}
 
+      {editorView === "goty" ? (
       <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 border-t border-line bg-panel lg:hidden">
         <button
           type="button"
@@ -1131,6 +1170,7 @@ export function ListEditor({
           Search games
         </button>
       </nav>
+      ) : null}
 
       <ListExportDialog
         open={exportOpen}

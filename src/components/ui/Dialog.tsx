@@ -47,14 +47,24 @@ export function Dialog({
           tone === "danger" ? "border-danger" : "border-line"
         } ${className}`}
       >
-        <p
-          id={headingId}
-          className={`font-display text-2xl tracking-wide ${
-            tone === "danger" ? "text-danger" : "text-ink"
-          }`}
-        >
-          {title}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <p
+            id={headingId}
+            className={`font-display text-2xl tracking-wide ${
+              tone === "danger" ? "text-danger" : "text-ink"
+            }`}
+          >
+            {title}
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="shrink-0 p-1 text-muted transition-colors hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
         {children}
       </div>
     </div>
