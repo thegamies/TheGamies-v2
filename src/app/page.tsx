@@ -44,10 +44,7 @@ export default async function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-6 sm:py-8">
-      <h1 className="font-display text-5xl leading-none tracking-wide text-accent sm:text-7xl">
-        The Gamies
-      </h1>
-      <p className="mt-3 max-w-lg font-serif text-xl leading-snug text-muted sm:text-2xl">
+      <p className="max-w-lg font-serif text-xl leading-snug text-muted sm:text-2xl">
         Personal Game of the Year lists and community awards.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
