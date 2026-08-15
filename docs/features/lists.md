@@ -19,7 +19,7 @@ Lists have **no draft/published status**. If a row exists in Postgres, it is sha
 ### Signed in
 
 1. Start GOTY or custom → **creates and attaches a list to the account immediately** (profile + slug).
-2. GOTY: if the profile already has that year, open the existing list instead of creating a second one.
+2. GOTY: if the profile already has that year, show that list’s top 5 with **Edit list** (does not open the builder until they choose to edit).
 3. Cookie drafts are not used. Save updates rankings; Share opens `/u/[username]/[slug]`; Export is client-side.
 
 ### Signed out
@@ -50,10 +50,10 @@ Create UI mirrors the Social Gamer Card prototype:
 
 - Up to **100** ranked games; ranks are contiguous 1..n.
 - GOTY: year required; games should match year / be released (enforced in domain rules).
-- One **owned** GOTY list per profile per year (create opens the existing list; claim/save fail clearly otherwise).
+- One **owned** GOTY list per profile per year (create shows top 5 + Edit list when that year already exists; claim/save fail clearly otherwise).
 - Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)).
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
-- Owned GOTY lists may include **one game per site award category** (signed-in only).
+- Owned GOTY lists may include **one game per site award category** (signed-in only). Category picks live on a **Categories** tab beside **Game of the Year** in the builder (secondary underline control).
 
 ## URLs
 

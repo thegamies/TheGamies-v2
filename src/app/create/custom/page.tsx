@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { startCustomDraftAction } from "@/app/create/actions";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
+import { StartCustomForm } from "@/components/lists/StartCustomForm";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import {
@@ -254,26 +254,7 @@ export default async function CreateCustomPage({
           error={error}
         />
       ) : (
-        <form action={startCustomDraftAction} className="max-w-sm space-y-4">
-          <label className="block text-sm tracking-wide text-muted">
-            Title
-            <input
-              name="title"
-              required
-              placeholder="All-time favorites"
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <label className="block text-sm tracking-wide text-muted">
-            Year (optional)
-            <input
-              name="year"
-              type="number"
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <Button type="submit">Start custom list</Button>
-        </form>
+        <StartCustomForm error={error} />
       )}
     </div>
   );

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { startGotyDraftAction } from "@/app/create/actions";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
+import { ExistingGotyPreview } from "@/components/lists/ExistingGotyPreview";
 import { ListEditor } from "@/components/lists/ListEditor";
+import { StartGotyForm } from "@/components/lists/StartGotyForm";
 import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import {
@@ -55,7 +56,7 @@ export default async function CreateGotyPage({
   const publicId = first(params.id);
   const yearParam = first(params.year);
   const resume = first(params.resume) === "1";
-  const existingNotice = first(params.existing) === "1";
+  const existingPreview = first(params.existing) === "1";
   const error = first(params.error) ?? null;
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
@@ -88,10 +89,19 @@ export default async function CreateGotyPage({
       coverUrl: string | null;
     }[];
   } | null = null;
+  let existingList: {
+    publicId: string;
+    title: string;
+    year: number;
+    items: {
+      gameId: string;
+      slug: string;
+      title: string;
+      coverUrl: string | null;
+      rank: number;
+    }[];
+  } | null = null;
   let loadError: string | null = error;
-  const info: string | null = existingNotice
-    ? "You already have a Game of the Year list for this year. Continue editing it here."
-    : null;
 
   if (publicId) {
     const cookie = await readListEditCookie();
@@ -102,6 +112,24 @@ export default async function CreateGotyPage({
     });
     if ("error" in result) {
       loadError = result.error;
+    } else if (
+      existingPreview &&
+      signedIn &&
+      result.list.listType === "goty" &&
+      result.list.year != null
+    ) {
+      existingList = {
+        publicId: result.list.publicId,
+        title: result.list.title,
+        year: result.list.year,
+        items: result.items.slice(0, 5).map((item) => ({
+          gameId: item.gameId,
+          slug: item.slug,
+          title: item.title,
+          coverUrl: item.coverUrl,
+          rank: item.rank,
+        })),
+      };
     } else {
       editor = {
         publicId: result.list.publicId,
@@ -254,19 +282,20 @@ export default async function CreateGotyPage({
         Game of the Year
       </p>
 
-      {loadError ? (
+      {loadError && !existingList ? (
         <p className="mb-6 text-sm text-accent" role="alert">
           {loadError}
         </p>
       ) : null}
 
-      {info ? (
-        <p className="mb-6 text-sm text-muted" role="status">
-          {info}
-        </p>
-      ) : null}
-
-      {editor ? (
+      {existingList ? (
+        <ExistingGotyPreview
+          year={existingList.year}
+          publicId={existingList.publicId}
+          title={existingList.title}
+          items={existingList.items}
+        />
+      ) : editor ? (
         <ListEditor
           publicId={editor.publicId}
           listType="goty"
@@ -283,19 +312,7 @@ export default async function CreateGotyPage({
           initialCategoryVotes={editor.categoryVotes ?? []}
         />
       ) : (
-        <form action={startGotyDraftAction} className="max-w-sm space-y-4">
-          <label className="block text-sm tracking-wide text-muted">
-            Year
-            <input
-              name="year"
-              type="number"
-              required
-              defaultValue={currentYear}
-              className="mt-1 block w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent"
-            />
-          </label>
-          <Button type="submit">Start GOTY list</Button>
-        </form>
+        <StartGotyForm defaultYear={currentYear} error={error} />
       )}
     </div>
   );

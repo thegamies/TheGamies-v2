@@ -100,7 +100,7 @@ Rules:
 
 `DatePicker` — button trigger (no text entry) with a branded calendar mark: `--accent` header bar, `--paper` rings, `--ink` day ticks. Opens a month grid in `--panel` with a hard `--line` border. Selected day uses `--accent`; today gets an accent ring; `min` / `max` disable out-of-range days. Hidden input when `name` is set. Do not use native `<input type="date">` in product UI.
 
-`YearPicker` — same trigger language, calendar mark, year number on the button. Opens a 12-year grid with prev/next. Selected year uses `--accent`; the current year gets an accent ring. `min` / `max` default 1970–2100; `disabledYears` greys out taken years. Use for create-event year. Do not use a number input for calendar years.
+`YearPicker` — same trigger language, calendar mark, year number on the button. Opens a 12-year grid with prev/next. Selected year uses `--accent`; the current year gets an accent ring. `min` / `max` default 1970–2100; `disabledYears` greys out taken years. Use for create-event year, create-list year (GOTY and optional custom), and GOTY year in list settings. Do not use a number input for calendar years.
 
 `TimePicker` — button trigger (no text entry) with a branded clock mark. Opens hour / minute / AM·PM wheels (`TimePanel`). Value is `HH:mm`. Use when time is independent of date.
 
