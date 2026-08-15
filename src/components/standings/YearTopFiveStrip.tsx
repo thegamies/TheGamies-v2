@@ -17,6 +17,7 @@ export type YearTopFiveRow = {
 /**
  * One year of Top 5 — community event Comparison strip language:
  * horizontal scroll when mobile or ties push past the viewport.
+ * The year mark itself opens the full board (no floating side link).
  */
 export function YearTopFiveStrip({
   year,
@@ -32,17 +33,14 @@ export function YearTopFiveStrip({
   return (
     <article>
       {showRule ? <SectionRule className="mb-3" /> : null}
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
-        <h3 className="font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl">
-          {year}
-        </h3>
+      <h3 className="font-display text-2xl leading-none tracking-wide sm:text-3xl">
         <Link
           href={yearHref}
-          className="text-sm text-accent hover:underline"
+          className="text-ink transition-colors hover:text-accent"
         >
-          Full standings
+          {year}
         </Link>
-      </div>
+      </h3>
 
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-muted">No rankings for this year yet.</p>
@@ -78,12 +76,15 @@ export function YearTopFiveStrip({
 
 export function YearTopFiveSections({
   sections,
+  allYearsHref,
 }: {
   sections: Array<{
     year: number;
     rows: YearTopFiveRow[];
     yearHref: string;
   }>;
+  /** Quiet footer link under the year strips (homepage → /standings). */
+  allYearsHref?: string | null;
 }) {
   if (sections.length === 0) {
     return (
@@ -92,16 +93,28 @@ export function YearTopFiveSections({
   }
 
   return (
-    <div className="mt-6 space-y-8 sm:space-y-10">
-      {sections.map((section, index) => (
-        <YearTopFiveStrip
-          key={section.year}
-          year={section.year}
-          rows={section.rows}
-          yearHref={section.yearHref}
-          showRule={index > 0}
-        />
-      ))}
+    <div className="mt-6">
+      <div className="space-y-8 sm:space-y-10">
+        {sections.map((section, index) => (
+          <YearTopFiveStrip
+            key={section.year}
+            year={section.year}
+            rows={section.rows}
+            yearHref={section.yearHref}
+            showRule={index > 0}
+          />
+        ))}
+      </div>
+      {allYearsHref ? (
+        <p className="mt-10 border-t border-line pt-6">
+          <Link
+            href={allYearsHref}
+            className="text-sm text-muted transition-colors hover:text-accent"
+          >
+            All years
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

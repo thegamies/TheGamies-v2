@@ -65,19 +65,11 @@ export default async function HomePage() {
       </div>
 
       <section className="mt-16 border-t border-line pt-12 sm:mt-20 sm:pt-14">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-          <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
-            Game of the Year
-          </h2>
-          <Link
-            href="/standings"
-            className="text-sm text-accent hover:underline"
-          >
-            View all years
-          </Link>
-        </div>
+        <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+          Game of the Year
+        </h2>
 
-        <YearTopFiveSections sections={sections} />
+        <YearTopFiveSections sections={sections} allYearsHref="/standings" />
       </section>
     </main>
   );
