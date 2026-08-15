@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
-import { SectionRule } from "@/components/ui/SectionRule";
 
 export type YearTopFiveRow = {
   place: number;
@@ -14,10 +13,13 @@ export type YearTopFiveRow = {
   score: number | null;
 };
 
+/** Same chrome as `Button` bordered / sm — for Next `Link` CTAs. */
+const outlinedLinkClass =
+  "inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold tracking-wide text-ink transition-colors hover:border-accent";
+
 /**
- * One year of Top 5 — community event Comparison strip language:
- * horizontal scroll when mobile or ties push past the viewport.
- * The year mark itself opens the full board (no floating side link).
+ * One year of Top 5 — community event Comparison strip language.
+ * Year + Standings share a ruled header bar (outlined control, not a float).
  */
 export function YearTopFiveStrip({
   year,
@@ -31,16 +33,15 @@ export function YearTopFiveStrip({
   showRule?: boolean;
 }) {
   return (
-    <article>
-      {showRule ? <SectionRule className="mb-3" /> : null}
-      <h3 className="font-display text-2xl leading-none tracking-wide sm:text-3xl">
-        <Link
-          href={yearHref}
-          className="text-ink transition-colors hover:text-accent"
-        >
+    <article className={showRule ? "mt-8 sm:mt-10" : undefined}>
+      <div className="flex items-end justify-between gap-4 border-b border-line pb-3">
+        <h3 className="font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl">
           {year}
+        </h3>
+        <Link href={yearHref} className={outlinedLinkClass}>
+          Standings
         </Link>
-      </h3>
+      </div>
 
       {rows.length === 0 ? (
         <p className="mt-4 text-sm text-muted">No rankings for this year yet.</p>
@@ -83,7 +84,6 @@ export function YearTopFiveSections({
     rows: YearTopFiveRow[];
     yearHref: string;
   }>;
-  /** Quiet footer link under the year strips (homepage → /standings). */
   allYearsHref?: string | null;
 }) {
   if (sections.length === 0) {
@@ -93,28 +93,26 @@ export function YearTopFiveSections({
   }
 
   return (
-    <div className="mt-6">
-      <div className="space-y-8 sm:space-y-10">
-        {sections.map((section, index) => (
-          <YearTopFiveStrip
-            key={section.year}
-            year={section.year}
-            rows={section.rows}
-            yearHref={section.yearHref}
-            showRule={index > 0}
-          />
-        ))}
-      </div>
+    <div className="mt-6 space-y-0">
       {allYearsHref ? (
-        <p className="mt-10 border-t border-line pt-6">
-          <Link
-            href={allYearsHref}
-            className="text-sm text-muted transition-colors hover:text-accent"
-          >
+        <div className="mb-8 flex items-end justify-between gap-4 border-b border-line pb-3 sm:mb-10">
+          <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+            Game of the Year
+          </h2>
+          <Link href={allYearsHref} className={outlinedLinkClass}>
             All years
           </Link>
-        </p>
+        </div>
       ) : null}
+      {sections.map((section, index) => (
+        <YearTopFiveStrip
+          key={section.year}
+          year={section.year}
+          rows={section.rows}
+          yearHref={section.yearHref}
+          showRule={index > 0}
+        />
+      ))}
     </div>
   );
 }

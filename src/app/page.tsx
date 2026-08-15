@@ -65,10 +65,6 @@ export default async function HomePage() {
       </div>
 
       <section className="mt-16 border-t border-line pt-12 sm:mt-20 sm:pt-14">
-        <h2 className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
-          Game of the Year
-        </h2>
-
         <YearTopFiveSections sections={sections} allYearsHref="/standings" />
       </section>
     </main>
