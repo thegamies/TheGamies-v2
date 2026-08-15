@@ -7,10 +7,10 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 | Term | Meaning |
 |---|---|
 | Draft cookie | Anon-only client cookie (`tg_list_draft`) with ordered IGDB ids + meta; auto-updated while building |
-| Edit cookie | httpOnly `tg_list_edit` (`publicId.secret`) set after Share for anonymous edit access |
+| Edit cookie | httpOnly `tg_list_edit` (`publicId.secret`) for legacy anonymous `/l/` edit access |
 | Owned list | Attached to a profile (`profileId` + `slug`); canonical URL `/u/[username]/[slug]` |
-| Anon share | DB row without profile; URL `/l/[publicId]` until claimed |
-| Claim | Attach an anonymous shared list to a signed-in profile (assigns slug) |
+| Anon share (legacy) | Older DB rows without profile at `/l/[publicId]` until claimed |
+| Claim | Attach a legacy anonymous shared list to a signed-in profile (assigns slug) |
 
 Lists have **no draft/published status**. If a row exists in Postgres, it is shareable.
 
@@ -19,20 +19,26 @@ Lists have **no draft/published status**. If a row exists in Postgres, it is sha
 ### Signed in
 
 1. Start GOTY or custom → **creates and attaches a list to the account immediately** (profile + slug).
-2. GOTY: if the profile already has that year, open the existing list instead of creating a second one.
-3. Cookie drafts are not used. Save updates rankings; Share opens `/u/[username]/[slug]`; Export is client-side.
+2. GOTY: if the profile already has that year, stay on the year picker and show that list’s top 5 with **Edit list**. On entry, the default selected year is fetched immediately (picker stays closed).
+3. Cookie drafts are not used (except one-shot restore after sign-in with `intent`). **Save** updates rankings. **Share** opens a menu: **Share as image** (client JPEG) or **Share with a link** (publish → `/u/[username]/[slug]`).
 
 ### Signed out
 
 1. Start GOTY or custom → builder opens **without** a database row.
 2. Ranking auto-persists to the draft cookie (this device only).
 3. Visiting Create with an unfinished cookie asks: **Continue editing** or **Start a new list** (warns the unfinished ranking will be lost). Type chooser is hidden until they decide.
-4. Toolbar:
-   - **Save** — prompts to sign in (cookie already keeps the draft).
-   - **Share** — creates/updates a Postgres list, sets the edit cookie, opens `/l/[publicId]`.
-   - **Export** — JPEG poster from current client state (no DB required).
-5. Soft prompt on the share page: sign in to save; **Don’t prompt again** uses `localStorage`.
-6. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret, redirects to `/u/[username]/[slug]`.
+4. Toolbar shows only **Save** and **Share** (no top-level Export):
+   - **Save** — dialog: sign in to save to profile (GOTY also counts toward rankings). Draft stays on device.
+   - **Share** — menu:
+     - **Share as image** — everyone; downloadable/shareable JPEG; does not save or rank.
+     - **Share with a link** — requires sign-in; dialog prompts to sign in & share, share as image instead, or cancel.
+5. After authentication with `intent=save` or `intent=share`, restore the draft, attach/save the owned list, then stay in the editor (save) or open the owned share URL (share).
+6. Soft prompt on **legacy** `/l/` pages: sign in to claim; **Don’t prompt again** uses `localStorage`.
+7. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret, redirects to `/u/[username]/[slug]`.
+
+### Core product rule
+
+Anyone can create and share an image. Signed-in users can save, publish share links, and contribute GOTY lists to rankings. The editor does **not** create new anonymous `/l/` rows.
 
 ## Builder
 
@@ -43,23 +49,24 @@ Create UI mirrors the Social Gamer Card prototype:
 - Rank chrome: Banner / Chip / Off (+ ordinal suffix)
 - Optional per-game notes (blurbs) — **signed-in only**
 - Drag-and-drop reorder
-- Image export (JPEG poster)
+- Image export via **Share → Share as image** (JPEG poster)
 - Warnings when shrinking size or switching year/GOTY would drop games (and notes)
 
 ## Rules
 
 - Up to **100** ranked games; ranks are contiguous 1..n.
 - GOTY: year required; games should match year / be released (enforced in domain rules).
-- One **owned** GOTY list per profile per year (create opens the existing list; claim/save fail clearly otherwise).
+- One **owned** GOTY list per profile per year (year picker stays put and shows top 5 + Edit list when that year already exists; claim/save fail clearly otherwise).
 - Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)).
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
-- Owned GOTY lists may include **one game per site award category** (signed-in only).
+- Owned GOTY lists may include **one game per site award category** (signed-in only). Category picks live on a **Categories** tab beside **Game of the Year** in the builder (secondary underline control).
 
 ## URLs
 
 - Create: `/create`, `/create/goty`, `/create/custom`
 - Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`)
-- Anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
+- Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
+- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share`
 - Profile lists link to the owned slug URL
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`
 
