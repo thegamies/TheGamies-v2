@@ -313,10 +313,13 @@ export default function DesignSystemPage() {
               </h3>
               <YearSelect
                 year={2026}
-                years={[2026, 2025, 2024]}
+                options={[
+                  { year: 2026, href: "/game-of-the-year/2026" },
+                  { year: 2025, href: "/game-of-the-year/2025" },
+                  { year: 2024, href: "/game-of-the-year/2024" },
+                ]}
                 alwaysShow
                 label="Standings year"
-                hrefForYear={(y) => `/game-of-the-year/${y}`}
               />
             </div>
           </div>

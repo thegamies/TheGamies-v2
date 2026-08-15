@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
+export type YearSelectOption = {
+  year: number;
+  href: string;
+};
+
 type Props = {
   year: number;
-  years: number[];
-  /** Build the href for a year option. */
-  hrefForYear: (year: number) => string;
+  /** Precomputed year links — serializable for Server → Client boundaries. */
+  options: YearSelectOption[];
   /** Show the year even when there is only one (no menu). */
   alwaysShow?: boolean;
   /** Accessible name for the control / listbox. */
@@ -17,11 +21,12 @@ type Props = {
 /**
  * Compact pop-open year switcher — sits to the right of a section heading.
  * Shared by live standings and edition results (via EditionYearSelect).
+ * Pass `options` (year + href) rather than a function so Server Components
+ * can render this Client Component without RSC serialization errors.
  */
 export function YearSelect({
   year,
-  years,
-  hrefForYear,
+  options,
   alwaysShow = false,
   label = "Year",
 }: Props) {
@@ -50,10 +55,10 @@ export function YearSelect({
     };
   }, [open]);
 
-  if (years.length === 0) return null;
-  if (years.length === 1 && !alwaysShow) return null;
+  if (options.length === 0) return null;
+  if (options.length === 1 && !alwaysShow) return null;
 
-  if (years.length === 1) {
+  if (options.length === 1) {
     return (
       <p className="font-display text-2xl tracking-wide text-ink" aria-label={label}>
         {year}
@@ -88,12 +93,12 @@ export function YearSelect({
           aria-label={label}
           className="absolute right-0 z-20 mt-2 min-w-[7.5rem] border border-line bg-paper py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
         >
-          {years.map((y) => {
-            const active = y === year;
+          {options.map((opt) => {
+            const active = opt.year === year;
             return (
-              <li key={y} role="option" aria-selected={active}>
+              <li key={opt.year} role="option" aria-selected={active}>
                 <Link
-                  href={hrefForYear(y)}
+                  href={opt.href}
                   className={`block px-3 py-2 text-sm tracking-wide ${
                     active
                       ? "text-accent"
@@ -101,7 +106,7 @@ export function YearSelect({
                   }`}
                   onClick={() => setOpen(false)}
                 >
-                  {y}
+                  {opt.year}
                 </Link>
               </li>
             );

@@ -34,17 +34,20 @@ export function EditionYearSelect({
   links = "results",
   alwaysShow = false,
 }: Props) {
+  const options = years.map((y) => ({
+    year: y,
+    href:
+      links === "settings"
+        ? communitySettingsHref(slug, { tab: "events", year: y })
+        : editionResultsHref(slug, y, { view, mode }),
+  }));
+
   return (
     <YearSelect
       year={year}
-      years={years}
+      options={options}
       alwaysShow={alwaysShow}
       label="Event year"
-      hrefForYear={(y) =>
-        links === "settings"
-          ? communitySettingsHref(slug, { tab: "events", year: y })
-          : editionResultsHref(slug, y, { view, mode })
-      }
     />
   );
 }

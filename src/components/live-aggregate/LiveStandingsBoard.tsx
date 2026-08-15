@@ -222,6 +222,13 @@ export function LiveStandingsBoard({
     parts[parts.length - 1] = String(y);
     return parts.join("/");
   };
+  const yearOptionsLinks = yearOptions.map((y) => ({
+    year: y,
+    href: liveStandingsHref(yearBase(y), {
+      group: page.categoryGroup,
+      view: page.view,
+    }),
+  }));
   const Heading = headingLevel;
 
   return (
@@ -233,15 +240,9 @@ export function LiveStandingsBoard({
           </Heading>
           <YearSelect
             year={page.year}
-            years={yearOptions}
+            options={yearOptionsLinks}
             alwaysShow
             label="Standings year"
-            hrefForYear={(y) =>
-              liveStandingsHref(yearBase(y), {
-                group: page.categoryGroup,
-                view: page.view,
-              })
-            }
           />
         </div>
         {listCountLabel ? (
