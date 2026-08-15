@@ -18,15 +18,19 @@ export function YearPanel({
   max = YEAR_PICKER_MAX,
   disabledYears = [],
   onPick,
+  autoFocusSelected = false,
 }: {
   value: number;
   min?: number;
   max?: number;
   disabledYears?: number[];
   onPick: (year: number) => void;
+  /** Focus the selected year cell when the panel mounts / value changes. */
+  autoFocusSelected?: boolean;
 }) {
   const [start, setStart] = useState(() => yearGridStart(value));
   const [seenValue, setSeenValue] = useState(value);
+  const selectedRef = useRef<HTMLButtonElement>(null);
   if (seenValue !== value) {
     setSeenValue(value);
     setStart(yearGridStart(value));
@@ -38,6 +42,12 @@ export function YearPanel({
   const end = start + years.length - 1;
   const canPrev = start > min;
   const canNext = end < max;
+
+  useEffect(() => {
+    if (!autoFocusSelected) return;
+    if (!years.includes(value)) return;
+    selectedRef.current?.focus();
+  }, [autoFocusSelected, start, value, years]);
 
   return (
     <div>
@@ -79,6 +89,7 @@ export function YearPanel({
           return (
             <button
               key={year}
+              ref={isSelected ? selectedRef : undefined}
               type="button"
               role="gridcell"
               aria-selected={isSelected}
@@ -118,6 +129,7 @@ export function YearPicker({
   placeholder = "Pick a year",
   className = "",
   "aria-label": ariaLabel,
+  defaultOpen = false,
   onChange,
 }: {
   id?: string;
@@ -131,13 +143,15 @@ export function YearPicker({
   placeholder?: string;
   className?: string;
   "aria-label"?: string;
+  /** Open the year grid on mount (create-list year entry). */
+  defaultOpen?: boolean;
   onChange: (next: number) => void;
 }) {
   const generatedId = useId();
   const triggerId = id ?? generatedId;
   const gridId = `${triggerId}-grid`;
   const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const selected = typeof value === "number" ? value : null;
   const label = selected != null ? String(selected) : placeholder;
   const panelYear = selected ?? new Date().getFullYear();
@@ -202,6 +216,7 @@ export function YearPicker({
             min={min}
             max={max}
             disabledYears={disabledYears}
+            autoFocusSelected
             onPick={(year) => {
               onChange(year);
               setOpen(false);
