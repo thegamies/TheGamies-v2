@@ -15,9 +15,7 @@ describe("existingGotyEditHref", () => {
 });
 
 describe("existingGotyPreviewHref", () => {
-  it("keeps the existing preview query", () => {
-    expect(existingGotyPreviewHref("abc123")).toBe(
-      "/create/goty?id=abc123&existing=1",
-    );
+  it("stays on the year picker page for that year", () => {
+    expect(existingGotyPreviewHref(2026)).toBe("/create/goty?year=2026");
   });
 });

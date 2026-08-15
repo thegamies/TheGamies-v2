@@ -65,7 +65,7 @@ export async function startGotyDraftAction(formData: FormData) {
     await clearListDraftCookie();
     const existing = await getOwnedGotyForYear(profileId, y);
     if (existing) {
-      redirect(existingGotyPreviewHref(existing.publicId));
+      redirect(existingGotyPreviewHref(y));
     }
     const result = await createDraft(
       { listType: "goty", year: y },

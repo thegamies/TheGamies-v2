@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { StartCustomForm } from "@/components/lists/StartCustomForm";
@@ -188,6 +189,7 @@ export default async function CreateCustomPage({
       if (year != null) params.set("year", String(year));
       return (
         <div>
+          <CreatePageHeader />
           <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
             Custom list
           </p>
@@ -227,19 +229,9 @@ export default async function CreateCustomPage({
     }
   }
 
-  return (
-    <div>
-      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
-        Custom list
-      </p>
-
-      {loadError ? (
-        <p className="mb-6 text-sm text-accent" role="alert">
-          {loadError}
-        </p>
-      ) : null}
-
-      {editor ? (
+  if (editor) {
+    return (
+      <div>
         <ListEditor
           publicId={editor.publicId}
           listType="custom"
@@ -253,9 +245,24 @@ export default async function CreateCustomPage({
           signedIn={signedIn}
           error={error}
         />
-      ) : (
-        <StartCustomForm error={error} />
-      )}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <CreatePageHeader />
+      <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
+        Custom list
+      </p>
+
+      {loadError ? (
+        <p className="mb-6 text-sm text-accent" role="alert">
+          {loadError}
+        </p>
+      ) : null}
+
+      <StartCustomForm error={error} />
     </div>
   );
 }

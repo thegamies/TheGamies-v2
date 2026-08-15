@@ -1,7 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { startGotyDraftAction } from "@/app/create/actions";
+import { existingGotyPreviewHref } from "@/lib/lists/existing-goty";
 import { Button } from "@/components/ui/Button";
 import { YearPicker } from "@/components/ui/YearPicker";
 
@@ -9,11 +11,18 @@ const currentYear = new Date().getUTCFullYear();
 
 export function StartGotyForm({
   defaultYear = currentYear,
+  syncYearInUrl = false,
+  hasExistingForYear = false,
   error = null,
 }: {
   defaultYear?: number;
+  /** Keep `?year=` in sync so an owned year can show its preview on this page. */
+  syncYearInUrl?: boolean;
+  /** True when the selected year already has a list (preview shown below). */
+  hasExistingForYear?: boolean;
   error?: string | null;
 }) {
+  const router = useRouter();
   const [year, setYear] = useState(defaultYear);
 
   return (
@@ -37,10 +46,17 @@ export function StartGotyForm({
           required
           className="mt-1"
           aria-label="Year"
-          onChange={setYear}
+          onChange={(next) => {
+            setYear(next);
+            if (syncYearInUrl) {
+              router.replace(existingGotyPreviewHref(next));
+            }
+          }}
         />
       </div>
-      <Button type="submit">Start GOTY list</Button>
+      {hasExistingForYear ? null : (
+        <Button type="submit">Start GOTY list</Button>
+      )}
     </form>
   );
 }
