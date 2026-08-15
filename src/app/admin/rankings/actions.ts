@@ -134,7 +134,7 @@ export async function saveRankModeAction(
     const saved = await setSiteRankMode(rankMode);
     revalidatePath("/");
     revalidatePath("/standings");
-    revalidatePath("/game-of-the-year");
+    revalidatePath("/game-of-the-year", "layout");
     revalidatePath("/admin/rankings");
     return { ok: true, rankMode: saved.rankMode };
   } catch (err) {
