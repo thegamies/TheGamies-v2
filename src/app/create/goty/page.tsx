@@ -15,6 +15,7 @@ import {
   getEditableList,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
+import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import {
   getCategoryVotesForList,
   listActiveAwardCategories,
@@ -57,6 +58,7 @@ export default async function CreateGotyPage({
   const resume = first(params.resume) === "1";
   const existingNotice = first(params.existing) === "1";
   const error = first(params.error) ?? null;
+  const authIntent = parseListAuthIntent(first(params.intent));
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
   const awardCategories = signedIn
@@ -246,6 +248,22 @@ export default async function CreateGotyPage({
         };
       }
     }
+  } else if (signedIn && authIntent) {
+    const draft = await readListDraftCookie();
+    if (draft && draft.listType === "goty") {
+      editor = await editorSeedFromDraft(draft);
+    } else if (yearParam && Number.isFinite(Number(yearParam))) {
+      const y = Math.floor(Number(yearParam));
+      editor = {
+        publicId: null,
+        title: `${y} Game of the Year`,
+        year: y,
+        slotCount: 10,
+        items: [],
+      };
+    } else {
+      loadError = "Could not restore your ranking after signing in.";
+    }
   }
 
   return (
@@ -279,6 +297,12 @@ export default async function CreateGotyPage({
           initialShowSuffix={editor.showSuffix}
           signedIn={signedIn}
           error={error}
+          authIntent={authIntent}
+          returnPath={
+            editor.year != null
+              ? `/create/goty?year=${editor.year}`
+              : "/create/goty"
+          }
           awardCategories={awardCategories}
           initialCategoryVotes={editor.categoryVotes ?? []}
         />

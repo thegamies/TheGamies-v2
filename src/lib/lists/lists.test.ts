@@ -245,3 +245,18 @@ describe("claim conflict helper", () => {
     expect(canEditList(claimed, { profileId: "owner" })).toBe(true);
   });
 });
+
+describe("promote draft / owned GOTY uniqueness signals", () => {
+  it("keeps owned GOTY editable only by the owning profile", () => {
+    // saveOwnedListFromClientDraft reuses an existing owned GOTY for the same
+    // year instead of creating a second ranking-contributing list; ownership
+    // remains the gate for that reuse path.
+    const ownedGoty = {
+      profileId: "owner",
+      editSecretHash: null as string | null,
+    };
+    expect(ownsListByProfile(ownedGoty, "owner")).toBe(true);
+    expect(ownsListByProfile(ownedGoty, "other")).toBe(false);
+    expect(canEditList(ownedGoty, { profileId: "other" })).toBe(false);
+  });
+});

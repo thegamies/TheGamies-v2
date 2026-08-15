@@ -10,6 +10,7 @@ import {
 } from "@thegamies/db";
 import { coverUrlFromImageId } from "@thegamies/igdb";
 import { canEditList } from "@/lib/lists/ownership";
+import { shareLinkPublishError } from "@/lib/lists/auth-intent";
 import {
   clientDraftUpsertSchema,
   createDraftSchema,
@@ -801,6 +802,11 @@ export async function shareListFromClientDraft(
   | { list: ListRow; editSecret: string | null }
   | { error: string }
 > {
+  const publishDenied = shareLinkPublishError(access.profileId);
+  if (publishDenied) {
+    return { error: publishDenied };
+  }
+
   const parsed = clientDraftUpsertSchema.safeParse(raw);
   if (!parsed.success) {
     return { error: "Check the ranking, title, and year." };

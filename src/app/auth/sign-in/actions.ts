@@ -3,6 +3,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { safeNextPath } from "@/lib/auth/safe-next";
+import {
+  parseListAuthIntent,
+  withListAuthIntent,
+} from "@/lib/lists/auth-intent";
 
 export async function signInWithEmail(
   _prevState: { error: string } | null,
@@ -10,7 +14,11 @@ export async function signInWithEmail(
 ) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = safeNextPath(String(formData.get("next") ?? "")) ?? "/account";
+  const intent = parseListAuthIntent(formData.get("intent"));
+  let next = safeNextPath(String(formData.get("next") ?? "")) ?? "/account";
+  if (intent) {
+    next = withListAuthIntent(next, intent);
+  }
 
   if (!email || !password) {
     return { error: "Enter your email and password." };

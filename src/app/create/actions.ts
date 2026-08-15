@@ -6,12 +6,9 @@ import { getAuthOrNull } from "@/lib/auth/server";
 import {
   clearListEditCookie,
   readListEditCookie,
-  setListEditCookie,
 } from "@/lib/lists/cookies";
 import {
-  buildListDraftPayload,
   clearListDraftCookie,
-  setListDraftCookie,
 } from "@/lib/lists/draft-cookie";
 import {
   claimList,
@@ -266,6 +263,14 @@ export async function shareListAction(formData: FormData) {
       : null;
 
   const profileId = await currentProfileId();
+  if (!profileId) {
+    redirect(
+      `/create/${listType}?error=${encodeURIComponent(
+        "Sign in to publish a share link.",
+      )}`,
+    );
+  }
+
   const cookie = await readListEditCookie();
   const editSecret =
     publicIdHint && cookie?.publicId === publicIdHint ? cookie.secret : null;
@@ -281,36 +286,16 @@ export async function shareListAction(formData: FormData) {
     );
   }
 
-  if (result.editSecret) {
-    await setListEditCookie({
-      publicId: result.list.publicId,
-      secret: result.editSecret,
-    });
-  }
-
-  if (!profileId) {
-    const d = draft as {
-      listType?: "goty" | "custom";
-      title?: string;
-      year?: number | null;
-      items?: { igdbId: number }[];
-    };
-    await setListDraftCookie(
-      buildListDraftPayload({
-        listType: d.listType === "custom" ? "custom" : "goty",
-        title: d.title ?? result.list.title,
-        year: d.year ?? result.list.year,
-        igdbIds: (d.items ?? []).map((item) => item.igdbId),
-        slotCount: Math.max(10, (d.items ?? []).length),
-        publicId: result.list.publicId,
-      }),
-    );
-  } else {
-    await clearListDraftCookie();
-  }
+  await clearListDraftCookie();
 
   const share = await getListShareTarget(result.list);
   revalidatePath(share.path);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
   redirect(share.path);
 }
 
@@ -321,12 +306,13 @@ export async function resetActiveDraftAction() {
 export async function claimListAction(formData: FormData) {
   const publicId = String(formData.get("publicId") ?? "");
   const auth = getAuthOrNull();
+  const signInNext = `/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}&intent=save`;
   if (!auth) {
-    redirect(`/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}`);
+    redirect(signInNext);
   }
   const { data: session } = await auth.getSession();
   if (!session?.user?.id) {
-    redirect(`/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}`);
+    redirect(signInNext);
   }
   const profile = await getProfileByAuthUserId(session.user.id);
   if (!profile) {
@@ -359,4 +345,87 @@ export async function loadEditorState(publicId: string) {
 
 export async function hydrateDraftGamesAction(igdbIds: number[]) {
   return hydrateGamesByIgdbIds(igdbIds);
+}
+
+/**
+ * After sign-in with intent=save|share: promote the client draft to an owned
+ * list. Save stays in the editor; share redirects to the public URL.
+ */
+export async function completeListAuthIntentAction(
+  formData: FormData,
+): Promise<{
+  error?: string;
+  publicId?: string;
+  sharePath?: string;
+  intent?: "save" | "share";
+}> {
+  const intentRaw = String(formData.get("intent") ?? "");
+  const intent =
+    intentRaw === "save" || intentRaw === "share" ? intentRaw : null;
+  if (!intent) return { error: "Missing save or share intent." };
+
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    return { error: "Sign in to save this list to your account." };
+  }
+
+  const draft = parseClientDraftPayload(formData);
+  if (!draft) return { error: "Could not restore the ranking." };
+
+  const publicId =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+  const cookie = await readListEditCookie();
+  const editSecret =
+    publicId && cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await saveOwnedListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const votesRaw = String(formData.get("categoryVotesJson") ?? "").trim();
+  if (votesRaw && result.list.listType === "goty") {
+    let parsedVotes: unknown;
+    try {
+      parsedVotes = JSON.parse(votesRaw);
+    } catch {
+      return { error: "Could not save category picks." };
+    }
+    const votes = replaceCategoryVotesSchema.safeParse(parsedVotes);
+    if (!votes.success) {
+      return { error: "Only one game per category." };
+    }
+    const written = await replaceCategoryVotesForList(
+      result.list.id,
+      votes.data,
+    );
+    if ("error" in written) return { error: written.error };
+    await syncLiveAggregateForOwnedList(result.list);
+  }
+
+  await clearListDraftCookie();
+  await clearListEditCookie();
+
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
+  revalidatePath("/");
+
+  if (intent === "share") {
+    redirect(share.path);
+  }
+
+  return {
+    intent: "save",
+    publicId: result.list.publicId,
+    sharePath: share.path,
+  };
 }

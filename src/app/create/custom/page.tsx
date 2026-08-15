@@ -15,6 +15,7 @@ import {
   getEditableList,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
+import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 export const metadata: Metadata = {
@@ -51,6 +52,7 @@ export default async function CreateCustomPage({
   const yearParam = first(params.year);
   const resume = first(params.resume) === "1";
   const error = first(params.error) ?? null;
+  const authIntent = parseListAuthIntent(first(params.intent));
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
 
@@ -225,6 +227,24 @@ export default async function CreateCustomPage({
         items: [],
       };
     }
+  } else if (signedIn && authIntent) {
+    const draft = await readListDraftCookie();
+    if (draft && draft.listType === "custom") {
+      editor = await editorSeedFromDraft(draft);
+    } else if (titleParam?.trim()) {
+      editor = {
+        publicId: null,
+        title: titleParam.trim(),
+        year:
+          yearParam && Number.isFinite(Number(yearParam))
+            ? Math.floor(Number(yearParam))
+            : null,
+        slotCount: 10,
+        items: [],
+      };
+    } else {
+      loadError = "Could not restore your ranking after signing in.";
+    }
   }
 
   return (
@@ -252,6 +272,12 @@ export default async function CreateCustomPage({
           initialShowSuffix={editor.showSuffix}
           signedIn={signedIn}
           error={error}
+          authIntent={authIntent}
+          returnPath={(() => {
+            const params = new URLSearchParams({ title: editor.title });
+            if (editor.year != null) params.set("year", String(editor.year));
+            return `/create/custom?${params.toString()}`;
+          })()}
         />
       ) : (
         <form action={startCustomDraftAction} className="max-w-sm space-y-4">
