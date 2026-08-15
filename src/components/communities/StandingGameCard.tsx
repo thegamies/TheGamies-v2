@@ -158,11 +158,20 @@ export function EmptyStandingCard({
 
 export function StandingGameCardGrid({
   children,
+  density = "default",
 }: {
   children: React.ReactNode;
+  /** `tight` — live standings boards (less vertical air). */
+  density?: "default" | "tight";
 }) {
   return (
-    <ul className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <ul
+      className={
+        density === "tight"
+          ? "mt-4 grid grid-cols-2 gap-x-3 gap-y-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+          : "mt-6 grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+      }
+    >
       {children}
     </ul>
   );

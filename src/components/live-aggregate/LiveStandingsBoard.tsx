@@ -1,15 +1,13 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import {
   StandingGameCard,
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
-import { AwardCategoryGroupNav } from "@/components/live-aggregate/AwardCategoryGroupNav";
+import { LiveCategoriesPanel } from "@/components/live-aggregate/LiveCategoriesPanel";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { navItemClass } from "@/components/ui/navLevels";
 import type {
-  CategoryStandingsBlock,
   StandingsGameRow,
   StandingsPage,
 } from "@/lib/live-aggregate/service";
@@ -43,7 +41,7 @@ function GotyPager({
 
   return (
     <nav
-      className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4 text-sm"
+      className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 text-sm"
       aria-label="Standings pages"
     >
       <p className="text-muted">
@@ -97,11 +95,11 @@ function GotyGrid({
   empty: string;
 }) {
   if (rows.length === 0) {
-    return <p className="mt-6 text-muted">{empty}</p>;
+    return <p className="mt-4 text-muted">{empty}</p>;
   }
 
   return (
-    <StandingGameCardGrid>
+    <StandingGameCardGrid density="tight">
       {rows.map((row) => (
         <li key={row.gameId}>
           <StandingGameCard
@@ -109,47 +107,11 @@ function GotyGrid({
             slug={row.slug}
             title={row.title}
             coverUrl={row.coverUrl}
-            year={row.year}
             points={revealed ? row.score : null}
           />
         </li>
       ))}
     </StandingGameCardGrid>
-  );
-}
-
-function CategoryChapter({
-  block,
-  revealed,
-  index,
-}: {
-  block: CategoryStandingsBlock;
-  revealed: boolean;
-  index: number;
-}) {
-  if (block.rows.length === 0) return null;
-  return (
-    <article className={index === 0 ? undefined : "mt-8 sm:mt-10"}>
-      <CategoryChapterHeader
-        label={block.label}
-        description={block.description}
-        showRule={index > 0}
-      />
-      <StandingGameCardGrid>
-        {block.rows.map((row) => (
-          <li key={`${block.categoryId}-${row.gameId}`}>
-            <StandingGameCard
-              place={row.place}
-              slug={row.slug}
-              title={row.title}
-              coverUrl={row.coverUrl}
-              points={revealed ? row.voteCount : null}
-              scoreUnit="votes"
-            />
-          </li>
-        ))}
-      </StandingGameCardGrid>
-    </article>
   );
 }
 
@@ -166,7 +128,7 @@ function LiveStandingsViewNav({
   ];
 
   return (
-    <div className="mt-6 flex flex-wrap gap-5 border-b border-line pb-0">
+    <div className="mt-5 flex flex-wrap gap-5 border-b border-line pb-0">
       {views.map((v) => (
         <Link
           key={v.id}
@@ -246,7 +208,7 @@ export function LiveStandingsBoard({
           />
         </div>
         {listCountLabel ? (
-          <p className="mt-3 text-sm text-muted">{listCountLabel}</p>
+          <p className="mt-2 text-sm text-muted">{listCountLabel}</p>
         ) : null}
         {statusNotes.map((note) => (
           <p key={note} className="mt-2 max-w-2xl text-sm text-muted" role="status">
@@ -258,29 +220,17 @@ export function LiveStandingsBoard({
       <LiveStandingsViewNav basePath={basePath} page={page} />
 
       {page.view === "categories" ? (
-        <section className="mt-10">
-          <AwardCategoryGroupNav
+        <section className="mt-6">
+          <LiveCategoriesPanel
             hrefBase={basePath}
             group={page.categoryGroup}
-            view="categories"
+            categories={page.categories}
+            revealed={revealed}
+            empty={emptyCategories}
           />
-          {page.categories.length === 0 ? (
-            <p className="mt-8 text-muted">{emptyCategories}</p>
-          ) : (
-            <div className="mt-8">
-              {page.categories.map((block, index) => (
-                <CategoryChapter
-                  key={block.categoryId}
-                  block={block}
-                  revealed={revealed}
-                  index={index}
-                />
-              ))}
-            </div>
-          )}
         </section>
       ) : (
-        <section className="mt-10">
+        <section className="mt-6">
           <GotyGrid rows={page.goty} revealed={revealed} empty={emptyGoty} />
           <GotyPager page={page} basePath={basePath} />
         </section>
