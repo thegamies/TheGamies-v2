@@ -94,12 +94,14 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 ## Ops: standings seed
 
 `/admin/seed` (same unlock as other admin tools) creates synthetic profiles
-(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
+(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists
+**and** category votes (from each list’s ranked picks, top-rank weighted).
 
 - Up to **1000** seed indices; UI batches of 50
 - **Reseed** rewrites rankings for existing seed voters in range
 - **Keep adding until stopped** continues from max index
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
+- Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
 - Ends with one year score rebuild (or after Stop)
 
 Community / edition ceremony seeding is separate: `/admin/communities` — see [community.md](./community.md).
