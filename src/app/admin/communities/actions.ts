@@ -6,6 +6,7 @@ import {
   clearCommunitySeeds,
   countCommunitySeeds,
   publishEditionForSeed,
+  refreshPublishedEditionResultsForSeed,
   seedCommunityEditionBallots,
 } from "@/lib/communities/seed-community";
 
@@ -87,6 +88,31 @@ export async function publishCommunityEditionSeedAction(input: {
     editionId: result.editionId,
     path: `/communities/${slug}/edition/${year}`,
   };
+}
+
+export async function refreshCommunityEditionResultsAction(input: {
+  communitySlug: string;
+  year: number;
+}): Promise<
+  | { ok: true; editionId: string; refreshed: boolean; status: string }
+  | { error: string }
+> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const result = await refreshPublishedEditionResultsForSeed(
+    input.communitySlug,
+    input.year,
+  );
+  if ("error" in result) return result;
+
+  const slug = input.communitySlug.trim().toLowerCase();
+  const year = Math.floor(input.year);
+  revalidatePath("/admin/communities");
+  revalidatePath(`/communities/${slug}`);
+  revalidatePath(`/communities/${slug}/edition`);
+  revalidatePath(`/communities/${slug}/edition/${year}`);
+  return result;
 }
 
 export async function clearCommunitySeedsAction(input: {

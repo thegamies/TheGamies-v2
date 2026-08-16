@@ -11,6 +11,7 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 import {
   loadSeedGamePool,
   buildSeedCategoryVotes,
@@ -26,8 +27,9 @@ import { computeEditionStatus } from "./edition-status";
 
 export const SEED_COMMUNITY_AUTH_PREFIX = "seed:community:";
 export const SEED_COMMUNITY_USERNAME_PREFIX = "seedcmem";
-/** Per-request batch size (no total index cap — run again with Reseed off to grow). */
-export const SEED_COMMUNITY_MAX_BATCH = 500;
+/** Per-request batch size (no total index cap — client loops to grow). */
+export const SEED_COMMUNITY_MAX_BATCH = 50;
+export const SEED_COMMUNITY_INSERT_CHUNK = 200;
 
 function getDb(): Db {
   return createDb();
@@ -44,18 +46,21 @@ export function seedCommunityUsername(index: number): string {
 export async function getMaxCommunitySeedIndex(
   db: Db = getDb(),
 ): Promise<number> {
-  const rows = await db
-    .select({ authUserId: profiles.authUserId })
+  const [row] = await db
+    .select({
+      maxIndex: sql<number>`coalesce(max(nullif(replace(${profiles.authUserId}, ${SEED_COMMUNITY_AUTH_PREFIX}, ''), '')::int), 0)`,
+    })
     .from(profiles)
     .where(like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`));
+  return Number(row?.maxIndex ?? 0);
+}
 
-  let max = 0;
-  for (const row of rows) {
-    const suffix = row.authUserId.slice(SEED_COMMUNITY_AUTH_PREFIX.length);
-    const n = Number(suffix);
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  return max;
+export function resolveCommunitySeedStartIndex(opts: {
+  reseed: boolean;
+  maxIndex: number;
+}): number {
+  if (opts.reseed) return 1;
+  return Math.max(1, Math.floor(opts.maxIndex) + 1);
 }
 
 export async function countCommunitySeeds(
@@ -83,41 +88,27 @@ export async function countCommunitySeeds(
       .where(eq(communities.slug, communitySlug.trim().toLowerCase()))
       .limit(1);
     if (community) {
-      const seedProfiles = await db
-        .select({ id: profiles.id })
-        .from(profiles)
-        .where(like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`));
-      const seedIds = seedProfiles.map((p) => p.id);
-      if (seedIds.length > 0) {
-        const [memberCount] = await db
-          .select({ n: sql<number>`count(*)::int` })
-          .from(communityMembers)
-          .where(
-            and(
-              eq(communityMembers.communityId, community.id),
-              inArray(communityMembers.profileId, seedIds),
-            ),
-          );
-        membersInCommunity = Number(memberCount?.n ?? 0);
+      const seedAuth = like(
+        profiles.authUserId,
+        `${SEED_COMMUNITY_AUTH_PREFIX}%`,
+      );
+      const [memberCount] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(communityMembers)
+        .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
+        .where(and(eq(communityMembers.communityId, community.id), seedAuth));
+      membersInCommunity = Number(memberCount?.n ?? 0);
 
-        const editionRows = await db
-          .select({ id: communityEditions.id })
-          .from(communityEditions)
-          .where(eq(communityEditions.communityId, community.id));
-        const editionIds = editionRows.map((e) => e.id);
-        if (editionIds.length > 0) {
-          const [ballotCount] = await db
-            .select({ n: sql<number>`count(*)::int` })
-            .from(communityEditionBallots)
-            .where(
-              and(
-                inArray(communityEditionBallots.editionId, editionIds),
-                inArray(communityEditionBallots.profileId, seedIds),
-              ),
-            );
-          ballotsInEdition = Number(ballotCount?.n ?? 0);
-        }
-      }
+      const [ballotCount] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(communityEditionBallots)
+        .innerJoin(
+          communityEditions,
+          eq(communityEditions.id, communityEditionBallots.editionId),
+        )
+        .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
+        .where(and(eq(communityEditions.communityId, community.id), seedAuth));
+      ballotsInEdition = Number(ballotCount?.n ?? 0);
     }
   }
 
@@ -280,6 +271,51 @@ export async function publishEditionForSeed(
   return { ok: true, editionId: edition.id };
 }
 
+/** Rebuild freeze if the edition is already published — does not close voting. */
+export async function refreshPublishedEditionResultsForSeed(
+  communitySlug: string,
+  year: number,
+  db: Db = getDb(),
+): Promise<
+  | { ok: true; editionId: string; refreshed: boolean; status: string }
+  | { error: string }
+> {
+  const slug = communitySlug.trim().toLowerCase();
+  const y = Math.floor(year);
+  if (!slug) return { error: "Enter a community slug." };
+  if (!Number.isFinite(y) || y < 1970 || y > 2100) {
+    return { error: "Pick a valid year." };
+  }
+
+  const [community] = await db
+    .select()
+    .from(communities)
+    .where(eq(communities.slug, slug))
+    .limit(1);
+  if (!community) return { error: "Community not found." };
+
+  const [edition] = await db
+    .select()
+    .from(communityEditions)
+    .where(
+      and(
+        eq(communityEditions.communityId, community.id),
+        eq(communityEditions.year, y),
+      ),
+    )
+    .limit(1);
+  if (!edition) return { error: "Edition not found." };
+
+  const status = computeEditionStatus(edition, new Date());
+  if (status !== "published") {
+    return { ok: true, editionId: edition.id, refreshed: false, status };
+  }
+
+  const frozen = await rebuildEditionResultsFrozen(edition.id, db);
+  if (frozen && "error" in frozen) return frozen;
+  return { ok: true, editionId: edition.id, refreshed: true, status };
+}
+
 export async function seedCommunityEditionBallots(
   input: SeedCommunityEditionInput,
   db: Db = getDb(),
@@ -347,158 +383,223 @@ export async function seedCommunityEditionBallots(
   }
 
   const wantedAuthIds = indices.map(seedCommunityAuthUserId);
+  const wantedUsernames = indices.map(seedCommunityUsername);
   const existingProfiles = await db
     .select()
     .from(profiles)
     .where(inArray(profiles.authUserId, wantedAuthIds));
   const byAuth = new Map(existingProfiles.map((p) => [p.authUserId, p]));
 
-  let createdProfiles = 0;
-  let joinedMembers = 0;
-  let alreadyMembers = 0;
-  let createdBallots = 0;
-  let updatedBallots = 0;
-  let voicesSet = 0;
-  let skipped = 0;
+  const missing = indices
+    .map((index, i) => ({
+      index,
+      authUserId: wantedAuthIds[i]!,
+      username: wantedUsernames[i]!,
+      displayName: `Seed Member ${String(index).padStart(3, "0")}`,
+    }))
+    .filter((row) => !byAuth.has(row.authUserId));
 
-  for (let i = 0; i < indices.length; i++) {
-    const index = indices[i]!;
-    const authUserId = seedCommunityAuthUserId(index);
-    const username = seedCommunityUsername(index);
-    let profile = byAuth.get(authUserId);
+  if (missing.length > 0) {
+    const usernameClash = await db
+      .select({ username: profiles.username })
+      .from(profiles)
+      .where(inArray(profiles.username, missing.map((m) => m.username)));
+    if (usernameClash.length > 0) {
+      return {
+        error: `Username ${usernameClash[0]!.username} is already taken by a non-seed account.`,
+      };
+    }
 
-    if (!profile) {
-      const [created] = await db
-        .insert(profiles)
-        .values({
-          authUserId,
-          username,
-          displayName: `Seed Member ${String(index).padStart(3, "0")}`,
+    const inserted = await db
+      .insert(profiles)
+      .values(
+        missing.map((m) => ({
+          authUserId: m.authUserId,
+          username: m.username,
+          displayName: m.displayName,
           bio: "Synthetic community member for edition QA.",
-          visibility: "public",
-        })
-        .returning();
-      if (!created) {
-        skipped += 1;
-        continue;
-      }
-      profile = created;
-      byAuth.set(authUserId, created);
-      createdProfiles += 1;
-    }
-
-    const [member] = await db
-      .select({ profileId: communityMembers.profileId })
-      .from(communityMembers)
-      .where(
-        and(
-          eq(communityMembers.communityId, community.id),
-          eq(communityMembers.profileId, profile.id),
-        ),
+          visibility: "public" as const,
+        })),
       )
-      .limit(1);
-
-    if (!member) {
-      await db.insert(communityMembers).values({
-        communityId: community.id,
-        profileId: profile.id,
-        role: "member",
-      });
-      joinedMembers += 1;
-    } else {
-      alreadyMembers += 1;
+      .returning();
+    for (const profile of inserted) {
+      byAuth.set(profile.authUserId, profile);
     }
+  }
 
-    const makeVoice = i < voiceCount;
-    if (makeVoice) {
-      await db
-        .insert(communityEditionVoices)
-        .values({
+  const profilesInOrder = wantedAuthIds.map((id) => byAuth.get(id));
+  if (profilesInOrder.some((p) => !p)) {
+    return { error: "Could not create seed profiles." };
+  }
+  const readyProfiles = profilesInOrder as NonNullable<
+    (typeof profilesInOrder)[number]
+  >[];
+  const profileIds = readyProfiles.map((p) => p.id);
+  const createdProfiles = missing.length;
+
+  const existingMembers = await db
+    .select({ profileId: communityMembers.profileId })
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, community.id),
+        inArray(communityMembers.profileId, profileIds),
+      ),
+    );
+  const memberSet = new Set(existingMembers.map((m) => m.profileId));
+  const membersToJoin = readyProfiles.filter((p) => !memberSet.has(p.id));
+  if (membersToJoin.length > 0) {
+    await db
+      .insert(communityMembers)
+      .values(
+        membersToJoin.map((p) => ({
+          communityId: community.id,
+          profileId: p.id,
+          role: "member" as const,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+  const joinedMembers = membersToJoin.length;
+  const alreadyMembers = readyProfiles.length - joinedMembers;
+
+  const voiceProfiles = readyProfiles.slice(0, voiceCount);
+  let voicesSet = 0;
+  if (voiceProfiles.length > 0) {
+    const designatedAt = new Date();
+    await db
+      .insert(communityEditionVoices)
+      .values(
+        voiceProfiles.map((p) => ({
           editionId: edition.id,
-          profileId: profile.id,
-          designatedAt: new Date(),
+          profileId: p.id,
+          designatedAt,
           designatedByProfileId: null,
-        })
-        .onConflictDoNothing();
-      voicesSet += 1;
-    }
-
-    const [existingBallot] = await db
-      .select()
-      .from(communityEditionBallots)
-      .where(
-        and(
-          eq(communityEditionBallots.editionId, edition.id),
-          eq(communityEditionBallots.profileId, profile.id),
-        ),
+        })),
       )
-      .limit(1);
+      .onConflictDoNothing();
+    voicesSet = voiceProfiles.length;
+  }
 
-    if (existingBallot && !reseed) {
+  const existingBallots = await db
+    .select({
+      id: communityEditionBallots.id,
+      profileId: communityEditionBallots.profileId,
+    })
+    .from(communityEditionBallots)
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, edition.id),
+        inArray(communityEditionBallots.profileId, profileIds),
+      ),
+    );
+  const ballotByProfile = new Map(
+    existingBallots.map((b) => [b.profileId, b.id]),
+  );
+
+  const now = new Date();
+  const toWrite: { profileId: string; ballotId?: string }[] = [];
+  let skipped = 0;
+  for (const profile of readyProfiles) {
+    const existingId = ballotByProfile.get(profile.id);
+    if (existingId && !reseed) {
       skipped += 1;
       continue;
     }
+    toWrite.push({ profileId: profile.id, ballotId: existingId });
+  }
 
+  const reseedIds = toWrite
+    .map((row) => row.ballotId)
+    .filter((id): id is string => Boolean(id));
+  if (reseedIds.length > 0) {
+    await db
+      .delete(communityEditionBallotItems)
+      .where(inArray(communityEditionBallotItems.ballotId, reseedIds));
+    await db
+      .delete(communityEditionBallotCategoryVotes)
+      .where(inArray(communityEditionBallotCategoryVotes.ballotId, reseedIds));
+    await db
+      .update(communityEditionBallots)
+      .set({ updatedAt: now })
+      .where(inArray(communityEditionBallots.id, reseedIds));
+  }
+  const updatedBallots = reseedIds.length;
+
+  const toCreate = toWrite.filter((row) => !row.ballotId);
+  if (toCreate.length > 0) {
+    const created = await db
+      .insert(communityEditionBallots)
+      .values(
+        toCreate.map((row) => ({
+          editionId: edition.id,
+          profileId: row.profileId,
+          submittedAt: now,
+          updatedAt: now,
+        })),
+      )
+      .returning({
+        id: communityEditionBallots.id,
+        profileId: communityEditionBallots.profileId,
+      });
+    for (const ballot of created) {
+      ballotByProfile.set(ballot.profileId, ballot.id);
+    }
+  }
+  const createdBallots = toCreate.length;
+
+  const itemRows: {
+    ballotId: string;
+    gameId: string;
+    rank: number;
+    blurb: null;
+  }[] = [];
+  const categoryVoteRows: {
+    ballotId: string;
+    categoryId: string;
+    gameId: string;
+  }[] = [];
+
+  for (const row of toWrite) {
+    const ballotId = row.ballotId ?? ballotByProfile.get(row.profileId);
+    if (!ballotId) continue;
     const picked = weightedSample(pool, effectiveListSize, (g) =>
       weightForRatedGame(g, ratingBias),
     );
-
-    let ballotId: string;
-    const now = new Date();
-    if (existingBallot) {
-      ballotId = existingBallot.id;
-      await db
-        .delete(communityEditionBallotItems)
-        .where(eq(communityEditionBallotItems.ballotId, ballotId));
-      await db
-        .delete(communityEditionBallotCategoryVotes)
-        .where(eq(communityEditionBallotCategoryVotes.ballotId, ballotId));
-      await db
-        .update(communityEditionBallots)
-        .set({ updatedAt: now })
-        .where(eq(communityEditionBallots.id, ballotId));
-      updatedBallots += 1;
-    } else {
-      const [createdBallot] = await db
-        .insert(communityEditionBallots)
-        .values({
-          editionId: edition.id,
-          profileId: profile.id,
-          submittedAt: now,
-          updatedAt: now,
-        })
-        .returning();
-      if (!createdBallot) {
-        skipped += 1;
-        continue;
-      }
-      ballotId = createdBallot.id;
-      createdBallots += 1;
+    for (let rankIndex = 0; rankIndex < picked.length; rankIndex += 1) {
+      const game = picked[rankIndex]!;
+      itemRows.push({
+        ballotId,
+        gameId: game.id,
+        rank: rankIndex + 1,
+        blurb: null,
+      });
     }
-
-    if (picked.length > 0) {
-      await db.insert(communityEditionBallotItems).values(
-        picked.map((game, rankIndex) => ({
-          ballotId,
-          gameId: game.id,
-          rank: rankIndex + 1,
-          blurb: null,
-        })),
-      );
-    }
-
     if (categories.length > 0 && picked.length > 0) {
       const catVotes = buildSeedCategoryVotes(categories, picked);
-      if (catVotes.length > 0) {
-        await db.insert(communityEditionBallotCategoryVotes).values(
-          catVotes.map((vote) => ({
-            ballotId,
-            categoryId: vote.categoryId,
-            gameId: vote.gameId,
-          })),
-        );
+      for (const vote of catVotes) {
+        categoryVoteRows.push({
+          ballotId,
+          categoryId: vote.categoryId,
+          gameId: vote.gameId,
+        });
       }
     }
+  }
+
+  if (itemRows.length > 0) {
+    await insertInChunks(
+      itemRows,
+      (chunk) => db.insert(communityEditionBallotItems).values(chunk),
+      SEED_COMMUNITY_INSERT_CHUNK,
+    );
+  }
+  if (categoryVoteRows.length > 0) {
+    await insertInChunks(
+      categoryVoteRows,
+      (chunk) => db.insert(communityEditionBallotCategoryVotes).values(chunk),
+      SEED_COMMUNITY_INSERT_CHUNK,
+    );
   }
 
   let resultsRefreshed = false;

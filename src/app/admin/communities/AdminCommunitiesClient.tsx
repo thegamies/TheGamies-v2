@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import {
   clearCommunitySeedsAction,
   loadCommunitySeedStatsAction,
   publishCommunityEditionSeedAction,
+  refreshCommunityEditionResultsAction,
   seedCommunityEditionAction,
 } from "./actions";
 
 const COUNT_PRESETS = [5, 10, 25, 50, 100, 250, 500] as const;
+const BATCH_SIZE = 50;
 
 type Stats = {
   profiles: number;
@@ -44,7 +46,9 @@ export function AdminCommunitiesClient({
   const [deleteProfiles, setDeleteProfiles] = useState(false);
   const [stats, setStats] = useState<Stats | null>(initialStats);
   const [message, setMessage] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const [pending, startTransition] = useTransition();
+  const stopRef = useRef(false);
 
   async function unlock(e: React.FormEvent) {
     e.preventDefault();
@@ -77,30 +81,193 @@ export function AdminCommunitiesClient({
     }
   }
 
-  function seed() {
-    setMessage(null);
-    startTransition(async () => {
-      const result = await seedCommunityEditionAction({
-        communitySlug: slug,
-        year,
-        startIndex: reseed ? 1 : Math.max(1, (stats?.maxIndex ?? 0) + 1),
-        count,
-        listSize,
-        voiceCount,
-        ratingBias,
-        poolSize,
-        reseed,
-        refreshPublishedResults: refreshPublished,
-      });
-      if ("error" in result) {
-        setMessage(result.error);
-        return;
-      }
-      setMessage(
-        `Seeded ${result.createdBallots + result.updatedBallots} ballots (${result.joinedMembers} joined, ${result.voicesSet} Hosts). Edition ${result.year} is ${result.editionStatus}. Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.${result.resultsRefreshed ? " Published results refreshed." : ""}`,
-      );
-      await refreshStats();
+  async function runBatch(opts: {
+    startIndex: number;
+    count: number;
+    voiceCount: number;
+    reseed: boolean;
+    refreshPublishedResults: boolean;
+  }) {
+    return seedCommunityEditionAction({
+      communitySlug: slug,
+      year,
+      startIndex: opts.startIndex,
+      count: opts.count,
+      listSize,
+      voiceCount: opts.voiceCount,
+      ratingBias,
+      poolSize,
+      reseed: opts.reseed,
+      refreshPublishedResults: opts.refreshPublishedResults,
     });
+  }
+
+  async function maybeRefreshPublished(doneMessage: string) {
+    if (!refreshPublished) {
+      setMessage(doneMessage);
+      return;
+    }
+    const result = await refreshCommunityEditionResultsAction({
+      communitySlug: slug,
+      year,
+    });
+    if ("error" in result) {
+      setMessage(
+        `${doneMessage} Freeze rebuild failed (${result.error}). Use Publish / rebuild results.`,
+      );
+      return;
+    }
+    setMessage(
+      result.refreshed
+        ? `${doneMessage} Published results refreshed.`
+        : doneMessage,
+    );
+  }
+
+  async function seedOnce() {
+    setMessage(null);
+    setRunning(true);
+    stopRef.current = false;
+    let hadError = false;
+
+    try {
+      const loaded = await loadCommunitySeedStatsAction({
+        communitySlug: slug.trim() || undefined,
+      });
+      const maxIndex =
+        "maxIndex" in loaded ? loaded.maxIndex : (stats?.maxIndex ?? 0);
+      if ("profiles" in loaded) {
+        setStats({
+          profiles: loaded.profiles,
+          maxIndex: loaded.maxIndex,
+          membersInCommunity: loaded.membersInCommunity,
+          ballotsInEdition: loaded.ballotsInEdition,
+        });
+      }
+
+      let startIndex = reseed ? 1 : Math.max(1, maxIndex + 1);
+      let remaining = Math.min(500, Math.max(1, Math.floor(count)));
+      let remainingVoices = Math.max(0, Math.floor(voiceCount));
+      let createdProfiles = 0;
+      let createdBallots = 0;
+      let updatedBallots = 0;
+      let joinedMembers = 0;
+      let voicesSet = 0;
+      let skipped = 0;
+      let lastEnd = 0;
+      let wroteAnything = false;
+      let editionStatus = "";
+
+      while (remaining > 0 && !stopRef.current) {
+        const batch = Math.min(BATCH_SIZE, remaining);
+        const voicesThisBatch = Math.min(remainingVoices, batch);
+        remainingVoices -= voicesThisBatch;
+        const result = await runBatch({
+          startIndex,
+          count: batch,
+          voiceCount: voicesThisBatch,
+          reseed,
+          refreshPublishedResults: false,
+        });
+        if ("error" in result) {
+          setMessage(result.error);
+          hadError = true;
+          break;
+        }
+        wroteAnything = true;
+        createdProfiles += result.createdProfiles;
+        createdBallots += result.createdBallots;
+        updatedBallots += result.updatedBallots;
+        joinedMembers += result.joinedMembers;
+        voicesSet += result.voicesSet;
+        skipped += result.skipped;
+        lastEnd = result.endIndex;
+        editionStatus = result.editionStatus;
+        startIndex = result.nextIndex;
+        remaining -= batch;
+        setMessage(
+          `Progress: seeded through member ${result.endIndex}… (${createdBallots + updatedBallots} ballots, ${joinedMembers} joined so far)`,
+        );
+      }
+
+      if (wroteAnything && !hadError) {
+        const stoppedEarly = stopRef.current && remaining > 0;
+        const done = stoppedEarly
+            ? `Stopped. Through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}.`
+            : `Done through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}. Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.`;
+        await maybeRefreshPublished(done);
+      }
+      await refreshStats();
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  async function seedUntilStopped() {
+    setMessage(null);
+    setRunning(true);
+    stopRef.current = false;
+    let startIndex = Math.max(1, (stats?.maxIndex ?? 0) + 1);
+    let remainingVoices = Math.max(0, Math.floor(voiceCount));
+    let totalProfiles = 0;
+    let totalBallots = 0;
+    let joinedMembers = 0;
+    let voicesSet = 0;
+    let wroteAnything = false;
+    let hadError = false;
+    let lastEnd = 0;
+
+    try {
+      const loaded = await loadCommunitySeedStatsAction({
+        communitySlug: slug.trim() || undefined,
+      });
+      if ("maxIndex" in loaded) {
+        startIndex = Math.max(1, loaded.maxIndex + 1);
+        setStats({
+          profiles: loaded.profiles,
+          maxIndex: loaded.maxIndex,
+          membersInCommunity: loaded.membersInCommunity,
+          ballotsInEdition: loaded.ballotsInEdition,
+        });
+      }
+
+      while (!stopRef.current) {
+        const voicesThisBatch = Math.min(remainingVoices, BATCH_SIZE);
+        remainingVoices -= voicesThisBatch;
+        const result = await runBatch({
+          startIndex,
+          count: BATCH_SIZE,
+          voiceCount: voicesThisBatch,
+          reseed: false,
+          refreshPublishedResults: false,
+        });
+        if ("error" in result) {
+          setMessage(result.error);
+          hadError = true;
+          break;
+        }
+        wroteAnything = true;
+        totalProfiles += result.createdProfiles;
+        totalBallots += result.createdBallots + result.updatedBallots;
+        joinedMembers += result.joinedMembers;
+        voicesSet += result.voicesSet;
+        lastEnd = result.endIndex;
+        startIndex = result.nextIndex;
+        setMessage(
+          `Running… through member ${result.endIndex} (+${totalBallots} ballots). Click Stop to finish.`,
+        );
+        await refreshStats();
+      }
+
+      if (wroteAnything && !hadError) {
+        await maybeRefreshPublished(
+          `Stopped at member index ${lastEnd}. Added ~${totalProfiles} profiles / ${totalBallots} ballot writes / ${joinedMembers} joined / ${voicesSet} Hosts.`,
+        );
+      }
+      await refreshStats();
+    } finally {
+      setRunning(false);
+    }
   }
 
   function clearSeeds() {
@@ -144,6 +311,8 @@ export function AdminCommunitiesClient({
     );
   }
 
+  const busy = pending || running;
+
   return (
     <div className="max-w-xl space-y-8">
       {stats ? (
@@ -158,7 +327,8 @@ export function AdminCommunitiesClient({
       <p className="mt-3 max-w-2xl text-sm text-muted">
         Seed members cannot sign in. While voting is open, hosts see a submitted
         ballot list on the Edition page. Public Community/Hosts boards appear
-        after you publish.
+        after you publish. Large counts run in batches of {BATCH_SIZE} so you
+        can stop between batches.
       </p>
 
       <div className="space-y-4">
@@ -169,6 +339,7 @@ export function AdminCommunitiesClient({
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
             placeholder="kinda_funny"
+            disabled={busy}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -178,6 +349,7 @@ export function AdminCommunitiesClient({
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
+            disabled={busy}
           />
         </label>
         <div>
@@ -188,6 +360,7 @@ export function AdminCommunitiesClient({
                 key={n}
                 type="button"
                 onClick={() => setCount(n)}
+                disabled={busy}
                 className={`border px-3 py-1.5 text-sm ${
                   count === n
                     ? "border-accent text-accent"
@@ -199,7 +372,8 @@ export function AdminCommunitiesClient({
             ))}
           </div>
           <label className="mt-3 block text-sm text-muted">
-            Custom count (1–500 per run; no total cap — uncheck Reseed to append)
+            Custom count (1–500 this run, in batches of {BATCH_SIZE}; no total
+            cap — uncheck Reseed to append, or keep seeding until Stop)
             <input
               className={`${fieldInputClass} mt-1`}
               type="number"
@@ -207,6 +381,7 @@ export function AdminCommunitiesClient({
               max={500}
               value={count}
               onChange={(e) => setCount(Number(e.target.value))}
+              disabled={busy}
             />
           </label>
         </div>
@@ -219,10 +394,11 @@ export function AdminCommunitiesClient({
             max={100}
             value={listSize}
             onChange={(e) => setListSize(Number(e.target.value))}
+            disabled={busy}
           />
         </label>
         <label className="block text-sm text-muted">
-          Hosts in this batch (from the start of the batch)
+          Hosts from the start of this run
           <input
             className={`${fieldInputClass} mt-1`}
             type="number"
@@ -230,6 +406,7 @@ export function AdminCommunitiesClient({
             max={count}
             value={voiceCount}
             onChange={(e) => setVoiceCount(Number(e.target.value))}
+            disabled={busy}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -241,6 +418,7 @@ export function AdminCommunitiesClient({
             max={100}
             value={ratingBias}
             onChange={(e) => setRatingBias(Number(e.target.value))}
+            disabled={busy}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -252,6 +430,7 @@ export function AdminCommunitiesClient({
             max={2000}
             value={poolSize}
             onChange={(e) => setPoolSize(Number(e.target.value))}
+            disabled={busy}
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-muted">
@@ -259,6 +438,7 @@ export function AdminCommunitiesClient({
             type="checkbox"
             checked={reseed}
             onChange={(e) => setReseed(e.target.checked)}
+            disabled={busy}
           />
           Reseed existing ballots for these members
         </label>
@@ -267,6 +447,7 @@ export function AdminCommunitiesClient({
             type="checkbox"
             checked={refreshPublished}
             onChange={(e) => setRefreshPublished(e.target.checked)}
+            disabled={busy}
           />
           If already published, rebuild frozen results after seed (needed to
           include new ballots)
@@ -274,13 +455,41 @@ export function AdminCommunitiesClient({
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Button type="button" disabled={pending} onClick={seed}>
-          {pending ? "Working…" : "Seed members + ballots"}
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            void seedOnce();
+          }}
+        >
+          {running ? "Working…" : "Seed members + ballots"}
         </Button>
         <Button
           type="button"
           variant="bordered"
-          disabled={pending}
+          disabled={busy}
+          onClick={() => {
+            void seedUntilStopped();
+          }}
+        >
+          Keep seeding until Stop
+        </Button>
+        {running ? (
+          <Button
+            type="button"
+            variant="bordered"
+            onClick={() => {
+              stopRef.current = true;
+              setMessage("Stopping after current batch…");
+            }}
+          >
+            Stop
+          </Button>
+        ) : null}
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={busy}
           onClick={() =>
             startTransition(async () => {
               setMessage(null);
@@ -304,7 +513,7 @@ export function AdminCommunitiesClient({
         <Button
           type="button"
           variant="bordered"
-          disabled={pending}
+          disabled={busy}
           onClick={() => startTransition(() => refreshStats())}
         >
           Refresh stats
@@ -321,13 +530,14 @@ export function AdminCommunitiesClient({
             type="checkbox"
             checked={deleteProfiles}
             onChange={(e) => setDeleteProfiles(e.target.checked)}
+            disabled={busy}
           />
           Also delete seed profiles
         </label>
         <Button
           type="button"
           variant="bordered"
-          disabled={pending}
+          disabled={busy}
           onClick={clearSeeds}
         >
           Clear community seeds
