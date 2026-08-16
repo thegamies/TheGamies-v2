@@ -35,8 +35,6 @@ import {
 import {
   CATEGORY_RANKED_TOP,
   ensurePublishedEditionResults,
-  getEditionBallotMatrix,
-  getEditionCategoryComparisonMatrix,
   getEditionCategoryResults,
   getEditionGotyThroughRank,
   getEditionResultsMeta,
@@ -439,33 +437,26 @@ export default async function CommunityEditionYearPage({
             publicBallot,
           };
         } else {
-          const [topTen, categoryPodiums, matrix, categoryComparison] =
-            await Promise.all([
-              getEditionGotyThroughRank(edition.id, mode, {
-                maxRank: 10,
-                rankMode,
-              }),
-              getEditionCategoryResults(edition.id, mode, {
-                maxRank: CATEGORY_RANKED_TOP,
-                rankMode,
-              }),
-              getEditionBallotMatrix(edition.id, {
-                viewerProfileId: profile?.id ?? null,
-                rankMode,
-              }),
-              getEditionCategoryComparisonMatrix(edition.id, {
-                viewerProfileId: profile?.id ?? null,
-                rankMode,
-              }),
-            ]);
+          // Reveal + Results Ranked: top 10 + category podiums only.
+          // Comparison matrices load on demand when that tertiary is selected.
+          const [topTen, categoryPodiums] = await Promise.all([
+            getEditionGotyThroughRank(edition.id, mode, {
+              maxRank: 10,
+              rankMode,
+            }),
+            getEditionCategoryResults(edition.id, mode, {
+              maxRank: CATEGORY_RANKED_TOP,
+              rankMode,
+            }),
+          ]);
           resultsBundle = {
             meta,
             topTen,
             categoryPodiums,
-            categoryComparison,
+            categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
             voters: emptyVoters,
-            matrix,
+            matrix: emptyMatrix,
             publicBallot: null,
           };
         }

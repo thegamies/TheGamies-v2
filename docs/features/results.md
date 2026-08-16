@@ -24,7 +24,7 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 
 **Results** (`?view=results`, also accepts `overview`)
 
-Tertiary **Ranked · Comparison** at the top of the page (default Ranked) applies to both GOTY and Categories.
+Tertiary **Ranked · Comparison** at the top of the page (default Ranked) applies to both GOTY and Categories. SSR loads Ranked data only (GOTY through 10 + category podiums); Comparison matrices fetch on first Comparison click (`/api/.../comparison`).
 
 1. **Game of the Year** — Ranked: one continuous wrapping Top 10 grid (no horizontal scroll); large place in front of the title. Comparison: per-rank chapters, each with You · Community · Hosts · each Host; **rank rows share one horizontal scroll** so columns stay aligned → link to **Full standings** when more than 10. Comparison numbering follows the event’s competition or dense setting (no Skip / Dense / Board picker).  
 2. Category awards — Ranked: every freeze row with **displayed rank ≤ 3** per award (full ties at the cutoff), **one line**, `HorizontalScroll` if needed; place in front of the title; #1 slightly wider. Comparison: same per-award chapters, each with You · Community (#1, stacked if tied) · Hosts (#1) · each Host → link to **Categories**  

@@ -59,6 +59,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-14 | Award category catalog | Site `award_categories` expanded (sort 2–64) with **groups** and **eligibility**. Ballot/GOTY UI is a searchable award **grid**, not every slot at once. Standings load **one group** of category laterals (`?group=`). Current/active ≈ released this year or earlier until a live-ops flag exists. **Upcoming** excludes the list year. Remake/DLC allow editions. |
 | 2026-08-16 | Edition freeze scope | Freeze **boards only** (GOTY tallies, category tallies, voter roster). Individual voter ranks/category picks stay on `community_edition_ballot_*` and are read after publish (ballots are already read-only after close). Avoids photocopying tens of thousands of pick rows on rebuild. |
 | 2026-08-16 | Edition freeze tallies | Publish/rebuild computes GOTY + category boards with **SQL `GROUP BY`** on ballot tables (not loading every vote row into the app). Same scoring rules as `aggregateEditionGoty` / `aggregateEditionCategories`; Hosts boards join `community_edition_voices`. |
+| 2026-08-16 | Edition results read path | Reveal / Results Ranked SSR: GOTY through 10 + category podiums only. Comparison matrices load on first Comparison click. Category top-N uses SQL window `RANK`/`DENSE_RANK` (full ties at cutoff). |
 
 ## Open (block dependent work until decided)
 
