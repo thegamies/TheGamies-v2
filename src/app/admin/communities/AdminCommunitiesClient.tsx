@@ -10,7 +10,7 @@ import {
   seedCommunityEditionAction,
 } from "./actions";
 
-const COUNT_PRESETS = [5, 10, 25, 50, 100] as const;
+const COUNT_PRESETS = [5, 10, 25, 50, 100, 250, 500] as const;
 
 type Stats = {
   profiles: number;
@@ -180,25 +180,17 @@ export function AdminCommunitiesClient({
             onChange={(e) => setYear(Number(e.target.value))}
           />
         </label>
-        <div>
-          <p className="text-sm text-muted">Members / ballots this run</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {COUNT_PRESETS.map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setCount(n)}
-                className={`border px-3 py-1.5 text-sm ${
-                  count === n
-                    ? "border-accent text-accent"
-                    : "border-line text-muted"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-        </div>
+        <label className="block text-sm text-muted">
+          Custom count (1–500 per run; no total cap — uncheck Reseed to append)
+          <input
+            className={`${fieldInputClass} mt-2`}
+            type="number"
+            min={1}
+            max={500}
+            value={count}
+            onChange={(e) => setCount(Number(e.target.value))}
+          />
+        </label>
         <label className="block text-sm text-muted">
           Ballot length (1–100)
           <input

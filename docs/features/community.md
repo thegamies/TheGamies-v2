@@ -110,7 +110,7 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Ops seed (admin)
 
-`/admin/communities` (admin code): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`).
+`/admin/communities` (admin code): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). No total seed-index cap (batches up to 500). Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`).
 
 ### Hosts (shipped)
 

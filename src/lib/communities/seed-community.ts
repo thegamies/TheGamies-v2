@@ -26,8 +26,8 @@ import { computeEditionStatus } from "./edition-status";
 
 export const SEED_COMMUNITY_AUTH_PREFIX = "seed:community:";
 export const SEED_COMMUNITY_USERNAME_PREFIX = "seedcmem";
-export const SEED_COMMUNITY_MAX_INDEX = 1000;
-export const SEED_COMMUNITY_MAX_BATCH = 100;
+/** Per-request batch size (no total index cap — run again with Reseed off to grow). */
+export const SEED_COMMUNITY_MAX_BATCH = 500;
 
 function getDb(): Db {
   return createDb();
@@ -310,8 +310,8 @@ export async function seedCommunityEditionBallots(
       error: `Each batch can create between 1 and ${SEED_COMMUNITY_MAX_BATCH} members.`,
     };
   }
-  if (startIndex > SEED_COMMUNITY_MAX_INDEX) {
-    return { error: `Seed index cannot exceed ${SEED_COMMUNITY_MAX_INDEX}.` };
+  if (!Number.isFinite(startIndex) || startIndex < 1) {
+    return { error: "Start index must be at least 1." };
   }
 
   const [community] = await db
@@ -323,10 +323,7 @@ export async function seedCommunityEditionBallots(
 
   const edition = await ensureEditionForSeed(community.id, year, db);
 
-  const endIndex = Math.min(
-    SEED_COMMUNITY_MAX_INDEX,
-    startIndex + count - 1,
-  );
+  const endIndex = startIndex + count - 1;
   const indices = Array.from(
     { length: endIndex - startIndex + 1 },
     (_, i) => startIndex + i,
