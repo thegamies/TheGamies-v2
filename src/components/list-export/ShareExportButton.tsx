@@ -10,11 +10,15 @@ export function ShareExportButton({
   year,
   title,
   listType = "goty",
+  rankStyle,
+  rankFormat,
 }: {
   games: ExportGame[];
   year: number;
   title: string;
   listType?: "goty" | "custom";
+  rankStyle?: "banner" | "chip" | "off";
+  rankFormat?: "ordinal" | "number";
 }) {
   const [open, setOpen] = useState(false);
 
@@ -36,6 +40,8 @@ export function ShareExportButton({
         year={year}
         title={title}
         listType={listType}
+        rankStyle={rankStyle}
+        rankFormat={rankFormat}
       />
     </>
   );

@@ -1,15 +1,54 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CopyLinkButton } from "@/components/lists/CopyLinkButton";
+import { ListFormatControl } from "@/components/lists/ListFormatControl";
 import { RefreshOnBfcache } from "@/components/lists/RefreshOnBfcache";
 import { SoftSavePrompt } from "@/components/lists/SoftSavePrompt";
 import { ShareExportButton } from "@/components/list-export/ShareExportButton";
+import { ListExportPoster } from "@/components/list-export/ListExportAwardsLayout";
+import { EXPORT_LAYOUT_DEFAULT } from "@/components/list-export/exportDimensions";
+import { rankChromeForStyle } from "@/components/list-export/rankChrome";
 import { Button } from "@/components/ui/Button";
+import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
-import type { ShareListPayload } from "@/lib/lists/service";
+import {
+  parseStoredListFormat,
+  parseStoredRankStyle,
+  type ListFormat,
+} from "@/lib/lists/schema";
+
+type SharedListItem = {
+  gameId: string;
+  slug: string;
+  title: string;
+  year: number | null;
+  coverUrl: string | null;
+  rank: number;
+  blurb: string | null;
+};
+
+type SharedListViewData = {
+  owner: { username: string; displayName: string } | null;
+  items: SharedListItem[];
+  list: {
+    publicId: string;
+    listType: string;
+    title: string;
+    year: number | null;
+    listFormat: string;
+    rankStyle: string;
+    showSuffix: boolean;
+  };
+};
+
+const POSTER_W = 1080;
+const POSTER_H = 1350;
 
 type SharedListViewProps = {
-  data: ShareListPayload;
+  data: SharedListViewData;
   canEdit: boolean;
   canClaim: boolean;
   isSignedIn: boolean;
@@ -29,19 +68,32 @@ export function SharedListView({
   saved = false,
   error = null,
 }: SharedListViewProps) {
+  const isGoty = data.list.listType !== "custom";
+  const [viewFormat, setViewFormat] = useState<ListFormat>(() =>
+    parseStoredListFormat(data.list.listFormat),
+  );
+  const rankStyle = parseStoredRankStyle(data.list.rankStyle);
+  const rankFormat = data.list.showSuffix ? "ordinal" : "number";
+  const year = data.list.year ?? new Date().getUTCFullYear();
+  const listType = isGoty ? "goty" : "custom";
+
   return (
     <main className="relative mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
       <RefreshOnBfcache />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,90,31,0.12),_transparent_55%)]" />
       <div className="relative">
-        {data.list.year ? (
+        {isGoty ? null : data.list.year ? (
           <p className="text-xs uppercase tracking-[0.2em] text-muted">
             {data.list.year}
           </p>
         ) : (
           <p className="text-xs uppercase tracking-[0.2em] text-muted">List</p>
         )}
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-7xl">
+        <h1
+          className={`font-display text-5xl tracking-wide text-ink md:text-7xl ${
+            isGoty ? "" : "mt-2"
+          }`}
+        >
           {data.list.title}
         </h1>
         <p className="mt-3 text-muted">
@@ -81,10 +133,18 @@ export function SharedListView({
           alreadyOwned={alreadyOwned}
         />
 
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/create">
-            <Button type="button">Make your own</Button>
-          </Link>
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          <ListFormatControl
+            value={viewFormat}
+            onChange={setViewFormat}
+          />
+          {alreadyOwned ? null : (
+            <Link href="/create">
+              <Button type="button" size="sm">
+                Make your own
+              </Button>
+            </Link>
+          )}
           <CopyLinkButton />
           <ShareExportButton
             games={data.items.map((item) => ({
@@ -92,46 +152,164 @@ export function SharedListView({
               title: item.title,
               imageUrl: item.coverUrl,
             }))}
-            year={data.list.year ?? new Date().getUTCFullYear()}
+            year={year}
             title={data.list.title}
-            listType={data.list.listType === "custom" ? "custom" : "goty"}
+            listType={listType}
+            rankStyle={rankStyle}
+            rankFormat={rankFormat}
           />
           {canEdit ? (
             <Link href={editHref}>
-              <Button type="button" variant="bordered">
+              <Button type="button" variant="bordered" size="sm">
                 Edit
               </Button>
             </Link>
           ) : null}
         </div>
 
-        <ol className="mt-10 divide-y divide-line border-y border-line">
-          {data.items.map((item) => (
-            <li key={item.gameId} className="flex items-center gap-5 py-5">
-              <RankMarker rank={item.rank} size="lg" />
-              <div className="w-16 shrink-0 sm:w-20">
-                <GameCover title={item.title} imageUrl={item.coverUrl} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <Link
-                  href={`/games/${item.slug}`}
-                  className="block truncate text-lg text-ink hover:text-accent"
-                >
-                  {item.title}
+        {viewFormat === "poster" ? (
+          <SharedPoster
+            items={data.items}
+            year={year}
+            title={data.list.title}
+            listType={listType}
+            rankStyle={rankStyle}
+            rankFormat={rankFormat}
+          />
+        ) : viewFormat === "grid" ? (
+          <ul className="mt-10 grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5">
+            {data.items.map((item) => (
+              <li key={item.gameId} className="min-w-0">
+                <Link href={`/games/${item.slug}`} className="group block">
+                  <GameCover title={item.title} imageUrl={item.coverUrl} />
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span
+                      className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent"
+                      aria-label={`Rank ${item.rank}`}
+                    >
+                      {item.rank}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <FitDisplayTitle
+                        className="w-full group-hover:text-accent"
+                        maxPx={18}
+                        minPx={12}
+                        lines={2}
+                      >
+                        {item.title}
+                      </FitDisplayTitle>
+                      {isGoty || !item.year ? null : (
+                        <p className="mt-0.5 text-xs text-muted">{item.year}</p>
+                      )}
+                    </div>
+                  </div>
                 </Link>
-                {item.year ? (
-                  <p className="text-sm text-muted">{item.year}</p>
-                ) : null}
-                {item.blurb ? (
-                  <p className="mt-2 max-w-2xl font-serif text-muted">
-                    {item.blurb}
-                  </p>
-                ) : null}
-              </div>
-            </li>
-          ))}
-        </ol>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <ol className="mt-10 divide-y divide-line border-y border-line">
+            {data.items.map((item) => (
+              <li key={item.gameId} className="flex items-center gap-5 py-5">
+                <RankMarker rank={item.rank} size="lg" />
+                <div className="w-16 shrink-0 sm:w-20">
+                  <GameCover title={item.title} imageUrl={item.coverUrl} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <Link
+                    href={`/games/${item.slug}`}
+                    className="block truncate text-lg text-ink hover:text-accent"
+                  >
+                    {item.title}
+                  </Link>
+                  {isGoty || !item.year ? null : (
+                    <p className="text-sm text-muted">{item.year}</p>
+                  )}
+                  {item.blurb ? (
+                    <p className="mt-2 max-w-2xl font-serif text-muted">
+                      {item.blurb}
+                    </p>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
     </main>
+  );
+}
+
+function SharedPoster({
+  items,
+  year,
+  title,
+  listType,
+  rankStyle,
+  rankFormat,
+}: {
+  items: SharedListItem[];
+  year: number;
+  title: string;
+  listType: "goty" | "custom";
+  rankStyle: ReturnType<typeof parseStoredRankStyle>;
+  rankFormat: "ordinal" | "number";
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.4);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => {
+      const w = el.clientWidth;
+      if (w > 0) setScale(w / POSTER_W);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="mt-10 w-full">
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          height: POSTER_H * scale,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: POSTER_W,
+            height: POSTER_H,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+        >
+          <ListExportPoster
+            games={items.map((item) => ({
+              id: item.gameId,
+              title: item.title,
+              imageUrl: item.coverUrl,
+            }))}
+            year={year}
+            layout={EXPORT_LAYOUT_DEFAULT}
+            width={POSTER_W}
+            height={POSTER_H}
+            gameCount={items.length}
+            title={title}
+            listType={listType}
+            showYearBadge={listType === "goty"}
+            showTopCount={listType === "custom"}
+            rankChrome={rankChromeForStyle(rankStyle, rankFormat)}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

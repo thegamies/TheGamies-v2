@@ -39,9 +39,10 @@ import {
   type ExportRankFormat,
   type ExportRankStyle,
 } from "@/components/list-export/rankChrome";
-import type {
-  ExportGame,
-  ListExportListType,
+import {
+  defaultPosterHeaderTitle,
+  type ExportGame,
+  type ListExportListType,
 } from "@/components/list-export/listExportTypes";
 import { cardOuterRadius } from "@/components/list-export/socialGamerCardTheme";
 import {
@@ -286,7 +287,7 @@ export function PosterBuilder({
                 listType={listType}
                 heightPx={AWARDS_HEADER_BAND_PX}
                 widthPx={CANVAS_W}
-                title={title}
+                title={defaultPosterHeaderTitle(listType, title)}
                 showYearBadge={showYearBadge}
                 showTopCount={showTopCount}
               />

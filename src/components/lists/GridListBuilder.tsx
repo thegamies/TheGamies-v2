@@ -21,8 +21,8 @@ import {
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
 import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
+import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
-import { RankMarker } from "@/components/ui/RankMarker";
 
 export type GridListItem = {
   id: string;
@@ -122,15 +122,20 @@ export function GridListBuilder({
                 <button
                   type="button"
                   onClick={onPickEmpty}
-                  className="flex w-full flex-col gap-2 text-left"
+                  className="flex w-full flex-col text-left"
                 >
                   <div className="aspect-[3/4] w-full border border-dashed border-line bg-panel transition-colors hover:border-accent" />
-                  <p className="text-xs text-muted">
-                    <span className="font-display text-sm text-accent/60">
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span
+                      className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent/60"
+                      aria-hidden
+                    >
                       {items.length + i + 1}
-                    </span>{" "}
-                    Empty
-                  </p>
+                    </span>
+                    <span className="min-w-0 flex-1 font-display text-[18px] leading-snug tracking-wide text-muted">
+                      Empty
+                    </span>
+                  </div>
                 </button>
               </li>
             ))}
@@ -195,18 +200,25 @@ function SortableGridCard({
         }}
         aria-label={`${item.title}, rank ${rank}. Tap for options, hold to move.`}
         aria-pressed={selected}
-        className={`flex flex-col gap-2 text-left outline-none ${cardTouchLockClassName}`}
+        className={`flex flex-col text-left outline-none ${cardTouchLockClassName}`}
       >
         <div
           className={`relative ${selected ? cardSelectedRingClassName : ""}`}
         >
           <GameCover title={item.title} imageUrl={item.coverUrl} />
         </div>
-        <div className="flex min-w-0 items-start gap-1.5">
-          <RankMarker rank={rank} size="sm" />
-          <p className="min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-snug text-ink">
-            {item.title}
-          </p>
+        <div className="mt-2 flex items-baseline gap-1">
+          <span
+            className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent"
+            aria-hidden
+          >
+            {rank}
+          </span>
+          <div className="min-w-0 flex-1">
+            <FitDisplayTitle className="w-full" maxPx={18} minPx={12} lines={2}>
+              {item.title}
+            </FitDisplayTitle>
+          </div>
         </div>
       </div>
     </li>

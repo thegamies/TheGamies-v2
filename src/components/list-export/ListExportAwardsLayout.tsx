@@ -3,7 +3,11 @@ import {
   SocialGamerCardImageFrame,
 } from "./SocialGamerCardImageFrame";
 import type { ExportGame, ListExportPosterProps } from "./listExportTypes";
-import { BRAND_ORANGE } from "./listExportTypes";
+import {
+  BRAND_ORANGE,
+  DEFAULT_GOTY_POSTER_TITLE,
+  POSTER_MADE_WITH_BRAND,
+} from "./listExportTypes";
 import {
   AWARDS_BRAND_SIZE,
   AWARDS_GRID_GAP,
@@ -344,16 +348,16 @@ function AwardsBrandLine({ size }: { size: number }) {
       </span>
       <span
         style={{
-          fontFamily: displayFont,
+          fontFamily: bodyFont,
           fontSize: size,
           fontWeight: 800,
-          letterSpacing: "0.02em",
+          letterSpacing: "0.01em",
           color: "#fff",
           lineHeight: 1,
         }}
       >
-        GOTY
-        <span style={{ color: BRAND_ORANGE }}>.</span>
+        {POSTER_MADE_WITH_BRAND.replace(/\.gg$/, "")}
+        <span style={{ color: BRAND_ORANGE }}>.gg</span>
       </span>
     </div>
   );
@@ -398,7 +402,7 @@ export function AwardsExportHeader({
       (badgeCount > 0 ? badgeGap : 0),
   );
   const { text: title, size: titleSize } = fitExportTitleSingleLine(
-    titleProp?.trim() || (listType === "custom" ? "MY LIST" : "MY GAMES OF THE YEAR"),
+    titleProp?.trim() || (listType === "custom" ? "MY LIST" : DEFAULT_GOTY_POSTER_TITLE),
     titleMaxW,
     preferredTitleSize,
     brandSize,

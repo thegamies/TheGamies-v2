@@ -31,6 +31,17 @@ export function exportGameCountOptions(listLength: number): number[] {
 
 export type ListExportListType = "goty" | "custom";
 
+export const DEFAULT_GOTY_POSTER_TITLE = "GAME OF THE YEAR";
+export const POSTER_MADE_WITH_BRAND = "TheGamies.gg";
+
+export function defaultPosterHeaderTitle(
+  listType: ListExportListType,
+  listTitle: string,
+): string {
+  if (listType === "custom") return listTitle.trim() || "MY LIST";
+  return DEFAULT_GOTY_POSTER_TITLE;
+}
+
 /**
  * Optional per-card render hook. Lets callers (e.g. the Remotion video export)
  * wrap each card to animate it. When omitted, cards render unchanged, so the

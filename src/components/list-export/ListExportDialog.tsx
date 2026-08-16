@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   exportGameCountOptions,
+  defaultPosterHeaderTitle,
   type ExportGame,
   type ListExportListType,
 } from "./listExportTypes";
@@ -37,16 +38,6 @@ import {
 const PREVIEW_MAX_W = 420;
 const PREVIEW_SIDE_INSET = 16;
 const EXPORT_FORMAT = "jpeg" as const;
-
-function defaultExportHeaderTitle(
-  listType: ListExportListType,
-  listTitle: string,
-): string {
-  if (listType === "custom") {
-    return listTitle.trim() || "MY LIST";
-  }
-  return "MY GAMES OF THE YEAR";
-}
 
 function initialPreviewWidth(): number {
   if (typeof window === "undefined") return 280;
@@ -86,7 +77,7 @@ export function ListExportDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
   const defaultHeaderTitle = useMemo(
-    () => defaultExportHeaderTitle(listType, title),
+    () => defaultPosterHeaderTitle(listType, title),
     [listType, title],
   );
   const [headerTitleDraft, setHeaderTitleDraft] = useState(defaultHeaderTitle);

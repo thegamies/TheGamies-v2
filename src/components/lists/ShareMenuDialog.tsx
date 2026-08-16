@@ -1,51 +1,43 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
-
 export function ShareMenuDialog({
   open,
-  onClose,
+  signedIn = true,
   onShareAsImage,
   onShareWithLink,
-  linkDisabled = false,
 }: {
   open: boolean;
-  onClose: () => void;
+  signedIn?: boolean;
   onShareAsImage: () => void;
   onShareWithLink: () => void;
-  linkDisabled?: boolean;
 }) {
+  if (!open) return null;
+
   return (
-    <Dialog open={open} title="Share" onClose={onClose} className="w-full max-w-md">
-      <p className="mt-2 text-sm text-muted">
-        Share a poster image, or publish a public page with a link.
-      </p>
-      <div className="mt-4 flex flex-col gap-2">
-        <Button
-          type="button"
-          variant="bordered"
-          className="w-full justify-start"
-          onClick={() => {
-            onClose();
-            onShareAsImage();
-          }}
-        >
-          Share as image
-        </Button>
-        <Button
-          type="button"
-          variant="bordered"
-          className="w-full justify-start"
-          disabled={linkDisabled}
-          onClick={() => {
-            onClose();
-            onShareWithLink();
-          }}
-        >
-          Share with a link
-        </Button>
-      </div>
-    </Dialog>
+    <div
+      role="menu"
+      aria-label="Share"
+      className="absolute right-0 top-full z-30 mt-2 w-[min(18rem,calc(100vw-2rem))] border border-line bg-panel p-2"
+    >
+      <button
+        type="button"
+        role="menuitem"
+        className="w-full px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-paper hover:text-accent"
+        onClick={onShareAsImage}
+      >
+        Share as image
+      </button>
+      <button
+        type="button"
+        role="menuitem"
+        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-paper hover:text-accent"
+        onClick={onShareWithLink}
+      >
+        <span>Share with a link</span>
+        {signedIn ? null : (
+          <span className="shrink-0 text-xs text-muted">Sign in required</span>
+        )}
+      </button>
+    </div>
   );
 }
