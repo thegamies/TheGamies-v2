@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -184,7 +183,6 @@ export function ListEditor({
   const settingsRef = useRef<HTMLDivElement>(null);
   const shareFormRef = useRef<HTMLFormElement>(null);
   const authIntentHandled = useRef(false);
-  const committedYearRef = useRef(initialYear ?? currentYear);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
     persistSnapshot({
       listType: initialListType,
@@ -207,12 +205,11 @@ export function ListEditor({
   const [publicId, setPublicId] = useState<string | null>(
     initialPublicId ?? null,
   );
-  const [listType, setListType] = useState<"goty" | "custom">(initialListType);
+  const [listType] = useState<"goty" | "custom">(initialListType);
   const [title, setTitle] = useState(initialTitle);
   const [year, setYear] = useState(
     (initialYear ?? currentYear).toString(),
   );
-  const [draftYear, setDraftYear] = useState(initialYear ?? currentYear);
   const [categoryVotes, setCategoryVotes] =
     useState<CategoryVoteSelection[]>(initialCategoryVotes);
   const showCategoryTabs =
@@ -251,10 +248,6 @@ export function ListEditor({
   const [saveSignInOpen, setSaveSignInOpen] = useState(false);
   const [shareLinkSignInOpen, setShareLinkSignInOpen] = useState(false);
   const [pendingTrim, setPendingTrim] = useState<number | null>(null);
-  const [pendingYearTrim, setPendingYearTrim] = useState<{
-    year: number;
-    listType: "goty" | "custom";
-  } | null>(null);
 
   const yearNum = Number(year) || currentYear;
   const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
@@ -535,38 +528,6 @@ export function ListEditor({
     };
   }, [signedIn, publicId, listType, title, year, yearNum, items]);
 
-  const requestYearTrim = useCallback(
-    (targetYear: number, nextListType: "goty" | "custom") => {
-      if (!Number.isFinite(targetYear)) return;
-      const y = Math.floor(targetYear);
-
-      if (nextListType !== "goty") {
-        setYear(String(y));
-        setDraftYear(y);
-        setListType(nextListType);
-        committedYearRef.current = y;
-        setPendingYearTrim(null);
-        return;
-      }
-
-      setItems((prev) => {
-        const disallowed = prev.filter((item) => item.year !== y);
-        if (disallowed.length === 0) {
-          setYear(String(y));
-          setDraftYear(y);
-          setListType(nextListType);
-          committedYearRef.current = y;
-          setTitle(`${y} Game of the Year`);
-          setPendingYearTrim(null);
-          return prev;
-        }
-        setPendingYearTrim({ year: y, listType: nextListType });
-        return prev;
-      });
-    },
-    [],
-  );
-
   useEffect(() => {
     if (!settingsOpen) return;
     function onPointer(e: MouseEvent) {
@@ -628,20 +589,6 @@ export function ListEditor({
       return;
     }
     applySlotCount(clamped);
-  }
-
-  function applyYearTrim(targetYear: number, nextListType: "goty" | "custom") {
-    setYear(String(targetYear));
-    setDraftYear(targetYear);
-    setListType(nextListType);
-    committedYearRef.current = targetYear;
-    if (nextListType === "goty") {
-      setTitle(`${targetYear} Game of the Year`);
-      setItems((prev) =>
-        withRanks(prev.filter((item) => item.year === targetYear)),
-      );
-    }
-    setPendingYearTrim(null);
   }
 
   function openSettings() {
@@ -796,22 +743,6 @@ export function ListEditor({
     } from the bottom of your ranking.`;
     if (noted.length === 0) return base;
     return `${base} Notes on ${formatTitleList(noted.map((n) => n.title))} will be lost.`;
-  })();
-
-  const yearTrimMessage = (() => {
-    if (pendingYearTrim == null) return "";
-    const dropped = items.filter((item) => item.year !== pendingYearTrim.year);
-    const noted = dropped.filter((item) => item.blurb.trim().length > 0);
-    const names = formatTitleList(dropped.map((d) => d.title));
-    const typeSwitch = pendingYearTrim.listType !== listType;
-    const lead = typeSwitch
-      ? `Switching to GOTY ${pendingYearTrim.year}`
-      : `Changing the year to ${pendingYearTrim.year}`;
-    const base = `${lead} removes ${
-      dropped.length === 1 ? "a game" : `${dropped.length} games`
-    } (${names}).`;
-    if (noted.length === 0) return base;
-    return `${base} Notes on those games will be lost.`;
   })();
 
   return (
@@ -1308,23 +1239,6 @@ export function ListEditor({
           confirmLabel="Shrink anyway"
           onCancel={() => setPendingTrim(null)}
           onConfirm={() => applySlotCount(pendingTrim)}
-        />
-      ) : null}
-
-      {pendingYearTrim != null ? (
-        <ConfirmDialog
-          open
-          title="Remove games?"
-          message={yearTrimMessage}
-          confirmLabel="Remove anyway"
-          onCancel={() => {
-            setYear(String(committedYearRef.current));
-            setDraftYear(committedYearRef.current);
-            setPendingYearTrim(null);
-          }}
-          onConfirm={() => {
-            applyYearTrim(pendingYearTrim.year, pendingYearTrim.listType);
-          }}
         />
       ) : null}
 
