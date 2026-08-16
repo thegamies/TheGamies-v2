@@ -43,8 +43,9 @@ import {
 import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { GridListBuilder } from "@/components/lists/GridListBuilder";
 import {
-  cardRemoveButtonClassName,
   cardTouchLockClassName,
+  mergeHoldDragListeners,
+  useDragBodyScrollLock,
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
 import { SaveSignInDialog } from "@/components/lists/SaveSignInDialog";
@@ -657,8 +658,15 @@ export function ListEditor({
 
   const notesDndId = useId();
   const notesSensors = useListCardDragSensors();
+  const [notesDragging, setNotesDragging] = useState(false);
+  useDragBodyScrollLock(notesDragging);
+
+  function onNotesDragStart() {
+    setNotesDragging(true);
+  }
 
   function onNotesDragEnd(event: DragEndEvent) {
+    setNotesDragging(false);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setItems((prev) => {
@@ -1037,7 +1045,7 @@ export function ListEditor({
               <p className="mt-2 text-center text-xs text-muted">
                 {items.length === 0
                   ? "Tap an empty slot or search to add games."
-                  : "Hold to reorder. Tap a game to delete it."}
+                  : "Hold to reorder. Tap a game to remove."}
               </p>
             </>
           ) : listFormat === "grid" ? (
@@ -1070,7 +1078,9 @@ export function ListEditor({
                   id={notesDndId}
                   sensors={notesSensors}
                   collisionDetection={closestCenter}
+                  onDragStart={onNotesDragStart}
                   onDragEnd={onNotesDragEnd}
+                  onDragCancel={() => setNotesDragging(false)}
                 >
                   <SortableContext
                     items={items.map((item) => item.gameId)}
@@ -1348,6 +1358,7 @@ function NotesCard({
   const [expanded, setExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.gameId });
+  const holdListeners = mergeHoldDragListeners(listeners);
 
   return (
     <li
@@ -1360,33 +1371,34 @@ function NotesCard({
         isDragging ? "z-10 opacity-90 shadow-lg" : ""
       }`}
       {...attributes}
-      {...listeners}
+      {...holdListeners}
       onContextMenu={(event) => event.preventDefault()}
       aria-label={`${item.title}, rank ${rank}. Hold to move.`}
     >
       <div className="flex w-10 shrink-0 items-start justify-center pt-2">
         <RankMarker rank={rank} size="sm" />
       </div>
-      <div className="relative h-28 w-[5.25rem] shrink-0 self-start">
+      <div className="h-28 w-[5.25rem] shrink-0 self-start">
         <GameCover title={item.title} imageUrl={item.coverUrl} />
-        <button
-          type="button"
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRemove(item.gameId);
-          }}
-          aria-label={`Remove ${item.title}`}
-          className={cardRemoveButtonClassName}
-        >
-          ✕
-        </button>
       </div>
       <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2 pr-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium leading-tight text-ink">
-            {item.title}
-          </p>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium leading-tight text-ink">
+              {item.title}
+            </p>
+          </div>
+          <button
+            type="button"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove(item.gameId);
+            }}
+            className="shrink-0 px-1.5 py-0.5 text-xs text-muted transition-colors hover:text-accent"
+          >
+            Remove
+          </button>
         </div>
         {canEditNotes ? (
           <div className="flex min-h-0 flex-1 flex-col gap-1">

@@ -49,7 +49,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Size presets (5 / 10 / 20 / 50, max 100)
 - Rank chrome: Banner / Chip / Off (+ ordinal suffix) in settings
 - Optional per-game notes (blurbs) — **signed-in only**, max **500** characters
-- Hold briefly to reorder (no persistent move handle). Poster/Grid: tap a game to select and reveal delete; tap elsewhere to dismiss. List keeps always-visible remove.
+- Hold briefly to reorder (scroll is blocked while holding so the page does not steal the gesture). Poster/Grid: tap a game to open a small **Remove** menu; tap elsewhere to dismiss. List keeps a text **Remove** control beside the title.
 - Image export via **Share → Share as image** on GOTY ranking view (JPEG poster)
 - Categories Share is **link only**
 - Warnings when shrinking size would drop games (and notes)

@@ -14,11 +14,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  cardRemoveButtonClassName,
   cardSelectedRingClassName,
   cardTouchLockClassName,
+  mergeHoldDragListeners,
+  useDragBodyScrollLock,
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
+import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 
@@ -44,8 +46,10 @@ export function GridListBuilder({
   const dndId = useId();
   const sensors = useListCardDragSensors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
   const dragOccurredRef = useRef(false);
   const emptySlots = Math.max(0, slotCount - items.length);
+  useDragBodyScrollLock(dragging);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -53,6 +57,7 @@ export function GridListBuilder({
       const target = event.target as Element | null;
       if (!target) return;
       if (target.closest(`[data-list-card="${selectedId}"]`)) return;
+      if (target.closest("[data-list-card-menu]")) return;
       setSelectedId(null);
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -61,10 +66,12 @@ export function GridListBuilder({
 
   function onDragStart() {
     dragOccurredRef.current = true;
+    setDragging(true);
     setSelectedId(null);
   }
 
   function onDragEnd(event: DragEndEvent) {
+    setDragging(false);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const oldIndex = items.findIndex((item) => item.id === active.id);
@@ -87,6 +94,7 @@ export function GridListBuilder({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
         onDragCancel={() => {
+          setDragging(false);
           window.setTimeout(() => {
             dragOccurredRef.current = false;
           }, 0);
@@ -136,7 +144,7 @@ export function GridListBuilder({
       <p className="mt-3 text-center text-xs text-muted">
         {items.length === 0
           ? "Tap an empty slot or search to add games."
-          : "Hold to reorder. Tap a game to delete it."}
+          : "Hold to reorder. Tap a game to remove."}
       </p>
     </div>
   );
@@ -157,6 +165,7 @@ function SortableGridCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
+  const holdListeners = mergeHoldDragListeners(listeners);
 
   return (
     <li
@@ -170,7 +179,7 @@ function SortableGridCard({
     >
       <div
         {...attributes}
-        {...listeners}
+        {...holdListeners}
         role="button"
         tabIndex={0}
         onClick={onSelect}
@@ -181,7 +190,7 @@ function SortableGridCard({
             onSelect();
           }
         }}
-        aria-label={`${item.title}, rank ${rank}. Tap to select, hold to move.`}
+        aria-label={`${item.title}, rank ${rank}. Tap for options, hold to move.`}
         aria-pressed={selected}
         className={`flex flex-col gap-2 text-left outline-none ${cardTouchLockClassName}`}
       >
@@ -189,21 +198,7 @@ function SortableGridCard({
           className={`relative ${selected ? cardSelectedRingClassName : ""}`}
         >
           <GameCover title={item.title} imageUrl={item.coverUrl} />
-          {selected ? (
-            <button
-              type="button"
-              data-list-card-delete
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation();
-                onRemove();
-              }}
-              aria-label={`Remove ${item.title}`}
-              className={cardRemoveButtonClassName}
-            >
-              ✕
-            </button>
-          ) : null}
+          {selected ? <ListCardActionMenu onRemove={onRemove} /> : null}
         </div>
         <div className="flex min-w-0 items-start gap-1.5">
           <RankMarker rank={rank} size="sm" />

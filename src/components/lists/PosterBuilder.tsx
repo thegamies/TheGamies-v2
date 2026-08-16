@@ -46,10 +46,12 @@ import type {
 } from "@/components/list-export/listExportTypes";
 import { cardOuterRadius } from "@/components/list-export/socialGamerCardTheme";
 import {
-  cardRemoveButtonStyle,
   cardTouchLockClassName,
+  mergeHoldDragListeners,
+  useDragBodyScrollLock,
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
+import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const CANVAS_W = 1080;
@@ -111,6 +113,7 @@ export function PosterBuilder({
   const sensors = useListCardDragSensors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const dragOccurredRef = useRef(false);
+  useDragBodyScrollLock(activeId != null);
 
   useEffect(() => {
     if (!selectedId) return;
@@ -118,6 +121,7 @@ export function PosterBuilder({
       const target = event.target as Element | null;
       if (!target) return;
       if (target.closest(`[data-list-card="${selectedId}"]`)) return;
+      if (target.closest("[data-list-card-menu]")) return;
       setSelectedId(null);
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -476,6 +480,7 @@ function SortableCard({
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
+  const holdListeners = mergeHoldDragListeners(listeners);
 
   // dnd-kit's sorting strategy animates the displaced siblings (including across
   // rows) via `transform`. Those values are measured in on-screen (scaled)
@@ -506,10 +511,10 @@ function SortableCard({
       }}
       className={cardTouchLockClassName}
       {...attributes}
-      {...listeners}
+      {...holdListeners}
       onClick={onSelect}
       onContextMenu={(event) => event.preventDefault()}
-      aria-label={`${game.title} — rank ${rank}. Tap to select, hold to move.`}
+      aria-label={`${game.title} — rank ${rank}. Tap for options, hold to move.`}
       aria-pressed={selected}
     >
       <SocialGamerCardImageFrame
@@ -520,28 +525,7 @@ function SortableCard({
         rankScaleWidth={rankScaleWidth}
         rankChrome={rankChrome}
       />
-      {selected ? (
-        <button
-          type="button"
-          data-list-card-delete
-          onPointerDown={(event) => event.stopPropagation()}
-          onClick={(event) => {
-            event.stopPropagation();
-            onRemove();
-          }}
-          aria-label={`Remove ${game.title}`}
-          style={{
-            ...cardRemoveButtonStyle,
-            top: 12,
-            right: 12,
-            width: 44,
-            height: 44,
-            fontSize: 18,
-          }}
-        >
-          ✕
-        </button>
-      ) : null}
+      {selected ? <ListCardActionMenu onRemove={onRemove} /> : null}
     </div>
   );
 }
