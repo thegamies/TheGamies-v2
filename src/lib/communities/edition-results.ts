@@ -153,6 +153,7 @@ export async function rebuildEditionResultsFrozen(
 }
 
 async function clearEditionResultTables(editionId: string, db: Db) {
+  // Legacy freeze tables (voter ranks/picks) may still hold old rows; clear them.
   await db
     .delete(communityEditionResultVoterCategoryPicks)
     .where(
@@ -173,6 +174,103 @@ async function clearEditionResultTables(editionId: string, db: Db) {
   await db
     .delete(communityEditionResultMeta)
     .where(eq(communityEditionResultMeta.editionId, editionId));
+}
+
+type BallotVoterGameRow = {
+  profileId: string;
+  gameId: string;
+  slug: string;
+  title: string;
+  coverUrl: string | null;
+};
+
+/** GOTY ranks from ballot tables (not freeze copies). */
+async function loadBallotVoterRanks(
+  editionId: string,
+  profileIds: string[],
+  db: Db,
+): Promise<Array<BallotVoterGameRow & { rank: number }>> {
+  if (profileIds.length === 0) return [];
+  const rows = await db
+    .select({
+      profileId: communityEditionBallots.profileId,
+      rank: communityEditionBallotItems.rank,
+      gameId: communityEditionBallotItems.gameId,
+      slug: games.slug,
+      title: games.title,
+      coverImageId: covers.imageId,
+    })
+    .from(communityEditionBallotItems)
+    .innerJoin(
+      communityEditionBallots,
+      eq(communityEditionBallots.id, communityEditionBallotItems.ballotId),
+    )
+    .innerJoin(games, eq(games.id, communityEditionBallotItems.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, editionId),
+        inArray(communityEditionBallots.profileId, profileIds),
+        gte(communityEditionBallotItems.rank, 1),
+        sql`${communityEditionBallotItems.rank} <= 10`,
+      ),
+    )
+    .orderBy(
+      asc(communityEditionBallots.profileId),
+      asc(communityEditionBallotItems.rank),
+    );
+
+  return rows.map((r) => ({
+    profileId: r.profileId,
+    rank: r.rank,
+    gameId: r.gameId,
+    slug: r.slug,
+    title: r.title,
+    coverUrl: coverUrlFrom(r.coverImageId),
+  }));
+}
+
+/** Category picks from ballot tables (not freeze copies). */
+async function loadBallotVoterCategoryPicks(
+  editionId: string,
+  profileIds: string[],
+  db: Db,
+): Promise<Array<BallotVoterGameRow & { categoryId: string }>> {
+  if (profileIds.length === 0) return [];
+  const rows = await db
+    .select({
+      profileId: communityEditionBallots.profileId,
+      categoryId: communityEditionBallotCategoryVotes.categoryId,
+      gameId: communityEditionBallotCategoryVotes.gameId,
+      slug: games.slug,
+      title: games.title,
+      coverImageId: covers.imageId,
+    })
+    .from(communityEditionBallotCategoryVotes)
+    .innerJoin(
+      communityEditionBallots,
+      eq(
+        communityEditionBallots.id,
+        communityEditionBallotCategoryVotes.ballotId,
+      ),
+    )
+    .innerJoin(games, eq(games.id, communityEditionBallotCategoryVotes.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, editionId),
+        inArray(communityEditionBallots.profileId, profileIds),
+      ),
+    );
+
+  return rows.map((r) => ({
+    profileId: r.profileId,
+    categoryId: r.categoryId,
+    gameId: r.gameId,
+    slug: r.slug,
+    title: r.title,
+    coverUrl: coverUrlFrom(r.coverImageId),
+  }));
 }
 
 async function freezeEditionResults(
@@ -356,33 +454,6 @@ async function freezeEditionResults(
     username: b.username,
   }));
 
-  const top10 = itemRows.filter((r) => r.rank >= 1 && r.rank <= 10);
-  const voterRankRows = top10.map((r) => {
-    const metaRow = gameMeta.get(r.gameId);
-    return {
-      editionId,
-      profileId: r.profileId,
-      rank: r.rank,
-      gameId: r.gameId,
-      slug: metaRow?.slug ?? "",
-      title: metaRow?.title ?? "Unknown",
-      coverUrl: metaRow?.coverUrl ?? null,
-    };
-  });
-
-  const voterCategoryRows = catVoteRows.map((r) => {
-    const metaRow = gameMeta.get(r.gameId);
-    return {
-      editionId,
-      profileId: r.profileId,
-      categoryId: r.categoryId,
-      gameId: r.gameId,
-      slug: metaRow?.slug ?? "",
-      title: metaRow?.title ?? "Unknown",
-      coverUrl: metaRow?.coverUrl ?? null,
-    };
-  });
-
   try {
     try {
       await db.insert(communityEditionResultMeta).values({
@@ -416,21 +487,8 @@ async function freezeEditionResults(
         200,
       );
     }
-    if (voterRankRows.length > 0) {
-      await insertInChunks(
-        voterRankRows,
-        (chunk) => db.insert(communityEditionResultVoterRanks).values(chunk),
-        200,
-      );
-    }
-    if (voterCategoryRows.length > 0) {
-      await insertInChunks(
-        voterCategoryRows,
-        (chunk) =>
-          db.insert(communityEditionResultVoterCategoryPicks).values(chunk),
-        200,
-      );
-    }
+    // Voter GOTY ranks + category picks stay on ballot tables (read-only after
+    // close). Freezing them duplicated tens of thousands of rows on rebuild.
   } catch (err) {
     // Meta-only / partial freezes would make later ensure() no-ops — clear so
     // publish/rebuild can retry a complete snapshot.
@@ -1024,22 +1082,7 @@ export async function getEditionBallotMatrix(
     coverUrl: string | null;
   }> = [];
   if (uniqueProfileIds.length > 0) {
-    voterRanks = await db
-      .select({
-        profileId: communityEditionResultVoterRanks.profileId,
-        rank: communityEditionResultVoterRanks.rank,
-        gameId: communityEditionResultVoterRanks.gameId,
-        slug: communityEditionResultVoterRanks.slug,
-        title: communityEditionResultVoterRanks.title,
-        coverUrl: communityEditionResultVoterRanks.coverUrl,
-      })
-      .from(communityEditionResultVoterRanks)
-      .where(
-        and(
-          eq(communityEditionResultVoterRanks.editionId, editionId),
-          inArray(communityEditionResultVoterRanks.profileId, uniqueProfileIds),
-        ),
-      );
+    voterRanks = await loadBallotVoterRanks(editionId, uniqueProfileIds, db);
   }
 
   const standingInput = {
@@ -1182,25 +1225,11 @@ export async function getEditionCategoryComparisonMatrix(
     coverUrl: string | null;
   }> = [];
   if (uniqueProfileIds.length > 0 && categories.length > 0) {
-    picks = await db
-      .select({
-        profileId: communityEditionResultVoterCategoryPicks.profileId,
-        categoryId: communityEditionResultVoterCategoryPicks.categoryId,
-        gameId: communityEditionResultVoterCategoryPicks.gameId,
-        slug: communityEditionResultVoterCategoryPicks.slug,
-        title: communityEditionResultVoterCategoryPicks.title,
-        coverUrl: communityEditionResultVoterCategoryPicks.coverUrl,
-      })
-      .from(communityEditionResultVoterCategoryPicks)
-      .where(
-        and(
-          eq(communityEditionResultVoterCategoryPicks.editionId, editionId),
-          inArray(
-            communityEditionResultVoterCategoryPicks.profileId,
-            uniqueProfileIds,
-          ),
-        ),
-      );
+    picks = await loadBallotVoterCategoryPicks(
+      editionId,
+      uniqueProfileIds,
+      db,
+    );
   }
 
   const rows = assembleCategoryComparisonRows({
@@ -1254,26 +1283,10 @@ export async function getEditionVoterDetail(
     .limit(1);
   if (!voter) return null;
 
-  const ranks = await db
-    .select()
-    .from(communityEditionResultVoterRanks)
-    .where(
-      and(
-        eq(communityEditionResultVoterRanks.editionId, editionId),
-        eq(communityEditionResultVoterRanks.profileId, profileId),
-      ),
-    )
-    .orderBy(asc(communityEditionResultVoterRanks.rank));
-
-  const categoryPicks = await db
-    .select()
-    .from(communityEditionResultVoterCategoryPicks)
-    .where(
-      and(
-        eq(communityEditionResultVoterCategoryPicks.editionId, editionId),
-        eq(communityEditionResultVoterCategoryPicks.profileId, profileId),
-      ),
-    );
+  const [ranks, categoryPicks] = await Promise.all([
+    loadBallotVoterRanks(editionId, [profileId], db),
+    loadBallotVoterCategoryPicks(editionId, [profileId], db),
+  ]);
 
   return {
     voter: {

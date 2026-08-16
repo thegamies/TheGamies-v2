@@ -35,7 +35,7 @@ Sections use the accent-tick `SectionRule` between later blocks.
 
 **Categories** — per-award cover card grids, **10 per page**, Load more via API. Not the full tally dump on Results.
 
-**Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. Available after results publish **and** while voting is open or closed (turnout; names only — ballots stay hidden until publish). Community · Hosts filters Hosts-only when on Hosts. After publish, **display name** opens that voter’s frozen ballot; **@username** opens their profile.
+**Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. Available after results publish **and** while voting is open or closed (turnout; names only — ballots stay hidden until publish). Community · Hosts filters Hosts-only when on Hosts. After publish, **display name** opens that voter’s ballot (from ballot tables, read-only after close); **@username** opens their profile.
 
 **Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Hosts toggle is hidden here.
 

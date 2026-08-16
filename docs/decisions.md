@@ -57,6 +57,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-14 | Voice public name | Public UI uses **Host** / **Hosts**. Code, URLs, and tables stay Voice (`?mode=voices`, `community_edition_voices`). |
 | 2026-08-14 | Event create requires schedule | Hosts create an event with **year + opens/closes/publishes** in one dialog. No draft create. Status is still **computed** from timestamps; incomplete timestamps remain `draft` only for legacy rows. |
 | 2026-08-14 | Award category catalog | Site `award_categories` expanded (sort 2–64) with **groups** and **eligibility**. Ballot/GOTY UI is a searchable award **grid**, not every slot at once. Standings load **one group** of category laterals (`?group=`). Current/active ≈ released this year or earlier until a live-ops flag exists. **Upcoming** excludes the list year. Remake/DLC allow editions. |
+| 2026-08-16 | Edition freeze scope | Freeze **boards only** (GOTY tallies, category tallies, voter roster). Individual voter ranks/category picks stay on `community_edition_ballot_*` and are read after publish (ballots are already read-only after close). Avoids photocopying tens of thousands of pick rows on rebuild. |
 
 ## Open (block dependent work until decided)
 
