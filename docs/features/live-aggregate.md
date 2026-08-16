@@ -105,7 +105,8 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
 - Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
 - Category vote / contrib inserts are **chunked** (Neon HTTP-safe); the admin result reports category count + votes written
-- Ends with one year score rebuild (or after Stop)
+- Year **rebuild** aggregates first, then replaces score rows in chunks (avoids wiping categories when a single large insert fails)
+- Ends with one year score rebuild (or after Stop). If rebuild fails after lists are written, the seed result says so — use Rankings → Rebuild.
 
 Community / edition ceremony seeding is separate: `/admin/communities` — see [community.md](./community.md).
 

@@ -18,6 +18,7 @@ import { buildGotyContribRows } from "@/lib/live-aggregate/scoring";
 import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 
 export const SEED_AUTH_PREFIX = "seed:standings:";
 export const SEED_USERNAME_PREFIX = "seedvoter";
@@ -25,18 +26,6 @@ export const SEED_MAX_INDEX = 1000;
 export const SEED_MAX_BATCH = 100;
 /** Neon HTTP inserts stay reliable when category vote batches stay small. */
 export const SEED_INSERT_CHUNK = 200;
-
-/** Insert rows in chunks so large category vote batches do not blow the query. */
-export async function insertInChunks<T>(
-  rows: T[],
-  write: (chunk: T[]) => Promise<unknown>,
-  chunkSize = SEED_INSERT_CHUNK,
-): Promise<void> {
-  const size = Math.max(1, Math.floor(chunkSize));
-  for (let i = 0; i < rows.length; i += size) {
-    await write(rows.slice(i, i + size));
-  }
-}
 
 function getDb(): Db {
   return createDb();
@@ -495,11 +484,17 @@ export async function seedStandingsVoters(
   }
 
   if (itemRows.length > 0) {
-    await insertInChunks(itemRows, (chunk) => db.insert(listItems).values(chunk));
+    await insertInChunks(
+      itemRows,
+      (chunk) => db.insert(listItems).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
   }
   if (categoryVoteRows.length > 0) {
-    await insertInChunks(categoryVoteRows, (chunk) =>
-      db.insert(listCategoryVotes).values(chunk),
+    await insertInChunks(
+      categoryVoteRows,
+      (chunk) => db.insert(listCategoryVotes).values(chunk),
+      SEED_INSERT_CHUNK,
     );
   }
 
@@ -510,13 +505,17 @@ export async function seedStandingsVoters(
     .delete(liveCategoryContrib)
     .where(inArray(liveCategoryContrib.listId, listIds));
   if (contribRows.length > 0) {
-    await insertInChunks(contribRows, (chunk) =>
-      db.insert(liveGotyContrib).values(chunk),
+    await insertInChunks(
+      contribRows,
+      (chunk) => db.insert(liveGotyContrib).values(chunk),
+      SEED_INSERT_CHUNK,
     );
   }
   if (categoryContribRows.length > 0) {
-    await insertInChunks(categoryContribRows, (chunk) =>
-      db.insert(liveCategoryContrib).values(chunk),
+    await insertInChunks(
+      categoryContribRows,
+      (chunk) => db.insert(liveCategoryContrib).values(chunk),
+      SEED_INSERT_CHUNK,
     );
   }
 
@@ -526,7 +525,15 @@ export async function seedStandingsVoters(
     .where(inArray(lists.id, listIds));
 
   if (doRebuild) {
-    await rebuildYear(year, db);
+    try {
+      await rebuildYear(year, db);
+    } catch (err) {
+      const detail =
+        err instanceof Error ? err.message : "Standings rebuild failed.";
+      return {
+        error: `Seed lists were written, but rebuilding standings failed (${detail}). Open Rankings and run Rebuild for ${year}.`,
+      };
+    }
   }
 
   return {

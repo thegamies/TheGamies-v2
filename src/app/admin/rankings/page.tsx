@@ -6,6 +6,8 @@ import { getSiteSettings } from "@/lib/site-settings/service";
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { AdminRankingsClient } from "./AdminRankingsClient";
 
+export const maxDuration = 300;
+
 export const metadata: Metadata = {
   title: "Admin Rankings",
   robots: { index: false, follow: false },

@@ -4,6 +4,9 @@ import { isAdminAuthorized } from "@/lib/admin-auth";
 import { countStandingsSeeds } from "@/lib/live-aggregate/seed-standings";
 import { AdminSeedClient } from "./AdminSeedClient";
 
+/** Seed + year rebuild can exceed the default serverless budget. */
+export const maxDuration = 300;
+
 export const metadata: Metadata = {
   title: "Admin Standings Seed",
   robots: { index: false, follow: false },
