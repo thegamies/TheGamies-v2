@@ -5,7 +5,6 @@ import {
   DndContext,
   closestCenter,
   type DragEndEvent,
-  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -60,7 +59,7 @@ export function GridListBuilder({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [selectedId]);
 
-  function onDragStart(_event: DragStartEvent) {
+  function onDragStart() {
     dragOccurredRef.current = true;
     setSelectedId(null);
   }

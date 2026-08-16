@@ -15,7 +15,6 @@ import {
   DndContext,
   closestCenter,
   type DragEndEvent,
-  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
@@ -674,7 +673,7 @@ export function ListEditor({
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [selectedNoteId]);
 
-  function onNotesDragStart(_event: DragStartEvent) {
+  function onNotesDragStart() {
     noteDragOccurredRef.current = true;
     setSelectedNoteId(null);
   }
@@ -1421,7 +1420,6 @@ function NotesCard({
       }}
       onContextMenu={(event) => event.preventDefault()}
       aria-label={`${item.title}, rank ${rank}. Tap to select, hold to move.`}
-      aria-pressed={selected}
     >
       <div className="flex w-10 shrink-0 items-start justify-center pt-2">
         <RankMarker rank={rank} size="sm" />
