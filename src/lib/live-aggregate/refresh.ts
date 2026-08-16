@@ -9,6 +9,7 @@ import {
   liveGotyYearStats,
   type Db,
 } from "@thegamies/db";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 import { getLiveAggregateDb } from "./contrib";
 
 const REFRESH_LOCK_STALE_MS = 60_000;
@@ -294,17 +295,8 @@ export async function rebuildYear(
   }
 
   try {
-    await db.delete(liveGotyScores).where(eq(liveGotyScores.year, year));
-    await db
-      .delete(liveCategoryScores)
-      .where(eq(liveCategoryScores.year, year));
-    await db
-      .delete(liveGotyDirtyGames)
-      .where(eq(liveGotyDirtyGames.year, year));
-    await db
-      .delete(liveCategoryDirty)
-      .where(eq(liveCategoryDirty.year, year));
-
+    // Aggregate before deleting so a failed insert can be retried without
+    // depending on in-flight score rows, and so we minimize empty-cache time.
     const gotyGroups = await db
       .select({
         gameId: liveGotyContrib.gameId,
@@ -325,27 +317,6 @@ export async function rebuildYear(
       .where(eq(liveGotyContrib.year, year))
       .groupBy(liveGotyContrib.gameId);
 
-    if (gotyGroups.length > 0) {
-      await db.insert(liveGotyScores).values(
-        gotyGroups.map((g) => ({
-          year,
-          gameId: g.gameId,
-          score: Number(g.score),
-          listMentions: Number(g.listMentions),
-          rank1Count: Number(g.rank1Count),
-          rank2Count: Number(g.rank2Count),
-          rank3Count: Number(g.rank3Count),
-          rank4Count: Number(g.rank4Count),
-          rank5Count: Number(g.rank5Count),
-          rank6Count: Number(g.rank6Count),
-          rank7Count: Number(g.rank7Count),
-          rank8Count: Number(g.rank8Count),
-          rank9Count: Number(g.rank9Count),
-          rank10Count: Number(g.rank10Count),
-        })),
-      );
-    }
-
     const catGroups = await db
       .select({
         categoryId: liveCategoryContrib.categoryId,
@@ -356,14 +327,52 @@ export async function rebuildYear(
       .where(eq(liveCategoryContrib.year, year))
       .groupBy(liveCategoryContrib.categoryId, liveCategoryContrib.gameId);
 
-    if (catGroups.length > 0) {
-      await db.insert(liveCategoryScores).values(
-        catGroups.map((g) => ({
-          year,
-          categoryId: g.categoryId,
-          gameId: g.gameId,
-          voteCount: Number(g.voteCount),
-        })),
+    const gotyRows = gotyGroups.map((g) => ({
+      year,
+      gameId: g.gameId,
+      score: Number(g.score),
+      listMentions: Number(g.listMentions),
+      rank1Count: Number(g.rank1Count),
+      rank2Count: Number(g.rank2Count),
+      rank3Count: Number(g.rank3Count),
+      rank4Count: Number(g.rank4Count),
+      rank5Count: Number(g.rank5Count),
+      rank6Count: Number(g.rank6Count),
+      rank7Count: Number(g.rank7Count),
+      rank8Count: Number(g.rank8Count),
+      rank9Count: Number(g.rank9Count),
+      rank10Count: Number(g.rank10Count),
+    }));
+    const catRows = catGroups.map((g) => ({
+      year,
+      categoryId: g.categoryId,
+      gameId: g.gameId,
+      voteCount: Number(g.voteCount),
+    }));
+
+    await db.delete(liveGotyScores).where(eq(liveGotyScores.year, year));
+    await db
+      .delete(liveCategoryScores)
+      .where(eq(liveCategoryScores.year, year));
+    await db
+      .delete(liveGotyDirtyGames)
+      .where(eq(liveGotyDirtyGames.year, year));
+    await db
+      .delete(liveCategoryDirty)
+      .where(eq(liveCategoryDirty.year, year));
+
+    if (gotyRows.length > 0) {
+      await insertInChunks(
+        gotyRows,
+        (chunk) => db.insert(liveGotyScores).values(chunk),
+        100,
+      );
+    }
+    if (catRows.length > 0) {
+      await insertInChunks(
+        catRows,
+        (chunk) => db.insert(liveCategoryScores).values(chunk),
+        200,
       );
     }
 

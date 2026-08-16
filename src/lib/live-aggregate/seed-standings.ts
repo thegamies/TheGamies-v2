@@ -10,16 +10,22 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
+import {
+  ensureAwardCategories,
+  listActiveAwardCategories,
+} from "@/lib/live-aggregate/categories";
 import { buildGotyContribRows } from "@/lib/live-aggregate/scoring";
 import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 
 export const SEED_AUTH_PREFIX = "seed:standings:";
 export const SEED_USERNAME_PREFIX = "seedvoter";
 export const SEED_MAX_INDEX = 1000;
 export const SEED_MAX_BATCH = 100;
+/** Neon HTTP inserts stay reliable when category vote batches stay small. */
+export const SEED_INSERT_CHUNK = 200;
 
 function getDb(): Db {
   return createDb();
@@ -181,6 +187,10 @@ export type SeedStandingsResult = {
   skipped: number;
   year: number;
   gamePoolSize: number;
+  /** Active award categories used for this batch (after catalog ensure). */
+  categoryCount: number;
+  /** list_category_votes rows written in this batch. */
+  categoryVotes: number;
   startIndex: number;
   endIndex: number;
   nextIndex: number;
@@ -201,6 +211,19 @@ export async function getMaxSeedIndex(
     if (Number.isFinite(n) && n > max) max = n;
   }
   return max;
+}
+
+/**
+ * Where "Seed N" should begin.
+ * Reseed on → rewrite from index 1.
+ * Reseed off → append after the highest existing seed index.
+ */
+export function resolveSeedStartIndex(opts: {
+  reseed: boolean;
+  maxIndex: number;
+}): number {
+  if (opts.reseed) return 1;
+  return Math.max(1, Math.floor(opts.maxIndex) + 1);
 }
 
 /**
@@ -336,6 +359,8 @@ export async function seedStandingsVoters(
       skipped,
       year,
       gamePoolSize: pool.length,
+      categoryCount: 0,
+      categoryVotes: 0,
       startIndex,
       endIndex,
       nextIndex: endIndex + 1,
@@ -368,7 +393,15 @@ export async function seedStandingsVoters(
   const allLists = activeProfiles.map((p) => listByProfile.get(p.id)!);
   const listIds = allLists.map((l) => l.id);
   const updatedLists = allLists.length - listsToCreate.length;
+
+  await ensureAwardCategories(db);
   const categories = await listActiveAwardCategories(db);
+  if (categories.length === 0) {
+    return {
+      error:
+        "No active award categories found after syncing the catalog. Check award category migrations.",
+    };
+  }
 
   await db.delete(listItems).where(inArray(listItems.listId, listIds));
   await db
@@ -451,10 +484,18 @@ export async function seedStandingsVoters(
   }
 
   if (itemRows.length > 0) {
-    await db.insert(listItems).values(itemRows);
+    await insertInChunks(
+      itemRows,
+      (chunk) => db.insert(listItems).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
   }
   if (categoryVoteRows.length > 0) {
-    await db.insert(listCategoryVotes).values(categoryVoteRows);
+    await insertInChunks(
+      categoryVoteRows,
+      (chunk) => db.insert(listCategoryVotes).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
   }
 
   await db
@@ -464,10 +505,18 @@ export async function seedStandingsVoters(
     .delete(liveCategoryContrib)
     .where(inArray(liveCategoryContrib.listId, listIds));
   if (contribRows.length > 0) {
-    await db.insert(liveGotyContrib).values(contribRows);
+    await insertInChunks(
+      contribRows,
+      (chunk) => db.insert(liveGotyContrib).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
   }
   if (categoryContribRows.length > 0) {
-    await db.insert(liveCategoryContrib).values(categoryContribRows);
+    await insertInChunks(
+      categoryContribRows,
+      (chunk) => db.insert(liveCategoryContrib).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
   }
 
   await db
@@ -476,7 +525,15 @@ export async function seedStandingsVoters(
     .where(inArray(lists.id, listIds));
 
   if (doRebuild) {
-    await rebuildYear(year, db);
+    try {
+      await rebuildYear(year, db);
+    } catch (err) {
+      const detail =
+        err instanceof Error ? err.message : "Standings rebuild failed.";
+      return {
+        error: `Seed lists were written, but rebuilding standings failed (${detail}). Open Rankings and run Rebuild for ${year}.`,
+      };
+    }
   }
 
   return {
@@ -486,6 +543,8 @@ export async function seedStandingsVoters(
     skipped,
     year,
     gamePoolSize: pool.length,
+    categoryCount: categories.length,
+    categoryVotes: categoryVoteRows.length,
     startIndex,
     endIndex,
     nextIndex: endIndex + 1,

@@ -17,14 +17,17 @@ import {
   weightForRatedGame,
   weightedSample,
 } from "@/lib/live-aggregate/seed-standings";
-import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
+import {
+  ensureAwardCategories,
+  listActiveAwardCategories,
+} from "@/lib/live-aggregate/categories";
 import { rebuildEditionResultsFrozen } from "./edition-results";
 import { computeEditionStatus } from "./edition-status";
 
 export const SEED_COMMUNITY_AUTH_PREFIX = "seed:community:";
 export const SEED_COMMUNITY_USERNAME_PREFIX = "seedcmem";
-export const SEED_COMMUNITY_MAX_INDEX = 1000;
-export const SEED_COMMUNITY_MAX_BATCH = 100;
+/** Per-request batch size (no total index cap — run again with Reseed off to grow). */
+export const SEED_COMMUNITY_MAX_BATCH = 500;
 
 function getDb(): Db {
   return createDb();
@@ -272,7 +275,8 @@ export async function publishEditionForSeed(
 
   if (!updated) return { error: "Could not publish edition." };
 
-  await rebuildEditionResultsFrozen(edition.id, db);
+  const frozen = await rebuildEditionResultsFrozen(edition.id, db);
+  if (frozen && "error" in frozen) return frozen;
   return { ok: true, editionId: edition.id };
 }
 
@@ -306,8 +310,8 @@ export async function seedCommunityEditionBallots(
       error: `Each batch can create between 1 and ${SEED_COMMUNITY_MAX_BATCH} members.`,
     };
   }
-  if (startIndex > SEED_COMMUNITY_MAX_INDEX) {
-    return { error: `Seed index cannot exceed ${SEED_COMMUNITY_MAX_INDEX}.` };
+  if (!Number.isFinite(startIndex) || startIndex < 1) {
+    return { error: "Start index must be at least 1." };
   }
 
   const [community] = await db
@@ -319,10 +323,7 @@ export async function seedCommunityEditionBallots(
 
   const edition = await ensureEditionForSeed(community.id, year, db);
 
-  const endIndex = Math.min(
-    SEED_COMMUNITY_MAX_INDEX,
-    startIndex + count - 1,
-  );
+  const endIndex = startIndex + count - 1;
   const indices = Array.from(
     { length: endIndex - startIndex + 1 },
     (_, i) => startIndex + i,
@@ -336,7 +337,14 @@ export async function seedCommunityEditionBallots(
   }
   const effectiveListSize = Math.min(listSize, pool.length);
 
+  await ensureAwardCategories(db);
   const categories = await listActiveAwardCategories(db);
+  if (categories.length === 0) {
+    return {
+      error:
+        "No active award categories found after syncing the catalog. Check award category migrations.",
+    };
+  }
 
   const wantedAuthIds = indices.map(seedCommunityAuthUserId);
   const existingProfiles = await db
@@ -495,7 +503,12 @@ export async function seedCommunityEditionBallots(
 
   let resultsRefreshed = false;
   if (refreshPublished && edition.status === "published") {
-    await rebuildEditionResultsFrozen(edition.id, db);
+    const frozen = await rebuildEditionResultsFrozen(edition.id, db);
+    if (frozen && "error" in frozen) {
+      return {
+        error: `Ballots were written, but rebuilding published results failed (${frozen.error}). Use Publish / rebuild results.`,
+      };
+    }
     resultsRefreshed = true;
   }
 

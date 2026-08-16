@@ -10,7 +10,7 @@ import {
   seedCommunityEditionAction,
 } from "./actions";
 
-const COUNT_PRESETS = [5, 10, 25, 50, 100] as const;
+const COUNT_PRESETS = [5, 10, 25, 50, 100, 250, 500] as const;
 
 type Stats = {
   profiles: number;
@@ -198,6 +198,17 @@ export function AdminCommunitiesClient({
               </button>
             ))}
           </div>
+          <label className="mt-3 block text-sm text-muted">
+            Custom count (1–500 per run; no total cap — uncheck Reseed to append)
+            <input
+              className={`${fieldInputClass} mt-1`}
+              type="number"
+              min={1}
+              max={500}
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value))}
+            />
+          </label>
         </div>
         <label className="block text-sm text-muted">
           Ballot length (1–100)

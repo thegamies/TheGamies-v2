@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSeedCategoryVotes,
+  resolveSeedStartIndex,
   weightForRatedGame,
   weightForTopRank,
   weightedSample,
@@ -75,5 +76,20 @@ describe("buildSeedCategoryVotes", () => {
   it("returns nothing without picks or categories", () => {
     expect(buildSeedCategoryVotes([{ id: "a" }], [])).toEqual([]);
     expect(buildSeedCategoryVotes([], [{ id: "g1" }])).toEqual([]);
+  });
+});
+
+describe("resolveSeedStartIndex", () => {
+  it("reseeds from index 1", () => {
+    expect(resolveSeedStartIndex({ reseed: true, maxIndex: 50 })).toBe(1);
+    expect(resolveSeedStartIndex({ reseed: true, maxIndex: 0 })).toBe(1);
+  });
+
+  it("appends after the highest seed when reseed is off", () => {
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 0 })).toBe(1);
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 50 })).toBe(51);
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 1000 })).toBe(
+      1001,
+    );
   });
 });

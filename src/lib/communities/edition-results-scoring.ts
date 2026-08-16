@@ -90,9 +90,64 @@ export type AggregatedCategoryRow = GameMeta & {
   votes: number;
 };
 
+export type GotyTallyWithMeta = GameMeta & {
+  points: number;
+  firstPlaceVotes: number;
+  appearances: number;
+};
+
+export type CategoryTallyWithMeta = GameMeta & {
+  categoryId: string;
+  votes: number;
+};
+
+/**
+ * Board order for GOTY tallies.
+ * Tie-break: more points, then more #1s, then more appearances, then gameId.
+ */
+export function placeEditionGotyTallies(
+  tallies: GotyTallyWithMeta[],
+): AggregatedGotyRow[] {
+  const rows = tallies.filter((row) => row.points > 0);
+  rows.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.firstPlaceVotes !== a.firstPlaceVotes) {
+      return b.firstPlaceVotes - a.firstPlaceVotes;
+    }
+    if (b.appearances !== a.appearances) return b.appearances - a.appearances;
+    return a.gameId.localeCompare(b.gameId);
+  });
+  return rows.map((row, i) => ({ ...row, place: i + 1 }));
+}
+
+/** Per-category board order; tie-break votes then gameId. */
+export function placeEditionCategoryTallies(
+  tallies: CategoryTallyWithMeta[],
+): AggregatedCategoryRow[] {
+  const byCategory = new Map<string, CategoryTallyWithMeta[]>();
+  for (const entry of tallies) {
+    if (entry.votes <= 0) continue;
+    const list = byCategory.get(entry.categoryId) ?? [];
+    list.push(entry);
+    byCategory.set(entry.categoryId, list);
+  }
+
+  const out: AggregatedCategoryRow[] = [];
+  for (const list of byCategory.values()) {
+    list.sort((a, b) => {
+      if (b.votes !== a.votes) return b.votes - a.votes;
+      return a.gameId.localeCompare(b.gameId);
+    });
+    list.forEach((row, i) => {
+      out.push({ ...row, place: i + 1 });
+    });
+  }
+  return out;
+}
+
 /**
  * Aggregate GOTY points for a ballot pool (top-10 pointsForRank).
- * Tie-break: more points, then more #1s, then more appearances, then gameId.
+ * Freeze path aggregates in SQL then uses placeEditionGotyTallies.
  */
 export function aggregateEditionGoty(
   lines: RankedBallotLine[],
@@ -121,33 +176,25 @@ export function aggregateEditionGoty(
     byGame.set(line.gameId, cur);
   }
 
-  const rows: AggregatedGotyRow[] = [];
+  const tallies: GotyTallyWithMeta[] = [];
   for (const [gameId, stats] of byGame) {
-    if (stats.points <= 0) continue;
     const meta = games.get(gameId);
     if (!meta) continue;
-    rows.push({
+    tallies.push({
       ...meta,
-      place: 0,
       points: stats.points,
       firstPlaceVotes: stats.firstPlaceVotes,
       appearances: stats.appearances,
     });
   }
 
-  rows.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points;
-    if (b.firstPlaceVotes !== a.firstPlaceVotes) {
-      return b.firstPlaceVotes - a.firstPlaceVotes;
-    }
-    if (b.appearances !== a.appearances) return b.appearances - a.appearances;
-    return a.gameId.localeCompare(b.gameId);
-  });
-
-  return rows.map((row, i) => ({ ...row, place: i + 1 }));
+  return placeEditionGotyTallies(tallies);
 }
 
-/** Plurality category tallies; tie-break votes then gameId. */
+/**
+ * Plurality category tallies.
+ * Freeze path aggregates in SQL then uses placeEditionCategoryTallies.
+ */
 export function aggregateEditionCategories(
   votes: CategoryVoteLine[],
   games: Map<string, GameMeta>,
@@ -167,29 +214,16 @@ export function aggregateEditionCategories(
     byKey.set(key, cur);
   }
 
-  const byCategory = new Map<string, AggregatedCategoryRow[]>();
+  const tallies: CategoryTallyWithMeta[] = [];
   for (const entry of byKey.values()) {
     const meta = games.get(entry.gameId);
     if (!meta) continue;
-    const list = byCategory.get(entry.categoryId) ?? [];
-    list.push({
+    tallies.push({
       ...meta,
       categoryId: entry.categoryId,
-      place: 0,
       votes: entry.votes,
     });
-    byCategory.set(entry.categoryId, list);
   }
 
-  const out: AggregatedCategoryRow[] = [];
-  for (const list of byCategory.values()) {
-    list.sort((a, b) => {
-      if (b.votes !== a.votes) return b.votes - a.votes;
-      return a.gameId.localeCompare(b.gameId);
-    });
-    list.forEach((row, i) => {
-      out.push({ ...row, place: i + 1 });
-    });
-  }
-  return out;
+  return placeEditionCategoryTallies(tallies);
 }

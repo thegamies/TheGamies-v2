@@ -4,6 +4,9 @@ import { isAdminAuthorized } from "@/lib/admin-auth";
 import { countCommunitySeeds } from "@/lib/communities/seed-community";
 import { AdminCommunitiesClient } from "./AdminCommunitiesClient";
 
+/** Publish / rebuild freeze can exceed the default serverless budget. */
+export const maxDuration = 300;
+
 export const metadata: Metadata = {
   title: "Admin Community Seed",
   robots: { index: false, follow: false },

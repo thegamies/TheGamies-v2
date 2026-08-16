@@ -6,6 +6,8 @@ import {
   editionBoardLabel,
   parseEditionResultMode,
   parseEditionResultsView,
+  placeEditionCategoryTallies,
+  placeEditionGotyTallies,
   storageModeFor,
   type GameMeta,
 } from "./edition-results-scoring";
@@ -87,6 +89,64 @@ describe("parseEditionResultsView", () => {
     expect(parseEditionResultsView("voters")).toBe("voters");
     expect(parseEditionResultsView("ballot")).toBe("ballot");
     expect(parseEditionResultsView("settings")).toBe("settings");
+  });
+});
+
+describe("placeEditionGotyTallies / placeEditionCategoryTallies", () => {
+  it("orders GOTY by points, #1s, appearances, then gameId", () => {
+    const rows = placeEditionGotyTallies([
+      {
+        gameId: "g2",
+        slug: "two",
+        title: "Two",
+        gameYear: 2026,
+        coverUrl: null,
+        points: 10,
+        firstPlaceVotes: 1,
+        appearances: 1,
+      },
+      {
+        gameId: "g1",
+        slug: "one",
+        title: "One",
+        gameYear: 2026,
+        coverUrl: null,
+        points: 10,
+        firstPlaceVotes: 1,
+        appearances: 2,
+      },
+    ]);
+    expect(rows.map((r) => [r.gameId, r.place])).toEqual([
+      ["g1", 1],
+      ["g2", 2],
+    ]);
+  });
+
+  it("orders category tallies per award by votes then gameId", () => {
+    const rows = placeEditionCategoryTallies([
+      {
+        gameId: "g2",
+        slug: "two",
+        title: "Two",
+        gameYear: 2026,
+        coverUrl: null,
+        categoryId: "best",
+        votes: 1,
+      },
+      {
+        gameId: "g1",
+        slug: "one",
+        title: "One",
+        gameYear: 2026,
+        coverUrl: null,
+        categoryId: "best",
+        votes: 1,
+      },
+    ]);
+    expect(rows[0]?.gameId).toBe("g1");
+    expect(rows[0]?.place).toBe(1);
+    expect(rows[1]?.gameId).toBe("g2");
+    expect(rows[1]?.place).toBe(2);
   });
 });
 

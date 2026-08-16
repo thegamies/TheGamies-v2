@@ -110,7 +110,7 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Ops seed (admin)
 
-`/admin/communities` (admin code): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`).
+`/admin/communities` (admin code): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). No total seed-index cap (batches up to 500). Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`).
 
 ### Hosts (shipped)
 
@@ -118,7 +118,9 @@ Community hosts designate **Hosts** **per edition** under Settings (`community_e
 
 ### Results (shipped)
 
-On publish, write-once freeze into normalized tables (`community_edition_result_*`). Public mode switcher is **Community · Hosts** (Combined hidden until weighted scoring). Displayed rank is derived at read from equal points/votes using the event’s **tie numbering** setting (competition 1–1–3 default, or dense 1–1–2). Hosts set this in Event Settings and may change it after publish (no freeze rebuild). Unique freeze `place` stays board order. GOTY and voters are **SQL-paginated** (50 games, not 50 ranks). Categories load in full (small).
+On publish, write-once freeze into normalized tables (`community_edition_result_*`) for **GOTY boards, category tallies, and the voter roster only**. Individual voter GOTY ranks and category picks are **not** copied into freeze tables — Results Comparison and voter ballot views read them from `community_edition_ballot_*` (read-only after close). Public mode switcher is **Community · Hosts** (Combined hidden until weighted scoring). Displayed rank is derived at read from equal points/votes using the event’s **tie numbering** setting (competition 1–1–3 default, or dense 1–1–2). Hosts set this in Event Settings and may change it after publish (no freeze rebuild). Unique freeze `place` stays board order. GOTY and voters are **SQL-paginated** (50 games, not 50 ranks). Categories load in full (small).
+
+Board tallies are computed with **SQL `GROUP BY`** on ballot tables (same `pointsForRank` / plurality rules as before), then chunked into freeze rows for Neon HTTP. Hosts boards join `community_edition_voices`. Category top-N reads use window `RANK` / `DENSE_RANK` (not a correlated scan over full tallies). Reveal and Results Ranked SSR load GOTY through 10 + category podiums only; Comparison matrices load on demand. If a freeze fails mid-write, tables are cleared so the next ensure/rebuild can retry a complete snapshot. Rebuild no longer photocopies every voter’s category picks (that was the multi-minute / timeout path at a few hundred ballots).
 
 **GOTY / category Comparison:** Results GOTY and Categories share tertiary **Ranked · Comparison** at the top of the page (default Ranked). GOTY Ranked is a wrapping Top 10 grid with place in front of the title. Category Ranked is displayed rank ≤ 3 per award on one line with horizontal scroll (full ties). Comparison lays out parallel lists as per-rank (GOTY) or per-award (Categories) chapters — You · Community · Hosts · each Host — not one mega-table. GOTY Comparison numbering follows the event’s competition or dense setting.
 

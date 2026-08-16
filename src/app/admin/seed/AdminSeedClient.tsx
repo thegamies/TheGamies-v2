@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
+import { resolveSeedStartIndex } from "@/lib/live-aggregate/seed-standings";
 import {
   clearStandingsSeedsAction,
   loadSeedStatsAction,
@@ -99,13 +100,39 @@ export function AdminSeedClient({
     let hadError = false;
 
     try {
-      let startIndex = 1;
-      let remaining = Math.min(1000, Math.max(1, Math.floor(count)));
+      // Fresh max index so Reseed-off appends instead of re-targeting 1…N.
+      const loaded = await loadSeedStatsAction();
+      const maxIndex =
+        "maxIndex" in loaded ? loaded.maxIndex : (stats?.maxIndex ?? 0);
+      if ("profiles" in loaded) {
+        setStats({
+          profiles: loaded.profiles,
+          lists: loaded.lists,
+          maxIndex: loaded.maxIndex,
+        });
+      }
+
+      let startIndex = resolveSeedStartIndex({ reseed, maxIndex });
+      if (startIndex > 1000) {
+        setMessage(
+          reseed
+            ? "Seed index cannot exceed 1000."
+            : "Already at 1000 seed voters. Clear some before adding more, or turn Reseed on to rewrite 1…N.",
+        );
+        return;
+      }
+
+      let remaining = Math.min(
+        1000 - startIndex + 1,
+        Math.min(1000, Math.max(1, Math.floor(count))),
+      );
       let createdProfiles = 0;
       let createdLists = 0;
       let updatedLists = 0;
       let skipped = 0;
       let gamePoolSize = 0;
+      let categoryCount = 0;
+      let categoryVotes = 0;
       let lastEnd = 0;
       let wroteAnything = false;
 
@@ -132,11 +159,13 @@ export function AdminSeedClient({
         updatedLists += result.updatedLists;
         skipped += result.skipped;
         gamePoolSize = result.gamePoolSize;
+        categoryCount = result.categoryCount;
+        categoryVotes += result.categoryVotes;
         lastEnd = result.endIndex;
         startIndex = result.nextIndex;
         remaining = nextRemaining;
         setMessage(
-          `Progress: seeded through voter ${result.endIndex}… (${createdLists + updatedLists} lists so far)`,
+          `Progress: seeded through voter ${result.endIndex}… (${createdLists + updatedLists} lists, ${categoryVotes} category votes so far)`,
         );
         if (result.nextIndex > 1000) break;
       }
@@ -149,8 +178,8 @@ export function AdminSeedClient({
         }
         setMessage(
           stoppedEarly
-            ? `Stopped. Through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. Pool ${gamePoolSize}.`
-            : `Done through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. Pool ${gamePoolSize} games (bias ${ratingBias}).`,
+            ? `Stopped. Through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categoryVotes} category votes across ${categoryCount} categories. Pool ${gamePoolSize}.`
+            : `Done through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categoryVotes} category votes across ${categoryCount} categories. Pool ${gamePoolSize} games (bias ${ratingBias}).`,
         );
       }
       await refreshStats();
@@ -166,6 +195,8 @@ export function AdminSeedClient({
     let startIndex = Math.max(1, (stats?.maxIndex ?? 0) + 1);
     let totalLists = 0;
     let totalProfiles = 0;
+    let categoryCount = 0;
+    let categoryVotes = 0;
     let wroteAnything = false;
     let hadError = false;
 
@@ -184,9 +215,11 @@ export function AdminSeedClient({
         wroteAnything = true;
         totalProfiles += result.createdProfiles;
         totalLists += result.createdLists + result.updatedLists;
+        categoryCount = result.categoryCount;
+        categoryVotes += result.categoryVotes;
         startIndex = result.nextIndex;
         setMessage(
-          `Running… through voter ${result.endIndex} (+${totalLists} lists). Click Stop to finish.`,
+          `Running… through voter ${result.endIndex} (+${totalLists} lists, ${categoryVotes} category votes). Click Stop to finish.`,
         );
         await refreshStats();
       }
@@ -195,8 +228,8 @@ export function AdminSeedClient({
         await rebuildSeedYearAction({ year });
         setMessage(
           stopRef.current
-            ? `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes.`
-            : `Filled through ${Math.min(1000, startIndex - 1)}. Added ~${totalProfiles} profiles / ${totalLists} list writes.`,
+            ? `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categoryVotes} category votes (${categoryCount} categories).`
+            : `Filled through ${Math.min(1000, startIndex - 1)}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categoryVotes} category votes (${categoryCount} categories).`,
         );
       }
       await refreshStats();
@@ -234,8 +267,9 @@ export function AdminSeedClient({
   return (
     <div className="max-w-xl space-y-6">
       <p className="text-sm text-muted">
-        Synthetic voters and GOTY lists for standings QA. They cannot sign in.
-        Runs in batches of {BATCH_SIZE}; up to 1000 voters.
+        Synthetic voters, GOTY lists, and category votes for standings QA. They
+        cannot sign in. Runs in batches of {BATCH_SIZE}; up to 1000 voters.
+        Syncs the award catalog before each batch.
       </p>
 
       {stats ? (
@@ -335,7 +369,8 @@ export function AdminSeedClient({
           onChange={(e) => setReseed(e.target.checked)}
           disabled={busy}
         />
-        Reseed existing seed accounts in range (rewrite their rankings)
+        Reseed: rewrite voters 1…N. Off = add N new voters after the current max
+        index.
       </label>
 
       <div className="flex flex-wrap gap-3">
@@ -427,8 +462,8 @@ export function AdminSeedClient({
           href={`/game-of-the-year/${year}`}
         >
           {year} standings
-        </a>
-        .
+        </a>{" "}
+        (switch to Categories to confirm award votes).
       </p>
     </div>
   );

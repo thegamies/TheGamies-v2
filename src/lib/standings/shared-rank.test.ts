@@ -64,6 +64,15 @@ describe("scoreCutoffThroughRank", () => {
     expect(scoreCutoffThroughRank(votes, 3, "competition")).toBe(4);
     expect(votes.filter((v) => v >= 4)).toHaveLength(6);
   });
+
+  it("matches RANK()/DENSE_RANK window filter for category top-N", () => {
+    // Same predicate as SQL window filter in getEditionCategoryResults.
+    const votes = [12, 9, 4, 4, 4, 1];
+    const competition = ranksForSortedScores(votes, "competition");
+    expect(competition.filter((r) => r <= 3)).toEqual([1, 2, 3, 3, 3]);
+    const dense = ranksForSortedScores(votes, "dense");
+    expect(dense.filter((r) => r <= 3)).toEqual([1, 2, 3, 3, 3]);
+  });
 });
 
 describe("ranksForSortedPage", () => {
