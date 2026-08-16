@@ -2,6 +2,7 @@
 
 import {
   DndContext,
+  DragOverlay,
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
@@ -52,30 +53,9 @@ import {
 } from "@/components/lists/cardChrome";
 import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
-
-type DragGhost = {
-  x: number;
-  y: number;
-  grabX: number;
-  grabY: number;
-  screenW: number;
-  screenH: number;
-};
-
-function pointerClient(event: Event): { x: number; y: number } | null {
-  if ("clientX" in event && typeof (event as PointerEvent).clientX === "number") {
-    const e = event as PointerEvent;
-    return { x: e.clientX, y: e.clientY };
-  }
-  const touch = (event as TouchEvent).touches?.[0]
-    ?? (event as TouchEvent).changedTouches?.[0];
-  if (touch) return { x: touch.clientX, y: touch.clientY };
-  return null;
-}
 
 export type PosterItem = {
   id: string;
@@ -132,7 +112,6 @@ export function PosterBuilder({
 
   const sensors = useListCardDragSensors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dragGhost, setDragGhost] = useState<DragGhost | null>(null);
   const dragOccurredRef = useRef(false);
   useDragBodyScrollLock(activeId != null);
 
@@ -186,8 +165,7 @@ export function PosterBuilder({
 
   const bannerH = exportRankBannerBelowHeight(rankScaleWidth, chrome);
 
-  // Map each rank (1-based) to the card dimensions of the row it lives in, so the
-  // drag overlay can render the floating card at the correct size for its slot.
+  // Map each rank (1-based) to canvas card dimensions for the drag overlay.
   const rankSize = useMemo(() => {
     const m = new Map<number, { w: number; h: number }>();
     rows.forEach((row, rowIndex) => {
@@ -197,31 +175,26 @@ export function PosterBuilder({
     return m;
   }, [rows, cardByRow]);
 
+  /**
+   * Interactive poster is laid out in **on-screen pixels** (canvas × scale).
+   * Do not CSS-`scale()` the DnD tree — that breaks pointer tracking (Grid
+   * works because it has no transform wrapper).
+   */
+  const sx = (n: number) => n * scale;
+  const viewW = sx(CANVAS_W);
+  const viewH = sx(CANVAS_H);
+  const viewGap = sx(AWARDS_GRID_GAP);
+  const viewSidePad = sx(AWARDS_SIDE_PAD);
+  const viewGridTopPad = sx(AWARDS_GRID_TOP_PAD);
+  const viewHeaderH = sx(AWARDS_HEADER_BAND_PX);
+  const viewFooterH = sx(AWARDS_FOOTER_PX);
+  const viewBannerH = sx(bannerH);
+  const viewRankScaleW = sx(rankScaleWidth);
+
   const handleDragStart = (event: DragStartEvent) => {
     dragOccurredRef.current = true;
     setSelectedId(null);
-    const id = String(event.active.id);
-    setActiveId(id);
-
-    const node = document.querySelector(
-      `[data-list-card="${globalThis.CSS.escape(id)}"]`,
-    );
-    const rect = node?.getBoundingClientRect();
-    const pointer = event.activatorEvent
-      ? pointerClient(event.activatorEvent)
-      : null;
-    if (rect && rect.width > 0) {
-      const px = pointer?.x ?? rect.left + rect.width / 2;
-      const py = pointer?.y ?? rect.top + rect.height / 2;
-      setDragGhost({
-        x: rect.left,
-        y: rect.top,
-        grabX: px - rect.left,
-        grabY: py - rect.top,
-        screenW: rect.width,
-        screenH: rect.height,
-      });
-    }
+    setActiveId(String(event.active.id));
   };
 
   // Commit the reorder once, on drop. Reordering live during the drag causes an
@@ -230,7 +203,6 @@ export function PosterBuilder({
   // sorting strategy provides the animated live preview instead.
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
-    setDragGhost(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const from = filledIds.indexOf(String(active.id));
@@ -244,33 +216,10 @@ export function PosterBuilder({
 
   const handleDragCancel = () => {
     setActiveId(null);
-    setDragGhost(null);
     window.setTimeout(() => {
       dragOccurredRef.current = false;
     }, 0);
   };
-
-  // Follow the finger in client coordinates so canvas scale / browser zoom
-  // cannot pull the ghost away from the pointer (dnd-kit DragOverlay is fixed
-  // and drifts inside transformed ancestors).
-  useEffect(() => {
-    if (!dragGhost) return;
-    function onMove(event: Event) {
-      const point = pointerClient(event);
-      if (!point) return;
-      setDragGhost((curr) =>
-        curr
-          ? { ...curr, x: point.x - curr.grabX, y: point.y - curr.grabY }
-          : null,
-      );
-    }
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("touchmove", onMove, { passive: true });
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("touchmove", onMove);
-    };
-  }, [dragGhost != null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeItem = activeId ? items.find((i) => i.id === activeId) ?? null : null;
   const activeRank = activeId ? filledIds.indexOf(activeId) + 1 : 0;
@@ -324,217 +273,190 @@ export function PosterBuilder({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-    <div ref={containerRef} className="w-full">
-      <div style={{ position: "relative", width: "100%", height: CANVAS_H * scale }}>
+      <div ref={containerRef} className="w-full">
         <div
           style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: CANVAS_W,
-            height: CANVAS_H,
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
+            position: "relative",
+            width: "100%",
+            height: viewH,
+            overflow: "hidden",
           }}
         >
+          <AwardsPosterBackground
+            width={viewW}
+            height={viewH}
+            headerLineY={sx(awardsHeaderLineY())}
+          />
           <div
             style={{
               position: "relative",
-              width: CANVAS_W,
-              height: CANVAS_H,
-              overflow: "hidden",
+              zIndex: 1,
+              display: "flex",
+              flexDirection: "column",
+              width: viewW,
+              height: viewH,
+              minHeight: 0,
             }}
           >
-            <AwardsPosterBackground
-              width={CANVAS_W}
-              height={CANVAS_H}
-              headerLineY={awardsHeaderLineY()}
+            <AwardsExportHeader
+              year={year}
+              topCount={slotCount}
+              listType={listType}
+              heightPx={viewHeaderH}
+              widthPx={viewW}
+              title={title}
+              showYearBadge={showYearBadge}
+              showTopCount={showTopCount}
             />
-            <div
-              style={{
-                position: "relative",
-                zIndex: 1,
-                display: "flex",
-                flexDirection: "column",
-                width: "100%",
-                height: "100%",
-                minHeight: 0,
-              }}
-            >
-              <AwardsExportHeader
-                year={year}
-                topCount={slotCount}
-                listType={listType}
-                heightPx={AWARDS_HEADER_BAND_PX}
-                widthPx={CANVAS_W}
-                title={title}
-                showYearBadge={showYearBadge}
-                showTopCount={showTopCount}
-              />
 
-                <SortableContext items={filledIds} strategy={rectSortingStrategy}>
-                  <div
-                    style={{
-                      flex: 1,
-                      minHeight: 0,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: AWARDS_GRID_GAP,
-                      padding: `${AWARDS_GRID_TOP_PAD}px ${AWARDS_SIDE_PAD}px 0`,
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    {rows.map((row, rowIndex) => {
-                      const { w, h } = cardByRow[rowIndex]!;
-                      const rowH = h + bannerH;
-                      return (
-                        <div
-                          key={row.ranks.join("-")}
-                          style={{
-                            width: CANVAS_W - AWARDS_SIDE_PAD * 2,
-                            height: rowH,
-                            display: "flex",
-                            alignItems: "stretch",
-                            justifyContent: "center",
-                            gap: AWARDS_GRID_GAP,
-                            flexShrink: 0,
-                          }}
-                        >
-                          {row.ranks.map((rank) => {
-                            const item = items[rank - 1];
-                            if (item) {
-                              return (
-                                <SortableCard
-                                  key={item.id}
-                                  id={item.id}
-                                  game={{
-                                    id: item.id,
-                                    title: item.title,
-                                    imageUrl: item.coverUrl,
-                                  }}
-                                  rank={rank}
-                                  width={w}
-                                  height={h}
-                                  rankScaleWidth={rankScaleWidth}
-                                  rankChrome={chrome}
-                                  scale={scale}
-                                  selected={selectedId === item.id}
-                                  onSelect={() => {
-                                    if (dragOccurredRef.current) return;
-                                    setSelectedId((curr) =>
-                                      curr === item.id ? null : item.id,
-                                    );
-                                  }}
-                                />
-                              );
-                            }
-                            return (
-                              <EmptySlot
-                                key={`empty-${rank}`}
-                                rank={rank}
-                                width={w}
-                                height={h}
-                                bannerH={bannerH}
-                                showRank={!hideRanks}
-                                onClick={onPickEmpty}
-                              />
-                            );
-                          })}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </SortableContext>
+            <SortableContext items={filledIds} strategy={rectSortingStrategy}>
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: viewGap,
+                  padding: `${viewGridTopPad}px ${viewSidePad}px 0`,
+                  boxSizing: "border-box",
+                }}
+              >
+                {rows.map((row, rowIndex) => {
+                  const { w, h } = cardByRow[rowIndex]!;
+                  const cardW = sx(w);
+                  const cardH = sx(h);
+                  const rowH = cardH + viewBannerH;
+                  return (
+                    <div
+                      key={row.ranks.join("-")}
+                      style={{
+                        width: viewW - viewSidePad * 2,
+                        height: rowH,
+                        display: "flex",
+                        alignItems: "stretch",
+                        justifyContent: "center",
+                        gap: viewGap,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {row.ranks.map((rank) => {
+                        const item = items[rank - 1];
+                        if (item) {
+                          return (
+                            <SortableCard
+                              key={item.id}
+                              id={item.id}
+                              game={{
+                                id: item.id,
+                                title: item.title,
+                                imageUrl: item.coverUrl,
+                              }}
+                              rank={rank}
+                              width={cardW}
+                              height={cardH}
+                              rankScaleWidth={viewRankScaleW}
+                              rankChrome={chrome}
+                              selected={selectedId === item.id}
+                              onSelect={() => {
+                                if (dragOccurredRef.current) return;
+                                setSelectedId((curr) =>
+                                  curr === item.id ? null : item.id,
+                                );
+                              }}
+                            />
+                          );
+                        }
+                        return (
+                          <EmptySlot
+                            key={`empty-${rank}`}
+                            rank={rank}
+                            width={cardW}
+                            height={cardH}
+                            bannerH={viewBannerH}
+                            showRank={!hideRanks}
+                            onClick={onPickEmpty}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            </SortableContext>
 
-              <AwardsExportFooter heightPx={AWARDS_FOOTER_PX} widthPx={CANVAS_W} />
+            <AwardsExportFooter heightPx={viewFooterH} widthPx={viewW} />
+          </div>
+        </div>
+
+        {debugStats ? (
+          <div className="mt-3 border border-[var(--line)] bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
+            <div className="mb-1 font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
+              Layout debug
+            </div>
+            <div>
+              slots {debugStats.slots} · rows {debugStats.distribution} · canvas{" "}
+              {CANVAS_W}×{CANVAS_H}
+            </div>
+            <div>
+              <span className="text-[var(--ink)]">largest</span>{" "}
+              {debugStats.largest.w}×{debugStats.largest.h}px ·{" "}
+              {debugStats.largest.widthPct}% width · {debugStats.largest.areaPct}
+              % area
+            </div>
+            <div>
+              <span className="text-[var(--ink)]">smallest</span>{" "}
+              {debugStats.smallest.w}×{debugStats.smallest.h}px ·{" "}
+              {debugStats.smallest.widthPct}% width ·{" "}
+              {debugStats.smallest.areaPct}% area
+            </div>
+            <div>
+              size parity (small/large){" "}
+              <span className="text-[var(--ink)]">{debugStats.parityPct}%</span>{" "}
+              · area used{" "}
+              <span className="text-[var(--ink)]">{debugStats.coveragePct}%</span>
             </div>
           </div>
-        </div>
-      </div>
+        ) : null}
 
-      {debugStats ? (
-        <div className="mt-3 border border-[var(--line)] bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
-          <div className="mb-1 font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
-            Layout debug
-          </div>
-          <div>
-            slots {debugStats.slots} · rows {debugStats.distribution} · canvas{" "}
-            {CANVAS_W}×{CANVAS_H}
-          </div>
-          <div>
-            <span className="text-[var(--ink)]">largest</span>{" "}
-            {debugStats.largest.w}×{debugStats.largest.h}px · {debugStats.largest.widthPct}
-            % width · {debugStats.largest.areaPct}% area
-          </div>
-          <div>
-            <span className="text-[var(--ink)]">smallest</span>{" "}
-            {debugStats.smallest.w}×{debugStats.smallest.h}px ·{" "}
-            {debugStats.smallest.widthPct}% width · {debugStats.smallest.areaPct}% area
-          </div>
-          <div>
-            size parity (small/large){" "}
-            <span className="text-[var(--ink)]">{debugStats.parityPct}%</span> · area used{" "}
-            <span className="text-[var(--ink)]">{debugStats.coveragePct}%</span>
-          </div>
-        </div>
-      ) : null}
-
-      {dragGhost && activeItem && activeSize
-        ? createPortal(
+        <DragOverlay dropAnimation={null}>
+          {activeItem && activeSize ? (
             <div
-              aria-hidden
               style={{
-                position: "fixed",
-                left: dragGhost.x,
-                top: dragGhost.y,
-                width: dragGhost.screenW,
-                height: dragGhost.screenH,
-                zIndex: 80,
-                pointerEvents: "none",
+                width: sx(activeSize.w),
                 cursor: "grabbing",
               }}
             >
-              <div
-                style={{
-                  width: activeSize.w,
-                  height: activeSize.h + bannerH,
-                  transform: `scale(${scale})`,
-                  transformOrigin: "top left",
+              <SocialGamerCardImageFrame
+                game={{
+                  id: activeItem.id,
+                  title: activeItem.title,
+                  imageUrl: activeItem.coverUrl,
                 }}
-              >
-                <SocialGamerCardImageFrame
-                  game={{
-                    id: activeItem.id,
-                    title: activeItem.title,
-                    imageUrl: activeItem.coverUrl,
-                  }}
-                  rank={activeRank}
-                  width={activeSize.w}
-                  height={activeSize.h}
-                  rankScaleWidth={rankScaleWidth}
-                  rankChrome={chrome}
-                  style={{
-                    boxShadow:
-                      "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
-                  }}
-                />
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
-      {selectedId ? (
-        <ListCardActionMenu
-          anchorId={selectedId}
-          onRemove={() => {
-            onRemove(selectedId);
-            setSelectedId(null);
-          }}
-        />
-      ) : null}
-    </div>
+                rank={activeRank}
+                width={sx(activeSize.w)}
+                height={sx(activeSize.h)}
+                rankScaleWidth={viewRankScaleW}
+                rankChrome={chrome}
+                style={{
+                  boxShadow:
+                    "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
+                }}
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+        {selectedId ? (
+          <ListCardActionMenu
+            anchorId={selectedId}
+            onRemove={() => {
+              onRemove(selectedId);
+              setSelectedId(null);
+            }}
+          />
+        ) : null}
+      </div>
     </DndContext>
   );
 }
@@ -547,7 +469,6 @@ function SortableCard({
   height,
   rankScaleWidth,
   rankChrome,
-  scale,
   selected,
   onSelect,
 }: {
@@ -558,26 +479,12 @@ function SortableCard({
   height: number;
   rankScaleWidth: number;
   rankChrome: ExportRankChromeConfig;
-  scale: number;
   selected: boolean;
   onSelect: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
   const holdListeners = mergeHoldDragListeners(listeners);
-
-  // dnd-kit's sorting strategy animates the displaced siblings (including across
-  // rows) via `transform`. Those values are measured in on-screen (scaled)
-  // pixels, but the transform is applied inside the `scale()` canvas — so divide
-  // by `scale` to move the correct visual distance ("all the way" to the slot).
-  const shift =
-    transform && scale > 0
-      ? CSS.Transform.toString({
-          ...transform,
-          x: transform.x / scale,
-          y: transform.y / scale,
-        })
-      : undefined;
 
   return (
     <div
@@ -587,7 +494,7 @@ function SortableCard({
         position: "relative",
         width,
         flexShrink: 0,
-        transform: shift,
+        transform: CSS.Transform.toString(transform),
         transition,
         opacity: isDragging ? 0 : 1,
         outline: selected ? "3px solid var(--accent)" : undefined,
@@ -638,51 +545,44 @@ function EmptySlot({
         width,
         height: height + bannerH,
         flexShrink: 0,
+        borderRadius: radius,
+        border: "2px dashed rgba(244,240,232,0.22)",
+        background: "rgba(255,255,255,0.03)",
+        color: "rgba(244,240,232,0.45)",
+        cursor: onClick ? "pointer" : "default",
         display: "flex",
         flexDirection: "column",
-        borderRadius: radius,
-        overflow: "hidden",
-        border: "3px dashed rgba(255,255,255,0.16)",
-        background: "rgba(255,255,255,0.02)",
-        cursor: onClick ? "pointer" : "default",
-        boxSizing: "border-box",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: Math.max(4, Math.round(width * 0.04)),
+        padding: Math.max(6, Math.round(width * 0.06)),
       }}
-      aria-label={`Empty slot ${rank} — add a game`}
+      aria-label={
+        onClick ? `Empty slot ${rank}, add a game` : `Empty slot ${rank}`
+      }
     >
-      <div
-        style={{
-          height,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: Math.round(width * 0.06),
-          color: "rgba(255,255,255,0.28)",
-          fontSize: Math.round(width * 0.28),
-          fontWeight: 300,
-          lineHeight: 1,
-        }}
-      >
-        +
-      </div>
-      {showRank && bannerH > 0 ? (
-        <div
+      {showRank ? (
+        <span
           style={{
-            height: bannerH,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            background: "rgba(255,90,31,0.14)",
-            color: "rgba(255,255,255,0.4)",
-            fontFamily: "Arial, sans-serif",
-            fontWeight: 800,
-            fontSize: Math.max(12, Math.round(width * 0.12)),
-            letterSpacing: "0.02em",
+            fontFamily: "Bebas Neue, Impact, sans-serif",
+            fontSize: Math.max(16, Math.round(width * 0.22)),
+            letterSpacing: "0.04em",
+            lineHeight: 1,
+            color: "rgba(255,90,31,0.55)",
           }}
         >
           {formatExportRank(rank, "ordinal")}
-        </div>
+        </span>
       ) : null}
+      <span
+        style={{
+          fontSize: Math.max(10, Math.round(width * 0.08)),
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+        }}
+      >
+        Empty
+      </span>
     </button>
   );
 }
