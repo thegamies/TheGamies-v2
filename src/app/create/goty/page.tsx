@@ -20,6 +20,7 @@ import {
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
+import { parseStoredListFormat, parseStoredRankStyle } from "@/lib/lists/schema";
 import { createGotyEntryMode } from "@/lib/lists/create-goty-entry";
 import {
   getCategoryVotesForList,
@@ -129,6 +130,9 @@ export default async function CreateGotyPage({
         title: result.list.title,
         year: result.list.year,
         slotCount: Math.max(10, result.items.length),
+        rankStyle: parseStoredRankStyle(result.list.rankStyle),
+        showSuffix: result.list.showSuffix,
+        listFormat: parseStoredListFormat(result.list.listFormat),
         items: result.items.map((item) => ({
           gameId: item.gameId,
           igdbId: item.igdbId,

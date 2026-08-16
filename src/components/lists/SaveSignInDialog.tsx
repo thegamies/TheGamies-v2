@@ -31,9 +31,6 @@ export function SaveSignInDialog({
             Create account &amp; save
           </Button>
         </Link>
-        <Button type="button" variant="quiet" onClick={onClose}>
-          Keep editing
-        </Button>
       </div>
     </Dialog>
   );

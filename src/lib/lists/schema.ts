@@ -82,12 +82,31 @@ export const replaceItemsByIgdbSchema = z
     refineUniqueRanks(items, ctx, (item) => String(item.igdbId));
   });
 
+export const listRankStyleSchema = z.enum(["banner", "chip", "off"]);
+export type ListRankStyle = z.infer<typeof listRankStyleSchema>;
+
+export function parseStoredRankStyle(value: string): ListRankStyle {
+  const parsed = listRankStyleSchema.safeParse(value);
+  return parsed.success ? parsed.data : "chip";
+}
+
+export const listFormatSchema = z.enum(["poster", "list", "grid"]);
+export type ListFormat = z.infer<typeof listFormatSchema>;
+
+export function parseStoredListFormat(value: string): ListFormat {
+  const parsed = listFormatSchema.safeParse(value);
+  return parsed.success ? parsed.data : "grid";
+}
+
 export const clientDraftUpsertSchema = z.object({
   publicId: z.string().min(1).optional().nullable(),
   listType: listTypeSchema,
   title: listTitleSchema,
   year: listYearSchema.optional().nullable(),
   items: replaceItemsByIgdbSchema,
+  rankStyle: listRankStyleSchema.optional(),
+  showSuffix: z.boolean().optional(),
+  listFormat: listFormatSchema.optional(),
 });
 
 export const updateListMetaSchema = z.object({

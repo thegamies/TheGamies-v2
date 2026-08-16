@@ -91,15 +91,47 @@ export function mergeHoldDragListeners(
   };
 }
 
+const SCROLL_KEYS = new Set([
+  " ",
+  "Spacebar",
+  "ArrowUp",
+  "ArrowDown",
+  "ArrowLeft",
+  "ArrowRight",
+  "PageUp",
+  "PageDown",
+  "Home",
+  "End",
+]);
+
+/**
+ * Freeze document scroll without `overflow: hidden`, which hides the
+ * scrollbar and shifts the page when the gutter disappears.
+ */
+export function lockDocumentScroll(): () => void {
+  const prevent = (event: Event) => {
+    event.preventDefault();
+  };
+  const preventKeys = (event: KeyboardEvent) => {
+    if (SCROLL_KEYS.has(event.key)) event.preventDefault();
+  };
+
+  document.addEventListener("wheel", prevent, { passive: false });
+  document.addEventListener("touchmove", prevent, { passive: false });
+  document.addEventListener("keydown", preventKeys);
+
+  return () => {
+    document.removeEventListener("wheel", prevent);
+    document.removeEventListener("touchmove", prevent);
+    document.removeEventListener("keydown", preventKeys);
+  };
+}
+
 /** Freeze document scroll while a card drag is active. */
 export function useDragBodyScrollLock(active: boolean) {
   useEffect(() => {
     if (!active) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
+    return lockDocumentScroll();
   }, [active]);
 }
 

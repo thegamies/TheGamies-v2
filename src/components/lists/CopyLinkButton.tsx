@@ -7,6 +7,7 @@ export function CopyLinkButton() {
     <Button
       type="button"
       variant="bordered"
+      size="sm"
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(window.location.href);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { type GameSearchHit } from "@/app/create/search-actions";
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/CategoryPickCard";
 import { Dialog } from "@/components/ui/Dialog";
 import { GameSearchField } from "@/components/ui/GameSearchField";
-import { SectionRule } from "@/components/ui/SectionRule";
 import {
   AWARD_CATEGORY_ELIGIBILITY_LABEL,
   AWARD_CATEGORY_GROUP_LABEL,
@@ -53,6 +52,8 @@ type Props = {
   locked?: boolean;
   lockHref?: string;
   lockMessage?: string;
+  /** Optional controls aligned with the Award picks heading (e.g. Save / Share). */
+  actions?: ReactNode;
 };
 
 export function CategoryVotesEditor({
@@ -64,6 +65,7 @@ export function CategoryVotesEditor({
   locked = false,
   lockHref,
   lockMessage = "Sign in to choose award winners for your GOTY list.",
+  actions,
 }: Props) {
   const catalog = useMemo(() => sortedAwardCategories(categories), [categories]);
   const [openIds, setOpenIds] = useState<string[]>(() =>
@@ -126,12 +128,11 @@ export function CategoryVotesEditor({
   if (locked) {
     return (
       <section>
-        <SectionRule />
         <BallotChapterHeader
-          className="mt-8"
           eyebrow="Categories"
           title="Award picks"
           description="Site award categories for this year’s Game of the Year."
+          actions={actions}
         />
         <div className="mt-6 border border-line bg-panel p-5">
           <p className="font-display text-2xl tracking-wide text-ink">
@@ -166,13 +167,12 @@ export function CategoryVotesEditor({
   }
 
   return (
-    <section>
-      <SectionRule />
+      <section>
       <BallotChapterHeader
-        className="mt-8"
         eyebrow="Categories"
         title="Award picks"
         description={description}
+        actions={actions}
       />
 
       <div className="mt-6 flex flex-wrap items-center gap-3">

@@ -1,7 +1,7 @@
 /** @vitest-environment jsdom */
 
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SaveSignInDialog } from "./SaveSignInDialog";
 import { ShareLinkSignInDialog } from "./ShareLinkSignInDialog";
@@ -28,42 +28,40 @@ afterEach(() => {
 });
 
 describe("ShareMenuDialog", () => {
-  it("offers image and link actions without calling share by itself", () => {
+  it("offers image and link actions from the share button menu", () => {
     const onShareAsImage = vi.fn();
     const onShareWithLink = vi.fn();
-    const onClose = vi.fn();
 
-    const { rerender } = render(
-      <ShareMenuDialog
-        open
-        onClose={onClose}
-        onShareAsImage={onShareAsImage}
-        onShareWithLink={onShareWithLink}
-      />,
+    render(
+      <div className="relative">
+        <ShareMenuDialog
+          open
+          signedIn
+          onShareAsImage={onShareAsImage}
+          onShareWithLink={onShareWithLink}
+        />
+      </div>,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "Share" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Share as image" }));
+    const menu = screen.getByRole("menu", { name: "Share" });
+    fireEvent.click(screen.getByRole("menuitem", { name: "Share as image" }));
     expect(onShareAsImage).toHaveBeenCalledTimes(1);
     expect(onShareWithLink).not.toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    expect(menu).toBeTruthy();
+  });
 
-    onClose.mockClear();
-    onShareAsImage.mockClear();
-
-    rerender(
+  it("marks share with a link as sign-in required when signed out", () => {
+    render(
       <ShareMenuDialog
         open
-        onClose={onClose}
-        onShareAsImage={onShareAsImage}
-        onShareWithLink={onShareWithLink}
+        signedIn={false}
+        onShareAsImage={() => undefined}
+        onShareWithLink={() => undefined}
       />,
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Share with a link" }),
-    );
-    expect(onShareWithLink).toHaveBeenCalledTimes(1);
-    expect(onShareAsImage).not.toHaveBeenCalled();
+
+    expect(screen.getByText("Sign in required")).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: /Share with a link/i })).toBeTruthy();
   });
 });
 
@@ -86,7 +84,8 @@ describe("SaveSignInDialog", () => {
     expect(link.getAttribute("href")).toContain(
       encodeURIComponent("/create/goty?year=2026&intent=save"),
     );
-    expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Keep editing" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
     const createLink = screen.getByRole("link", {
       name: /Create account & save/i,
     });
@@ -96,15 +95,11 @@ describe("SaveSignInDialog", () => {
 });
 
 describe("ShareLinkSignInDialog", () => {
-  it("links Sign in & share and can fall back to image", () => {
-    const onShareAsImage = vi.fn();
-    const onClose = vi.fn();
-
+  it("only offers sign in or create account", () => {
     render(
       <ShareLinkSignInDialog
         open
-        onClose={onClose}
-        onShareAsImage={onShareAsImage}
+        onClose={() => undefined}
         returnPath="/create/custom?title=Favs"
       />,
     );
@@ -114,11 +109,8 @@ describe("ShareLinkSignInDialog", () => {
     expect(link.getAttribute("href")).toContain(
       encodeURIComponent("/create/custom?title=Favs&intent=share"),
     );
-
-    fireEvent.click(
-      screen.getByRole("button", { name: "Share as image instead" }),
-    );
-    expect(onClose).toHaveBeenCalled();
-    expect(onShareAsImage).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "Share as image instead" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
   });
 });

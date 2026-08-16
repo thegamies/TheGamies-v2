@@ -8,6 +8,7 @@ import {
   beginHoldScrollGuard,
   cardActionMenuItemClassName,
   cardTouchLockClassName,
+  lockDocumentScroll,
 } from "./cardChrome";
 import { ListCardActionMenu } from "./ListCardActionMenu";
 
@@ -63,6 +64,29 @@ describe("list card chrome", () => {
 
     addSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+
+  it("locks scroll without hiding the body scrollbar", () => {
+    document.body.style.overflow = "";
+    const unlock = lockDocumentScroll();
+
+    expect(document.body.style.overflow).toBe("");
+
+    const wheel = new Event("wheel", { cancelable: true });
+    document.dispatchEvent(wheel);
+    expect(wheel.defaultPrevented).toBe(true);
+
+    const key = new KeyboardEvent("keydown", {
+      key: "ArrowDown",
+      cancelable: true,
+    });
+    document.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(true);
+
+    unlock();
+    const after = new Event("wheel", { cancelable: true });
+    document.dispatchEvent(after);
+    expect(after.defaultPrevented).toBe(false);
   });
 });
 

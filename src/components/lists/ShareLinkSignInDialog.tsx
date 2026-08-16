@@ -9,12 +9,10 @@ import { buildListSignInHref } from "@/lib/lists/auth-intent";
 export function ShareLinkSignInDialog({
   open,
   onClose,
-  onShareAsImage,
   returnPath,
 }: {
   open: boolean;
   onClose: () => void;
-  onShareAsImage: () => void;
   returnPath: string;
 }) {
   return (
@@ -31,19 +29,6 @@ export function ShareLinkSignInDialog({
             Create account &amp; share
           </Button>
         </Link>
-        <Button
-          type="button"
-          variant="bordered"
-          onClick={() => {
-            onClose();
-            onShareAsImage();
-          }}
-        >
-          Share as image instead
-        </Button>
-        <Button type="button" variant="quiet" onClick={onClose}>
-          Cancel
-        </Button>
       </div>
     </Dialog>
   );

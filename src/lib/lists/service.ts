@@ -759,6 +759,9 @@ async function applyMetaPatch(
     title: string;
     listType: "goty" | "custom";
     year: number | null;
+    rankStyle?: "banner" | "chip" | "off";
+    showSuffix?: boolean;
+    listFormat?: "poster" | "list" | "grid";
   },
   db: Db,
 ): Promise<{ list: ListRow } | { error: string }> {
@@ -768,6 +771,9 @@ async function applyMetaPatch(
     year: input.listType === "goty" ? input.year : input.year,
     updatedAt: new Date(),
   };
+  if (input.rankStyle) patch.rankStyle = input.rankStyle;
+  if (typeof input.showSuffix === "boolean") patch.showSuffix = input.showSuffix;
+  if (input.listFormat) patch.listFormat = input.listFormat;
   if (input.listType === "goty" && input.year == null) {
     return { error: "GOTY lists need a year." };
   }
@@ -852,13 +858,18 @@ export async function shareListFromClientDraft(
     if ("error" in created) return created;
     list = created.list;
     editSecret = created.editSecret;
-  } else {
+  }
+
+  {
     const meta = await applyMetaPatch(
       list,
       {
         title: data.title,
         listType: data.listType,
         year: data.year ?? null,
+        rankStyle: data.rankStyle,
+        showSuffix: data.showSuffix,
+        listFormat: data.listFormat,
       },
       db,
     );
@@ -917,6 +928,9 @@ export async function syncExistingSharedListFromClientDraft(
       title: data.title,
       listType: data.listType,
       year: data.year ?? null,
+      rankStyle: data.rankStyle,
+      showSuffix: data.showSuffix,
+      listFormat: data.listFormat,
     },
     db,
   );
@@ -995,19 +1009,22 @@ export async function saveOwnedListFromClientDraft(
     );
     if ("error" in created) return created;
     list = created.list;
-  } else {
-    const meta = await applyMetaPatch(
-      list,
-      {
-        title: data.title,
-        listType: data.listType,
-        year: data.year ?? null,
-      },
-      db,
-    );
-    if ("error" in meta) return meta;
-    list = meta.list;
   }
+
+  const meta = await applyMetaPatch(
+    list,
+    {
+      title: data.title,
+      listType: data.listType,
+      year: data.year ?? null,
+      rankStyle: data.rankStyle,
+      showSuffix: data.showSuffix,
+      listFormat: data.listFormat,
+    },
+    db,
+  );
+  if ("error" in meta) return meta;
+  list = meta.list;
 
   const written = await writeItemsFromIgdb(
     list,

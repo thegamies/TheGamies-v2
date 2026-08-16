@@ -32,8 +32,8 @@ import {
 } from "@/app/create/actions";
 import {
   searchGamesForList,
-  type GameSearchHit,
-} from "@/app/create/search-actions";
+} from "@/lib/lists/search-games-client";
+import type { GameSearchHit } from "@/lib/lists/game-search-hit";
 import { ListExportDialog } from "@/components/list-export/ListExportDialog";
 import {
   EXPORT_RANK_STYLES,
@@ -44,10 +44,11 @@ import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { GridListBuilder } from "@/components/lists/GridListBuilder";
 import {
   cardTouchLockClassName,
-  mergeHoldDragListeners,
   useDragBodyScrollLock,
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
+import { ListDragHandle } from "@/components/lists/ListDragHandle";
+import { ListFormatControl } from "@/components/lists/ListFormatControl";
 import { SaveSignInDialog } from "@/components/lists/SaveSignInDialog";
 import { ShareLinkSignInDialog } from "@/components/lists/ShareLinkSignInDialog";
 import { ShareMenuDialog } from "@/components/lists/ShareMenuDialog";
@@ -134,7 +135,6 @@ function persistSnapshot(input: {
   items: EditorItem[];
   categoryVotes: CategoryVoteSelection[];
   listFormat: ListFormat;
-  slotCount: number;
   rankStyle: ExportRankStyle;
   showSuffix: boolean;
 }): string {
@@ -142,8 +142,7 @@ function persistSnapshot(input: {
     listType: input.listType,
     title: input.title,
     year: input.year,
-    listFormat: input.listFormat,
-    slotCount: input.slotCount,
+    defaultFormat: input.listFormat,
     rankStyle: input.rankStyle,
     showSuffix: input.showSuffix,
     items: input.items.map((item, index) => ({
@@ -166,7 +165,7 @@ export function ListEditor({
   initialYear,
   initialItems,
   initialSlotCount,
-  initialListFormat = "poster",
+  initialListFormat = "grid",
   initialRankStyle = "chip",
   initialShowSuffix = false,
   signedIn = false,
@@ -182,6 +181,7 @@ export function ListEditor({
   const currentYear = new Date().getUTCFullYear();
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
+  const shareRef = useRef<HTMLDivElement>(null);
   const shareFormRef = useRef<HTMLFormElement>(null);
   const authIntentHandled = useRef(false);
   const [savedSnapshot, setSavedSnapshot] = useState(() =>
@@ -197,7 +197,6 @@ export function ListEditor({
       ),
       categoryVotes: initialCategoryVotes,
       listFormat: initialListFormat,
-      slotCount: Math.max(initialSlotCount ?? 10, initialItems.length),
       rankStyle: initialRankStyle,
       showSuffix: initialShowSuffix,
     }),
@@ -228,10 +227,19 @@ export function ListEditor({
     Math.max(initialSlotCount ?? 10, initialItems.length),
   );
   const [listFormat, setListFormat] = useState<ListFormat>(initialListFormat);
+  const [defaultFormat, setDefaultFormat] = useState<ListFormat>(initialListFormat);
   const [rankStyle, setRankStyle] =
     useState<ExportRankStyle>(initialRankStyle);
   const [showSuffix, setShowSuffix] = useState(initialShowSuffix);
-  const [query, setQuery] = useState("");
+  const searchStorageKey = `tg_list_search:${initialListType}:${initialYear ?? ""}`;
+  const [query, setQuery] = useState(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return sessionStorage.getItem(searchStorageKey) ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [hits, setHits] = useState<GameSearchHit[]>([]);
   const [saveError, setSaveError] = useState<string | null>(error);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
@@ -249,6 +257,9 @@ export function ListEditor({
   const [saveSignInOpen, setSaveSignInOpen] = useState(false);
   const [shareLinkSignInOpen, setShareLinkSignInOpen] = useState(false);
   const [pendingTrim, setPendingTrim] = useState<number | null>(null);
+  const [leavePrompt, setLeavePrompt] = useState<"done" | "share" | null>(
+    null,
+  );
 
   const yearNum = Number(year) || currentYear;
   const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
@@ -266,8 +277,7 @@ export function ListEditor({
       year,
       items,
       categoryVotes,
-      listFormat,
-      slotCount,
+      listFormat: defaultFormat,
       rankStyle,
       showSuffix,
     });
@@ -295,6 +305,15 @@ export function ListEditor({
     }, 200);
     return () => window.clearTimeout(handle);
   }, [query, yearNum, listType]);
+
+  useEffect(() => {
+    try {
+      if (query.trim()) sessionStorage.setItem(searchStorageKey, query);
+      else sessionStorage.removeItem(searchStorageKey);
+    } catch {
+      // ignore
+    }
+  }, [query, searchStorageKey]);
 
   // Restore anon draft BEFORE any cookie write — remounting an empty editor
   // used to wipe the saved draft on back/forward. Also restore once after
@@ -346,7 +365,10 @@ export function ListEditor({
         setSlotCount(Math.max(draft.slotCount, nextItems.length));
         setTitle(draft.title);
         if (draft.year != null) setYear(String(draft.year));
-        if (draft.listFormat) setListFormat(draft.listFormat);
+        if (draft.listFormat) {
+          setListFormat(draft.listFormat);
+          setDefaultFormat(draft.listFormat);
+        }
         if (draft.rankStyle) setRankStyle(draft.rankStyle);
         if (typeof draft.showSuffix === "boolean") {
           setShowSuffix(draft.showSuffix);
@@ -385,7 +407,10 @@ export function ListEditor({
       setSlotCount(Math.max(draft.slotCount, nextItems.length));
       setTitle(draft.title);
       if (draft.year != null) setYear(String(draft.year));
-      if (draft.listFormat) setListFormat(draft.listFormat);
+      if (draft.listFormat) {
+        setListFormat(draft.listFormat);
+        setDefaultFormat(draft.listFormat);
+      }
       if (draft.rankStyle) setRankStyle(draft.rankStyle);
       if (typeof draft.showSuffix === "boolean") setShowSuffix(draft.showSuffix);
       if (draft.publicId) setPublicId(draft.publicId);
@@ -461,7 +486,7 @@ export function ListEditor({
       title,
       igdbIds: items.map((item) => item.igdbId),
       slotCount,
-      listFormat,
+      listFormat: defaultFormat,
       rankStyle,
       showSuffix,
       publicId,
@@ -484,7 +509,7 @@ export function ListEditor({
     title,
     items,
     slotCount,
-    listFormat,
+    defaultFormat,
     rankStyle,
     showSuffix,
     publicId,
@@ -530,18 +555,28 @@ export function ListEditor({
   }, [signedIn, publicId, listType, title, year, yearNum, items]);
 
   useEffect(() => {
-    if (!settingsOpen) return;
+    if (!settingsOpen && !shareMenuOpen) return;
     function onPointer(e: MouseEvent) {
+      const target = e.target as Node;
       if (
+        settingsOpen &&
         settingsRef.current &&
-        !settingsRef.current.contains(e.target as Node)
+        !settingsRef.current.contains(target)
       ) {
         setSettingsOpen(false);
+      }
+      if (
+        shareMenuOpen &&
+        shareRef.current &&
+        !shareRef.current.contains(target)
+      ) {
+        setShareMenuOpen(false);
       }
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
         setSettingsOpen(false);
+        setShareMenuOpen(false);
         setSlotPickerOpen(false);
         setPanelOpen(false);
       }
@@ -552,7 +587,13 @@ export function ListEditor({
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [settingsOpen]);
+  }, [settingsOpen, shareMenuOpen]);
+
+  useEffect(() => {
+    if (listFormat !== "poster" || editorView === "categories") {
+      setSettingsOpen(false);
+    }
+  }, [listFormat, editorView]);
 
   function focusSearch() {
     setPanelOpen(true);
@@ -570,6 +611,9 @@ export function ListEditor({
         rank: index + 1,
         blurb: includeBlurbs ? item.blurb : null,
       })),
+      rankStyle,
+      showSuffix,
+      listFormat: defaultFormat,
     });
   }
 
@@ -628,7 +672,6 @@ export function ListEditor({
         },
       ]);
     });
-    setQuery("");
     setSaveError(null);
     setPanelOpen(false);
   }
@@ -677,50 +720,77 @@ export function ListEditor({
     });
   }
 
-  function save() {
+  async function persistList(): Promise<{
+    ok: boolean;
+    publicId?: string | null;
+  }> {
     if (!signedIn) {
       setSaveSignInOpen(true);
       setSaveNotice(null);
       setSavedFlash(false);
+      return { ok: false };
+    }
+    const fd = new FormData();
+    fd.set("draftJson", draftJson(true));
+    if (listType === "goty") {
+      fd.set(
+        "categoryVotesJson",
+        JSON.stringify(
+          categoryVotes.map((v) => ({
+            categoryId: v.categoryId,
+            gameId: v.gameId,
+          })),
+        ),
+      );
+    }
+    const result = await saveOwnedListAction(null, fd);
+    if (result.error) {
+      setSaveError(result.error);
+      setSavedFlash(false);
+      return { ok: false };
+    }
+    const nextId = result.publicId ?? publicId;
+    if (result.publicId) setPublicId(result.publicId);
+    setSavedSnapshot(currentSnapshot());
+    setSaveError(null);
+    setSaveNotice(null);
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 2000);
+    return { ok: true, publicId: nextId };
+  }
+
+  function save() {
+    startTransition(async () => {
+      await persistList();
+    });
+  }
+
+  function viewPath(id: string | null | undefined) {
+    return id ? `/l/${id}` : "/create";
+  }
+
+  function onDone() {
+    if (dirty) {
+      setLeavePrompt("done");
       return;
     }
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("draftJson", draftJson(true));
-      if (listType === "goty" && signedIn) {
-        fd.set(
-          "categoryVotesJson",
-          JSON.stringify(
-            categoryVotes.map((v) => ({
-              categoryId: v.categoryId,
-              gameId: v.gameId,
-            })),
-          ),
-        );
-      }
-      const result = await saveOwnedListAction(null, fd);
-      if (result.error) {
-        setSaveError(result.error);
-        setSavedFlash(false);
-        return;
-      }
-      if (result.publicId) setPublicId(result.publicId);
-      setSavedSnapshot(currentSnapshot());
-      setSaveError(null);
-      setSaveNotice(null);
-      setSavedFlash(true);
-      window.setTimeout(() => setSavedFlash(false), 2000);
-    });
+    allowLeave();
+    router.push(viewPath(publicId));
   }
 
   function openShareMenu() {
     if (items.length === 0) return;
-    setShareMenuOpen(true);
+    setSettingsOpen(false);
+    setShareMenuOpen((open) => !open);
   }
 
   function shareWithLink() {
     if (!signedIn) {
       setShareLinkSignInOpen(true);
+      return;
+    }
+    if (dirty) {
+      setLeavePrompt("share");
       return;
     }
     allowLeave();
@@ -748,6 +818,71 @@ export function ListEditor({
     return `${base} Notes on ${formatTitleList(noted.map((n) => n.title))} will be lost.`;
   })();
 
+  const saveShareControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        type="button"
+        variant="bordered"
+        size="sm"
+        onClick={save}
+        disabled={pending}
+      >
+        {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
+      </Button>
+      <div ref={shareRef} className="relative">
+        <Button
+          type="button"
+          size="sm"
+          disabled={items.length === 0 || pending}
+          onClick={onShareClick}
+          aria-expanded={shareMenuOpen}
+          aria-haspopup="menu"
+        >
+          Share
+        </Button>
+        <ShareMenuDialog
+          open={shareMenuOpen}
+          signedIn={signedIn}
+          onShareAsImage={() => {
+            setShareMenuOpen(false);
+            setExportOpen(true);
+          }}
+          onShareWithLink={() => {
+            setShareMenuOpen(false);
+            shareWithLink();
+          }}
+        />
+      </div>
+      {signedIn ? (
+        <Button
+          type="button"
+          variant="quiet"
+          size="sm"
+          disabled={pending}
+          onClick={onDone}
+        >
+          Done
+        </Button>
+      ) : null}
+      <form
+        ref={shareFormRef}
+        action={shareListAction}
+        className="hidden"
+        onSubmit={() => {
+          allowLeave();
+        }}
+      >
+        <input
+          type="hidden"
+          name="draftJson"
+          value={draftJson(signedIn)}
+        />
+      </form>
+    </div>
+  );
+
+  const showToolbar = onGotyChrome || Boolean(saveNotice || displayError);
+
   return (
     <div
       className={`space-y-6 ${
@@ -758,23 +893,27 @@ export function ListEditor({
           : "pb-20 lg:pb-0"
       }`}
     >
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-        <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
-          Title
-          <input
-            value={title}
-            readOnly={listType === "goty"}
-            onChange={(e) => {
-              if (listType === "goty") return;
-              setTitle(e.target.value);
-            }}
-            className={`mt-1 w-full border-b border-line bg-transparent py-1.5 text-lg outline-none ${
-              listType === "goty"
-                ? "cursor-default text-muted"
-                : "text-ink focus:border-accent"
-            }`}
-          />
-        </label>
+      <div
+        className={
+          listType === "goty"
+            ? "-mt-6"
+            : "flex flex-wrap items-end gap-x-4 gap-y-3"
+        }
+      >
+        {listType === "goty" ? (
+          <p className="font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
+            {yearNum} Game of the Year
+          </p>
+        ) : (
+          <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
+            Title
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1 w-full border-b border-line bg-transparent py-1.5 text-lg text-ink outline-none focus:border-accent"
+            />
+          </label>
+        )}
       </div>
 
       {showCategoryTabs ? (
@@ -809,7 +948,12 @@ export function ListEditor({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
+      {showToolbar ? (
+      <div
+        className={`flex flex-wrap items-end gap-x-4 gap-y-3 ${
+          onGotyChrome ? "border-b border-line pb-4" : ""
+        }`}
+      >
         {onGotyChrome ? (
           <>
             <div className={controlLabelClass}>
@@ -846,42 +990,27 @@ export function ListEditor({
               </div>
             </div>
 
-            <div className={controlLabelClass}>
-              Format
-              <div
-                role="group"
-                aria-label="List format"
-                className={controlGroupClass}
-              >
-                <button
-                  type="button"
-                  onClick={() => setListFormat("poster")}
-                  aria-pressed={listFormat === "poster"}
-                  className={segmentBtnClass(listFormat === "poster")}
-                >
-                  Poster
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setListFormat("list")}
-                  aria-pressed={listFormat === "list"}
-                  className={segmentBtnClass(listFormat === "list")}
-                >
-                  List
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setListFormat("grid")}
-                  aria-pressed={listFormat === "grid"}
-                  className={segmentBtnClass(listFormat === "grid")}
-                >
-                  Grid
-                </button>
-              </div>
-            </div>
+            <ListFormatControl
+              labeled
+              value={listFormat}
+              onChange={setListFormat}
+            />
+
+            <label className="flex cursor-pointer items-center gap-2 self-end pb-1 text-sm text-muted">
+              <input
+                type="checkbox"
+                checked={defaultFormat === listFormat}
+                onChange={(event) => {
+                  if (event.target.checked) setDefaultFormat(listFormat);
+                }}
+                className="size-4 accent-[var(--accent)]"
+              />
+              Default view
+            </label>
           </>
         ) : null}
 
+        {onGotyChrome && listFormat === "poster" ? (
         <div ref={settingsRef} className="relative self-end">
           <button
             type="button"
@@ -940,42 +1069,11 @@ export function ListEditor({
             </div>
           ) : null}
         </div>
+        ) : null}
 
-        <div className="ml-auto flex flex-wrap items-center gap-2 self-end">
-          {!(signedIn && dirty) ? (
-            <Button
-              type="button"
-              variant="bordered"
-              size="sm"
-              onClick={save}
-              disabled={pending}
-            >
-              {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
-            </Button>
-          ) : null}
-          <Button
-            type="button"
-            size="sm"
-            disabled={items.length === 0 || pending}
-            onClick={onShareClick}
-          >
-            Share
-          </Button>
-          <form
-            ref={shareFormRef}
-            action={shareListAction}
-            className="hidden"
-            onSubmit={() => {
-              allowLeave();
-            }}
-          >
-            <input
-              type="hidden"
-              name="draftJson"
-              value={draftJson(signedIn)}
-            />
-          </form>
-        </div>
+        {onGotyChrome ? (
+          <div className="ml-auto self-end">{saveShareControls}</div>
+        ) : null}
 
         {saveNotice ? (
           <p className="w-full text-sm text-muted" role="status">
@@ -992,6 +1090,7 @@ export function ListEditor({
           </p>
         ) : null}
       </div>
+      ) : null}
 
       {showCategoryTabs && editorView === "categories" ? (
         <div className="mx-auto w-full max-w-[var(--page-max)] pb-8">
@@ -1003,6 +1102,7 @@ export function ListEditor({
             year={yearNum}
             locked={!signedIn}
             lockHref={signInHref}
+            actions={saveShareControls}
           />
         </div>
       ) : (
@@ -1136,7 +1236,7 @@ export function ListEditor({
                 {slotCount < LIST_MAX_ITEMS
                   ? ` · capacity up to ${LIST_MAX_ITEMS}`
                   : null}
-                {" · Hold to reorder."}
+                {" · Hold the handle to reorder."}
               </p>
             </>
           )}
@@ -1207,13 +1307,6 @@ export function ListEditor({
         showTopCount={showTopCount}
       />
 
-      <ShareMenuDialog
-        open={shareMenuOpen}
-        onClose={() => setShareMenuOpen(false)}
-        onShareAsImage={() => setExportOpen(true)}
-        onShareWithLink={shareWithLink}
-      />
-
       <SaveSignInDialog
         open={saveSignInOpen}
         onClose={() => setSaveSignInOpen(false)}
@@ -1223,7 +1316,6 @@ export function ListEditor({
       <ShareLinkSignInDialog
         open={shareLinkSignInOpen}
         onClose={() => setShareLinkSignInOpen(false)}
-        onShareAsImage={() => setExportOpen(true)}
         returnPath={returnPath}
       />
 
@@ -1244,6 +1336,44 @@ export function ListEditor({
           confirmLabel="Shrink anyway"
           onCancel={() => setPendingTrim(null)}
           onConfirm={() => applySlotCount(pendingTrim)}
+        />
+      ) : null}
+
+      {leavePrompt ? (
+        <ConfirmDialog
+          open
+          title="Unsaved changes"
+          message={
+            leavePrompt === "share"
+              ? "Save your latest edits before opening the share page?"
+              : "Save your latest edits before leaving?"
+          }
+          confirmLabel={leavePrompt === "share" ? "Save and continue" : "Save"}
+          onCancel={() => setLeavePrompt(null)}
+          onConfirm={() => {
+            const kind = leavePrompt;
+            setLeavePrompt(null);
+            startTransition(async () => {
+              const result = await persistList();
+              if (!result.ok) return;
+              allowLeave();
+              if (kind === "share") {
+                shareFormRef.current?.requestSubmit();
+                return;
+              }
+              router.push(viewPath(result.publicId ?? publicId));
+            });
+          }}
+          discardLabel={leavePrompt === "done" ? "Leave without saving" : undefined}
+          onDiscard={
+            leavePrompt === "done"
+              ? () => {
+                  setLeavePrompt(null);
+                  allowLeave();
+                  router.push(viewPath(publicId));
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -1358,7 +1488,6 @@ function NotesCard({
   const [expanded, setExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.gameId });
-  const holdListeners = mergeHoldDragListeners(listeners);
 
   return (
     <li
@@ -1370,10 +1499,8 @@ function NotesCard({
       className={`flex items-stretch border border-line bg-panel ${cardTouchLockClassName} ${
         isDragging ? "z-10 opacity-90 shadow-lg" : ""
       }`}
-      {...attributes}
-      {...holdListeners}
       onContextMenu={(event) => event.preventDefault()}
-      aria-label={`${item.title}, rank ${rank}. Hold to move.`}
+      aria-label={`${item.title}, rank ${rank}. Hold the handle to move.`}
     >
       <div className="flex w-10 shrink-0 items-start justify-center pt-2">
         <RankMarker rank={rank} size="sm" />
@@ -1381,7 +1508,7 @@ function NotesCard({
       <div className="h-28 w-[5.25rem] shrink-0 self-start">
         <GameCover title={item.title} imageUrl={item.coverUrl} />
       </div>
-      <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2 pr-3">
+      <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium leading-tight text-ink">
@@ -1438,6 +1565,9 @@ function NotesCard({
             to add notes.
           </p>
         )}
+      </div>
+      <div className="flex shrink-0 items-center border-l border-line">
+        <ListDragHandle attributes={attributes} listeners={listeners} />
       </div>
     </li>
   );
@@ -1544,6 +1674,8 @@ function ConfirmDialog({
   confirmLabel,
   onCancel,
   onConfirm,
+  discardLabel,
+  onDiscard,
 }: {
   open: boolean;
   title: string;
@@ -1551,6 +1683,8 @@ function ConfirmDialog({
   confirmLabel: string;
   onCancel: () => void;
   onConfirm: () => void;
+  discardLabel?: string;
+  onDiscard?: () => void;
 }) {
   if (!open) return null;
   return (
@@ -1566,6 +1700,11 @@ function ConfirmDialog({
           <Button type="button" variant="bordered" size="sm" onClick={onCancel}>
             Cancel
           </Button>
+          {discardLabel && onDiscard ? (
+            <Button type="button" variant="quiet" size="sm" onClick={onDiscard}>
+              {discardLabel}
+            </Button>
+          ) : null}
           <Button type="button" size="sm" onClick={onConfirm}>
             {confirmLabel}
           </Button>

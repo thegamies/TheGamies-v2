@@ -8,7 +8,10 @@ import {
   parseListDraftCookie,
 } from "./draft-cookie";
 import {
+  clientDraftUpsertSchema,
   createDraftSchema,
+  parseStoredListFormat,
+  parseStoredRankStyle,
   replaceItemsByIgdbSchema,
   replaceItemsSchema,
   LIST_BLURB_MAX,
@@ -228,6 +231,25 @@ describe("list draft cookie", () => {
     });
     expect(payload.igdbIds).toEqual([1, 2]);
     expect(payload.slotCount).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("list rank style persistence", () => {
+  it("accepts banner chip off and defaults unknown values", () => {
+    expect(parseStoredRankStyle("banner")).toBe("banner");
+    expect(parseStoredRankStyle("nope")).toBe("chip");
+    expect(parseStoredListFormat("poster")).toBe("poster");
+    expect(parseStoredListFormat("nope")).toBe("grid");
+    expect(
+      clientDraftUpsertSchema.safeParse({
+        listType: "goty",
+        title: "2026 Game of the Year",
+        year: 2026,
+        items: [{ igdbId: 1, rank: 1 }],
+        rankStyle: "banner",
+        showSuffix: true,
+      }).success,
+    ).toBe(true);
   });
 });
 

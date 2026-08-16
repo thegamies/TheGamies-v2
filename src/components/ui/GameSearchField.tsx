@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, useTransition } from "react";
-import {
-  searchGamesForList,
-  type GameSearchHit,
-} from "@/app/create/search-actions";
+import { searchGamesForList } from "@/lib/lists/search-games-client";
+import type { GameSearchHit } from "@/lib/lists/game-search-hit";
 import type { AwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
 import { fieldInputClass } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
@@ -89,9 +87,8 @@ export function GameSearchField({
 
   function select(hit: GameSearchHit) {
     onSelect(hit);
-    setQuery("");
-    setHits([]);
-    setOpen(false);
+    setHits((prev) => prev.filter((row) => row.id !== hit.id));
+    setOpen(true);
   }
 
   return (

@@ -3,8 +3,10 @@
 export const controlLabelClass =
   "text-sm font-medium tracking-wide text-muted";
 
-export const controlGroupClass =
-  "mt-1 flex h-9 overflow-hidden border border-line rounded-[var(--radius-control)]";
+export const controlGroupBarClass =
+  "flex h-9 overflow-hidden border border-line rounded-[var(--radius-control)]";
+
+export const controlGroupClass = `mt-1 ${controlGroupBarClass}`;
 
 /** Use in stacked panels (settings) so segments span the panel width. */
 export const controlGroupFullClass = `${controlGroupClass} w-full`;

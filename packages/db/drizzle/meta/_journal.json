@@ -141,6 +141,27 @@
       "when": 1786838400000,
       "tag": "0019_site_rank_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786924800000,
+      "tag": "0020_list_rank_style",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787011200000,
+      "tag": "0021_list_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787097600000,
+      "tag": "0022_list_format_default_grid",
+      "breakpoints": true
     }
   ]
 }

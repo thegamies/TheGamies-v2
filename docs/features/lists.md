@@ -45,15 +45,19 @@ Anyone can create and share an image. Signed-in users can save, publish share li
 
 Create UI mirrors the Social Gamer Card prototype:
 
-- Poster, List, or **Grid** format (Grid uses the standings cover grid)
+- Poster, List, or **Grid** format (Grid uses the standings cover grid and standings title type)
 - Size presets (5 / 10 / 20 / 50, max 100)
 - Rank chrome: Banner / Chip / Off (+ ordinal suffix) in settings
 - Optional per-game notes (blurbs) — **signed-in only**, max **500** characters
-- Hold briefly to reorder (scroll is blocked while holding so the page does not steal the gesture). Poster/Grid: tap a game to open an external **Remove** popover (ink-contrast border, design-system danger button) that points at the card; tap elsewhere to dismiss. List keeps a text **Remove** control beside the title.
-- Image export via **Share → Share as image** on GOTY ranking view (JPEG poster)
-- Categories Share is **link only**
+- GOTY builder heading is `{year} Game of the Year` in body ink (no Title field). Custom lists keep an editable Title.
+- Hold briefly to reorder (scroll is blocked while holding so the page does not steal the gesture). List format: six-dot handle on the right of each row. Poster/Grid: tap a game to open an external **Remove** popover (ink-contrast border, design-system danger button) that points at the card; tap elsewhere to dismiss. List keeps a text **Remove** control beside the title.
+- Image export via **Share → Share as image** on GOTY ranking view (JPEG poster). Rank style (banner / chip / off + suffix) and **default view** (Grid / List / Poster; new lists default to Grid) are saved on the list. The public list page uses that default and lets anyone switch formats.
+- **Settings** (rank style) only on Poster, not on List/Grid or the Categories tab.
+- List **size** is a layout control only — changing empty slots is not an unsaved edit. Switching format is preview-only until **Default view** is checked.
+- Signed-in **Done** (and **Share with a link**) asks to save if there are unsaved changes, then opens the public list.
+- Categories Share is **link only**. Share menu opens from the Share button. Signed out: **Share with a link** shows Sign in required, then Sign in / Create account only (same two options for Save).
 - Warnings when shrinking size would drop games (and notes)
-- Signed-in: floating **Save** bar when there are unsaved changes (including category picks)
+- **Save** stays in the toolbar. Signed-in unsaved edits also show a floating **Save** bar (including category picks).
 
 ## Rules
 
