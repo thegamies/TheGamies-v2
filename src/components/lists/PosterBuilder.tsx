@@ -2,7 +2,6 @@
 
 import {
   DndContext,
-  DragOverlay,
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
@@ -53,9 +52,30 @@ import {
 } from "@/components/lists/cardChrome";
 import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
+
+type DragGhost = {
+  x: number;
+  y: number;
+  grabX: number;
+  grabY: number;
+  screenW: number;
+  screenH: number;
+};
+
+function pointerClient(event: Event): { x: number; y: number } | null {
+  if ("clientX" in event && typeof (event as PointerEvent).clientX === "number") {
+    const e = event as PointerEvent;
+    return { x: e.clientX, y: e.clientY };
+  }
+  const touch = (event as TouchEvent).touches?.[0]
+    ?? (event as TouchEvent).changedTouches?.[0];
+  if (touch) return { x: touch.clientX, y: touch.clientY };
+  return null;
+}
 
 export type PosterItem = {
   id: string;
@@ -112,6 +132,7 @@ export function PosterBuilder({
 
   const sensors = useListCardDragSensors();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dragGhost, setDragGhost] = useState<DragGhost | null>(null);
   const dragOccurredRef = useRef(false);
   useDragBodyScrollLock(activeId != null);
 
@@ -179,7 +200,28 @@ export function PosterBuilder({
   const handleDragStart = (event: DragStartEvent) => {
     dragOccurredRef.current = true;
     setSelectedId(null);
-    setActiveId(String(event.active.id));
+    const id = String(event.active.id);
+    setActiveId(id);
+
+    const node = document.querySelector(
+      `[data-list-card="${globalThis.CSS.escape(id)}"]`,
+    );
+    const rect = node?.getBoundingClientRect();
+    const pointer = event.activatorEvent
+      ? pointerClient(event.activatorEvent)
+      : null;
+    if (rect && rect.width > 0) {
+      const px = pointer?.x ?? rect.left + rect.width / 2;
+      const py = pointer?.y ?? rect.top + rect.height / 2;
+      setDragGhost({
+        x: rect.left,
+        y: rect.top,
+        grabX: px - rect.left,
+        grabY: py - rect.top,
+        screenW: rect.width,
+        screenH: rect.height,
+      });
+    }
   };
 
   // Commit the reorder once, on drop. Reordering live during the drag causes an
@@ -188,6 +230,7 @@ export function PosterBuilder({
   // sorting strategy provides the animated live preview instead.
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
+    setDragGhost(null);
     const { active, over } = event;
     if (over && active.id !== over.id) {
       const from = filledIds.indexOf(String(active.id));
@@ -201,10 +244,33 @@ export function PosterBuilder({
 
   const handleDragCancel = () => {
     setActiveId(null);
+    setDragGhost(null);
     window.setTimeout(() => {
       dragOccurredRef.current = false;
     }, 0);
   };
+
+  // Follow the finger in client coordinates so canvas scale / browser zoom
+  // cannot pull the ghost away from the pointer (dnd-kit DragOverlay is fixed
+  // and drifts inside transformed ancestors).
+  useEffect(() => {
+    if (!dragGhost) return;
+    function onMove(event: Event) {
+      const point = pointerClient(event);
+      if (!point) return;
+      setDragGhost((curr) =>
+        curr
+          ? { ...curr, x: point.x - curr.grabX, y: point.y - curr.grabY }
+          : null,
+      );
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("touchmove", onMove, { passive: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("touchmove", onMove);
+    };
+  }, [dragGhost != null]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeItem = activeId ? items.find((i) => i.id === activeId) ?? null : null;
   const activeRank = activeId ? filledIds.indexOf(activeId) + 1 : 0;
@@ -415,45 +481,50 @@ export function PosterBuilder({
         </div>
       ) : null}
 
-      <DragOverlay dropAnimation={null}>
-        {activeItem && activeSize ? (
-          <div
-            style={{
-              // Match on-screen size so dnd-kit's overlay tracks the finger.
-              // Inner node keeps canvas pixel layout, then scales down.
-              width: activeSize.w * scale,
-              height: (activeSize.h + bannerH) * scale,
-              cursor: "grabbing",
-            }}
-          >
+      {dragGhost && activeItem && activeSize
+        ? createPortal(
             <div
+              aria-hidden
               style={{
-                width: activeSize.w,
-                height: activeSize.h + bannerH,
-                transform: `scale(${scale})`,
-                transformOrigin: "top left",
+                position: "fixed",
+                left: dragGhost.x,
+                top: dragGhost.y,
+                width: dragGhost.screenW,
+                height: dragGhost.screenH,
+                zIndex: 80,
+                pointerEvents: "none",
+                cursor: "grabbing",
               }}
             >
-              <SocialGamerCardImageFrame
-                game={{
-                  id: activeItem.id,
-                  title: activeItem.title,
-                  imageUrl: activeItem.coverUrl,
-                }}
-                rank={activeRank}
-                width={activeSize.w}
-                height={activeSize.h}
-                rankScaleWidth={rankScaleWidth}
-                rankChrome={chrome}
+              <div
                 style={{
-                  boxShadow:
-                    "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
+                  width: activeSize.w,
+                  height: activeSize.h + bannerH,
+                  transform: `scale(${scale})`,
+                  transformOrigin: "top left",
                 }}
-              />
-            </div>
-          </div>
-        ) : null}
-      </DragOverlay>
+              >
+                <SocialGamerCardImageFrame
+                  game={{
+                    id: activeItem.id,
+                    title: activeItem.title,
+                    imageUrl: activeItem.coverUrl,
+                  }}
+                  rank={activeRank}
+                  width={activeSize.w}
+                  height={activeSize.h}
+                  rankScaleWidth={rankScaleWidth}
+                  rankChrome={chrome}
+                  style={{
+                    boxShadow:
+                      "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
+                  }}
+                />
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
       {selectedId ? (
         <ListCardActionMenu
           anchorId={selectedId}

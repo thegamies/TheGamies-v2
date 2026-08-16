@@ -112,7 +112,7 @@ export function ListCardActionMenu({
       onClick={(event) => event.stopPropagation()}
     >
       <div
-        className="relative min-w-[8rem] bg-panel p-1.5"
+        className="relative w-fit bg-panel p-1"
         style={{ border: `1.5px solid ${MENU_BORDER}` }}
       >
         <Button
@@ -121,7 +121,7 @@ export function ListCardActionMenu({
           data-list-card-delete
           variant="danger"
           size="sm"
-          className="w-full"
+          className="h-auto min-h-0 px-2.5 py-1.5"
           onClick={onRemove}
         >
           Remove
