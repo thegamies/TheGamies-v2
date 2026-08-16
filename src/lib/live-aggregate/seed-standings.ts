@@ -10,7 +10,10 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
+import {
+  ensureAwardCategories,
+  listActiveAwardCategories,
+} from "@/lib/live-aggregate/categories";
 import { buildGotyContribRows } from "@/lib/live-aggregate/scoring";
 import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
@@ -20,6 +23,20 @@ export const SEED_AUTH_PREFIX = "seed:standings:";
 export const SEED_USERNAME_PREFIX = "seedvoter";
 export const SEED_MAX_INDEX = 1000;
 export const SEED_MAX_BATCH = 100;
+/** Neon HTTP inserts stay reliable when category vote batches stay small. */
+export const SEED_INSERT_CHUNK = 200;
+
+/** Insert rows in chunks so large category vote batches do not blow the query. */
+export async function insertInChunks<T>(
+  rows: T[],
+  write: (chunk: T[]) => Promise<unknown>,
+  chunkSize = SEED_INSERT_CHUNK,
+): Promise<void> {
+  const size = Math.max(1, Math.floor(chunkSize));
+  for (let i = 0; i < rows.length; i += size) {
+    await write(rows.slice(i, i + size));
+  }
+}
 
 function getDb(): Db {
   return createDb();
@@ -181,6 +198,10 @@ export type SeedStandingsResult = {
   skipped: number;
   year: number;
   gamePoolSize: number;
+  /** Active award categories used for this batch (after catalog ensure). */
+  categoryCount: number;
+  /** list_category_votes rows written in this batch. */
+  categoryVotes: number;
   startIndex: number;
   endIndex: number;
   nextIndex: number;
@@ -336,6 +357,8 @@ export async function seedStandingsVoters(
       skipped,
       year,
       gamePoolSize: pool.length,
+      categoryCount: 0,
+      categoryVotes: 0,
       startIndex,
       endIndex,
       nextIndex: endIndex + 1,
@@ -368,7 +391,15 @@ export async function seedStandingsVoters(
   const allLists = activeProfiles.map((p) => listByProfile.get(p.id)!);
   const listIds = allLists.map((l) => l.id);
   const updatedLists = allLists.length - listsToCreate.length;
+
+  await ensureAwardCategories(db);
   const categories = await listActiveAwardCategories(db);
+  if (categories.length === 0) {
+    return {
+      error:
+        "No active award categories found after syncing the catalog. Check award category migrations.",
+    };
+  }
 
   await db.delete(listItems).where(inArray(listItems.listId, listIds));
   await db
@@ -451,10 +482,12 @@ export async function seedStandingsVoters(
   }
 
   if (itemRows.length > 0) {
-    await db.insert(listItems).values(itemRows);
+    await insertInChunks(itemRows, (chunk) => db.insert(listItems).values(chunk));
   }
   if (categoryVoteRows.length > 0) {
-    await db.insert(listCategoryVotes).values(categoryVoteRows);
+    await insertInChunks(categoryVoteRows, (chunk) =>
+      db.insert(listCategoryVotes).values(chunk),
+    );
   }
 
   await db
@@ -464,10 +497,14 @@ export async function seedStandingsVoters(
     .delete(liveCategoryContrib)
     .where(inArray(liveCategoryContrib.listId, listIds));
   if (contribRows.length > 0) {
-    await db.insert(liveGotyContrib).values(contribRows);
+    await insertInChunks(contribRows, (chunk) =>
+      db.insert(liveGotyContrib).values(chunk),
+    );
   }
   if (categoryContribRows.length > 0) {
-    await db.insert(liveCategoryContrib).values(categoryContribRows);
+    await insertInChunks(categoryContribRows, (chunk) =>
+      db.insert(liveCategoryContrib).values(chunk),
+    );
   }
 
   await db
@@ -486,6 +523,8 @@ export async function seedStandingsVoters(
     skipped,
     year,
     gamePoolSize: pool.length,
+    categoryCount: categories.length,
+    categoryVotes: categoryVoteRows.length,
     startIndex,
     endIndex,
     nextIndex: endIndex + 1,

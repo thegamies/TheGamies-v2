@@ -17,7 +17,10 @@ import {
   weightForRatedGame,
   weightedSample,
 } from "@/lib/live-aggregate/seed-standings";
-import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
+import {
+  ensureAwardCategories,
+  listActiveAwardCategories,
+} from "@/lib/live-aggregate/categories";
 import { rebuildEditionResultsFrozen } from "./edition-results";
 import { computeEditionStatus } from "./edition-status";
 
@@ -336,7 +339,14 @@ export async function seedCommunityEditionBallots(
   }
   const effectiveListSize = Math.min(listSize, pool.length);
 
+  await ensureAwardCategories(db);
   const categories = await listActiveAwardCategories(db);
+  if (categories.length === 0) {
+    return {
+      error:
+        "No active award categories found after syncing the catalog. Check award category migrations.",
+    };
+  }
 
   const wantedAuthIds = indices.map(seedCommunityAuthUserId);
   const existingProfiles = await db

@@ -58,7 +58,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## Categories
 
-- Site defs in `award_categories` (seeded from `AWARD_CATEGORY_DEFS`, sort 2–64; GOTY itself is the main board).
+- Site defs in `award_categories` (kept in sync from `AWARD_CATEGORY_DEFS` via `ensureAwardCategories`, including on `/admin/seed`; GOTY itself is the main board).
 - Groups (Premier, Major, Genre, …) for browsing standings and the ballot picker.
 - **Eligibility** per category: current year, current/active, active in year, upcoming, any year. Current/active and active-in-year currently treat prior-year *released* titles as eligible (no live-ops catalog flag yet). **Upcoming** is later years only — not the list year, even if still unreleased. Remake/DLC categories allow edition/version titles.
 - Owned GOTY lists and edition ballots: **one game per category**. Voters **add categories from a grouped list** instead of seeing every slot at once. Order follows `sort_order`.
@@ -69,7 +69,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 ## URLs
 
 - `/` — homepage Top 5 strips for featured years (default: current + previous; admin override on `/admin/rankings`)
-- `/standings` — Top 5 for every year with live scores
+- `/admin/seed` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
 - `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
@@ -97,11 +97,13 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 (`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists
 **and** category votes (from each list’s ranked picks, top-rank weighted).
 
+- Upserts the award catalog (`ensureAwardCategories`) before writing votes; errors if no active categories remain
 - Up to **1000** seed indices; UI batches of 50
 - **Reseed** rewrites rankings for existing seed voters in range
 - **Keep adding until stopped** continues from max index
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
 - Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
+- Category vote / contrib inserts are **chunked** (Neon HTTP-safe); the admin result reports category count + votes written
 - Ends with one year score rebuild (or after Stop)
 
 Community / edition ceremony seeding is separate: `/admin/communities` — see [community.md](./community.md).

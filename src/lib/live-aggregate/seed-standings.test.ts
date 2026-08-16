@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildSeedCategoryVotes,
+  insertInChunks,
   weightForRatedGame,
   weightForTopRank,
   weightedSample,
@@ -75,5 +76,25 @@ describe("buildSeedCategoryVotes", () => {
   it("returns nothing without picks or categories", () => {
     expect(buildSeedCategoryVotes([{ id: "a" }], [])).toEqual([]);
     expect(buildSeedCategoryVotes([], [{ id: "g1" }])).toEqual([]);
+  });
+});
+
+describe("insertInChunks", () => {
+  it("writes every row across chunk boundaries", async () => {
+    const seen: number[][] = [];
+    await insertInChunks(
+      [1, 2, 3, 4, 5],
+      async (chunk) => {
+        seen.push([...chunk]);
+      },
+      2,
+    );
+    expect(seen).toEqual([[1, 2], [3, 4], [5]]);
+  });
+
+  it("no-ops on an empty list", async () => {
+    const write = vi.fn();
+    await insertInChunks([], write, 10);
+    expect(write).not.toHaveBeenCalled();
   });
 });

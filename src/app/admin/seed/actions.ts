@@ -34,6 +34,8 @@ export async function seedStandingsAction(input: {
       skipped: number;
       year: number;
       gamePoolSize: number;
+      categoryCount: number;
+      categoryVotes: number;
       startIndex: number;
       endIndex: number;
       nextIndex: number;
