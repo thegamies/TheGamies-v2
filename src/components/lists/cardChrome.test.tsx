@@ -1,13 +1,20 @@
 /** @vitest-environment jsdom */
 
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CARD_DRAG_DELAY_MS,
   CARD_DRAG_TOLERANCE_PX,
   beginHoldScrollGuard,
-  cardActionMenuClassName,
+  cardActionMenuItemClassName,
   cardTouchLockClassName,
 } from "./cardChrome";
+import { ListCardActionMenu } from "./ListCardActionMenu";
+
+afterEach(() => {
+  cleanup();
+  document.body.innerHTML = "";
+});
 
 describe("list card chrome", () => {
   it("requires a short hold before drag starts", () => {
@@ -22,10 +29,9 @@ describe("list card chrome", () => {
     expect(cardTouchLockClassName).toContain("[&_img]:[-webkit-user-drag:none]");
   });
 
-  it("styles a floating action menu for selected poster/grid cards", () => {
-    expect(cardActionMenuClassName).toContain("absolute");
-    expect(cardActionMenuClassName).toContain("border-line");
-    expect(cardActionMenuClassName).toContain("bg-panel");
+  it("styles remove menu items for the external card popover", () => {
+    expect(cardActionMenuItemClassName).toContain("text-sm");
+    expect(cardActionMenuItemClassName).toContain("hover:text-accent");
   });
 
   it("blocks touchmove while holding steady for drag", () => {
@@ -50,7 +56,6 @@ describe("list card chrome", () => {
     } as unknown as TouchEvent);
     expect(preventDefault).toHaveBeenCalled();
 
-    // Cleanup listeners registered for this gesture.
     const pointerUp = addSpy.mock.calls.find(
       (call) => call[0] === "pointerup",
     )?.[1] as EventListener | undefined;
@@ -59,5 +64,34 @@ describe("list card chrome", () => {
 
     addSpy.mockRestore();
     removeSpy.mockRestore();
+  });
+});
+
+describe("ListCardActionMenu", () => {
+  it("renders outside the card via portal and offers Remove", () => {
+    const anchor = document.createElement("div");
+    anchor.setAttribute("data-list-card", "game-1");
+    Object.defineProperty(anchor, "getBoundingClientRect", {
+      value: () => ({
+        top: 200,
+        bottom: 360,
+        left: 40,
+        right: 160,
+        width: 120,
+        height: 160,
+        x: 40,
+        y: 200,
+        toJSON: () => ({}),
+      }),
+    });
+    document.body.appendChild(anchor);
+
+    const onRemove = vi.fn();
+    render(<ListCardActionMenu anchorId="game-1" onRemove={onRemove} />);
+
+    const menu = document.querySelector("[data-list-card-menu]");
+    expect(menu).toBeTruthy();
+    expect(menu?.parentElement).toBe(document.body);
+    expect(screen.getByRole("menuitem", { name: "Remove" })).toBeTruthy();
   });
 });

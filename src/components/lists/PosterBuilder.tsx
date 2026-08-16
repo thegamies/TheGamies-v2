@@ -361,10 +361,6 @@ export function PosterBuilder({
                                       curr === item.id ? null : item.id,
                                     );
                                   }}
-                                  onRemove={() => {
-                                    onRemove(item.id);
-                                    setSelectedId(null);
-                                  }}
                                 />
                               );
                             }
@@ -448,6 +444,15 @@ export function PosterBuilder({
           </div>
         ) : null}
       </DragOverlay>
+      {selectedId ? (
+        <ListCardActionMenu
+          anchorId={selectedId}
+          onRemove={() => {
+            onRemove(selectedId);
+            setSelectedId(null);
+          }}
+        />
+      ) : null}
     </div>
     </DndContext>
   );
@@ -464,7 +469,6 @@ function SortableCard({
   scale,
   selected,
   onSelect,
-  onRemove,
 }: {
   id: string;
   game: ExportGame;
@@ -476,7 +480,6 @@ function SortableCard({
   scale: number;
   selected: boolean;
   onSelect: () => void;
-  onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
@@ -525,7 +528,6 @@ function SortableCard({
         rankScaleWidth={rankScaleWidth}
         rankChrome={rankChrome}
       />
-      {selected ? <ListCardActionMenu onRemove={onRemove} /> : null}
     </div>
   );
 }

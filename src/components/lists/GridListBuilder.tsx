@@ -115,10 +115,6 @@ export function GridListBuilder({
                   if (dragOccurredRef.current) return;
                   setSelectedId((curr) => (curr === item.id ? null : item.id));
                 }}
-                onRemove={() => {
-                  onRemove(item.id);
-                  setSelectedId(null);
-                }}
               />
             ))}
             {Array.from({ length: emptySlots }).map((_, i) => (
@@ -141,6 +137,15 @@ export function GridListBuilder({
           </ul>
         </SortableContext>
       </DndContext>
+      {selectedId ? (
+        <ListCardActionMenu
+          anchorId={selectedId}
+          onRemove={() => {
+            onRemove(selectedId);
+            setSelectedId(null);
+          }}
+        />
+      ) : null}
       <p className="mt-3 text-center text-xs text-muted">
         {items.length === 0
           ? "Tap an empty slot or search to add games."
@@ -155,13 +160,11 @@ function SortableGridCard({
   rank,
   selected,
   onSelect,
-  onRemove,
 }: {
   item: GridListItem;
   rank: number;
   selected: boolean;
   onSelect: () => void;
-  onRemove: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: item.id });
@@ -198,7 +201,6 @@ function SortableGridCard({
           className={`relative ${selected ? cardSelectedRingClassName : ""}`}
         >
           <GameCover title={item.title} imageUrl={item.coverUrl} />
-          {selected ? <ListCardActionMenu onRemove={onRemove} /> : null}
         </div>
         <div className="flex min-w-0 items-start gap-1.5">
           <RankMarker rank={rank} size="sm" />

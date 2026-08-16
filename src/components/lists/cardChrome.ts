@@ -25,10 +25,7 @@ export const CARD_DRAG_TOLERANCE_PX = 10;
 export const cardTouchLockClassName =
   "select-none touch-manipulation [-webkit-touch-callout:none] [-webkit-user-select:none] [&_*]:select-none [&_img]:pointer-events-none [&_img]:[-webkit-user-drag:none]";
 
-/** Floating action menu shown after tapping a Poster/Grid card. */
-export const cardActionMenuClassName =
-  "absolute left-1/2 top-1/2 z-[3] min-w-[7.5rem] -translate-x-1/2 -translate-y-1/2 border border-line bg-panel p-1";
-
+/** Floating action menu item for Poster/Grid card select popover. */
 export const cardActionMenuItemClassName =
   "w-full px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-paper hover:text-accent";
 
