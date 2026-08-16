@@ -1,21 +1,14 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   DndContext,
-  DragOverlay,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   rectSortingStrategy,
   useSortable,
 } from "@dnd-kit/sortable";
@@ -51,6 +44,14 @@ import type {
   ListExportListType,
 } from "@/components/list-export/listExportTypes";
 import { cardOuterRadius } from "@/components/list-export/socialGamerCardTheme";
+import {
+  cardTouchLockClassName,
+  mergeHoldDragListeners,
+  useDragBodyScrollLock,
+  useListCardDragSensors,
+} from "@/components/lists/cardChrome";
+import { ListCardActionMenu } from "@/components/lists/ListCardActionMenu";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
@@ -108,10 +109,23 @@ export function PosterBuilder({
     return () => ro.disconnect();
   }, []);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-  );
+  const sensors = useListCardDragSensors();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const dragOccurredRef = useRef(false);
+  useDragBodyScrollLock(activeId != null);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Element | null;
+      if (!target) return;
+      if (target.closest(`[data-list-card="${selectedId}"]`)) return;
+      if (target.closest("[data-list-card-menu]")) return;
+      setSelectedId(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [selectedId]);
 
   const chrome = useMemo(
     () => rankChromeForStyle(rankStyle, rankFormat),
@@ -150,18 +164,10 @@ export function PosterBuilder({
 
   const bannerH = exportRankBannerBelowHeight(rankScaleWidth, chrome);
 
-  // Map each rank (1-based) to the card dimensions of the row it lives in, so the
-  // drag overlay can render the floating card at the correct size for its slot.
-  const rankSize = useMemo(() => {
-    const m = new Map<number, { w: number; h: number }>();
-    rows.forEach((row, rowIndex) => {
-      const { w, h } = cardByRow[rowIndex]!;
-      row.ranks.forEach((rank) => m.set(rank, { w, h }));
-    });
-    return m;
-  }, [rows, cardByRow]);
 
   const handleDragStart = (event: DragStartEvent) => {
+    dragOccurredRef.current = true;
+    setSelectedId(null);
     setActiveId(String(event.active.id));
   };
 
@@ -172,18 +178,22 @@ export function PosterBuilder({
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveId(null);
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const from = filledIds.indexOf(String(active.id));
-    const to = filledIds.indexOf(String(over.id));
-    if (from < 0 || to < 0) return;
-    onReorder(arrayMove(filledIds, from, to));
+    if (over && active.id !== over.id) {
+      const from = filledIds.indexOf(String(active.id));
+      const to = filledIds.indexOf(String(over.id));
+      if (from >= 0 && to >= 0) onReorder(arrayMove(filledIds, from, to));
+    }
+    window.setTimeout(() => {
+      dragOccurredRef.current = false;
+    }, 0);
   };
 
-  const handleDragCancel = () => setActiveId(null);
-
-  const activeItem = activeId ? items.find((i) => i.id === activeId) ?? null : null;
-  const activeRank = activeId ? filledIds.indexOf(activeId) + 1 : 0;
-  const activeSize = activeRank > 0 ? rankSize.get(activeRank) : undefined;
+  const handleDragCancel = () => {
+    setActiveId(null);
+    window.setTimeout(() => {
+      dragOccurredRef.current = false;
+    }, 0);
+  };
 
   const debugStats = useMemo(() => {
     if (!debug) return null;
@@ -251,7 +261,7 @@ export function PosterBuilder({
               position: "relative",
               width: CANVAS_W,
               height: CANVAS_H,
-              overflow: "hidden",
+              overflow: activeId ? "visible" : "hidden",
             }}
           >
             <AwardsPosterBackground
@@ -329,7 +339,13 @@ export function PosterBuilder({
                                   rankScaleWidth={rankScaleWidth}
                                   rankChrome={chrome}
                                   scale={scale}
-                                  onRemove={onRemove}
+                                  selected={selectedId === item.id}
+                                  onSelect={() => {
+                                    if (dragOccurredRef.current) return;
+                                    setSelectedId((curr) =>
+                                      curr === item.id ? null : item.id,
+                                    );
+                                  }}
                                 />
                               );
                             }
@@ -384,35 +400,15 @@ export function PosterBuilder({
         </div>
       ) : null}
 
-      <DragOverlay dropAnimation={null}>
-        {activeItem && activeSize ? (
-          <div
-            style={{
-              width: activeSize.w,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-              cursor: "grabbing",
-            }}
-          >
-            <SocialGamerCardImageFrame
-              game={{
-                id: activeItem.id,
-                title: activeItem.title,
-                imageUrl: activeItem.coverUrl,
-              }}
-              rank={activeRank}
-              width={activeSize.w}
-              height={activeSize.h}
-              rankScaleWidth={rankScaleWidth}
-              rankChrome={chrome}
-              style={{
-                boxShadow:
-                  "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
-              }}
-            />
-          </div>
-        ) : null}
-      </DragOverlay>
+      {selectedId ? (
+        <ListCardActionMenu
+          anchorId={selectedId}
+          onRemove={() => {
+            onRemove(selectedId);
+            setSelectedId(null);
+          }}
+        />
+      ) : null}
     </div>
     </DndContext>
   );
@@ -427,7 +423,8 @@ function SortableCard({
   rankScaleWidth,
   rankChrome,
   scale,
-  onRemove,
+  selected,
+  onSelect,
 }: {
   id: string;
   game: ExportGame;
@@ -437,10 +434,12 @@ function SortableCard({
   rankScaleWidth: number;
   rankChrome: ExportRankChromeConfig;
   scale: number;
-  onRemove: (id: string) => void;
+  selected: boolean;
+  onSelect: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
+  const holdListeners = mergeHoldDragListeners(listeners);
 
   // dnd-kit's sorting strategy animates the displaced siblings (including across
   // rows) via `transform`. Those values are measured in on-screen (scaled)
@@ -458,19 +457,29 @@ function SortableCard({
   return (
     <div
       ref={setNodeRef}
+      data-list-card={id}
       style={{
         position: "relative",
         width,
         flexShrink: 0,
         transform: shift,
         transition,
-        opacity: isDragging ? 0 : 1,
-        cursor: "grab",
-        touchAction: "none",
+        opacity: isDragging ? 0.92 : 1,
+        zIndex: isDragging ? 20 : undefined,
+        outline: selected ? "3px solid var(--accent)" : undefined,
+        outlineOffset: 4,
+        boxShadow: isDragging
+          ? "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)"
+          : undefined,
+        cursor: isDragging ? "grabbing" : undefined,
       }}
+      className={cardTouchLockClassName}
       {...attributes}
-      {...listeners}
-      aria-label={`${game.title} — rank ${rank}. Drag to reorder.`}
+      {...holdListeners}
+      onClick={onSelect}
+      onContextMenu={(event) => event.preventDefault()}
+      aria-label={`${game.title} — rank ${rank}. Tap for options, hold to move.`}
+      aria-pressed={selected}
     >
       <SocialGamerCardImageFrame
         game={game}
@@ -480,29 +489,6 @@ function SortableCard({
         rankScaleWidth={rankScaleWidth}
         rankChrome={rankChrome}
       />
-      <button
-        type="button"
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => onRemove(id)}
-        aria-label={`Remove ${game.title}`}
-        style={{
-          position: "absolute",
-          top: -18,
-          right: -18,
-          width: 52,
-          height: 52,
-          display: "grid",
-          placeItems: "center",
-          borderRadius: 999,
-          background: "#0c0c0e",
-          color: "#fff",
-          border: "2px solid rgba(255,255,255,0.25)",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.5)",
-          cursor: "pointer",
-        }}
-      >
-        ✕
-      </button>
     </div>
   );
 }

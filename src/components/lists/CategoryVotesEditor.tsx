@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { type GameSearchHit } from "@/app/create/search-actions";
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { Button } from "@/components/ui/Button";
@@ -48,6 +49,10 @@ type Props = {
   onChange: (next: CategoryVoteSelection[]) => void;
   year: number;
   description?: string;
+  /** When set, show awards but block picks (signed-out list editor). */
+  locked?: boolean;
+  lockHref?: string;
+  lockMessage?: string;
 };
 
 export function CategoryVotesEditor({
@@ -56,6 +61,9 @@ export function CategoryVotesEditor({
   onChange,
   year,
   description = "Add the awards you want to pick. Search is limited to each category’s eligibility.",
+  locked = false,
+  lockHref,
+  lockMessage = "Sign in to choose award winners for your GOTY list.",
 }: Props) {
   const catalog = useMemo(() => sortedAwardCategories(categories), [categories]);
   const [openIds, setOpenIds] = useState<string[]>(() =>
@@ -114,6 +122,48 @@ export function CategoryVotesEditor({
   if (catalog.length === 0) return null;
 
   const canAdd = unused.length > 0;
+
+  if (locked) {
+    return (
+      <section>
+        <SectionRule />
+        <BallotChapterHeader
+          className="mt-8"
+          eyebrow="Categories"
+          title="Award picks"
+          description="Site award categories for this year’s Game of the Year."
+        />
+        <div className="mt-6 border border-line bg-panel p-5">
+          <p className="font-display text-2xl tracking-wide text-ink">
+            Sign in to pick awards
+          </p>
+          <p className="mt-2 max-w-xl text-sm text-muted">{lockMessage}</p>
+          {lockHref ? (
+            <div className="mt-4">
+              <Link href={lockHref}>
+                <Button type="button">Sign in</Button>
+              </Link>
+            </div>
+          ) : null}
+        </div>
+        <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {catalog.slice(0, 16).map((cat) => (
+            <li
+              key={cat.id}
+              className="border border-line bg-panel px-3 py-3 text-sm text-muted"
+            >
+              {cat.label}
+            </li>
+          ))}
+        </ul>
+        {catalog.length > 16 ? (
+          <p className="mt-3 text-xs text-muted">
+            +{catalog.length - 16} more after you sign in
+          </p>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section>

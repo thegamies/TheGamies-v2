@@ -45,13 +45,15 @@ Anyone can create and share an image. Signed-in users can save, publish share li
 
 Create UI mirrors the Social Gamer Card prototype:
 
-- Poster or List format
+- Poster, List, or **Grid** format (Grid uses the standings cover grid)
 - Size presets (5 / 10 / 20 / 50, max 100)
-- Rank chrome: Banner / Chip / Off (+ ordinal suffix)
-- Optional per-game notes (blurbs) — **signed-in only**
-- Drag-and-drop reorder
-- Image export via **Share → Share as image** (JPEG poster)
-- Warnings when shrinking size or switching year/GOTY would drop games (and notes)
+- Rank chrome: Banner / Chip / Off (+ ordinal suffix) in settings
+- Optional per-game notes (blurbs) — **signed-in only**, max **500** characters
+- Hold briefly to reorder (scroll is blocked while holding so the page does not steal the gesture). Poster/Grid: tap a game to open an external **Remove** popover (ink-contrast border, design-system danger button) that points at the card; tap elsewhere to dismiss. List keeps a text **Remove** control beside the title.
+- Image export via **Share → Share as image** on GOTY ranking view (JPEG poster)
+- Categories Share is **link only**
+- Warnings when shrinking size would drop games (and notes)
+- Signed-in: floating **Save** bar when there are unsaved changes (including category picks)
 
 ## Rules
 
@@ -60,7 +62,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - One **owned** GOTY list per profile per year (year picker stays put and shows top 5 + Edit list when that year already exists; claim/save fail clearly otherwise).
 - Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)).
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
-- Owned GOTY lists may include **one game per site award category** (signed-in only). Category picks live on a **Categories** tab beside **Game of the Year** in the builder (secondary underline control).
+- Owned GOTY lists may include **one game per site award category** (signed-in only to pick). The Categories tab is visible when signed out with a sign-in prompt. Category picks live on a **Categories** tab beside **Game of the Year** in the builder (title above tabs; Format/Size hidden on Categories).
 
 ## URLs
 

@@ -62,7 +62,7 @@ export default async function CreateCustomPage({
     title: string;
     year: number | null;
     slotCount: number;
-    listFormat?: "poster" | "list";
+    listFormat?: "poster" | "list" | "grid";
     rankStyle?: "banner" | "chip" | "off";
     showSuffix?: boolean;
     items: {

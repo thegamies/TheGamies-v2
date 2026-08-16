@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 export const LIST_MAX_ITEMS = 100;
+/** Max length for per-game notes (UX + Zod). */
+export const LIST_BLURB_MAX = 500;
 export const LIST_TYPES = ["goty", "custom"] as const;
 
 export const listTypeSchema = z.enum(LIST_TYPES);
@@ -29,13 +31,13 @@ export const createDraftSchema = z.discriminatedUnion("listType", [
 export const listItemInputSchema = z.object({
   gameId: z.string().uuid(),
   rank: z.number().int().min(1).max(LIST_MAX_ITEMS),
-  blurb: z.string().trim().max(500).optional().nullable(),
+  blurb: z.string().trim().max(LIST_BLURB_MAX).optional().nullable(),
 });
 
 export const listItemByIgdbInputSchema = z.object({
   igdbId: z.number().int().positive(),
   rank: z.number().int().min(1).max(LIST_MAX_ITEMS),
-  blurb: z.string().trim().max(500).optional().nullable(),
+  blurb: z.string().trim().max(LIST_BLURB_MAX).optional().nullable(),
 });
 
 function refineUniqueRanks<T extends { rank: number }>(

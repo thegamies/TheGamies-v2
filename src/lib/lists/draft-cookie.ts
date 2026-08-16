@@ -24,7 +24,7 @@ export type ListDraftPayload = {
   title: string;
   igdbIds: number[];
   slotCount: number;
-  listFormat?: "poster" | "list";
+  listFormat?: "poster" | "list" | "grid";
   rankStyle?: "banner" | "chip" | "off";
   showSuffix?: boolean;
   publicId?: string | null;
@@ -37,7 +37,7 @@ function isRankStyle(value: unknown): value is ListDraftPayload["rankStyle"] {
 }
 
 function isListFormat(value: unknown): value is ListDraftPayload["listFormat"] {
-  return value === "poster" || value === "list";
+  return value === "poster" || value === "list" || value === "grid";
 }
 
 function parseGames(raw: unknown): ListDraftGame[] | undefined {
