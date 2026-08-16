@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import {
   awardCategories,
   communityEditionBallotCategoryVotes,
@@ -10,6 +10,7 @@ import {
   communityEditionResultVoterCategoryPicks,
   communityEditionResultVoterRanks,
   communityEditionResultVoters,
+  communityEditionVoices,
   covers,
   createDb,
   games,
@@ -30,11 +31,12 @@ import {
   type MatrixVoiceColumn,
 } from "./edition-ballot-matrix";
 import {
-  aggregateEditionCategories,
-  aggregateEditionGoty,
+  placeEditionCategoryTallies,
+  placeEditionGotyTallies,
   storageModeFor,
+  type AggregatedCategoryRow,
+  type AggregatedGotyRow,
   type EditionResultMode,
-  type GameMeta,
 } from "./edition-results-scoring";
 import {
   withDisplayRanks,
@@ -273,6 +275,154 @@ async function loadBallotVoterCategoryPicks(
   }));
 }
 
+/**
+ * GOTY board tallies via SQL GROUP BY (pointsForRank = 11 − rank for ranks 1–10).
+ * Hosts board joins edition voices so only designated Host ballots count.
+ */
+async function sqlAggregateEditionGoty(
+  editionId: string,
+  voicesOnly: boolean,
+  db: Db,
+): Promise<AggregatedGotyRow[]> {
+  const pointsExpr = sql<number>`coalesce(sum(11 - ${communityEditionBallotItems.rank}), 0)::int`;
+  const firstPlaceExpr = sql<number>`coalesce(sum(case when ${communityEditionBallotItems.rank} = 1 then 1 else 0 end), 0)::int`;
+  const appearancesExpr = sql<number>`count(*)::int`;
+
+  const base = db
+    .select({
+      gameId: communityEditionBallotItems.gameId,
+      slug: games.slug,
+      title: games.title,
+      gameYear: games.year,
+      coverImageId: covers.imageId,
+      points: pointsExpr,
+      firstPlaceVotes: firstPlaceExpr,
+      appearances: appearancesExpr,
+    })
+    .from(communityEditionBallotItems)
+    .innerJoin(
+      communityEditionBallots,
+      eq(communityEditionBallots.id, communityEditionBallotItems.ballotId),
+    )
+    .innerJoin(games, eq(games.id, communityEditionBallotItems.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
+
+  const withVoices = voicesOnly
+    ? base.innerJoin(
+        communityEditionVoices,
+        and(
+          eq(
+            communityEditionVoices.editionId,
+            communityEditionBallots.editionId,
+          ),
+          eq(
+            communityEditionVoices.profileId,
+            communityEditionBallots.profileId,
+          ),
+        ),
+      )
+    : base;
+
+  const rows = await withVoices
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, editionId),
+        gte(communityEditionBallotItems.rank, 1),
+        lte(communityEditionBallotItems.rank, 10),
+      ),
+    )
+    .groupBy(
+      communityEditionBallotItems.gameId,
+      games.slug,
+      games.title,
+      games.year,
+      covers.imageId,
+    )
+    .having(sql`sum(11 - ${communityEditionBallotItems.rank}) > 0`);
+
+  return placeEditionGotyTallies(
+    rows.map((r) => ({
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      gameYear: r.gameYear,
+      coverUrl: coverUrlFrom(r.coverImageId),
+      points: Number(r.points),
+      firstPlaceVotes: Number(r.firstPlaceVotes),
+      appearances: Number(r.appearances),
+    })),
+  );
+}
+
+/** Category plurality tallies via SQL GROUP BY; Hosts board joins edition voices. */
+async function sqlAggregateEditionCategories(
+  editionId: string,
+  voicesOnly: boolean,
+  db: Db,
+): Promise<AggregatedCategoryRow[]> {
+  const votesExpr = sql<number>`count(*)::int`;
+
+  const base = db
+    .select({
+      categoryId: communityEditionBallotCategoryVotes.categoryId,
+      gameId: communityEditionBallotCategoryVotes.gameId,
+      slug: games.slug,
+      title: games.title,
+      gameYear: games.year,
+      coverImageId: covers.imageId,
+      votes: votesExpr,
+    })
+    .from(communityEditionBallotCategoryVotes)
+    .innerJoin(
+      communityEditionBallots,
+      eq(
+        communityEditionBallots.id,
+        communityEditionBallotCategoryVotes.ballotId,
+      ),
+    )
+    .innerJoin(games, eq(games.id, communityEditionBallotCategoryVotes.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
+
+  const withVoices = voicesOnly
+    ? base.innerJoin(
+        communityEditionVoices,
+        and(
+          eq(
+            communityEditionVoices.editionId,
+            communityEditionBallots.editionId,
+          ),
+          eq(
+            communityEditionVoices.profileId,
+            communityEditionBallots.profileId,
+          ),
+        ),
+      )
+    : base;
+
+  const rows = await withVoices
+    .where(eq(communityEditionBallots.editionId, editionId))
+    .groupBy(
+      communityEditionBallotCategoryVotes.categoryId,
+      communityEditionBallotCategoryVotes.gameId,
+      games.slug,
+      games.title,
+      games.year,
+      covers.imageId,
+    );
+
+  return placeEditionCategoryTallies(
+    rows.map((r) => ({
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      gameYear: r.gameYear,
+      coverUrl: coverUrlFrom(r.coverImageId),
+      categoryId: r.categoryId,
+      votes: Number(r.votes),
+    })),
+  );
+}
+
 async function freezeEditionResults(
   editionId: string,
   db: Db,
@@ -292,106 +442,23 @@ async function freezeEditionResults(
     .where(eq(communityEditionBallots.editionId, editionId));
 
   const voiceIds = await listEditionVoiceProfileIds(editionId, db);
-  const ballotIds = ballots.map((b) => b.ballotId);
 
-  const itemRows =
-    ballotIds.length === 0
-      ? []
-      : await db
-          .select({
-            ballotId: communityEditionBallotItems.ballotId,
-            profileId: communityEditionBallots.profileId,
-            gameId: communityEditionBallotItems.gameId,
-            rank: communityEditionBallotItems.rank,
-          })
-          .from(communityEditionBallotItems)
-          .innerJoin(
-            communityEditionBallots,
-            eq(communityEditionBallots.id, communityEditionBallotItems.ballotId),
-          )
-          .where(inArray(communityEditionBallotItems.ballotId, ballotIds));
+  const [communityGoty, voicesGoty, communityCats, voicesCats, categoryDefs] =
+    await Promise.all([
+      sqlAggregateEditionGoty(editionId, false, db),
+      sqlAggregateEditionGoty(editionId, true, db),
+      sqlAggregateEditionCategories(editionId, false, db),
+      sqlAggregateEditionCategories(editionId, true, db),
+      db
+        .select({
+          id: awardCategories.id,
+          label: awardCategories.label,
+          description: awardCategories.description,
+          sortOrder: awardCategories.sortOrder,
+        })
+        .from(awardCategories),
+    ]);
 
-  const catVoteRows =
-    ballotIds.length === 0
-      ? []
-      : await db
-          .select({
-            ballotId: communityEditionBallotCategoryVotes.ballotId,
-            profileId: communityEditionBallots.profileId,
-            categoryId: communityEditionBallotCategoryVotes.categoryId,
-            gameId: communityEditionBallotCategoryVotes.gameId,
-          })
-          .from(communityEditionBallotCategoryVotes)
-          .innerJoin(
-            communityEditionBallots,
-            eq(
-              communityEditionBallots.id,
-              communityEditionBallotCategoryVotes.ballotId,
-            ),
-          )
-          .where(
-            inArray(communityEditionBallotCategoryVotes.ballotId, ballotIds),
-          );
-
-  const gameIds = [
-    ...new Set([
-      ...itemRows.map((r) => r.gameId),
-      ...catVoteRows.map((r) => r.gameId),
-    ]),
-  ];
-
-  const gameMeta = new Map<string, GameMeta>();
-  if (gameIds.length > 0) {
-    const found = await db
-      .select({
-        id: games.id,
-        slug: games.slug,
-        title: games.title,
-        year: games.year,
-        coverImageId: covers.imageId,
-      })
-      .from(games)
-      .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
-      .where(inArray(games.id, gameIds));
-    for (const g of found) {
-      gameMeta.set(g.id, {
-        gameId: g.id,
-        slug: g.slug,
-        title: g.title,
-        gameYear: g.year,
-        coverUrl: coverUrlFrom(g.coverImageId),
-      });
-    }
-  }
-
-  const rankedLines = itemRows.map((r) => ({
-    profileId: r.profileId,
-    gameId: r.gameId,
-    rank: r.rank,
-  }));
-  const categoryLines = catVoteRows.map((r) => ({
-    profileId: r.profileId,
-    categoryId: r.categoryId,
-    gameId: r.gameId,
-  }));
-
-  const communityGoty = aggregateEditionGoty(rankedLines, gameMeta);
-  const voicesGoty = aggregateEditionGoty(rankedLines, gameMeta, voiceIds);
-  const communityCats = aggregateEditionCategories(categoryLines, gameMeta);
-  const voicesCats = aggregateEditionCategories(
-    categoryLines,
-    gameMeta,
-    voiceIds,
-  );
-
-  const categoryDefs = await db
-    .select({
-      id: awardCategories.id,
-      label: awardCategories.label,
-      description: awardCategories.description,
-      sortOrder: awardCategories.sortOrder,
-    })
-    .from(awardCategories);
   const catDefById = new Map(categoryDefs.map((c) => [c.id, c]));
 
   const ballotCountCommunity = ballots.length;
