@@ -64,16 +64,14 @@ export default async function CreateGotyPage({
   const authIntent = parseListAuthIntent(first(params.intent));
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
-  const awardCategories = signedIn
-    ? await listActiveAwardCategories().catch(() => [])
-    : [];
+  const awardCategories = await listActiveAwardCategories().catch(() => []);
 
   let editor: {
     publicId: string | null;
     title: string;
     year: number | null;
     slotCount: number;
-    listFormat?: "poster" | "list";
+    listFormat?: "poster" | "list" | "grid";
     rankStyle?: "banner" | "chip" | "off";
     showSuffix?: boolean;
     items: {

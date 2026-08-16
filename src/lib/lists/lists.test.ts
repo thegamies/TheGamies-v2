@@ -11,6 +11,7 @@ import {
   createDraftSchema,
   replaceItemsByIgdbSchema,
   replaceItemsSchema,
+  LIST_BLURB_MAX,
   LIST_MAX_ITEMS,
 } from "./schema";
 import {
@@ -131,6 +132,20 @@ describe("replaceItemsSchema", () => {
           rank: i + 1,
         })),
       ).success,
+    ).toBe(false);
+  });
+
+  it("caps notes at LIST_BLURB_MAX", () => {
+    expect(LIST_BLURB_MAX).toBe(500);
+    expect(
+      replaceItemsSchema.safeParse([
+        { gameId: id, rank: 1, blurb: "x".repeat(LIST_BLURB_MAX) },
+      ]).success,
+    ).toBe(true);
+    expect(
+      replaceItemsSchema.safeParse([
+        { gameId: id, rank: 1, blurb: "x".repeat(LIST_BLURB_MAX + 1) },
+      ]).success,
     ).toBe(false);
   });
 });

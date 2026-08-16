@@ -47,10 +47,12 @@ import {
   type ExportRankStyle,
 } from "@/components/list-export/rankChrome";
 import { PosterBuilder } from "@/components/lists/PosterBuilder";
+import { GridListBuilder } from "@/components/lists/GridListBuilder";
 import { SaveSignInDialog } from "@/components/lists/SaveSignInDialog";
 import { ShareLinkSignInDialog } from "@/components/lists/ShareLinkSignInDialog";
 import { ShareMenuDialog } from "@/components/lists/ShareMenuDialog";
 import { Button } from "@/components/ui/Button";
+import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import {
   controlGroupClass,
   controlGroupFullClass,
@@ -62,7 +64,6 @@ import {
 } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
-import { YearPicker } from "@/components/ui/YearPicker";
 import { navItemClass } from "@/components/ui/navLevels";
 import {
   buildListDraftPayload,
@@ -75,8 +76,11 @@ import {
   type AwardCategoryOption,
   type CategoryVoteSelection,
 } from "@/components/lists/CategoryVotesEditor";
-import { type ListAuthIntent } from "@/lib/lists/auth-intent";
-import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import {
+  buildListSignInHref,
+  type ListAuthIntent,
+} from "@/lib/lists/auth-intent";
+import { LIST_BLURB_MAX, LIST_MAX_ITEMS } from "@/lib/lists/schema";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 const SLOT_PRESETS = [5, 10, 20, 50] as const;
@@ -92,7 +96,7 @@ export type EditorItem = {
   blurb: string;
 };
 
-type ListFormat = "poster" | "list";
+type ListFormat = "poster" | "list" | "grid";
 
 type ListEditorProps = {
   publicId?: string | null;
@@ -128,16 +132,29 @@ function persistSnapshot(input: {
   title: string;
   year: string;
   items: EditorItem[];
+  categoryVotes: CategoryVoteSelection[];
+  listFormat: ListFormat;
+  slotCount: number;
+  rankStyle: ExportRankStyle;
+  showSuffix: boolean;
 }): string {
   return JSON.stringify({
     listType: input.listType,
     title: input.title,
     year: input.year,
+    listFormat: input.listFormat,
+    slotCount: input.slotCount,
+    rankStyle: input.rankStyle,
+    showSuffix: input.showSuffix,
     items: input.items.map((item, index) => ({
       igdbId: item.igdbId,
       gameId: item.gameId,
       rank: index + 1,
       blurb: item.blurb,
+    })),
+    categoryVotes: input.categoryVotes.map((v) => ({
+      categoryId: v.categoryId,
+      gameId: v.gameId,
     })),
   });
 }
@@ -179,6 +196,11 @@ export function ListEditor({
           blurb: item.blurb ?? "",
         })),
       ),
+      categoryVotes: initialCategoryVotes,
+      listFormat: initialListFormat,
+      slotCount: Math.max(initialSlotCount ?? 10, initialItems.length),
+      rankStyle: initialRankStyle,
+      showSuffix: initialShowSuffix,
     }),
   );
 
@@ -194,7 +216,7 @@ export function ListEditor({
   const [categoryVotes, setCategoryVotes] =
     useState<CategoryVoteSelection[]>(initialCategoryVotes);
   const showCategoryTabs =
-    signedIn && listType === "goty" && awardCategories.length > 0;
+    listType === "goty" && awardCategories.length > 0;
   const [editorView, setEditorView] = useState<"goty" | "categories">("goty");
   const [items, setItems] = useState<EditorItem[]>(() =>
     withRanks(
@@ -242,13 +264,24 @@ export function ListEditor({
   const selectedIds = new Set(items.map((i) => i.gameId));
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
   const emptySlots = Math.max(0, slotCount - items.length);
-  const signInHref = `/auth/sign-in?next=${encodeURIComponent(returnPath)}`;
-  const dirty =
-    signedIn &&
-    persistSnapshot({ listType, title, year, items }) !== savedSnapshot;
+  const signInHref = buildListSignInHref(returnPath, "save");
+  const currentSnapshot = () =>
+    persistSnapshot({
+      listType,
+      title,
+      year,
+      items,
+      categoryVotes,
+      listFormat,
+      slotCount,
+      rankStyle,
+      showSuffix,
+    });
+  const dirty = signedIn && currentSnapshot() !== savedSnapshot;
   const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
     message: "Leave without saving? Your latest edits won’t be kept on this list.",
   });
+  const onGotyChrome = editorView === "goty";
   const authIntentEmptyError =
     signedIn && authIntent && draftReady && items.length === 0
       ? "Add at least one game before saving or sharing."
@@ -403,14 +436,7 @@ export function ListEditor({
       }
       if (result.publicId) {
         setPublicId(result.publicId);
-        setSavedSnapshot(
-          persistSnapshot({
-            listType,
-            title,
-            year,
-            items,
-          }),
-        );
+        setSavedSnapshot(currentSnapshot());
         setSaveError(null);
         setSavedFlash(true);
         window.setTimeout(() => setSavedFlash(false), 2000);
@@ -549,9 +575,6 @@ export function ListEditor({
         !settingsRef.current.contains(e.target as Node)
       ) {
         setSettingsOpen(false);
-        if (listType === "goty") {
-          requestYearTrim(draftYear, "goty");
-        }
       }
     }
     function onKey(e: KeyboardEvent) {
@@ -559,9 +582,6 @@ export function ListEditor({
         setSettingsOpen(false);
         setSlotPickerOpen(false);
         setPanelOpen(false);
-        if (listType === "goty") {
-          requestYearTrim(draftYear, "goty");
-        }
       }
     }
     window.addEventListener("mousedown", onPointer);
@@ -570,7 +590,7 @@ export function ListEditor({
       window.removeEventListener("mousedown", onPointer);
       window.removeEventListener("keydown", onKey);
     };
-  }, [settingsOpen, listType, draftYear, requestYearTrim]);
+  }, [settingsOpen]);
 
   function focusSearch() {
     setPanelOpen(true);
@@ -625,25 +645,11 @@ export function ListEditor({
   }
 
   function openSettings() {
-    setDraftYear(Number(year) || currentYear);
     setSettingsOpen(true);
   }
 
   function closeSettings() {
     setSettingsOpen(false);
-    if (listType === "goty") {
-      requestYearTrim(draftYear, "goty");
-    }
-  }
-
-  function setListTypeChoice(next: "goty" | "custom") {
-    if (next === listType) return;
-    if (next === "custom") {
-      setListType("custom");
-      setPendingYearTrim(null);
-      return;
-    }
-    requestYearTrim(draftYear || yearNum, "goty");
   }
 
   function addGame(hit: GameSearchHit) {
@@ -685,8 +691,9 @@ export function ListEditor({
 
   function setBlurb(id: string, blurb: string) {
     if (!signedIn) return;
+    const next = blurb.slice(0, LIST_BLURB_MAX);
     setItems((prev) =>
-      prev.map((item) => (item.gameId === id ? { ...item, blurb } : item)),
+      prev.map((item) => (item.gameId === id ? { ...item, blurb: next } : item)),
     );
   }
 
@@ -748,14 +755,7 @@ export function ListEditor({
         return;
       }
       if (result.publicId) setPublicId(result.publicId);
-      setSavedSnapshot(
-        persistSnapshot({
-          listType,
-          title,
-          year,
-          items,
-        }),
-      );
+      setSavedSnapshot(currentSnapshot());
       setSaveError(null);
       setSaveNotice(null);
       setSavedFlash(true);
@@ -775,6 +775,15 @@ export function ListEditor({
     }
     allowLeave();
     shareFormRef.current?.requestSubmit();
+  }
+
+  function onShareClick() {
+    if (items.length === 0) return;
+    if (editorView === "categories") {
+      shareWithLink();
+      return;
+    }
+    openShareMenu();
   }
 
   const trimMessage = (() => {
@@ -806,7 +815,34 @@ export function ListEditor({
   })();
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-0">
+    <div
+      className={`space-y-6 ${
+        signedIn && dirty
+          ? editorView === "goty"
+            ? "pb-36 lg:pb-24"
+            : "pb-24"
+          : "pb-20 lg:pb-0"
+      }`}
+    >
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
+        <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
+          Title
+          <input
+            value={title}
+            readOnly={listType === "goty"}
+            onChange={(e) => {
+              if (listType === "goty") return;
+              setTitle(e.target.value);
+            }}
+            className={`mt-1 w-full border-b border-line bg-transparent py-1.5 text-lg outline-none ${
+              listType === "goty"
+                ? "cursor-default text-muted"
+                : "text-ink focus:border-accent"
+            }`}
+          />
+        </label>
+      </div>
+
       {showCategoryTabs ? (
         <div
           className="flex flex-wrap gap-5 border-b border-line pb-0"
@@ -840,82 +876,77 @@ export function ListEditor({
       ) : null}
 
       <div className="flex flex-wrap items-end gap-x-4 gap-y-3 border-b border-line pb-4">
-        <label className={`min-w-[12rem] flex-1 ${controlLabelClass}`}>
-          Title
-          <input
-            value={title}
-            readOnly={listType === "goty"}
-            onChange={(e) => {
-              if (listType === "goty") return;
-              setTitle(e.target.value);
-            }}
-            className={`mt-1 w-full border-b border-line bg-transparent py-1.5 text-lg outline-none ${
-              listType === "goty"
-                ? "cursor-default text-muted"
-                : "text-ink focus:border-accent"
-            }`}
-          />
-        </label>
+        {onGotyChrome ? (
+          <>
+            <div className={controlLabelClass}>
+              Size
+              <div className={controlGroupClass}>
+                <button
+                  type="button"
+                  onClick={() => changeSlotCount(slotCount - 1)}
+                  disabled={slotCount <= 1}
+                  aria-label="Fewer slots"
+                  className={stepperBtnClass}
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSlotPickerOpen(true)}
+                  aria-haspopup="dialog"
+                  aria-label={`List size: ${slotCount}. Tap to pick.`}
+                  className={stepperValueClass}
+                >
+                  {slotCount}
+                  <span className="text-muted">▾</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => changeSlotCount(slotCount + 1)}
+                  disabled={slotCount >= LIST_MAX_ITEMS}
+                  aria-label="More slots"
+                  className={stepperBtnClass}
+                >
+                  +
+                </button>
+              </div>
+            </div>
 
-        <div className={controlLabelClass}>
-          Size
-          <div className={controlGroupClass}>
-            <button
-              type="button"
-              onClick={() => changeSlotCount(slotCount - 1)}
-              disabled={slotCount <= 1}
-              aria-label="Fewer slots"
-              className={stepperBtnClass}
-            >
-              −
-            </button>
-            <button
-              type="button"
-              onClick={() => setSlotPickerOpen(true)}
-              aria-haspopup="dialog"
-              aria-label={`List size: ${slotCount}. Tap to pick.`}
-              className={stepperValueClass}
-            >
-              {slotCount}
-              <span className="text-muted">▾</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => changeSlotCount(slotCount + 1)}
-              disabled={slotCount >= LIST_MAX_ITEMS}
-              aria-label="More slots"
-              className={stepperBtnClass}
-            >
-              +
-            </button>
-          </div>
-        </div>
-
-        <div className={controlLabelClass}>
-          Format
-          <div
-            role="group"
-            aria-label="List format"
-            className={controlGroupClass}
-          >
-            <button
-              type="button"
-              onClick={() => setListFormat("poster")}
-              aria-pressed={listFormat === "poster"}
-              className={segmentBtnClass(listFormat === "poster")}
-            >
-              Poster
-            </button>
-            <button
-              type="button"
-              onClick={() => setListFormat("list")}
-              aria-pressed={listFormat === "list"}
-              className={segmentBtnClass(listFormat === "list")}
-            >
-              List
-            </button>
-          </div>
-        </div>
+            <div className={controlLabelClass}>
+              Format
+              <div
+                role="group"
+                aria-label="List format"
+                className={controlGroupClass}
+              >
+                <button
+                  type="button"
+                  onClick={() => setListFormat("poster")}
+                  aria-pressed={listFormat === "poster"}
+                  className={segmentBtnClass(listFormat === "poster")}
+                >
+                  Poster
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListFormat("list")}
+                  aria-pressed={listFormat === "list"}
+                  className={segmentBtnClass(listFormat === "list")}
+                >
+                  List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setListFormat("grid")}
+                  aria-pressed={listFormat === "grid"}
+                  className={segmentBtnClass(listFormat === "grid")}
+                >
+                  Grid
+                </button>
+              </div>
+            </div>
+          </>
+        ) : null}
 
         <div ref={settingsRef} className="relative self-end">
           <button
@@ -937,46 +968,6 @@ export function ListEditor({
               aria-label="List settings"
               className="absolute top-full left-0 z-30 mt-2 w-[min(20rem,calc(100vw-2rem))] space-y-4 border border-line bg-panel p-3"
             >
-              <div className="space-y-1.5">
-                <p className={controlLabelClass}>List type</p>
-                <div
-                  role="group"
-                  aria-label="List type"
-                  className={controlGroupFullClass}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setListTypeChoice("goty")}
-                    aria-pressed={listType === "goty"}
-                    className={segmentBtnClass(listType === "goty")}
-                  >
-                    GOTY
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setListTypeChoice("custom")}
-                    aria-pressed={listType === "custom"}
-                    className={segmentBtnClass(listType === "custom")}
-                  >
-                    Custom
-                  </button>
-                </div>
-                {listType === "goty" ? (
-                  <div className={`mt-2 ${controlLabelClass}`}>
-                    Year
-                    <YearPicker
-                      value={Number.isFinite(draftYear) ? draftYear : ""}
-                      className="mt-1"
-                      aria-label="Year"
-                      onChange={(next) => {
-                        setDraftYear(next);
-                        requestYearTrim(next, "goty");
-                      }}
-                    />
-                  </div>
-                ) : null}
-              </div>
-
               <div className="space-y-1.5">
                 <p className={controlLabelClass}>Rank style</p>
                 <div className="flex w-full flex-col gap-2">
@@ -1017,20 +1008,22 @@ export function ListEditor({
         </div>
 
         <div className="ml-auto flex flex-wrap items-center gap-2 self-end">
-          <Button
-            type="button"
-            variant="bordered"
-            size="sm"
-            onClick={save}
-            disabled={pending}
-          >
-            {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
-          </Button>
+          {!(signedIn && dirty) ? (
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              onClick={save}
+              disabled={pending}
+            >
+              {pending ? "Saving…" : savedFlash ? "Saved" : "Save"}
+            </Button>
+          ) : null}
           <Button
             type="button"
             size="sm"
             disabled={items.length === 0 || pending}
-            onClick={openShareMenu}
+            onClick={onShareClick}
           >
             Share
           </Button>
@@ -1050,16 +1043,6 @@ export function ListEditor({
           </form>
         </div>
 
-        {signedIn && dirty ? (
-          <p
-            className="w-full text-sm text-muted"
-            role="status"
-            data-testid="unsaved-changes"
-          >
-            Unsaved changes
-          </p>
-        ) : null}
-
         {saveNotice ? (
           <p className="w-full text-sm text-muted" role="status">
             {saveNotice}{" "}
@@ -1077,13 +1060,15 @@ export function ListEditor({
       </div>
 
       {showCategoryTabs && editorView === "categories" ? (
-        <div className="mx-auto w-full max-w-[var(--page-max)] pb-24">
+        <div className="mx-auto w-full max-w-[var(--page-max)] pb-8">
           <CategoryVotesEditor
             key={yearNum}
             categories={awardCategories}
             value={categoryVotes}
             onChange={setCategoryVotes}
             year={yearNum}
+            locked={!signedIn}
+            lockHref={signInHref}
           />
         </div>
       ) : (
@@ -1129,6 +1114,19 @@ export function ListEditor({
                   : "Drag cards to reorder. Tap an empty slot to add more."}
               </p>
             </>
+          ) : listFormat === "grid" ? (
+            <GridListBuilder
+              items={items.map((item) => ({
+                id: item.gameId,
+                title: item.title,
+                coverUrl: item.coverUrl,
+                year: item.year,
+              }))}
+              slotCount={slotCount}
+              onReorder={reorder}
+              onRemove={removeGame}
+              onPickEmpty={focusSearch}
+            />
           ) : (
             <>
               {items.length === 0 ? (
@@ -1330,6 +1328,25 @@ export function ListEditor({
         />
       ) : null}
 
+      {signedIn && dirty ? (
+        <PinnedSaveBar
+          className={`fixed inset-x-0 z-40 ${
+            editorView === "goty" ? "bottom-14 lg:bottom-0" : "bottom-0"
+          }`}
+          message="Unsaved changes"
+        >
+          <Button
+            type="button"
+            size="sm"
+            onClick={save}
+            disabled={pending}
+            data-testid="unsaved-changes"
+          >
+            {pending ? "Saving…" : "Save"}
+          </Button>
+        </PinnedSaveBar>
+      ) : null}
+
       {unsavedDialog}
     </div>
   );
@@ -1419,6 +1436,7 @@ function NotesCard({
   onBlurbChange: (id: string, blurb: string) => void;
   onRemove: (id: string) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const {
     attributes,
     listeners,
@@ -1463,13 +1481,30 @@ function NotesCard({
           </button>
         </div>
         {canEditNotes ? (
-          <textarea
-            value={item.blurb}
-            onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
-            placeholder="Optional note / review"
-            rows={2}
-            className="min-h-0 w-full flex-1 resize-y border border-line bg-paper px-2 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus:border-accent"
-          />
+          <div className="flex min-h-0 flex-1 flex-col gap-1">
+            <textarea
+              value={item.blurb}
+              onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
+              placeholder="Optional note / review"
+              rows={expanded ? 8 : 2}
+              maxLength={LIST_BLURB_MAX}
+              className={`w-full resize-y border border-line bg-paper px-2 py-1.5 text-sm leading-relaxed text-ink outline-none placeholder:text-muted focus:border-accent ${
+                expanded ? "min-h-40" : "min-h-0 flex-1"
+              }`}
+            />
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
+              >
+                {expanded ? "Smaller field" : "Larger field"}
+              </button>
+              <p className="text-xs text-muted">
+                {item.blurb.length}/{LIST_BLURB_MAX}
+              </p>
+            </div>
+          </div>
         ) : (
           <p className="text-xs text-muted">
             <Link href={signInHref} className="text-accent underline">
