@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOutAction } from "@/app/auth/sign-out/actions";
+import { SignInLink } from "@/components/auth/SignInLink";
 import { Button } from "@/components/ui/Button";
 import type { SiteNavAccount, SiteNavLink } from "@/lib/site-nav";
 
@@ -123,13 +124,22 @@ export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
                   </form>
                 </>
               ) : (
-                <Link
-                  href="/auth/sign-in"
-                  className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
-                  onClick={close}
+                <Suspense
+                  fallback={
+                    <Link
+                      href="/auth/sign-in"
+                      className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                      onClick={close}
+                    >
+                      Sign in
+                    </Link>
+                  }
                 >
-                  Sign in
-                </Link>
+                  <SignInLink
+                    className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                    onClick={close}
+                  />
+                </Suspense>
               )}
             </nav>
           </aside>

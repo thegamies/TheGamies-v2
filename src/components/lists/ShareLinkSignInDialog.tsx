@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { buildSignUpHref } from "@/lib/auth/return-to";
 import { buildListSignInHref } from "@/lib/lists/auth-intent";
 
 export function ShareLinkSignInDialog({
@@ -24,6 +25,11 @@ export function ShareLinkSignInDialog({
       <div className="mt-4 flex flex-wrap gap-3">
         <Link href={buildListSignInHref(returnPath, "share")}>
           <Button type="button">Sign in &amp; share</Button>
+        </Link>
+        <Link href={buildSignUpHref({ next: returnPath, intent: "share" })}>
+          <Button type="button" variant="bordered">
+            Create account &amp; share
+          </Button>
         </Link>
         <Button
           type="button"

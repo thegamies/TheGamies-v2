@@ -44,14 +44,11 @@ export function withoutListAuthIntent(path: string): string {
   return qs ? `${pathname}?${qs}` : pathname;
 }
 
+import { buildSignInHref } from "@/lib/auth/return-to";
+
 export function buildListSignInHref(
   returnPath: string,
   intent: ListAuthIntent,
 ): string {
-  const next = withListAuthIntent(returnPath, intent);
-  const params = new URLSearchParams({
-    next,
-    intent,
-  });
-  return `/auth/sign-in?${params.toString()}`;
+  return buildSignInHref({ next: returnPath, intent });
 }
