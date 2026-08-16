@@ -419,28 +419,38 @@ export function PosterBuilder({
         {activeItem && activeSize ? (
           <div
             style={{
-              width: activeSize.w,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
+              // Match on-screen size so dnd-kit's overlay tracks the finger.
+              // Inner node keeps canvas pixel layout, then scales down.
+              width: activeSize.w * scale,
+              height: (activeSize.h + bannerH) * scale,
               cursor: "grabbing",
             }}
           >
-            <SocialGamerCardImageFrame
-              game={{
-                id: activeItem.id,
-                title: activeItem.title,
-                imageUrl: activeItem.coverUrl,
-              }}
-              rank={activeRank}
-              width={activeSize.w}
-              height={activeSize.h}
-              rankScaleWidth={rankScaleWidth}
-              rankChrome={chrome}
+            <div
               style={{
-                boxShadow:
-                  "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
+                width: activeSize.w,
+                height: activeSize.h + bannerH,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
               }}
-            />
+            >
+              <SocialGamerCardImageFrame
+                game={{
+                  id: activeItem.id,
+                  title: activeItem.title,
+                  imageUrl: activeItem.coverUrl,
+                }}
+                rank={activeRank}
+                width={activeSize.w}
+                height={activeSize.h}
+                rankScaleWidth={rankScaleWidth}
+                rankChrome={chrome}
+                style={{
+                  boxShadow:
+                    "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
+                }}
+              />
+            </div>
           </div>
         ) : null}
       </DragOverlay>

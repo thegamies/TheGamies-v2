@@ -31,7 +31,6 @@ describe("list card chrome", () => {
 
   it("styles remove menu items for the external card popover", () => {
     expect(cardActionMenuItemClassName).toContain("text-sm");
-    expect(cardActionMenuItemClassName).toContain("hover:text-accent");
   });
 
   it("blocks touchmove while holding steady for drag", () => {
@@ -68,7 +67,7 @@ describe("list card chrome", () => {
 });
 
 describe("ListCardActionMenu", () => {
-  it("renders outside the card via portal and offers Remove", () => {
+  it("portals an absolute popover with a danger Remove action", () => {
     const anchor = document.createElement("div");
     anchor.setAttribute("data-list-card", "game-1");
     Object.defineProperty(anchor, "getBoundingClientRect", {
@@ -92,6 +91,8 @@ describe("ListCardActionMenu", () => {
     const menu = document.querySelector("[data-list-card-menu]");
     expect(menu).toBeTruthy();
     expect(menu?.parentElement).toBe(document.body);
-    expect(screen.getByRole("menuitem", { name: "Remove" })).toBeTruthy();
+    expect(menu?.className).toContain("absolute");
+    const remove = screen.getByRole("menuitem", { name: "Remove" });
+    expect(remove.className).toMatch(/bg-danger/);
   });
 });
