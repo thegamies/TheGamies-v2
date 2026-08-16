@@ -2,7 +2,6 @@
 
 import {
   DndContext,
-  DragOverlay,
   closestCenter,
   type DragEndEvent,
   type DragStartEvent,
@@ -165,31 +164,6 @@ export function PosterBuilder({
 
   const bannerH = exportRankBannerBelowHeight(rankScaleWidth, chrome);
 
-  // Map each rank (1-based) to canvas card dimensions for the drag overlay.
-  const rankSize = useMemo(() => {
-    const m = new Map<number, { w: number; h: number }>();
-    rows.forEach((row, rowIndex) => {
-      const { w, h } = cardByRow[rowIndex]!;
-      row.ranks.forEach((rank) => m.set(rank, { w, h }));
-    });
-    return m;
-  }, [rows, cardByRow]);
-
-  /**
-   * Interactive poster is laid out in **on-screen pixels** (canvas × scale).
-   * Do not CSS-`scale()` the DnD tree — that breaks pointer tracking (Grid
-   * works because it has no transform wrapper).
-   */
-  const sx = (n: number) => n * scale;
-  const viewW = sx(CANVAS_W);
-  const viewH = sx(CANVAS_H);
-  const viewGap = sx(AWARDS_GRID_GAP);
-  const viewSidePad = sx(AWARDS_SIDE_PAD);
-  const viewGridTopPad = sx(AWARDS_GRID_TOP_PAD);
-  const viewHeaderH = sx(AWARDS_HEADER_BAND_PX);
-  const viewFooterH = sx(AWARDS_FOOTER_PX);
-  const viewBannerH = sx(bannerH);
-  const viewRankScaleW = sx(rankScaleWidth);
 
   const handleDragStart = (event: DragStartEvent) => {
     dragOccurredRef.current = true;
@@ -220,10 +194,6 @@ export function PosterBuilder({
       dragOccurredRef.current = false;
     }, 0);
   };
-
-  const activeItem = activeId ? items.find((i) => i.id === activeId) ?? null : null;
-  const activeRank = activeId ? filledIds.indexOf(activeId) + 1 : 0;
-  const activeSize = activeRank > 0 ? rankSize.get(activeRank) : undefined;
 
   const debugStats = useMemo(() => {
     if (!debug) return null;
@@ -273,190 +243,173 @@ export function PosterBuilder({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div ref={containerRef} className="w-full">
+    <div ref={containerRef} className="w-full">
+      <div style={{ position: "relative", width: "100%", height: CANVAS_H * scale }}>
         <div
           style={{
-            position: "relative",
-            width: "100%",
-            height: viewH,
-            overflow: "hidden",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: CANVAS_W,
+            height: CANVAS_H,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
           }}
         >
-          <AwardsPosterBackground
-            width={viewW}
-            height={viewH}
-            headerLineY={sx(awardsHeaderLineY())}
-          />
           <div
             style={{
               position: "relative",
-              zIndex: 1,
-              display: "flex",
-              flexDirection: "column",
-              width: viewW,
-              height: viewH,
-              minHeight: 0,
+              width: CANVAS_W,
+              height: CANVAS_H,
+              overflow: activeId ? "visible" : "hidden",
             }}
           >
-            <AwardsExportHeader
-              year={year}
-              topCount={slotCount}
-              listType={listType}
-              heightPx={viewHeaderH}
-              widthPx={viewW}
-              title={title}
-              showYearBadge={showYearBadge}
-              showTopCount={showTopCount}
+            <AwardsPosterBackground
+              width={CANVAS_W}
+              height={CANVAS_H}
+              headerLineY={awardsHeaderLineY()}
             />
-
-            <SortableContext items={filledIds} strategy={rectSortingStrategy}>
-              <div
-                style={{
-                  flex: 1,
-                  minHeight: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: viewGap,
-                  padding: `${viewGridTopPad}px ${viewSidePad}px 0`,
-                  boxSizing: "border-box",
-                }}
-              >
-                {rows.map((row, rowIndex) => {
-                  const { w, h } = cardByRow[rowIndex]!;
-                  const cardW = sx(w);
-                  const cardH = sx(h);
-                  const rowH = cardH + viewBannerH;
-                  return (
-                    <div
-                      key={row.ranks.join("-")}
-                      style={{
-                        width: viewW - viewSidePad * 2,
-                        height: rowH,
-                        display: "flex",
-                        alignItems: "stretch",
-                        justifyContent: "center",
-                        gap: viewGap,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {row.ranks.map((rank) => {
-                        const item = items[rank - 1];
-                        if (item) {
-                          return (
-                            <SortableCard
-                              key={item.id}
-                              id={item.id}
-                              game={{
-                                id: item.id,
-                                title: item.title,
-                                imageUrl: item.coverUrl,
-                              }}
-                              rank={rank}
-                              width={cardW}
-                              height={cardH}
-                              rankScaleWidth={viewRankScaleW}
-                              rankChrome={chrome}
-                              selected={selectedId === item.id}
-                              onSelect={() => {
-                                if (dragOccurredRef.current) return;
-                                setSelectedId((curr) =>
-                                  curr === item.id ? null : item.id,
-                                );
-                              }}
-                            />
-                          );
-                        }
-                        return (
-                          <EmptySlot
-                            key={`empty-${rank}`}
-                            rank={rank}
-                            width={cardW}
-                            height={cardH}
-                            bannerH={viewBannerH}
-                            showRank={!hideRanks}
-                            onClick={onPickEmpty}
-                          />
-                        );
-                      })}
-                    </div>
-                  );
-                })}
-              </div>
-            </SortableContext>
-
-            <AwardsExportFooter heightPx={viewFooterH} widthPx={viewW} />
-          </div>
-        </div>
-
-        {debugStats ? (
-          <div className="mt-3 border border-[var(--line)] bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
-            <div className="mb-1 font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
-              Layout debug
-            </div>
-            <div>
-              slots {debugStats.slots} · rows {debugStats.distribution} · canvas{" "}
-              {CANVAS_W}×{CANVAS_H}
-            </div>
-            <div>
-              <span className="text-[var(--ink)]">largest</span>{" "}
-              {debugStats.largest.w}×{debugStats.largest.h}px ·{" "}
-              {debugStats.largest.widthPct}% width · {debugStats.largest.areaPct}
-              % area
-            </div>
-            <div>
-              <span className="text-[var(--ink)]">smallest</span>{" "}
-              {debugStats.smallest.w}×{debugStats.smallest.h}px ·{" "}
-              {debugStats.smallest.widthPct}% width ·{" "}
-              {debugStats.smallest.areaPct}% area
-            </div>
-            <div>
-              size parity (small/large){" "}
-              <span className="text-[var(--ink)]">{debugStats.parityPct}%</span>{" "}
-              · area used{" "}
-              <span className="text-[var(--ink)]">{debugStats.coveragePct}%</span>
-            </div>
-          </div>
-        ) : null}
-
-        <DragOverlay dropAnimation={null}>
-          {activeItem && activeSize ? (
             <div
               style={{
-                width: sx(activeSize.w),
-                cursor: "grabbing",
+                position: "relative",
+                zIndex: 1,
+                display: "flex",
+                flexDirection: "column",
+                width: "100%",
+                height: "100%",
+                minHeight: 0,
               }}
             >
-              <SocialGamerCardImageFrame
-                game={{
-                  id: activeItem.id,
-                  title: activeItem.title,
-                  imageUrl: activeItem.coverUrl,
-                }}
-                rank={activeRank}
-                width={sx(activeSize.w)}
-                height={sx(activeSize.h)}
-                rankScaleWidth={viewRankScaleW}
-                rankChrome={chrome}
-                style={{
-                  boxShadow:
-                    "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)",
-                }}
+              <AwardsExportHeader
+                year={year}
+                topCount={slotCount}
+                listType={listType}
+                heightPx={AWARDS_HEADER_BAND_PX}
+                widthPx={CANVAS_W}
+                title={title}
+                showYearBadge={showYearBadge}
+                showTopCount={showTopCount}
               />
+
+                <SortableContext items={filledIds} strategy={rectSortingStrategy}>
+                  <div
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      gap: AWARDS_GRID_GAP,
+                      padding: `${AWARDS_GRID_TOP_PAD}px ${AWARDS_SIDE_PAD}px 0`,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    {rows.map((row, rowIndex) => {
+                      const { w, h } = cardByRow[rowIndex]!;
+                      const rowH = h + bannerH;
+                      return (
+                        <div
+                          key={row.ranks.join("-")}
+                          style={{
+                            width: CANVAS_W - AWARDS_SIDE_PAD * 2,
+                            height: rowH,
+                            display: "flex",
+                            alignItems: "stretch",
+                            justifyContent: "center",
+                            gap: AWARDS_GRID_GAP,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {row.ranks.map((rank) => {
+                            const item = items[rank - 1];
+                            if (item) {
+                              return (
+                                <SortableCard
+                                  key={item.id}
+                                  id={item.id}
+                                  game={{
+                                    id: item.id,
+                                    title: item.title,
+                                    imageUrl: item.coverUrl,
+                                  }}
+                                  rank={rank}
+                                  width={w}
+                                  height={h}
+                                  rankScaleWidth={rankScaleWidth}
+                                  rankChrome={chrome}
+                                  scale={scale}
+                                  selected={selectedId === item.id}
+                                  onSelect={() => {
+                                    if (dragOccurredRef.current) return;
+                                    setSelectedId((curr) =>
+                                      curr === item.id ? null : item.id,
+                                    );
+                                  }}
+                                />
+                              );
+                            }
+                            return (
+                              <EmptySlot
+                                key={`empty-${rank}`}
+                                rank={rank}
+                                width={w}
+                                height={h}
+                                bannerH={bannerH}
+                                showRank={!hideRanks}
+                                onClick={onPickEmpty}
+                              />
+                            );
+                          })}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </SortableContext>
+
+              <AwardsExportFooter heightPx={AWARDS_FOOTER_PX} widthPx={CANVAS_W} />
             </div>
-          ) : null}
-        </DragOverlay>
-        {selectedId ? (
-          <ListCardActionMenu
-            anchorId={selectedId}
-            onRemove={() => {
-              onRemove(selectedId);
-              setSelectedId(null);
-            }}
-          />
-        ) : null}
+          </div>
+        </div>
       </div>
+
+      {debugStats ? (
+        <div className="mt-3 border border-[var(--line)] bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-[var(--muted)]">
+          <div className="mb-1 font-bold tracking-[0.16em] text-[var(--accent)] uppercase">
+            Layout debug
+          </div>
+          <div>
+            slots {debugStats.slots} · rows {debugStats.distribution} · canvas{" "}
+            {CANVAS_W}×{CANVAS_H}
+          </div>
+          <div>
+            <span className="text-[var(--ink)]">largest</span>{" "}
+            {debugStats.largest.w}×{debugStats.largest.h}px · {debugStats.largest.widthPct}
+            % width · {debugStats.largest.areaPct}% area
+          </div>
+          <div>
+            <span className="text-[var(--ink)]">smallest</span>{" "}
+            {debugStats.smallest.w}×{debugStats.smallest.h}px ·{" "}
+            {debugStats.smallest.widthPct}% width · {debugStats.smallest.areaPct}% area
+          </div>
+          <div>
+            size parity (small/large){" "}
+            <span className="text-[var(--ink)]">{debugStats.parityPct}%</span> · area used{" "}
+            <span className="text-[var(--ink)]">{debugStats.coveragePct}%</span>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedId ? (
+        <ListCardActionMenu
+          anchorId={selectedId}
+          onRemove={() => {
+            onRemove(selectedId);
+            setSelectedId(null);
+          }}
+        />
+      ) : null}
+    </div>
     </DndContext>
   );
 }
@@ -469,6 +422,7 @@ function SortableCard({
   height,
   rankScaleWidth,
   rankChrome,
+  scale,
   selected,
   onSelect,
 }: {
@@ -479,12 +433,26 @@ function SortableCard({
   height: number;
   rankScaleWidth: number;
   rankChrome: ExportRankChromeConfig;
+  scale: number;
   selected: boolean;
   onSelect: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id });
   const holdListeners = mergeHoldDragListeners(listeners);
+
+  // dnd-kit's sorting strategy animates the displaced siblings (including across
+  // rows) via `transform`. Those values are measured in on-screen (scaled)
+  // pixels, but the transform is applied inside the `scale()` canvas — so divide
+  // by `scale` to move the correct visual distance ("all the way" to the slot).
+  const shift =
+    transform && scale > 0
+      ? CSS.Transform.toString({
+          ...transform,
+          x: transform.x / scale,
+          y: transform.y / scale,
+        })
+      : undefined;
 
   return (
     <div
@@ -494,11 +462,16 @@ function SortableCard({
         position: "relative",
         width,
         flexShrink: 0,
-        transform: CSS.Transform.toString(transform),
+        transform: shift,
         transition,
-        opacity: isDragging ? 0 : 1,
+        opacity: isDragging ? 0.92 : 1,
+        zIndex: isDragging ? 20 : undefined,
         outline: selected ? "3px solid var(--accent)" : undefined,
         outlineOffset: 4,
+        boxShadow: isDragging
+          ? "0 0 0 6px rgba(255,90,31,0.9), 0 24px 60px rgba(0,0,0,0.7)"
+          : undefined,
+        cursor: isDragging ? "grabbing" : undefined,
       }}
       className={cardTouchLockClassName}
       {...attributes}
@@ -545,44 +518,51 @@ function EmptySlot({
         width,
         height: height + bannerH,
         flexShrink: 0,
-        borderRadius: radius,
-        border: "2px dashed rgba(244,240,232,0.22)",
-        background: "rgba(255,255,255,0.03)",
-        color: "rgba(244,240,232,0.45)",
-        cursor: onClick ? "pointer" : "default",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: Math.max(4, Math.round(width * 0.04)),
-        padding: Math.max(6, Math.round(width * 0.06)),
+        borderRadius: radius,
+        overflow: "hidden",
+        border: "3px dashed rgba(255,255,255,0.16)",
+        background: "rgba(255,255,255,0.02)",
+        cursor: onClick ? "pointer" : "default",
+        boxSizing: "border-box",
       }}
-      aria-label={
-        onClick ? `Empty slot ${rank}, add a game` : `Empty slot ${rank}`
-      }
+      aria-label={`Empty slot ${rank} — add a game`}
     >
-      {showRank ? (
-        <span
+      <div
+        style={{
+          height,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: Math.round(width * 0.06),
+          color: "rgba(255,255,255,0.28)",
+          fontSize: Math.round(width * 0.28),
+          fontWeight: 300,
+          lineHeight: 1,
+        }}
+      >
+        +
+      </div>
+      {showRank && bannerH > 0 ? (
+        <div
           style={{
-            fontFamily: "Bebas Neue, Impact, sans-serif",
-            fontSize: Math.max(16, Math.round(width * 0.22)),
-            letterSpacing: "0.04em",
-            lineHeight: 1,
-            color: "rgba(255,90,31,0.55)",
+            height: bannerH,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(255,90,31,0.14)",
+            color: "rgba(255,255,255,0.4)",
+            fontFamily: "Arial, sans-serif",
+            fontWeight: 800,
+            fontSize: Math.max(12, Math.round(width * 0.12)),
+            letterSpacing: "0.02em",
           }}
         >
           {formatExportRank(rank, "ordinal")}
-        </span>
+        </div>
       ) : null}
-      <span
-        style={{
-          fontSize: Math.max(10, Math.round(width * 0.08)),
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-        }}
-      >
-        Empty
-      </span>
     </button>
   );
 }
