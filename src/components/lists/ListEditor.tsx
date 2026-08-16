@@ -589,11 +589,10 @@ export function ListEditor({
     };
   }, [settingsOpen, shareMenuOpen]);
 
-  useEffect(() => {
-    if (listFormat !== "poster" || editorView === "categories") {
-      setSettingsOpen(false);
-    }
-  }, [listFormat, editorView]);
+  function changeListFormat(next: ListFormat) {
+    setListFormat(next);
+    if (next !== "poster") setSettingsOpen(false);
+  }
 
   function focusSearch() {
     setPanelOpen(true);
@@ -939,6 +938,7 @@ export function ListEditor({
             aria-selected={editorView === "categories"}
             onClick={() => {
               setPanelOpen(false);
+              setSettingsOpen(false);
               setEditorView("categories");
             }}
             className={navItemClass("secondary", editorView === "categories")}
@@ -993,7 +993,7 @@ export function ListEditor({
             <ListFormatControl
               labeled
               value={listFormat}
-              onChange={setListFormat}
+              onChange={changeListFormat}
             />
 
             <label className="flex cursor-pointer items-center gap-2 self-end pb-1 text-sm text-muted">
