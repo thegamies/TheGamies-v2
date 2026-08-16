@@ -7,6 +7,7 @@ import {
   createDb,
   type Db,
 } from "@thegamies/db";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 import {
   STANDINGS_PAGE_SIZE,
   clampStandingsPage,
@@ -562,7 +563,7 @@ export async function upsertCommunityLiveLockSnapshot(
   });
 
   if (live.goty.length > 0) {
-    await db.insert(communityLiveLockGoty).values(
+    await insertInChunks(
       live.goty.map((row) => ({
         communityId,
         year,
@@ -575,6 +576,8 @@ export async function upsertCommunityLiveLockSnapshot(
         score: row.score ?? 0,
         listMentions: row.listMentions ?? 0,
       })),
+      (chunk) => db.insert(communityLiveLockGoty).values(chunk),
+      100,
     );
   }
 
@@ -611,7 +614,11 @@ export async function upsertCommunityLiveLockSnapshot(
     }
   });
   if (categoryInserts.length > 0) {
-    await db.insert(communityLiveLockCategoryRows).values(categoryInserts);
+    await insertInChunks(
+      categoryInserts,
+      (chunk) => db.insert(communityLiveLockCategoryRows).values(chunk),
+      100,
+    );
   }
 
   return { listCount: live.listCount, gotyTotal: live.goty.length };

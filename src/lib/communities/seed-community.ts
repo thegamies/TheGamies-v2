@@ -275,7 +275,8 @@ export async function publishEditionForSeed(
 
   if (!updated) return { error: "Could not publish edition." };
 
-  await rebuildEditionResultsFrozen(edition.id, db);
+  const frozen = await rebuildEditionResultsFrozen(edition.id, db);
+  if (frozen && "error" in frozen) return frozen;
   return { ok: true, editionId: edition.id };
 }
 
@@ -505,7 +506,12 @@ export async function seedCommunityEditionBallots(
 
   let resultsRefreshed = false;
   if (refreshPublished && edition.status === "published") {
-    await rebuildEditionResultsFrozen(edition.id, db);
+    const frozen = await rebuildEditionResultsFrozen(edition.id, db);
+    if (frozen && "error" in frozen) {
+      return {
+        error: `Ballots were written, but rebuilding published results failed (${frozen.error}). Use Publish / rebuild results.`,
+      };
+    }
     resultsRefreshed = true;
   }
 

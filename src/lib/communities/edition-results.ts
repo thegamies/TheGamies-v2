@@ -16,6 +16,7 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
+import { insertInChunks } from "@/lib/db/insert-chunks";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
   assembleBallotMatrixRows,
@@ -301,129 +302,149 @@ async function freezeEditionResults(
   ).length;
 
   const frozenAt = new Date();
-  try {
-    await db.insert(communityEditionResultMeta).values({
-      editionId,
-      frozenAt,
-      ballotCountCommunity,
-      ballotCountVoices,
-      gotyTotalCommunity: communityGoty.length,
-      gotyTotalVoices: voicesGoty.length,
-    });
-  } catch {
-    const raced = await getEditionResultsMeta(editionId, db);
-    if (raced) return raced;
-    return { error: "Could not freeze edition results." };
-  }
-
-  async function insertGoty(
-    mode: "community" | "voices",
-    rows: typeof communityGoty,
-  ) {
-    if (rows.length === 0) return;
-    await db.insert(communityEditionResultGoty).values(
-      rows.map((row) => ({
-        editionId,
-        mode,
-        place: row.place,
-        gameId: row.gameId,
-        slug: row.slug,
-        title: row.title,
-        gameYear: row.gameYear,
-        coverUrl: row.coverUrl,
-        points: row.points,
-        firstPlaceVotes: row.firstPlaceVotes,
-        appearances: row.appearances,
-      })),
-    );
-  }
-
-  await insertGoty("community", communityGoty);
-  await insertGoty("voices", voicesGoty);
-
-  async function insertCats(
-    mode: "community" | "voices",
-    rows: typeof communityCats,
-  ) {
-    if (rows.length === 0) return;
-    await db.insert(communityEditionResultCategories).values(
-      rows.map((row) => {
-        const def = catDefById.get(row.categoryId);
-        return {
-          editionId,
-          mode,
-          categoryId: row.categoryId,
-          label: def?.label ?? row.categoryId,
-          description: def?.description ?? null,
-          sortOrder: def?.sortOrder ?? 0,
-          place: row.place,
-          gameId: row.gameId,
-          slug: row.slug,
-          title: row.title,
-          coverUrl: row.coverUrl,
-          votes: row.votes,
-        };
-      }),
-    );
-  }
-
-  await insertCats("community", communityCats);
-  await insertCats("voices", voicesCats);
-
-  if (ballots.length > 0) {
-    await db.insert(communityEditionResultVoters).values(
-      ballots.map((b) => ({
-        editionId,
-        profileId: b.profileId,
-        isVoice: voiceIds.has(b.profileId),
-        displayName: b.displayName,
-        username: b.username,
-      })),
-    );
-  }
-
-  const top10 = itemRows.filter((r) => r.rank >= 1 && r.rank <= 10);
-  if (top10.length > 0) {
-    await db.insert(communityEditionResultVoterRanks).values(
-      top10.map((r) => {
-        const meta = gameMeta.get(r.gameId);
-        return {
-          editionId,
-          profileId: r.profileId,
-          rank: r.rank,
-          gameId: r.gameId,
-          slug: meta?.slug ?? "",
-          title: meta?.title ?? "Unknown",
-          coverUrl: meta?.coverUrl ?? null,
-        };
-      }),
-    );
-  }
-
-  if (catVoteRows.length > 0) {
-    await db.insert(communityEditionResultVoterCategoryPicks).values(
-      catVoteRows.map((r) => {
-        const meta = gameMeta.get(r.gameId);
-        return {
-          editionId,
-          profileId: r.profileId,
-          categoryId: r.categoryId,
-          gameId: r.gameId,
-          slug: meta?.slug ?? "",
-          title: meta?.title ?? "Unknown",
-          coverUrl: meta?.coverUrl ?? null,
-        };
-      }),
-    );
-  }
-
-  return {
+  const meta = {
     frozenAt,
     ballotCountCommunity,
     ballotCountVoices,
     gotyTotalCommunity: communityGoty.length,
     gotyTotalVoices: voicesGoty.length,
   };
+
+  const gotyRows = (["community", "voices"] as const).flatMap((mode) => {
+    const rows = mode === "community" ? communityGoty : voicesGoty;
+    return rows.map((row) => ({
+      editionId,
+      mode,
+      place: row.place,
+      gameId: row.gameId,
+      slug: row.slug,
+      title: row.title,
+      gameYear: row.gameYear,
+      coverUrl: row.coverUrl,
+      points: row.points,
+      firstPlaceVotes: row.firstPlaceVotes,
+      appearances: row.appearances,
+    }));
+  });
+
+  const categoryRows = (["community", "voices"] as const).flatMap((mode) => {
+    const rows = mode === "community" ? communityCats : voicesCats;
+    return rows.map((row) => {
+      const def = catDefById.get(row.categoryId);
+      return {
+        editionId,
+        mode,
+        categoryId: row.categoryId,
+        label: def?.label ?? row.categoryId,
+        description: def?.description ?? null,
+        sortOrder: def?.sortOrder ?? 0,
+        place: row.place,
+        gameId: row.gameId,
+        slug: row.slug,
+        title: row.title,
+        coverUrl: row.coverUrl,
+        votes: row.votes,
+      };
+    });
+  });
+
+  const voterRows = ballots.map((b) => ({
+    editionId,
+    profileId: b.profileId,
+    isVoice: voiceIds.has(b.profileId),
+    displayName: b.displayName,
+    username: b.username,
+  }));
+
+  const top10 = itemRows.filter((r) => r.rank >= 1 && r.rank <= 10);
+  const voterRankRows = top10.map((r) => {
+    const metaRow = gameMeta.get(r.gameId);
+    return {
+      editionId,
+      profileId: r.profileId,
+      rank: r.rank,
+      gameId: r.gameId,
+      slug: metaRow?.slug ?? "",
+      title: metaRow?.title ?? "Unknown",
+      coverUrl: metaRow?.coverUrl ?? null,
+    };
+  });
+
+  const voterCategoryRows = catVoteRows.map((r) => {
+    const metaRow = gameMeta.get(r.gameId);
+    return {
+      editionId,
+      profileId: r.profileId,
+      categoryId: r.categoryId,
+      gameId: r.gameId,
+      slug: metaRow?.slug ?? "",
+      title: metaRow?.title ?? "Unknown",
+      coverUrl: metaRow?.coverUrl ?? null,
+    };
+  });
+
+  try {
+    try {
+      await db.insert(communityEditionResultMeta).values({
+        editionId,
+        ...meta,
+      });
+    } catch {
+      const raced = await getEditionResultsMeta(editionId, db);
+      if (raced) return raced;
+      return { error: "Could not freeze edition results." };
+    }
+
+    if (gotyRows.length > 0) {
+      await insertInChunks(
+        gotyRows,
+        (chunk) => db.insert(communityEditionResultGoty).values(chunk),
+        100,
+      );
+    }
+    if (categoryRows.length > 0) {
+      await insertInChunks(
+        categoryRows,
+        (chunk) => db.insert(communityEditionResultCategories).values(chunk),
+        100,
+      );
+    }
+    if (voterRows.length > 0) {
+      await insertInChunks(
+        voterRows,
+        (chunk) => db.insert(communityEditionResultVoters).values(chunk),
+        200,
+      );
+    }
+    if (voterRankRows.length > 0) {
+      await insertInChunks(
+        voterRankRows,
+        (chunk) => db.insert(communityEditionResultVoterRanks).values(chunk),
+        200,
+      );
+    }
+    if (voterCategoryRows.length > 0) {
+      await insertInChunks(
+        voterCategoryRows,
+        (chunk) =>
+          db.insert(communityEditionResultVoterCategoryPicks).values(chunk),
+        200,
+      );
+    }
+  } catch (err) {
+    // Meta-only / partial freezes would make later ensure() no-ops — clear so
+    // publish/rebuild can retry a complete snapshot.
+    try {
+      await clearEditionResultTables(editionId, db);
+    } catch {
+      // ignore cleanup errors; surface the original write failure
+    }
+    const detail =
+      err instanceof Error ? err.message : "Could not freeze edition results.";
+    return { error: detail };
+  }
+
+  return meta;
 }
 
 /** Public ensure: freeze only when edition status is published. */
