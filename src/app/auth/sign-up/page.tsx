@@ -1,16 +1,93 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/Button";
+import { buildSignInHref } from "@/lib/auth/return-to";
+import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signUpWithEmail } from "./actions";
 
 const fieldClass =
   "mt-1 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent";
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next") ?? "";
+  const intent = parseListAuthIntent(searchParams.get("intent"));
   const [state, formAction, pending] = useActionState(signUpWithEmail, null);
 
+  return (
+    <form action={formAction} className="mt-10 space-y-4">
+      {next ? <input type="hidden" name="next" value={next} /> : null}
+      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
+      <label className="block text-sm text-muted">
+        Display name
+        <input
+          name="displayName"
+          type="text"
+          required
+          autoComplete="name"
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-sm text-muted">
+        Username
+        <input
+          name="username"
+          type="text"
+          required
+          autoComplete="username"
+          pattern="[A-Za-z0-9_]{3,24}"
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-sm text-muted">
+        Email
+        <input
+          name="email"
+          type="email"
+          required
+          autoComplete="email"
+          className={fieldClass}
+        />
+      </label>
+      <label className="block text-sm text-muted">
+        Password
+        <input
+          name="password"
+          type="password"
+          required
+          minLength={8}
+          autoComplete="new-password"
+          className={fieldClass}
+        />
+      </label>
+      {state?.error ? (
+        <p className="text-sm text-accent">{state.error}</p>
+      ) : null}
+      <Button type="submit" disabled={pending} className="w-full">
+        {pending ? "Creating…" : "Create account"}
+      </Button>
+    </form>
+  );
+}
+
+function SignInCrossLink() {
+  const searchParams = useSearchParams();
+  const next = searchParams.get("next");
+  const intent = parseListAuthIntent(searchParams.get("intent"));
+  return (
+    <Link
+      href={buildSignInHref({ next, intent })}
+      className="text-ink underline"
+    >
+      Sign in
+    </Link>
+  );
+}
+
+export default function SignUpPage() {
   return (
     <main className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-[var(--gutter)] py-12">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">Account</p>
@@ -21,62 +98,21 @@ export default function SignUpPage() {
         Create an account to save lists and appear on the boards.
       </p>
 
-      <form action={formAction} className="mt-10 space-y-4">
-        <label className="block text-sm text-muted">
-          Display name
-          <input
-            name="displayName"
-            type="text"
-            required
-            autoComplete="name"
-            className={fieldClass}
-          />
-        </label>
-        <label className="block text-sm text-muted">
-          Username
-          <input
-            name="username"
-            type="text"
-            required
-            autoComplete="username"
-            pattern="[A-Za-z0-9_]{3,24}"
-            className={fieldClass}
-          />
-        </label>
-        <label className="block text-sm text-muted">
-          Email
-          <input
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            className={fieldClass}
-          />
-        </label>
-        <label className="block text-sm text-muted">
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            className={fieldClass}
-          />
-        </label>
-        {state?.error ? (
-          <p className="text-sm text-accent">{state.error}</p>
-        ) : null}
-        <Button type="submit" disabled={pending} className="w-full">
-          {pending ? "Creating…" : "Create account"}
-        </Button>
-      </form>
+      <Suspense fallback={null}>
+        <SignUpForm />
+      </Suspense>
 
       <p className="mt-6 text-sm text-muted">
         Already have an account?{" "}
-        <Link href="/auth/sign-in" className="text-ink underline">
-          Sign in
-        </Link>
+        <Suspense
+          fallback={
+            <Link href="/auth/sign-in" className="text-ink underline">
+              Sign in
+            </Link>
+          }
+        >
+          <SignInCrossLink />
+        </Suspense>
       </p>
     </main>
   );

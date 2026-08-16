@@ -67,7 +67,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Create: `/create`, `/create/goty`, `/create/custom`
 - Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`)
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
-- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share`
+- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`
 

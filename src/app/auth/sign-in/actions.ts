@@ -2,11 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { safeNextPath } from "@/lib/auth/safe-next";
-import {
-  parseListAuthIntent,
-  withListAuthIntent,
-} from "@/lib/lists/auth-intent";
+import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 
 export async function signInWithEmail(
   _prevState: { error: string } | null,
@@ -14,11 +10,10 @@ export async function signInWithEmail(
 ) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const intent = parseListAuthIntent(formData.get("intent"));
-  let next = safeNextPath(String(formData.get("next") ?? "")) ?? "/account";
-  if (intent) {
-    next = withListAuthIntent(next, intent);
-  }
+  const next = resolvePostAuthRedirect(
+    formData.get("next"),
+    formData.get("intent"),
+  );
 
   if (!email || !password) {
     return { error: "Enter your email and password." };

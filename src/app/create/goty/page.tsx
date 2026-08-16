@@ -20,6 +20,7 @@ import {
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
+import { createGotyEntryMode } from "@/lib/lists/create-goty-entry";
 import {
   getCategoryVotesForList,
   listActiveAwardCategories,
@@ -107,7 +108,15 @@ export default async function CreateGotyPage({
   } | null = null;
   let loadError: string | null = error;
 
-  if (publicId) {
+  const entryMode = createGotyEntryMode({
+    publicId,
+    signedIn,
+    resume,
+    authIntent: Boolean(authIntent),
+    yearParam,
+  });
+
+  if (entryMode === "load-by-id" && publicId) {
     const cookie = await readListEditCookie();
     const result = await getEditableList(publicId, {
       profileId,
@@ -179,7 +188,7 @@ export default async function CreateGotyPage({
         }
       }
     }
-  } else if (!signedIn && resume) {
+  } else if (entryMode === "anon-resume") {
     const draft = await readListDraftCookie();
     if (!draft || draft.listType !== "goty" || draft.year == null) {
       loadError = "No unfinished Game of the Year ranking on this device.";
@@ -212,7 +221,24 @@ export default async function CreateGotyPage({
           .filter((item): item is NonNullable<typeof item> => Boolean(item)),
       };
     }
-  } else if (signedIn && profileId && !resume) {
+  } else if (entryMode === "auth-intent") {
+    // Restore draft after Save/Share sign-in or create account.
+    const draft = await readListDraftCookie();
+    if (draft && draft.listType === "goty") {
+      editor = await editorSeedFromDraft(draft);
+    } else if (yearParam && Number.isFinite(Number(yearParam))) {
+      const y = Math.floor(Number(yearParam));
+      editor = {
+        publicId: null,
+        title: `${y} Game of the Year`,
+        year: y,
+        slotCount: 10,
+        items: [],
+      };
+    } else {
+      loadError = "Could not restore your ranking after signing in.";
+    }
+  } else if (entryMode === "signed-in-year" && profileId) {
     // Use ?year= when present; otherwise fetch for the picker's default year.
     const year = yearParam ? Number(yearParam) : currentYear;
     if (yearParam && !Number.isFinite(year)) {
@@ -239,7 +265,7 @@ export default async function CreateGotyPage({
         };
       }
     }
-  } else if (!signedIn && yearParam) {
+  } else if (entryMode === "anon-year" && yearParam) {
     const year = Number(yearParam);
     if (!Number.isFinite(year)) {
       loadError = "Pick a valid year.";
@@ -287,22 +313,6 @@ export default async function CreateGotyPage({
           items: [],
         };
       }
-    }
-  } else if (signedIn && authIntent) {
-    const draft = await readListDraftCookie();
-    if (draft && draft.listType === "goty") {
-      editor = await editorSeedFromDraft(draft);
-    } else if (yearParam && Number.isFinite(Number(yearParam))) {
-      const y = Math.floor(Number(yearParam));
-      editor = {
-        publicId: null,
-        title: `${y} Game of the Year`,
-        year: y,
-        slotCount: 10,
-        items: [],
-      };
-    } else {
-      loadError = "Could not restore your ranking after signing in.";
     }
   }
 

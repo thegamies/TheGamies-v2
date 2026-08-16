@@ -87,6 +87,11 @@ describe("SaveSignInDialog", () => {
       encodeURIComponent("/create/goty?year=2026&intent=save"),
     );
     expect(screen.getByRole("button", { name: "Keep editing" })).toBeTruthy();
+    const createLink = screen.getByRole("link", {
+      name: /Create account & save/i,
+    });
+    expect(createLink.getAttribute("href")).toContain("/auth/sign-up?");
+    expect(createLink.getAttribute("href")).toContain("intent=save");
   });
 });
 
