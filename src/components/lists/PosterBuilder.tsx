@@ -51,6 +51,10 @@ import type {
   ListExportListType,
 } from "@/components/list-export/listExportTypes";
 import { cardOuterRadius } from "@/components/list-export/socialGamerCardTheme";
+import {
+  cardMoveButtonStyle,
+  cardRemoveButtonStyle,
+} from "@/components/lists/cardChrome";
 
 const CANVAS_W = 1080;
 const CANVAS_H = 1350;
@@ -439,8 +443,15 @@ function SortableCard({
   scale: number;
   onRemove: (id: string) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
 
   // dnd-kit's sorting strategy animates the displaced siblings (including across
   // rows) via `transform`. Those values are measured in on-screen (scaled)
@@ -465,12 +476,8 @@ function SortableCard({
         transform: shift,
         transition,
         opacity: isDragging ? 0 : 1,
-        cursor: "grab",
-        touchAction: "none",
       }}
-      {...attributes}
-      {...listeners}
-      aria-label={`${game.title} — rank ${rank}. Drag to reorder.`}
+      aria-label={`${game.title} — rank ${rank}`}
     >
       <SocialGamerCardImageFrame
         game={game}
@@ -486,22 +493,30 @@ function SortableCard({
         onClick={() => onRemove(id)}
         aria-label={`Remove ${game.title}`}
         style={{
-          position: "absolute",
-          top: -18,
-          right: -18,
-          width: 52,
-          height: 52,
-          display: "grid",
-          placeItems: "center",
-          borderRadius: 999,
-          background: "#0c0c0e",
-          color: "#fff",
-          border: "2px solid rgba(255,255,255,0.25)",
-          boxShadow: "0 6px 18px rgba(0,0,0,0.5)",
-          cursor: "pointer",
+          ...cardRemoveButtonStyle,
+          top: 12,
+          right: 12,
+          width: 44,
+          height: 44,
+          fontSize: 18,
         }}
       >
         ✕
+      </button>
+      <button
+        type="button"
+        ref={setActivatorNodeRef}
+        {...attributes}
+        {...listeners}
+        aria-label={`Reorder ${game.title}`}
+        style={{
+          ...cardMoveButtonStyle,
+          width: 56,
+          height: 56,
+          fontSize: 22,
+        }}
+      >
+        ⠿
       </button>
     </div>
   );

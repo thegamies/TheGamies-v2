@@ -19,8 +19,9 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  StandingGameCardGrid,
-} from "@/components/communities/StandingGameCard";
+  cardMoveButtonClassName,
+  cardRemoveButtonClassName,
+} from "@/components/lists/cardChrome";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 
@@ -28,7 +29,6 @@ export type GridListItem = {
   id: string;
   title: string;
   coverUrl: string | null;
-  year: number | null;
 };
 
 export function GridListBuilder({
@@ -74,7 +74,7 @@ export function GridListBuilder({
           items={items.map((item) => item.id)}
           strategy={rectSortingStrategy}
         >
-          <StandingGameCardGrid density="tight">
+          <ul className="mt-4 grid grid-cols-3 gap-3 md:grid-cols-4 lg:grid-cols-5">
             {items.map((item, index) => (
               <SortableGridCard
                 key={item.id}
@@ -100,13 +100,13 @@ export function GridListBuilder({
                 </button>
               </li>
             ))}
-          </StandingGameCardGrid>
+          </ul>
         </SortableContext>
       </DndContext>
       <p className="mt-3 text-center text-xs text-muted">
         {items.length === 0
           ? "Tap an empty slot or search to add games."
-          : "Drag covers to reorder. Tap an empty slot to add more."}
+          : "Use the move control to reorder. Tap an empty slot to add more."}
       </p>
     </div>
   );
@@ -141,35 +141,32 @@ function SortableGridCard({
       className={`min-w-0 list-none ${isDragging ? "z-10 opacity-90" : ""}`}
     >
       <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          ref={setActivatorNodeRef}
-          {...attributes}
-          {...listeners}
-          aria-label={`Reorder ${item.title}`}
-          className="block w-full cursor-grab touch-none text-left active:cursor-grabbing"
-        >
-          <div className="relative">
-            <GameCover title={item.title} imageUrl={item.coverUrl} />
-            <div className="absolute top-1.5 left-1.5">
-              <RankMarker rank={rank} size="sm" />
-            </div>
-          </div>
-        </button>
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="line-clamp-2 text-sm font-medium leading-snug text-ink">
-              {item.title}
-            </p>
-            <p className="text-xs text-muted">{item.year ?? "TBA"}</p>
-          </div>
+        <div className="relative">
+          <GameCover title={item.title} imageUrl={item.coverUrl} />
           <button
             type="button"
             onClick={() => onRemove(item.id)}
-            className="shrink-0 px-1 text-xs text-muted hover:text-accent"
+            aria-label={`Remove ${item.title}`}
+            className={cardRemoveButtonClassName}
           >
-            Remove
+            ✕
           </button>
+          <button
+            type="button"
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            aria-label={`Reorder ${item.title}`}
+            className={cardMoveButtonClassName}
+          >
+            ⠿
+          </button>
+        </div>
+        <div className="flex min-w-0 items-start gap-1.5">
+          <RankMarker rank={rank} size="sm" />
+          <p className="min-w-0 flex-1 line-clamp-2 text-sm font-medium leading-snug text-ink">
+            {item.title}
+          </p>
         </div>
       </div>
     </li>
