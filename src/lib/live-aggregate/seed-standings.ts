@@ -225,6 +225,19 @@ export async function getMaxSeedIndex(
 }
 
 /**
+ * Where "Seed N" should begin.
+ * Reseed on → rewrite from index 1.
+ * Reseed off → append after the highest existing seed index.
+ */
+export function resolveSeedStartIndex(opts: {
+  reseed: boolean;
+  maxIndex: number;
+}): number {
+  if (opts.reseed) return 1;
+  return Math.max(1, Math.floor(opts.maxIndex) + 1);
+}
+
+/**
  * Create/update a batch of synthetic GOTY voters.
  * Use startIndex + count for paging up to SEED_MAX_INDEX; client can loop until stopped.
  */

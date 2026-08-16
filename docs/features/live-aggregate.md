@@ -99,8 +99,9 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 - Upserts the award catalog (`ensureAwardCategories`) before writing votes; errors if no active categories remain
 - Up to **1000** seed indices; UI batches of 50
-- **Reseed** rewrites rankings for existing seed voters in range
-- **Keep adding until stopped** continues from max index
+- **Reseed on** → Seed N rewrites voters `1…N`
+- **Reseed off** → Seed N appends N new voters after the current max index (does not re-target `1…N` and skip)
+- **Keep adding until stopped** also continues from max index
 - Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
 - Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
 - Category vote / contrib inserts are **chunked** (Neon HTTP-safe); the admin result reports category count + votes written

@@ -3,6 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
+import { resolveSeedStartIndex } from "@/lib/live-aggregate/seed-standings";
 import {
   clearStandingsSeedsAction,
   loadSeedStatsAction,
@@ -99,8 +100,32 @@ export function AdminSeedClient({
     let hadError = false;
 
     try {
-      let startIndex = 1;
-      let remaining = Math.min(1000, Math.max(1, Math.floor(count)));
+      // Fresh max index so Reseed-off appends instead of re-targeting 1…N.
+      const loaded = await loadSeedStatsAction();
+      const maxIndex =
+        "maxIndex" in loaded ? loaded.maxIndex : (stats?.maxIndex ?? 0);
+      if ("profiles" in loaded) {
+        setStats({
+          profiles: loaded.profiles,
+          lists: loaded.lists,
+          maxIndex: loaded.maxIndex,
+        });
+      }
+
+      let startIndex = resolveSeedStartIndex({ reseed, maxIndex });
+      if (startIndex > 1000) {
+        setMessage(
+          reseed
+            ? "Seed index cannot exceed 1000."
+            : "Already at 1000 seed voters. Clear some before adding more, or turn Reseed on to rewrite 1…N.",
+        );
+        return;
+      }
+
+      let remaining = Math.min(
+        1000 - startIndex + 1,
+        Math.min(1000, Math.max(1, Math.floor(count))),
+      );
       let createdProfiles = 0;
       let createdLists = 0;
       let updatedLists = 0;
@@ -344,7 +369,8 @@ export function AdminSeedClient({
           onChange={(e) => setReseed(e.target.checked)}
           disabled={busy}
         />
-        Reseed existing seed accounts in range (rewrite their rankings)
+        Reseed: rewrite voters 1…N. Off = add N new voters after the current max
+        index.
       </label>
 
       <div className="flex flex-wrap gap-3">

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildSeedCategoryVotes,
   insertInChunks,
+  resolveSeedStartIndex,
   weightForRatedGame,
   weightForTopRank,
   weightedSample,
@@ -96,5 +97,20 @@ describe("insertInChunks", () => {
     const write = vi.fn();
     await insertInChunks([], write, 10);
     expect(write).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveSeedStartIndex", () => {
+  it("reseeds from index 1", () => {
+    expect(resolveSeedStartIndex({ reseed: true, maxIndex: 50 })).toBe(1);
+    expect(resolveSeedStartIndex({ reseed: true, maxIndex: 0 })).toBe(1);
+  });
+
+  it("appends after the highest seed when reseed is off", () => {
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 0 })).toBe(1);
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 50 })).toBe(51);
+    expect(resolveSeedStartIndex({ reseed: false, maxIndex: 1000 })).toBe(
+      1001,
+    );
   });
 });
