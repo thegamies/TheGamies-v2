@@ -1,26 +1,24 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   rectSortingStrategy,
-  sortableKeyboardCoordinates,
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
-  cardMoveButtonClassName,
   cardRemoveButtonClassName,
+  cardSelectedRingClassName,
+  cardTouchLockClassName,
+  useListCardDragSensors,
 } from "@/components/lists/cardChrome";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
@@ -45,21 +43,40 @@ export function GridListBuilder({
   onPickEmpty: () => void;
 }) {
   const dndId = useId();
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+  const sensors = useListCardDragSensors();
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const dragOccurredRef = useRef(false);
   const emptySlots = Math.max(0, slotCount - items.length);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Element | null;
+      if (!target) return;
+      if (target.closest(`[data-list-card="${selectedId}"]`)) return;
+      setSelectedId(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [selectedId]);
+
+  function onDragStart(_event: DragStartEvent) {
+    dragOccurredRef.current = true;
+    setSelectedId(null);
+  }
 
   function onDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = items.findIndex((item) => item.id === active.id);
-    const newIndex = items.findIndex((item) => item.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    onReorder(arrayMove(items, oldIndex, newIndex).map((item) => item.id));
+    if (over && active.id !== over.id) {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+      if (oldIndex >= 0 && newIndex >= 0) {
+        onReorder(arrayMove(items, oldIndex, newIndex).map((item) => item.id));
+      }
+    }
+    window.setTimeout(() => {
+      dragOccurredRef.current = false;
+    }, 0);
   }
 
   return (
@@ -68,7 +85,13 @@ export function GridListBuilder({
         id={dndId}
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={onDragStart}
         onDragEnd={onDragEnd}
+        onDragCancel={() => {
+          window.setTimeout(() => {
+            dragOccurredRef.current = false;
+          }, 0);
+        }}
       >
         <SortableContext
           items={items.map((item) => item.id)}
@@ -80,7 +103,15 @@ export function GridListBuilder({
                 key={item.id}
                 item={item}
                 rank={index + 1}
-                onRemove={onRemove}
+                selected={selectedId === item.id}
+                onSelect={() => {
+                  if (dragOccurredRef.current) return;
+                  setSelectedId((curr) => (curr === item.id ? null : item.id));
+                }}
+                onRemove={() => {
+                  onRemove(item.id);
+                  setSelectedId(null);
+                }}
               />
             ))}
             {Array.from({ length: emptySlots }).map((_, i) => (
@@ -106,7 +137,7 @@ export function GridListBuilder({
       <p className="mt-3 text-center text-xs text-muted">
         {items.length === 0
           ? "Tap an empty slot or search to add games."
-          : "Use the move control to reorder. Tap an empty slot to add more."}
+          : "Hold to reorder. Tap a game to delete it."}
       </p>
     </div>
   );
@@ -115,52 +146,65 @@ export function GridListBuilder({
 function SortableGridCard({
   item,
   rank,
+  selected,
+  onSelect,
   onRemove,
 }: {
   item: GridListItem;
   rank: number;
-  onRemove: (id: string) => void;
+  selected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id });
 
   return (
     <li
       ref={setNodeRef}
+      data-list-card={item.id}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
       }}
       className={`min-w-0 list-none ${isDragging ? "z-10 opacity-90" : ""}`}
     >
-      <div className="flex flex-col gap-2">
-        <div className="relative">
+      <div
+        {...attributes}
+        {...listeners}
+        role="button"
+        tabIndex={0}
+        onClick={onSelect}
+        onContextMenu={(event) => event.preventDefault()}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onSelect();
+          }
+        }}
+        aria-label={`${item.title}, rank ${rank}. Tap to select, hold to move.`}
+        aria-pressed={selected}
+        className={`flex flex-col gap-2 text-left outline-none ${cardTouchLockClassName}`}
+      >
+        <div
+          className={`relative ${selected ? cardSelectedRingClassName : ""}`}
+        >
           <GameCover title={item.title} imageUrl={item.coverUrl} />
-          <button
-            type="button"
-            onClick={() => onRemove(item.id)}
-            aria-label={`Remove ${item.title}`}
-            className={cardRemoveButtonClassName}
-          >
-            ✕
-          </button>
-          <button
-            type="button"
-            ref={setActivatorNodeRef}
-            {...attributes}
-            {...listeners}
-            aria-label={`Reorder ${item.title}`}
-            className={cardMoveButtonClassName}
-          >
-            ⠿
-          </button>
+          {selected ? (
+            <button
+              type="button"
+              data-list-card-delete
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove();
+              }}
+              aria-label={`Remove ${item.title}`}
+              className={cardRemoveButtonClassName}
+            >
+              ✕
+            </button>
+          ) : null}
         </div>
         <div className="flex min-w-0 items-start gap-1.5">
           <RankMarker rank={rank} size="sm" />

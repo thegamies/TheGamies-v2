@@ -14,16 +14,12 @@ import {
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -49,6 +45,9 @@ import { PosterBuilder } from "@/components/lists/PosterBuilder";
 import { GridListBuilder } from "@/components/lists/GridListBuilder";
 import {
   cardRemoveButtonClassName,
+  cardSelectedRingClassName,
+  cardTouchLockClassName,
+  useListCardDragSensors,
 } from "@/components/lists/cardChrome";
 import { SaveSignInDialog } from "@/components/lists/SaveSignInDialog";
 import { ShareLinkSignInDialog } from "@/components/lists/ShareLinkSignInDialog";
@@ -659,22 +658,40 @@ export function ListEditor({
   }
 
   const notesDndId = useId();
-  const notesSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+  const notesSensors = useListCardDragSensors();
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const noteDragOccurredRef = useRef(false);
+
+  useEffect(() => {
+    if (!selectedNoteId) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Element | null;
+      if (!target) return;
+      if (target.closest(`[data-list-card="${selectedNoteId}"]`)) return;
+      setSelectedNoteId(null);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [selectedNoteId]);
+
+  function onNotesDragStart(_event: DragStartEvent) {
+    noteDragOccurredRef.current = true;
+    setSelectedNoteId(null);
+  }
 
   function onNotesDragEnd(event: DragEndEvent) {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    setItems((prev) => {
-      const oldIndex = prev.findIndex((item) => item.gameId === active.id);
-      const newIndex = prev.findIndex((item) => item.gameId === over.id);
-      if (oldIndex < 0 || newIndex < 0) return prev;
-      return withRanks(arrayMove(prev, oldIndex, newIndex));
-    });
+    if (over && active.id !== over.id) {
+      setItems((prev) => {
+        const oldIndex = prev.findIndex((item) => item.gameId === active.id);
+        const newIndex = prev.findIndex((item) => item.gameId === over.id);
+        if (oldIndex < 0 || newIndex < 0) return prev;
+        return withRanks(arrayMove(prev, oldIndex, newIndex));
+      });
+    }
+    window.setTimeout(() => {
+      noteDragOccurredRef.current = false;
+    }, 0);
   }
 
   function save() {
@@ -1045,7 +1062,7 @@ export function ListEditor({
               <p className="mt-2 text-center text-xs text-muted">
                 {items.length === 0
                   ? "Tap an empty slot or search to add games."
-                  : "Drag cards to reorder. Tap an empty slot to add more."}
+                  : "Hold to reorder. Tap a game to delete it."}
               </p>
             </>
           ) : listFormat === "grid" ? (
@@ -1078,7 +1095,13 @@ export function ListEditor({
                   id={notesDndId}
                   sensors={notesSensors}
                   collisionDetection={closestCenter}
+                  onDragStart={onNotesDragStart}
                   onDragEnd={onNotesDragEnd}
+                  onDragCancel={() => {
+                    window.setTimeout(() => {
+                      noteDragOccurredRef.current = false;
+                    }, 0);
+                  }}
                 >
                   <SortableContext
                     items={items.map((item) => item.gameId)}
@@ -1092,8 +1115,18 @@ export function ListEditor({
                           rank={index + 1}
                           canEditNotes={signedIn}
                           signInHref={signInHref}
+                          selected={selectedNoteId === item.gameId}
+                          onSelect={() => {
+                            if (noteDragOccurredRef.current) return;
+                            setSelectedNoteId((curr) =>
+                              curr === item.gameId ? null : item.gameId,
+                            );
+                          }}
                           onBlurbChange={setBlurb}
-                          onRemove={removeGame}
+                          onRemove={() => {
+                            removeGame(item.gameId);
+                            setSelectedNoteId(null);
+                          }}
                         />
                       ))}
                     </ol>
@@ -1134,6 +1167,7 @@ export function ListEditor({
                 {slotCount < LIST_MAX_ITEMS
                   ? ` · capacity up to ${LIST_MAX_ITEMS}`
                   : null}
+                {" · Hold to reorder. Tap a game to delete it."}
               </p>
             </>
           )}
@@ -1342,6 +1376,8 @@ function NotesCard({
   rank,
   canEditNotes,
   signInHref,
+  selected,
+  onSelect,
   onBlurbChange,
   onRemove,
 }: {
@@ -1349,46 +1385,66 @@ function NotesCard({
   rank: number;
   canEditNotes: boolean;
   signInHref: string;
+  selected: boolean;
+  onSelect: () => void;
   onBlurbChange: (id: string, blurb: string) => void;
-  onRemove: (id: string) => void;
+  onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    setActivatorNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: item.gameId });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.gameId });
 
   return (
     <li
       ref={setNodeRef}
+      data-list-card={item.gameId}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`flex items-stretch border border-line bg-panel ${
-        isDragging ? "z-10 opacity-90 shadow-lg" : ""
-      }`}
+      className={`flex items-stretch border border-line bg-panel ${cardTouchLockClassName} ${
+        selected ? cardSelectedRingClassName : ""
+      } ${isDragging ? "z-10 opacity-90 shadow-lg" : ""}`}
+      {...attributes}
+      {...listeners}
+      onClick={(event) => {
+        const target = event.target as HTMLElement;
+        if (
+          target.closest("textarea") ||
+          target.closest("a") ||
+          target.closest("[data-list-card-delete]") ||
+          target.closest("[data-note-expand]")
+        ) {
+          return;
+        }
+        onSelect();
+      }}
+      onContextMenu={(event) => event.preventDefault()}
+      aria-label={`${item.title}, rank ${rank}. Tap to select, hold to move.`}
+      aria-pressed={selected}
     >
       <div className="flex w-10 shrink-0 items-start justify-center pt-2">
         <RankMarker rank={rank} size="sm" />
       </div>
       <div className="relative h-28 w-[5.25rem] shrink-0 self-start">
         <GameCover title={item.title} imageUrl={item.coverUrl} />
-        <button
-          type="button"
-          onClick={() => onRemove(item.gameId)}
-          aria-label={`Remove ${item.title}`}
-          className={cardRemoveButtonClassName}
-        >
-          ✕
-        </button>
+        {selected ? (
+          <button
+            type="button"
+            data-list-card-delete
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRemove();
+            }}
+            aria-label={`Remove ${item.title}`}
+            className={cardRemoveButtonClassName}
+          >
+            ✕
+          </button>
+        ) : null}
       </div>
-      <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2 pr-1">
+      <div className="flex min-h-28 min-w-0 flex-1 flex-col gap-1.5 p-2 pr-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium leading-tight text-ink">
             {item.title}
@@ -1399,6 +1455,7 @@ function NotesCard({
             <textarea
               value={item.blurb}
               onChange={(e) => onBlurbChange(item.gameId, e.target.value)}
+              onPointerDown={(event) => event.stopPropagation()}
               placeholder="Optional note / review"
               rows={expanded ? 8 : 2}
               maxLength={LIST_BLURB_MAX}
@@ -1409,7 +1466,12 @@ function NotesCard({
             <div className="flex items-center justify-between gap-2">
               <button
                 type="button"
-                onClick={() => setExpanded((v) => !v)}
+                data-note-expand
+                onPointerDown={(event) => event.stopPropagation()}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setExpanded((v) => !v);
+                }}
                 className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
               >
                 {expanded ? "Smaller field" : "Larger field"}
@@ -1428,16 +1490,6 @@ function NotesCard({
           </p>
         )}
       </div>
-      <button
-        type="button"
-        ref={setActivatorNodeRef}
-        {...attributes}
-        {...listeners}
-        aria-label={`Reorder ${item.title}`}
-        className="flex w-8 shrink-0 cursor-grab touch-none items-center justify-center border-l border-line text-muted transition-colors hover:bg-paper hover:text-ink active:cursor-grabbing"
-      >
-        ⠿
-      </button>
     </li>
   );
 }
