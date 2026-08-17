@@ -8,6 +8,7 @@ import { sliceLockGotyPage } from "./live-lock";
 import { COMMUNITY_MEMBERS_PAGE_SIZE, paginateCommunityMembers } from "./members-page";
 import {
   canManageCommunity,
+  canSeeCommunityInvite,
   demoteHostBlockedReason,
   leaveBlockedReason,
   setCommunityRoleBlockedReason,
@@ -33,6 +34,7 @@ describe("community slug", () => {
 
   it("rejects reserved and invalid slugs", () => {
     expect(communitySlugSchema.safeParse("new").success).toBe(false);
+    expect(communitySlugSchema.safeParse("join").success).toBe(false);
     expect(communitySlugSchema.safeParse("kf").success).toBe(false);
     expect(communitySlugSchema.safeParse("has-dash").success).toBe(false);
     expect(communitySlugSchema.safeParse("has space").success).toBe(false);
@@ -43,6 +45,7 @@ describe("community slug", () => {
     expect(slugifyCommunityName("  Kinda Funny! ")).toBe("kinda_funny");
     expect(slugifyCommunityName("The Gamies")).toBe("the_gamies");
     expect(slugifyCommunityName("new")).toBe("community");
+    expect(slugifyCommunityName("join")).toBe("community");
     expect(slugifyCommunityName("ab")).toBe("community");
     expect(communitySlugWithSuffix("kinda_funny", 2)).toBe("kinda_funny_2");
     expect(communitySlugWithSuffix("a".repeat(32), 2).length).toBe(32);
@@ -100,6 +103,16 @@ describe("canManageCommunity", () => {
     expect(canManageCommunity("admin")).toBe(true);
     expect(canManageCommunity("member")).toBe(false);
     expect(canManageCommunity(null)).toBe(false);
+  });
+});
+
+describe("canSeeCommunityInvite", () => {
+  it("is only for members when open invites is on", () => {
+    expect(canSeeCommunityInvite("member", true)).toBe(true);
+    expect(canSeeCommunityInvite("admin", true)).toBe(true);
+    expect(canSeeCommunityInvite("member", false)).toBe(false);
+    expect(canSeeCommunityInvite("admin", false)).toBe(false);
+    expect(canSeeCommunityInvite(null, true)).toBe(false);
   });
 });
 

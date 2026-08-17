@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CopyInviteButton } from "@/components/communities/CopyInviteButton";
 import { navItemClass } from "@/components/ui/navLevels";
 import {
   EDITION_PUBLIC_LABEL,
@@ -84,6 +85,7 @@ export function CommunityNav({
 
 type HeaderProps = NavProps & {
   name: string;
+  invitePath?: string | null;
 };
 
 /**
@@ -97,6 +99,7 @@ export function CommunityHeader({
   canManage,
   editionStatus,
   active,
+  invitePath = null,
 }: HeaderProps) {
   return (
     <header className="-mx-[var(--gutter)] border-b border-line bg-panel px-[var(--gutter)] py-5">
@@ -105,9 +108,14 @@ export function CommunityHeader({
           Communities
         </Link>
       </p>
-      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-        {name}
-      </h1>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
+          {name}
+        </h1>
+        {invitePath ? (
+          <CopyInviteButton path={invitePath} />
+        ) : null}
+      </div>
       <div className="mt-6">
         <CommunityNav
           slug={slug}

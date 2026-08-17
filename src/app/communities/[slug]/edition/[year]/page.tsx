@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { MembershipActions } from "@/app/communities/[slug]/MembershipActions";
 import {
   EditionBallotEditor,
   type EditionBallotEditorItem,
@@ -15,6 +14,7 @@ import {
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
 import { EditionYearSettings } from "@/components/communities/EditionYearSettings";
@@ -76,6 +76,7 @@ import {
 import { showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { listEditionHostRoster } from "@/lib/communities/voices";
 import {
   listEditionAwardCategories,
@@ -159,6 +160,9 @@ export default async function CommunityEditionYearPage({
     community = null;
   }
   if (!community) notFound();
+  if (!community.viewerRole) {
+    return <CommunityPrivateView name={community.name} />;
+  }
 
   let edition: CommunityEditionPublic | null = null;
   let publicEditions: CommunityEditionPublic[] = [];
@@ -746,6 +750,7 @@ export default async function CommunityEditionYearPage({
         canManage={canManage}
         editionStatus={navStatus}
         active="edition"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       {edition.status === "published" && resultsBundle ? (
@@ -926,17 +931,9 @@ export default async function CommunityEditionYearPage({
                     to join this community and vote.
                   </p>
                 ) : !isMember ? (
-                  <div className="mt-6 max-w-xl">
-                    <p className="text-muted">
-                      Join this community to submit a ballot while voting is
-                      open.
-                    </p>
-                    <MembershipActions
-                      slug={community.slug}
-                      isMember={false}
-                      canLeave={false}
-                    />
-                  </div>
+                  <p className="mt-6 max-w-xl text-muted">
+                    You need an invite to join this community and vote.
+                  </p>
                 ) : (
                   <EditionBallotEditor
                     slug={community.slug}

@@ -17,7 +17,9 @@ import {
 } from "@/lib/communities/editions";
 import { EDITION_PUBLIC_LABEL } from "@/lib/communities/edition-status";
 import { communityCreateEventHref } from "@/lib/communities/community-settings-href";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { MembershipActions } from "./MembershipActions";
 
 type Params = Promise<{ slug: string }>;
@@ -35,6 +37,7 @@ export async function generateMetadata({
       title: community.name,
       description:
         community.description || `${community.name} on The Gamies`,
+      robots: { index: false, follow: false },
     };
   } catch {
     return { title: "Community" };
@@ -59,12 +62,13 @@ export default async function CommunityHomePage({
     community = null;
   }
   if (!community) notFound();
+  if (!community.viewerRole) {
+    return <CommunityPrivateView name={community.name} />;
+  }
 
   const canLeave =
-    community.viewerRole != null &&
     leaveBlockedReason(community.viewerRole, community.hostCount) == null;
   const canManage = canManageCommunity(community.viewerRole);
-  const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}`;
   const membersHref = `/communities/${encodeURIComponent(community.slug)}/members`;
 
   let editions: CommunityEditionPublic[] = [];
@@ -90,6 +94,7 @@ export default async function CommunityHomePage({
         canManage={canManage}
         editionStatus={navEditionStatus}
         active="overview"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       {overviewEditions.length > 0 ? (
@@ -142,25 +147,10 @@ export default async function CommunityHomePage({
         {profile ? (
           <MembershipActions
             slug={community.slug}
-            isMember={community.viewerRole != null}
             canLeave={canLeave}
             isHost={canManage}
           />
-        ) : user ? (
-          <p className="mt-6 text-sm text-muted">
-            <Link href="/account" className="text-accent hover:underline">
-              Finish your profile
-            </Link>{" "}
-            to join this community.
-          </p>
-        ) : (
-          <p className="mt-6 text-sm text-muted">
-            <Link href={signInHref} className="text-accent hover:underline">
-              Sign in
-            </Link>{" "}
-            to join this community.
-          </p>
-        )}
+        ) : null}
       </section>
     </main>
   );

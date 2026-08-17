@@ -1,8 +1,9 @@
-export type CommunitySettingsTab = "live" | "events" | "community";
+export type CommunitySettingsTab = "live" | "events" | "community" | "invite";
 
 export function parseCommunitySettingsTab(raw: unknown): CommunitySettingsTab {
   if (raw === "events") return "events";
   if (raw === "community") return "community";
+  if (raw === "invite") return "invite";
   return "live";
 }
 
@@ -19,6 +20,8 @@ export function communitySettingsHref(
     params.set("tab", "events");
   } else if (tab === "community") {
     params.set("tab", "community");
+  } else if (tab === "invite") {
+    params.set("tab", "invite");
   }
   const qs = params.toString();
   return `/communities/${encodeURIComponent(slug)}/settings${qs ? `?${qs}` : ""}`;

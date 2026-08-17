@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   communities,
   communityMembers,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/profile/profile-page";
 import {
   canManageCommunity,
+  canSeeCommunityInvite,
   leaveBlockedReason,
   setCommunityRoleBlockedReason,
 } from "./rules";
@@ -29,11 +30,29 @@ import {
   COMMUNITY_MEMBERS_PAGE_SIZE,
   paginateCommunityMembers,
 } from "./members-page";
+import {
+  generateInviteCode,
+  parseInviteCode,
+} from "./invite-code";
 
 export type Community = typeof communities.$inferSelect;
 export type CommunityMemberRow = typeof communityMembers.$inferSelect;
 
-export type CommunitySummary = Community & { memberCount: number };
+export type MembershipCommunity = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  memberCount: number;
+};
+
+export type MembershipCommunitiesPage = {
+  communities: MembershipCommunity[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
 
 export type CommunityMemberPublic = {
   profileId: string;
@@ -43,10 +62,14 @@ export type CommunityMemberPublic = {
   joinedAt: Date;
 };
 
-export type CommunityDetail = Community & {
+export type CommunityDetail = Omit<Community, "inviteCode"> & {
   memberCount: number;
   hostCount: number;
   viewerRole: CommunityRole | null;
+  /** Present when open invites is on and the viewer is a member. */
+  viewerInviteCode: string | null;
+  /** Present for community admins (Settings → Invite). */
+  adminInviteCode: string | null;
 };
 
 export type CommunityMembersPage = {
@@ -80,35 +103,82 @@ function asRole(raw: string): CommunityRole {
   return raw === "admin" ? "admin" : "member";
 }
 
-export async function listCommunities(
+function toCommunityDetail(
+  community: Community,
+  memberCount: number,
+  hostCount: number,
+  viewerRole: CommunityRole | null,
+): CommunityDetail {
+  const { inviteCode, ...rest } = community;
+  return {
+    ...rest,
+    memberCount,
+    hostCount,
+    viewerRole,
+    viewerInviteCode: canSeeCommunityInvite(viewerRole, community.openInvites)
+      ? inviteCode
+      : null,
+    adminInviteCode: viewerRole === "admin" ? inviteCode : null,
+  };
+}
+
+export async function listMembershipCommunitiesPage(
+  profileId: string,
+  pageRaw: number,
   db: Db = getDb(),
-): Promise<CommunitySummary[]> {
+): Promise<MembershipCommunitiesPage> {
+  const pageSize = PROFILE_COMMUNITIES_PAGE_SIZE;
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(communityMembers)
+    .where(eq(communityMembers.profileId, profileId));
+  const total = Number(countRow?.n ?? 0);
+  const { page, offset, totalPages } = paginateProfileItems(
+    pageRaw,
+    total,
+    pageSize,
+  );
+
   const rows = await db
     .select({
       id: communities.id,
       slug: communities.slug,
       name: communities.name,
       description: communities.description,
-      createdByProfileId: communities.createdByProfileId,
-      liveRankingsEnabled: communities.liveRankingsEnabled,
-      liveRankingsLocked: communities.liveRankingsLocked,
-      liveScoresVisibleFrom: communities.liveScoresVisibleFrom,
-      createdAt: communities.createdAt,
-      updatedAt: communities.updatedAt,
-      memberCount: count(communityMembers.profileId),
     })
-    .from(communities)
-    .leftJoin(
-      communityMembers,
-      eq(communityMembers.communityId, communities.id),
-    )
-    .groupBy(communities.id)
-    .orderBy(desc(communities.createdAt), asc(communities.name));
+    .from(communityMembers)
+    .innerJoin(communities, eq(communities.id, communityMembers.communityId))
+    .where(eq(communityMembers.profileId, profileId))
+    .orderBy(asc(communities.name))
+    .limit(pageSize)
+    .offset(offset);
 
-  return rows.map((row) => ({
-    ...row,
-    memberCount: Number(row.memberCount),
-  }));
+  const ids = rows.map((row) => row.id);
+  const countRows =
+    ids.length === 0
+      ? []
+      : await db
+          .select({
+            communityId: communityMembers.communityId,
+            n: sql<number>`count(*)::int`,
+          })
+          .from(communityMembers)
+          .where(inArray(communityMembers.communityId, ids))
+          .groupBy(communityMembers.communityId);
+  const countById = new Map(
+    countRows.map((row) => [row.communityId, Number(row.n)]),
+  );
+
+  return {
+    communities: rows.map((row) => ({
+      ...row,
+      memberCount: countById.get(row.id) ?? 0,
+    })),
+    page,
+    pageSize,
+    total,
+    totalPages,
+  };
 }
 
 export async function listCommunitiesForProfile(
@@ -201,12 +271,12 @@ export async function getCommunityBySlug(
       : Promise.resolve([] as { role: string }[]),
   ]);
 
-  return {
-    ...community,
-    memberCount: Number(memberCountRows[0]?.n ?? 0),
-    hostCount: Number(hostCountRows[0]?.n ?? 0),
-    viewerRole: viewerRows[0] ? asRole(viewerRows[0].role) : null,
-  };
+  return toCommunityDetail(
+    community,
+    Number(memberCountRows[0]?.n ?? 0),
+    Number(hostCountRows[0]?.n ?? 0),
+    viewerRows[0] ? asRole(viewerRows[0].role) : null,
+  );
 }
 
 export async function listCommunityMembersPage(
@@ -319,15 +389,27 @@ export async function createCommunity(
     }
   }
 
-  const [created] = await db
-    .insert(communities)
-    .values({
-      slug,
-      name: parsed.name,
-      description: parsed.description ?? "",
-      createdByProfileId: profileId,
-    })
-    .returning();
+  let created: Community | undefined;
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    try {
+      const [row] = await db
+        .insert(communities)
+        .values({
+          slug,
+          name: parsed.name,
+          description: parsed.description ?? "",
+          createdByProfileId: profileId,
+          inviteCode: generateInviteCode(),
+        })
+        .returning();
+      created = row;
+      break;
+    } catch {
+      if (attempt === 8) {
+        return { error: "Could not create that community." };
+      }
+    }
+  }
   if (!created) {
     return { error: "Could not create that community." };
   }
@@ -346,25 +428,91 @@ export async function createCommunity(
   return created;
 }
 
-export async function joinCommunity(
-  slug: string,
+export async function getCommunityInvitePreview(
+  codeRaw: string,
+  viewerProfileId?: string | null,
+  db: Db = getDb(),
+): Promise<{
+  name: string;
+  slug: string;
+  alreadyMember: boolean;
+} | null> {
+  const code = parseInviteCode(codeRaw);
+  if (!code) return null;
+
+  const [community] = await db
+    .select({
+      id: communities.id,
+      slug: communities.slug,
+      name: communities.name,
+    })
+    .from(communities)
+    .where(eq(communities.inviteCode, code))
+    .limit(1);
+  if (!community) return null;
+
+  let alreadyMember = false;
+  if (viewerProfileId) {
+    const [member] = await db
+      .select({ profileId: communityMembers.profileId })
+      .from(communityMembers)
+      .where(
+        and(
+          eq(communityMembers.communityId, community.id),
+          eq(communityMembers.profileId, viewerProfileId),
+        ),
+      )
+      .limit(1);
+    alreadyMember = Boolean(member);
+  }
+
+  return {
+    name: community.name,
+    slug: community.slug,
+    alreadyMember,
+  };
+}
+
+export async function joinCommunityWithInvite(
+  codeRaw: string,
   profileId: string,
   db: Db = getDb(),
-): Promise<{ ok: true } | { error: string }> {
-  const detail = await getCommunityBySlug(slug, profileId, db);
-  if (!detail) return { error: "Community not found." };
-  if (detail.viewerRole) return { ok: true };
+): Promise<{ ok: true; slug: string } | { error: string }> {
+  const code = parseInviteCode(codeRaw);
+  if (!code) return { error: "That invite is not valid." };
+
+  const [community] = await db
+    .select({
+      id: communities.id,
+      slug: communities.slug,
+    })
+    .from(communities)
+    .where(eq(communities.inviteCode, code))
+    .limit(1);
+  if (!community) return { error: "That invite is not valid." };
+
+  const [existing] = await db
+    .select({ profileId: communityMembers.profileId })
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, community.id),
+        eq(communityMembers.profileId, profileId),
+      ),
+    )
+    .limit(1);
+  if (existing) return { ok: true, slug: community.slug };
 
   try {
     await db.insert(communityMembers).values({
-      communityId: detail.id,
+      communityId: community.id,
       profileId,
       role: "member",
     });
   } catch {
     return { error: "Could not join that community." };
   }
-  return { ok: true };
+  return { ok: true, slug: community.slug };
 }
 
 export async function leaveCommunity(
@@ -388,6 +536,67 @@ export async function leaveCommunity(
       ),
     );
   return { ok: true };
+}
+
+export async function rotateCommunityInviteCode(
+  slug: string,
+  profileId: string,
+  db: Db = getDb(),
+): Promise<{ ok: true; inviteCode: string } | { error: string }> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only admins can update invites." };
+  }
+
+  for (let attempt = 1; attempt <= 8; attempt += 1) {
+    const inviteCode = generateInviteCode();
+    try {
+      const [updated] = await db
+        .update(communities)
+        .set({
+          inviteCode,
+          updatedAt: new Date(),
+        })
+        .where(eq(communities.id, detail.id))
+        .returning({ inviteCode: communities.inviteCode });
+      if (updated) {
+        return { ok: true, inviteCode: updated.inviteCode };
+      }
+    } catch {
+      if (attempt === 8) {
+        return { error: "Could not generate a new invite." };
+      }
+    }
+  }
+  return { error: "Could not generate a new invite." };
+}
+
+export async function setCommunityOpenInvites(
+  slug: string,
+  profileId: string,
+  enabled: boolean,
+  db: Db = getDb(),
+): Promise<{ ok: true; openInvites: boolean } | { error: string }> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only admins can update invites." };
+  }
+
+  const [updated] = await db
+    .update(communities)
+    .set({
+      openInvites: enabled,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id))
+    .returning({ openInvites: communities.openInvites });
+
+  return {
+    ok: true,
+    openInvites: updated?.openInvites ?? enabled,
+  };
 }
 
 export async function setCommunityMemberRole(

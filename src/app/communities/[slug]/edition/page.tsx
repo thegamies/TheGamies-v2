@@ -33,6 +33,9 @@ export default async function CommunityEditionIndexPage({
   if (!community) {
     redirect("/communities");
   }
+  if (!community.viewerRole) {
+    redirect(`/communities/${encodeURIComponent(community.slug)}`);
+  }
 
   let editions: CommunityEditionPublic[] = [];
   try {

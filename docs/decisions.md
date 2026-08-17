@@ -39,12 +39,13 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-16 | List editor chrome | Title above GOTY/Categories tabs. Categories visible signed-out with sign-in CTA (picks signed-in only). Format/Size hidden on Categories; Categories Share is link-only. Settings: rank style only (no list type/year). Formats: Poster · List · **Grid**. Notes max 500 + enlarge. Signed-in floating `PinnedSaveBar` when dirty. |
 | 2026-08-16 | List card interaction | Poster/Grid: hold (~280ms) to drag (scroll locked during hold); tap opens an external Remove popover (document-absolute; ink-contrast border; compact design-system `Button` **danger**). Poster keeps CSS-scaled canvas for export fidelity; **drag is in-place** (no DragOverlay) like Grid so browser zoom does not detach the card. **List:** text **Remove** beside the title; hold-to-reorder. |
 | 2026-08-11 | Site live aggregate | **`live_goty_contrib` / `live_category_contrib` = scoring truth**; **`live_*_scores` = disposable cache**. Save replaces contrib + marks dirty keys; **async/lazy locked absolute SUM refresh** (saves do not contend on score rows). **`standingsVersion` bumps only after refresh succeeds**. Reveal gate: ranks public, scores/votes hidden until admin reveals. Site live categories: **single-choice** on owned GOTY; plurality. Community later = `SUM(contrib)` for members (no save fan-out). |
-| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). **Open join/leave** for signed-in profiles. Last admin cannot leave. Invite-only membership deferred. |
+| 2026-08-11 | Community create + join | **Any signed-in user with a profile** can create a community (creator = internal admin). Last admin cannot leave. |
+| 2026-08-17 | Community invites | Communities are **private**. `/communities` lists **memberships only**. Join requires a current **invite code** (`/communities/join/[code]`). Admins copy/rotate the code and may enable **open invites** (members copy the invite from the header) under Settings → Invite. |
 | 2026-08-12 | Community live reveal | One community date: **`live_scores_visible_from`** (null = scores hidden for **all** live years). Hosts set date / reveal now / hide under Settings. |
 | 2026-08-12 | Community live lock | Hosts lock/unlock under Settings. Lock freezes the public board into **normalized** `community_live_lock_*` tables (SQL-paginated reads). Unlock discards rows and resumes live `SUM(contrib)`. No fat JSONB on the hot path. |
 | 2026-08-12 | Request cost (reads) | Hot paths must consider **DB egress + compute + scale**. Prefer normalized freeze rows + SQL pagination; avoid fat JSONB blobs that force full read/parse per page. Search is SQL with a hit cap—not a client filter of a full dump. See `docs/request-cost.md`. |
 | 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. |
-| 2026-08-12 | Edition ballot eligibility | **Open community members** (signed-in profile + `community_members` row, including hosts). Invite-only / approval gates deferred. |
+| 2026-08-12 | Edition ballot eligibility | **Community members** (signed-in profile + `community_members` row, including hosts). Membership is invite-only. |
 | 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
 | 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
 | 2026-08-16 | Edition freeze compute | Freeze starts when voting **closes** (`closesAt`), via cron (`/api/cron/edition-freeze` + `CRON_SECRET`) and `after()` on schedule writes. Exclusive claim on `community_editions.freeze_status`. Reveal/results still gated by `publishesAt`. Edition page shows a calculating banner while pending/computing. No message queue — DB status + cron is enough for dual-host. |
@@ -66,7 +67,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 
 - Exact degrading score curve when scoring expands beyond top 10
 - Edition / community category voting modes beyond site single-choice
-- Invite-only / approval membership and any eligibility beyond open members
+- Approval membership and extra eligibility beyond invite-only members
 - Moderation and ballot invalidation workflow
 - Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

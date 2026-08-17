@@ -174,6 +174,7 @@ export default function DesignSystemPage() {
       <Section title="Controls">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="accent">Accent</Button>
+          <Button variant="accent-bordered">Accent bordered</Button>
           <Button variant="bordered">Bordered</Button>
           <Button variant="quiet">Quiet</Button>
           <Button variant="danger">Danger</Button>

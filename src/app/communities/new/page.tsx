@@ -33,7 +33,7 @@ export default async function NewCommunityPage() {
         Start a community
       </h1>
       <p className="mt-3 max-w-xl text-muted">
-        A public home for your crew. Anyone signed in can join.
+        A private home for your crew. People join with an invite.
       </p>
       <CreateCommunityForm />
     </main>

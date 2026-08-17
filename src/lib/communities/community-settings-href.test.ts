@@ -25,6 +25,12 @@ describe("communitySettingsHref", () => {
     );
   });
 
+  it("sets tab for Invite", () => {
+    expect(communitySettingsHref("test", { tab: "invite" })).toBe(
+      "/communities/test/settings?tab=invite",
+    );
+  });
+
   it("encodes the slug", () => {
     expect(communitySettingsHref("the gamies")).toBe(
       "/communities/the%20gamies/settings",
@@ -50,5 +56,6 @@ describe("parseCommunitySettingsTab", () => {
     expect(parseCommunitySettingsTab("nope")).toBe("live");
     expect(parseCommunitySettingsTab("events")).toBe("events");
     expect(parseCommunitySettingsTab("community")).toBe("community");
+    expect(parseCommunitySettingsTab("invite")).toBe("invite");
   });
 });

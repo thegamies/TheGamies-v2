@@ -43,3 +43,11 @@ export function setCommunityRoleBlockedReason(input: {
 export function canManageCommunity(role: CommunityRole | null): boolean {
   return role === "admin";
 }
+
+/** Members (including admins) see the header invite only when open invites is on. */
+export function canSeeCommunityInvite(
+  role: CommunityRole | null,
+  openInvites: boolean,
+): boolean {
+  return role != null && openInvites;
+}

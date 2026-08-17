@@ -9,10 +9,12 @@ import {
 import {
   createCommunity,
   getCommunityBySlug,
-  joinCommunity,
+  joinCommunityWithInvite,
   leaveCommunity,
+  rotateCommunityInviteCode,
   setCommunityLiveScoresVisibleFrom,
   setCommunityMemberRole,
+  setCommunityOpenInvites,
   setLiveRankingsEnabled,
   setLiveRankingsLocked,
 } from "@/lib/communities/service";
@@ -145,16 +147,51 @@ export async function joinCommunityAction(
   _prev: { error: string } | null,
   formData: FormData,
 ): Promise<{ error: string } | null> {
+  const code = String(formData.get("code") ?? "").trim();
+  if (!code) return { error: "That invite is not valid." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await joinCommunityWithInvite(code, gate.profile.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(result.slug, gate.profile.username);
+  redirect(`/communities/${result.slug}`);
+}
+
+export async function rotateCommunityInviteCodeAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
   const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
   if (!slug) return { error: "Community not found." };
 
   const gate = await requireProfile();
   if (!gate.ok) return { error: gate.error };
 
-  const result = await joinCommunity(slug, gate.profile.id);
+  const result = await rotateCommunityInviteCode(slug, gate.profile.id);
   if ("error" in result) return { error: result.error };
 
-  revalidateCommunity(slug, gate.profile.username);
+  revalidateCommunity(slug);
+  return null;
+}
+
+export async function setCommunityOpenInvitesAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+  const enabled = String(formData.get("enabled") ?? "") === "true";
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await setCommunityOpenInvites(slug, gate.profile.id, enabled);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug);
   return null;
 }
 

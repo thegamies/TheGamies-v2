@@ -15,7 +15,7 @@ Ballots belong to **editions** only (not live rankings).
 
 Tables `community_edition_ballots` + `community_edition_ballot_items` — **not** personal `lists`, **not** `live_*_contrib`.
 
-- **Eligibility:** signed-in community members (open membership for now)
+- **Eligibility:** signed-in community members (invite-only)
 - **Edit:** allowed while edition status is `open` (until `closesAt`); read-only after close/publish
 - GOTY eligibility matches personal GOTY helpers (`gotyEligibilityError`)
 

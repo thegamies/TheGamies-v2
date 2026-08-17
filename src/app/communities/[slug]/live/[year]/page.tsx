@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CommunityLiveView } from "@/components/communities/CommunityLiveView";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -10,6 +11,7 @@ import { getCommunityLiveStandings } from "@/lib/communities/live";
 import { isCommunityLiveScoresRevealed } from "@/lib/communities/live-reveal";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
@@ -80,6 +82,9 @@ export default async function CommunityLiveYearPage({
     community = null;
   }
   if (!community) notFound();
+  if (!community.viewerRole) {
+    return <CommunityPrivateView name={community.name} />;
+  }
   if (!community.liveRankingsEnabled) notFound();
 
   const canManage = canManageCommunity(community.viewerRole);
@@ -139,6 +144,7 @@ export default async function CommunityLiveYearPage({
         canManage={canManage}
         editionStatus={editionStatus}
         active="live"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       <CommunityLiveView

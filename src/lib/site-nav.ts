@@ -20,7 +20,7 @@ export type SiteNavAccount =
 
 export const SITE_CREATE_HREF = "/create";
 
-/** Accent-outline Create control shared by desktop nav, mobile header, and drawer. */
+/** Accent-bordered Create control shared by desktop nav, mobile header, and drawer. */
 export const siteCreateLinkClass =
   "inline-flex shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-accent px-4 py-2 text-sm font-semibold tracking-wide text-accent transition-opacity hover:opacity-90";
 

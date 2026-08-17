@@ -11,7 +11,7 @@ The long-term differentiator: creators, podcasts, Discord communities, Twitch st
 3. Rankings should be understandable at a glance but support deep exploration.
 4. Community, Host, and Combined results stay distinct concepts on **edition** results.
 5. **Editions** and **live rankings** are separate systems — do not mix their data or freeze rules.
-6. Public game, profile, list, community, and results pages must be crawlable and shareable.
+6. Public game, profile, list, and results pages must be crawlable and shareable. Communities are private (invite join); interiors are members-only.
 7. Mobile is a first-class layout, not a compressed desktop page.
 8. Interface stays restrained; personality comes from composition, typography, artwork, and rank treatment.
 
@@ -110,7 +110,7 @@ Site
 1. **Anonymous / casual** — land → build GOTY or custom list → see editorial view → soft prompt to save account.  
 2. **Discovery** — browse games → game page → add to list.  
 3. **Aggregate** — signed-in lists feed live site GOTY board (lockable).  
-4. **Community ceremony** — join community → submit edition ballot (+ categories) → wait for reveal → explore frozen Combined/Community/Hosts + voters.  
+4. **Community ceremony** — join with an invite → submit edition ballot (+ categories) → wait for reveal → explore frozen Combined/Community/Hosts + voters.  
 5. **Community live** — if enabled, see always-updating community board from members’ lists.
 
 ---

@@ -37,6 +37,12 @@ export function CommunitySettingsTabs({
       >
         Community
       </Link>
+      <Link
+        href={communitySettingsHref(slug, { tab: "invite" })}
+        className={navItemClass("secondary", tab === "invite")}
+      >
+        Invite
+      </Link>
     </nav>
   );
 }

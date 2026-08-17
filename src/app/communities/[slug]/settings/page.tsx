@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityInviteSettings } from "./CommunityInviteSettings";
 import { CommunitySettingsTabs } from "@/components/communities/CommunitySettingsTabs";
 import {
   getRequestProfileByAuthUserId,
@@ -15,6 +16,7 @@ import {
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   getCommunityBySlug,
   listCommunityMemberOptions,
@@ -99,6 +101,7 @@ export default async function CommunitySettingsPage({
         canManage
         editionStatus={featuredStatus}
         active="settings"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       <section className="mt-10">
@@ -106,7 +109,7 @@ export default async function CommunitySettingsPage({
           Settings
         </h2>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          Live rankings, yearly awards, and community admins.
+          Live rankings, yearly awards, community admins, and invites.
         </p>
         <CommunitySettingsTabs slug={community.slug} tab={tab} />
 
@@ -134,6 +137,12 @@ export default async function CommunitySettingsPage({
           </>
         ) : tab === "events" ? (
           <EditionSettings slug={community.slug} editions={editions} />
+        ) : tab === "invite" ? (
+          <CommunityInviteSettings
+            slug={community.slug}
+            inviteCode={community.adminInviteCode ?? ""}
+            openInvites={community.openInvites}
+          />
         ) : (
           <>
             <p className="mt-6 max-w-xl text-sm text-muted">

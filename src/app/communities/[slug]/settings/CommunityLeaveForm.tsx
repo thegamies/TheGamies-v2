@@ -42,8 +42,8 @@ export function CommunityLeaveForm({
             className="w-full max-w-md"
           >
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              You will leave this community. You can join again later if it
-              stays open.
+              You will leave this community. You can join again later with an
+              invite.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <form action={formAction}>

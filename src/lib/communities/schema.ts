@@ -6,8 +6,8 @@ export const COMMUNITY_NAME_MAX = 80;
 export const COMMUNITY_DESCRIPTION_MAX = 500;
 const COMMUNITY_SLUG_FALLBACK = "community";
 
-/** Reserved so `/communities/new` is never a community slug. */
-export const RESERVED_COMMUNITY_SLUGS = new Set(["new"]);
+/** Reserved so `/communities/new` and `/communities/join` are never slugs. */
+export const RESERVED_COMMUNITY_SLUGS = new Set(["new", "join"]);
 
 export const COMMUNITY_ROLES = ["admin", "member"] as const;
 export type CommunityRole = (typeof COMMUNITY_ROLES)[number];

@@ -11,7 +11,7 @@ Communities may turn **Live Rankings** on or off. Events are the end-of-year awa
 
 ## Identity + membership (shipped)
 
-Signed-in users with a **profile** can **create** a community (name + optional description; URL slug is derived from the name). The creator is the first internal `admin` member. Anyone signed in with a profile may **join or leave** (open membership). Admins can add other admins under Settings → Community. The last admin cannot leave — that note lives on Settings, not Overview.
+Signed-in users with a **profile** can **create** a community (name + optional description; URL slug is derived from the name). The creator is the first internal `admin` member. Communities are **private**: `/communities` lists only memberships, interiors are members-only, and people join with an **invite code**. Admins manage the current code, generate a new one, and optionally turn on **open invites** (members can copy the invite from the header) under Settings → Invite. Admins can add other admins under Settings → Community. The last admin cannot leave — that note lives on Settings, not Overview.
 
 Public member lists never say admin / judge / expert — people are listed by display name. Settings → Community uses **Admin**. Event boards still say **Host**. Internal role is `admin` | `member`.
 
@@ -37,22 +37,23 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 
 ### URLs
 
-- `/communities` — public directory
+- `/communities` — **Communities** page with a **My Communities** list of signed-in memberships only (paged; 24 per page). Not a public directory.
 - `/communities/new` — signed-in create (requires profile)
-- `/communities/[slug]` — public home (identity, about, join/leave for members; up to three public events ordered open → coming soon → closed → results, then newest created; hosts with no events yet see **Create event**)
+- `/communities/join/[code]` — join with a current invite code
+- `/communities/[slug]` — members-only home (identity, about, leave for members; up to three public events ordered open → coming soon → closed → results, then newest created; hosts with no events yet see **Create event**). Non-members see a private notice.
 - `/communities/[slug]/members` — paged member roster
 - `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
 - `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY event (vote + results by schedule)
 - `/communities/[slug]/ballot` → redirects to edition
 - `/communities/[slug]/results` → redirects to edition
-- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), and **Community** (`?tab=community`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: add/remove admins (last admin cannot be removed) and leave.
+- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), **Community** (`?tab=community`), and **Invite** (`?tab=invite`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: add/remove admins (last admin cannot be removed) and leave. Invite: copy the current join link, generate a new code (retires the old one), and toggle **open invites** so members can copy the invite from the header.
 - `/communities/[slug]/create/event` — hosts only. Create event: year, schedule, categories, tie numbering. Redirects to that year’s Edition settings.
 - Profile `/u/[username]` **Communities** tab (`?tab=communities`) lists communities the person belongs to (paged; 24 per page)
 
 ### Non-goals (next slices)
 
 - Weighted Combined (Host %)
-- Invite-only or approval join, bans, extra roles
+- Approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
 - Per-community custom defs / multi / ranked edition category modes
@@ -69,7 +70,7 @@ Hosts
 Overview    Live Rankings    Events    Members
 ```
 
-Exact tab labels: **Live Rankings** and **Events** (not Live / Edition). Vote and results share the Events tab with a year switcher. Settings is hosts only, with Live Rankings · Events · Community as secondary tabs.
+Exact tab labels: **Live Rankings** and **Events** (not Live / Edition). Vote and results share the Events tab with a year switcher. Settings is hosts only, with Live Rankings · Events · Community · Invite as secondary tabs.
 
 Settings and event management live on a separate administrative surface. Community Settings → Events lists every year and links into that year’s Edition settings / Manage hosts / Host preview.
 
@@ -104,7 +105,7 @@ Separate tables from personal lists / live contrib:
 - `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only (enabled subset from `community_edition_categories`)
 - `community_edition_categories` — which site awards are on this event (+ order). Reveal / Results / Categories join freeze rows to this set so awards removed from settings no longer appear. Removing an award while voting is open also deletes that award’s ballot picks.
 
-**Eligibility:** signed-in profile that is a community member (including hosts). Non-members see join / sign-in CTAs.
+**Eligibility:** signed-in profile that is a community member (including hosts). Non-members see a private notice and need an invite.
 
 **Edit window:** submit and update while status is `open` (until `closesAt`). After close/publish, the voter’s ballot is read-only (or “you did not submit”).
 

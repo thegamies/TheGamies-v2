@@ -189,7 +189,7 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-/** Public community that can later host live rankings and editions. */
+/** Private community that can later host live rankings and editions. */
 export const communities = pgTable("communities", {
   id: uuid("id").defaultRandom().primaryKey(),
   slug: text("slug").notNull().unique(),
@@ -206,11 +206,15 @@ export const communities = pgTable("communities", {
   liveRankingsLocked: boolean("live_rankings_locked").notNull().default(false),
   /** When set and reached, live scores are public for every year. Null = hidden. */
   liveScoresVisibleFrom: timestamp("live_scores_visible_from", { mode: "date" }),
+  /** Current join code. Rotating replaces it and retires the old link. */
+  inviteCode: text("invite_code").notNull().unique(),
+  /** When true, members can copy the invite from the community header. */
+  openInvites: boolean("open_invites").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-/** Open membership. role is internal (`admin` | `member`); public UI does not say admin. */
+/** Invite-only membership. role is internal (`admin` | `member`); public UI does not say admin. */
 export const communityMembers = pgTable(
   "community_members",
   {

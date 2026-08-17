@@ -19,6 +19,7 @@ import {
 import type { EditionStatus } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 
 type Params = Promise<{ slug: string }>;
@@ -90,6 +91,7 @@ export default async function CreateCommunityEventPage({
         canManage
         editionStatus={featuredStatus}
         active="settings"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       <section className="mt-10">

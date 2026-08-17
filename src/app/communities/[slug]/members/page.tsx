@@ -6,8 +6,10 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
+import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   COMMUNITY_MEMBERS_PAGE_SIZE,
   getCommunityBySlug,
@@ -72,6 +74,9 @@ export default async function CommunityMembersPage({
     community = null;
   }
   if (!community) notFound();
+  if (!community.viewerRole) {
+    return <CommunityPrivateView name={community.name} />;
+  }
 
   const canManage = canManageCommunity(community.viewerRole);
 
@@ -118,6 +123,7 @@ export default async function CommunityMembersPage({
         canManage={canManage}
         editionStatus={publicEdition?.status ?? null}
         active="members"
+        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
       <section className="mt-10">

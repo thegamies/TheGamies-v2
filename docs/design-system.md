@@ -96,7 +96,7 @@ Rules:
 
 ## Controls
 
-`Button` — accent / bordered / quiet / **danger** / **danger-bordered**. Danger is only for irreversible destroy (delete event). Trigger uses `danger-bordered`; the confirm action uses filled `danger`. Do not use `--accent` orange for delete. `Radio` — native radio, restyled: empty `--line` ring, `--accent` fill when selected (brand orange, not the browser default). `RadioOption` — label + optional hint row for settings. Do not use unstyled platform radios in product UI.
+`Button` — accent / **accent-bordered** / bordered / quiet / **danger** / **danger-bordered**. Accent-bordered is the outline Create / Start a community control (orange ring and type, no fill). Danger is only for irreversible destroy (delete event). Trigger uses `danger-bordered`; the confirm action uses filled `danger`. Do not use `--accent` orange for delete. `Radio` — native radio, restyled: empty `--line` ring, `--accent` fill when selected (brand orange, not the browser default). `RadioOption` — label + optional hint row for settings. Do not use unstyled platform radios in product UI.
 
 `DatePicker` — button trigger (no text entry) with a branded calendar mark: `--accent` header bar, `--paper` rings, `--ink` day ticks. Opens a month grid in `--panel` with a hard `--line` border. Selected day uses `--accent`; today gets an accent ring; `min` / `max` disable out-of-range days. Hidden input when `name` is set. Event schedule pairs this with `TimePicker`. Do not use native `<input type="date">` in product UI.
 

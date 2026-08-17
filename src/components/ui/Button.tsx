@@ -1,11 +1,13 @@
 import { type ButtonHTMLAttributes } from "react";
 
-type Variant = "accent" | "bordered" | "quiet" | "danger" | "danger-bordered";
+type Variant = "accent" | "accent-bordered" | "bordered" | "quiet" | "danger" | "danger-bordered";
 type Size = "md" | "sm";
 
 const variantClass: Record<Variant, string> = {
   accent:
     "bg-accent text-white hover:opacity-90 border border-transparent",
+  "accent-bordered":
+    "border border-accent text-accent hover:opacity-90 bg-transparent",
   bordered:
     "border border-line text-ink hover:border-accent bg-transparent",
   quiet: "border border-transparent text-muted hover:text-ink",
