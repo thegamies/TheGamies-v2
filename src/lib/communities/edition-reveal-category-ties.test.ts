@@ -137,7 +137,7 @@ describe("category reveal place open", () => {
   it("finishes a place’s grid before the next rank starts", () => {
     const present = [1, 2, 3];
     // While #3’s covers are still arriving, #2 must not have started.
-    const during3Grid = 0.28;
+    const during3Grid = 0.24;
     expect(categoryRevealPlaceGridEnter(during3Grid, 3, present)).toBeGreaterThan(
       0,
     );
@@ -147,16 +147,16 @@ describe("category reveal place open", () => {
     expect(categoryRevealPlaceLabelEnter(during3Grid, 2, present)).toBe(0);
 
     // After #3 is fully in, #2 may begin.
-    expect(categoryRevealPlaceGridEnter(0.42, 3, present)).toBeCloseTo(1, 1);
-    expect(categoryRevealPlaceLabelEnter(0.48, 2, present)).toBeGreaterThan(0);
+    expect(categoryRevealPlaceGridEnter(0.36, 3, present)).toBeCloseTo(1, 1);
+    expect(categoryRevealPlaceLabelEnter(0.4, 2, present)).toBeGreaterThan(0);
   });
 
   it("seats # / Tied before the game grid starts", () => {
     const present = [3];
-    expect(categoryRevealPlaceLabelEnter(0.28, 3, present)).toBeGreaterThan(
+    expect(categoryRevealPlaceLabelEnter(0.26, 3, present)).toBeGreaterThan(
       0.85,
     );
-    expect(categoryRevealPlaceGridEnter(0.28, 3, present)).toBe(0);
+    expect(categoryRevealPlaceGridEnter(0.26, 3, present)).toBe(0);
     expect(categoryRevealPlaceLabelEnter(0.4, 3, present)).toBeCloseTo(1, 1);
     expect(categoryRevealPlaceGridEnter(0.4, 3, present)).toBeGreaterThan(0);
   });

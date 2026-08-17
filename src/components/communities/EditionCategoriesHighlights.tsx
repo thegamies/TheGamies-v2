@@ -19,7 +19,11 @@ import type {
   EditionCategoryStandingBlock,
   MatrixVoiceColumn,
 } from "@/lib/communities/edition-results";
-import { editionVoterBallotHref } from "@/lib/communities/edition-results-href";
+import {
+  editionCategoryStandingsHref,
+  editionVoterBallotHref,
+} from "@/lib/communities/edition-results-href";
+import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
 
 /** Cell padding each side (`px-2`). Column: 103+16 → 119; lg 206+16 → 222. */
 const CELL_PAD_X = 8;
@@ -197,12 +201,14 @@ function CategoryComparisonSections({
   categoryPodiums,
   slug,
   year,
+  mode,
   youBallotHref,
 }: {
   matrix: EditionCategoryComparisonMatrix;
   categoryPodiums: EditionCategoryStandingBlock[];
   slug: string;
   year: number;
+  mode: EditionResultsPublicMode;
   youBallotHref: string | null;
 }) {
   if (!matrix.hasGames || matrix.rows.length === 0) {
@@ -226,6 +232,19 @@ function CategoryComparisonSections({
             label={row.label}
             description={descriptions.get(row.categoryId) ?? null}
             showRule={index > 0}
+            action={
+              <Link
+                href={editionCategoryStandingsHref(
+                  slug,
+                  year,
+                  row.categoryId,
+                  { mode },
+                )}
+                className="text-sm text-accent hover:underline"
+              >
+                Full standings
+              </Link>
+            }
           />
           <CategoryComparisonStrip
             row={row}
@@ -243,8 +262,14 @@ function CategoryComparisonSections({
 
 /** Per-award Top 3 on one line; overflow uses HorizontalScroll. */
 function CategoryRankedSections({
+  slug,
+  year,
+  mode,
   categories,
 }: {
+  slug: string;
+  year: number;
+  mode: EditionResultsPublicMode;
   categories: EditionCategoryStandingBlock[];
 }) {
   if (categories.length === 0) {
@@ -264,6 +289,19 @@ function CategoryRankedSections({
             label={cat.label}
             description={cat.description}
             showRule={index > 0}
+            action={
+              <Link
+                href={editionCategoryStandingsHref(
+                  slug,
+                  year,
+                  cat.categoryId,
+                  { mode },
+                )}
+                className="text-sm text-accent hover:underline"
+              >
+                Full standings
+              </Link>
+            }
           />
           {cat.rows.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
@@ -308,7 +346,7 @@ function CategoryRankedSections({
 export function EditionCategoriesHighlights({
   slug,
   year,
-  categoriesHref,
+  mode = "community",
   categoryPodiums,
   categoryComparison,
   youBallotHref = null,
@@ -316,7 +354,7 @@ export function EditionCategoriesHighlights({
 }: {
   slug: string;
   year: number;
-  categoriesHref: string;
+  mode?: EditionResultsPublicMode;
   categoryPodiums: EditionCategoryStandingBlock[];
   categoryComparison: EditionCategoryComparisonMatrix;
   youBallotHref?: string | null;
@@ -331,17 +369,9 @@ export function EditionCategoriesHighlights({
   return (
     <section>
       <SectionRule className="mb-6" />
-      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <h3 className="font-display text-3xl tracking-wide text-ink">
-          Categories
-        </h3>
-        <Link
-          href={categoriesHref}
-          className="text-sm text-accent hover:underline"
-        >
-          Full category results
-        </Link>
-      </div>
+      <h3 className="font-display text-3xl tracking-wide text-ink">
+        Categories
+      </h3>
 
       {layout === "comparison" ? (
         <CategoryComparisonSections
@@ -349,10 +379,16 @@ export function EditionCategoriesHighlights({
           categoryPodiums={categories}
           slug={slug}
           year={year}
+          mode={mode}
           youBallotHref={youBallotHref}
         />
       ) : (
-        <CategoryRankedSections categories={categories} />
+        <CategoryRankedSections
+          slug={slug}
+          year={year}
+          mode={mode}
+          categories={categories}
+        />
       )}
     </section>
   );

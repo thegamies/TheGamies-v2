@@ -227,8 +227,8 @@ function placeMotionWindow(
   if (beat < 0) return null;
 
   const n = order.length;
-  // Hold the final board; each place gets its own beat (no early overlap).
-  const dwellTail = n <= 1 ? 0.3 : n === 2 ? 0.18 : 0.12;
+  // Hold the final board (usually #1) before exit; each place gets its own beat.
+  const dwellTail = n <= 1 ? 0.38 : n === 2 ? 0.28 : 0.22;
   const motionSpan = Math.max(
     0.24,
     CATEGORY_REVEAL_EXIT_AT - CATEGORY_REVEAL_INTRO_AT - dwellTail,
@@ -375,8 +375,8 @@ export function categoryRevealPlaceTranslateX(
 /** Scroll units for one award — scales with how many podium places it has. */
 export function categoryRevealAwardScrollUnits(placeCount: number): number {
   const n = Math.max(1, Math.min(3, Math.floor(placeCount)));
-  // Extra scroll for full podiums so each rank can finish before the next.
-  return n === 1 ? 0.78 : n === 2 ? 1.2 : 1.7;
+  // Extra scroll for full podiums so each rank can finish, then linger on #1.
+  return n === 1 ? 0.88 : n === 2 ? 1.35 : 1.9;
 }
 
 /**

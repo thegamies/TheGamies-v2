@@ -185,6 +185,7 @@ export function DatePicker({
   required = false,
   placeholder = "Pick a date",
   className = "",
+  anchorYear,
   "aria-label": ariaLabel,
   onChange,
 }: {
@@ -197,6 +198,8 @@ export function DatePicker({
   required?: boolean;
   placeholder?: string;
   className?: string;
+  /** When unset, open this calendar year (past event years). */
+  anchorYear?: number;
   "aria-label"?: string;
   onChange: (next: string) => void;
 }) {
@@ -264,6 +267,7 @@ export function DatePicker({
             value={value}
             min={min}
             max={max}
+            anchorYear={anchorYear}
             onPick={(iso) => {
               onChange(iso);
               setOpen(false);

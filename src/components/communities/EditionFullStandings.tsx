@@ -26,18 +26,24 @@ export function EditionFullStandings({
   mode,
   rankMode = "competition",
   totalGames,
+  initialRows,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
   rankMode?: SharedRankMode;
   totalGames: number;
+  /** When set, render these rows and skip the published standings API. */
+  initialRows?: EditionGotyStandingRow[];
 }) {
+  const ssrOnly = initialRows != null;
   const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const displayRows = ssrOnly ? initialRows : rows;
 
   async function fetchPage(nextPage: number): Promise<StandingsPayload> {
     const params = new URLSearchParams({
@@ -54,6 +60,7 @@ export function EditionFullStandings({
   }
 
   useEffect(() => {
+    if (ssrOnly) return;
     let cancelled = false;
     startTransition(async () => {
       setRows([]);
@@ -75,7 +82,7 @@ export function EditionFullStandings({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- board identity only
-  }, [slug, year, mode, rankMode]);
+  }, [slug, year, mode, rankMode, ssrOnly]);
 
   function loadMore() {
     startTransition(async () => {
@@ -116,27 +123,26 @@ export function EditionFullStandings({
 
       {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
 
-      {rows.length === 0 && pending ? (
+      {displayRows.length === 0 && pending ? (
         <p className="mt-6 text-sm text-muted">Loading standings…</p>
       ) : null}
 
-      {rows.length > 0 ? (
+      {displayRows.length > 0 ? (
         <>
           <StandingGameCardGrid>
-            {rows.map((row) => (
+            {displayRows.map((row) => (
               <li key={row.gameId}>
                 <StandingGameCard
                   place={row.rank}
                   slug={row.slug}
                   title={row.title}
                   coverUrl={row.coverUrl}
-                  year={row.year}
                   points={row.points}
                 />
               </li>
             ))}
           </StandingGameCardGrid>
-          {page < totalPages ? (
+          {!ssrOnly && page < totalPages ? (
             <div className="mt-8">
               <button
                 type="button"
@@ -147,6 +153,12 @@ export function EditionFullStandings({
                 {pending ? "Loading…" : "Load more"}
               </button>
             </div>
+          ) : null}
+          {ssrOnly && displayRows.length < totalGames ? (
+            <p className="mt-6 text-sm text-muted">
+              Showing the first {displayRows.length} of {totalGames}. The full
+              board opens when results publish.
+            </p>
           ) : null}
         </>
       ) : null}

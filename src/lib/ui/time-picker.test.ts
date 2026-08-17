@@ -14,6 +14,8 @@ import {
   addMinutesToDateTime,
   wrapLoopScrollTop,
   loopSelectedTopOffset,
+  mergeIsoDateAndTime,
+  clampIsoDateTime,
 } from "./time-picker";
 
 describe("time-picker", () => {
@@ -69,5 +71,30 @@ describe("time-picker", () => {
     expect(wrapLoopScrollTop(cycle * 2 + 40, cycle)).toBe(cycle + 40);
     expect(loopSelectedTopOffset(0, 12, 32)).toBe(12 * 32);
     expect(loopSelectedTopOffset(5, 12, 32)).toBe((12 + 5) * 32);
+  });
+
+  it("merges date and time into datetime-local values", () => {
+    expect(mergeIsoDateAndTime("", "18:30", { hours: 9, minutes: 0 })).toBe("");
+    expect(
+      mergeIsoDateAndTime("2026-11-01", "18:30", { hours: 9, minutes: 0 }),
+    ).toBe("2026-11-01T18:30");
+    expect(
+      mergeIsoDateAndTime("2026-11-01", "", { hours: 9, minutes: 15 }),
+    ).toBe("2026-11-01T09:15");
+  });
+
+  it("clamps datetime values on the same day as the bound", () => {
+    expect(
+      clampIsoDateTime("2026-11-01T10:00", "2026-11-01T18:00"),
+    ).toBe("2026-11-01T18:00");
+    expect(
+      clampIsoDateTime("2026-10-31T10:00", "2026-11-01T18:00"),
+    ).toBeNull();
+    expect(
+      clampIsoDateTime("2026-11-02T10:00", "2026-11-01T18:00"),
+    ).toBe("2026-11-02T10:00");
+    expect(clampIsoDateTime("2026-11-01T18:00", "2026-11-01T10:00")).toBe(
+      "2026-11-01T18:00",
+    );
   });
 });

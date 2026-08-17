@@ -252,6 +252,7 @@ export function EditionBallotEditor({
           value={categoryVotes}
           onChange={setCategoryVotes}
           year={year}
+          catalogMode="fixed"
           description="Choose one game per category for this event."
         />
       ) : null}

@@ -1,30 +1,30 @@
-"use client";
-
-import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
+import { type ReactNode } from "react";
 import {
   StandingGameCard,
   StandingGameCardGrid,
+  standingStripColClass,
+  standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionCategoryMeta,
+  EditionCategoryStandingBlock,
   EditionCategoryStandingRow,
 } from "@/lib/communities/edition-results";
-import type { EditionResultsPublicMode, SharedRankMode } from "@/lib/communities/edition-results-scoring";
-
-type CategoryPagePayload = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  rows: EditionCategoryStandingRow[];
-};
+import {
+  editionCategoryStandingsHref,
+  editionResultsHref,
+} from "@/lib/communities/edition-results-href";
+import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
 
 function CategoryChapterHeader({
   label,
   description,
   showRule,
   compact = false,
+  action,
 }: {
   label: string;
   description?: string | null;
@@ -32,24 +32,26 @@ function CategoryChapterHeader({
   showRule?: boolean;
   /** Tighter type + rule for GOTY rank chapters. */
   compact?: boolean;
+  action?: ReactNode;
 }) {
   return (
     <header>
       {showRule ? (
-        <SectionRule
-          className={compact ? "mb-3" : "mb-5 sm:mb-6"}
-        />
+        <SectionRule className={compact ? "mb-3" : "mb-5 sm:mb-6"} />
       ) : null}
 
-      <h3
-        className={
-          compact
-            ? "line-clamp-2 font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl"
-            : "line-clamp-2 font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl"
-        }
-      >
-        {label}
-      </h3>
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+        <h3
+          className={
+            compact
+              ? "line-clamp-2 font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl"
+              : "line-clamp-2 font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl"
+          }
+        >
+          {label}
+        </h3>
+        {action}
+      </div>
       {description ? (
         <p
           className={
@@ -67,102 +69,64 @@ function CategoryChapterHeader({
 
 export { CategoryChapterHeader };
 
-function CategoryFullBoard({
+/** Paginated cover-card tallies for one award (`?view=category`). */
+export function EditionCategoryDetail({
   slug,
   year,
   mode,
-  rankMode = "competition",
   category,
-  index,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  rows,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
-  rankMode?: SharedRankMode;
   category: EditionCategoryMeta;
-  index: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  rows: EditionCategoryStandingRow[];
 }) {
-  const [rows, setRows] = useState<EditionCategoryStandingRow[]>([]);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  async function fetchPage(nextPage: number): Promise<CategoryPagePayload> {
-    const params = new URLSearchParams({
-      mode,
-      categoryId: category.categoryId,
-      page: String(nextPage),
-    });
-    const res = await fetch(
-      `/api/communities/${encodeURIComponent(slug)}/edition/${year}/categories?${params}`,
-    );
-    if (!res.ok) throw new Error("Could not load category results.");
-    return (await res.json()) as CategoryPagePayload;
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    startTransition(async () => {
-      setRows([]);
-      setPage(0);
-      setError(null);
-      try {
-        const data = await fetchPage(1);
-        if (cancelled) return;
-        setPage(data.page);
-        setTotalPages(data.totalPages);
-        setRows(data.rows);
-      } catch {
-        if (!cancelled) {
-          setError("Could not load category results. Try again.");
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- board + category identity
-  }, [slug, year, mode, rankMode, category.categoryId]);
-
-  function loadMore() {
-    startTransition(async () => {
-      try {
-        setError(null);
-        const data = await fetchPage(page + 1);
-        setPage(data.page);
-        setTotalPages(data.totalPages);
-        setRows((prev) => [...prev, ...data.rows]);
-      } catch {
-        setError("Could not load more results. Try again.");
-      }
-    });
-  }
+  const categoriesHref = editionResultsHref(slug, year, {
+    mode,
+    view: "categories",
+  });
+  const rangeFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, total);
 
   return (
-    <article className={index === 0 ? undefined : "mt-8 sm:mt-10"}>
-      <CategoryChapterHeader
-        label={category.label}
-        description={category.description}
-        showRule={index > 0}
-      />
-      <p className="mt-2 text-sm text-muted">
-        {category.total} game{category.total === 1 ? "" : "s"}
-      </p>
+    <section>
+      <Link
+        href={categoriesHref}
+        className="text-sm text-muted transition-colors hover:text-accent"
+      >
+        ← Categories
+      </Link>
+      <div className="mt-4">
+        <CategoryChapterHeader
+          label={category.label}
+          description={category.description}
+        />
+        <p className="mt-2 text-sm text-muted">
+          {category.total} game{category.total === 1 ? "" : "s"}
+        </p>
+      </div>
 
-      {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
-
-      {rows.length === 0 && pending ? (
-        <p className="mt-6 text-sm text-muted">Loading…</p>
-      ) : null}
-
-      {rows.length > 0 ? (
+      {rows.length === 0 ? (
+        <p className="mt-6 text-sm text-muted">
+          No scores for this award yet.
+        </p>
+      ) : (
         <>
           <StandingGameCardGrid>
             {rows.map((row) => (
               <li key={row.gameId}>
-                  <StandingGameCard
-                    place={row.rank}
+                <StandingGameCard
+                  place={row.rank}
                   slug={row.slug}
                   title={row.title}
                   coverUrl={row.coverUrl}
@@ -172,39 +136,74 @@ function CategoryFullBoard({
               </li>
             ))}
           </StandingGameCardGrid>
-          {page < totalPages ? (
-            <div className="mt-8">
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={pending}
-                className="border border-line px-3 py-2 text-sm text-ink hover:border-accent disabled:opacity-60"
-              >
-                {pending ? "Loading…" : "Load more"}
-              </button>
-            </div>
+          {totalPages > 1 ? (
+            <nav
+              className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 text-sm"
+              aria-label="Category standings pages"
+            >
+              <p className="text-muted">
+                {rangeFrom}–{rangeTo} of {total} · page {page} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                {page > 1 ? (
+                  <Link
+                    href={editionCategoryStandingsHref(
+                      slug,
+                      year,
+                      category.categoryId,
+                      { mode, page: page - 1 },
+                    )}
+                    className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
+                  >
+                    Previous
+                  </Link>
+                ) : (
+                  <span className="border border-line px-3 py-1.5 text-muted/50">
+                    Previous
+                  </span>
+                )}
+                {page < totalPages ? (
+                  <Link
+                    href={editionCategoryStandingsHref(
+                      slug,
+                      year,
+                      category.categoryId,
+                      { mode, page: page + 1 },
+                    )}
+                    className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="border border-line px-3 py-1.5 text-muted/50">
+                    Next
+                  </span>
+                )}
+              </div>
+            </nav>
           ) : null}
         </>
-      ) : null}
-    </article>
+      )}
+    </section>
   );
 }
 
-/** Categories tab: paginated cover-card grids (10 per page). */
+/** Categories tab: top 3 per award + link to full category standings. */
 export function EditionCategoryResults({
   slug,
   year,
   mode,
-  rankMode = "competition",
-  categories,
+  categoryPodiums,
+  showFullStandingsLinks = true,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
-  rankMode?: SharedRankMode;
-  categories: EditionCategoryMeta[];
+  categoryPodiums: EditionCategoryStandingBlock[];
+  /** Host closed preview: hide links to unpublished category detail. */
+  showFullStandingsLinks?: boolean;
 }) {
-  if (categories.length === 0) {
+  if (categoryPodiums.length === 0) {
     return (
       <section>
         <h3 className="font-display text-3xl tracking-wide text-ink">
@@ -222,21 +221,68 @@ export function EditionCategoryResults({
       <h3 className="font-display text-3xl tracking-wide text-ink">
         Categories
       </h3>
-      <p className="mt-2 max-w-xl text-sm text-muted">
-        Full tallies as cover cards — 10 at a time per award.
-      </p>
       <div className="mt-8">
-        {categories.map((cat, index) => (
-          <CategoryFullBoard
-            key={cat.categoryId}
-            slug={slug}
-            year={year}
-            mode={mode}
-            rankMode={rankMode}
-            category={cat}
-            index={index}
-          />
-        ))}
+        {categoryPodiums.map((cat, index) => {
+          const fullHref = editionCategoryStandingsHref(
+            slug,
+            year,
+            cat.categoryId,
+            { mode },
+          );
+          return (
+            <article
+              key={cat.categoryId}
+              className={index === 0 ? undefined : "mt-8 sm:mt-10"}
+            >
+              <CategoryChapterHeader
+                label={cat.label}
+                description={cat.description}
+                showRule={index > 0}
+                action={
+                  showFullStandingsLinks ? (
+                    <Link
+                      href={fullHref}
+                      className="text-sm text-accent hover:underline"
+                    >
+                      View full category standings
+                    </Link>
+                  ) : null
+                }
+              />
+              {cat.rows.length === 0 ? (
+                <p className="mt-4 text-sm text-muted">
+                  No scores for this award yet.
+                </p>
+              ) : (
+                <HorizontalScroll
+                  className="mt-4"
+                  label={`${cat.label} ranked`}
+                >
+                  <ul className={standingStripListClass}>
+                    {cat.rows.map((row) => (
+                      <li
+                        key={row.gameId}
+                        className={standingStripColClass(row.rank === 1)}
+                      >
+                        <StandingGameCard
+                          place={row.rank}
+                          placeSize="lg"
+                          slug={row.slug}
+                          title={row.title}
+                          coverUrl={row.coverUrl}
+                          points={row.votes}
+                          scoreUnit="votes"
+                          priority={row.rank === 1}
+                          pinCover
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </HorizontalScroll>
+              )}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

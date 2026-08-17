@@ -91,22 +91,22 @@ Rules:
 - Tertiary never uses boxes or underlines — text weight alone
 - Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
-- Community Settings Events uses the same year select (shown even for a single year) plus **Open event**, which opens that year on the event page with Settings selected.
+- Community Settings → Events lists every year with status and host links (Edition settings / Manage hosts / Host preview). Year switching on the public event page stays `EditionYearSelect`.
 - Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY. Category group filter is a single pop-open button with an **All** option; search filters chapters by name. Each chapter shows top-3 ranks in a horizontal strip, vote totals, and links to full category standings (`?view=category&category=`).
 
 ## Controls
 
 `Button` — accent / bordered / quiet / **danger** / **danger-bordered**. Danger is only for irreversible destroy (delete event). Trigger uses `danger-bordered`; the confirm action uses filled `danger`. Do not use `--accent` orange for delete. `Radio` — native radio, restyled: empty `--line` ring, `--accent` fill when selected (brand orange, not the browser default). `RadioOption` — label + optional hint row for settings. Do not use unstyled platform radios in product UI.
 
-`DatePicker` — button trigger (no text entry) with a branded calendar mark: `--accent` header bar, `--paper` rings, `--ink` day ticks. Opens a month grid in `--panel` with a hard `--line` border. Selected day uses `--accent`; today gets an accent ring; `min` / `max` disable out-of-range days. Hidden input when `name` is set. Do not use native `<input type="date">` in product UI.
+`DatePicker` — button trigger (no text entry) with a branded calendar mark: `--accent` header bar, `--paper` rings, `--ink` day ticks. Opens a month grid in `--panel` with a hard `--line` border. Selected day uses `--accent`; today gets an accent ring; `min` / `max` disable out-of-range days. Hidden input when `name` is set. Event schedule pairs this with `TimePicker`. Do not use native `<input type="date">` in product UI.
 
 `YearPicker` — same trigger language, calendar mark, year number on the button. Opens a 12-year grid with prev/next and focuses the selected year. Selected year uses `--accent`; the current year gets an accent ring. `min` / `max` default 1970–2100; `disabledYears` greys out taken years. Use for create-event year, create-list year (GOTY and optional custom), and GOTY year in list settings. Do not use a number input for calendar years.
 
-`TimePicker` — button trigger (no text entry) with a branded clock mark. Opens hour / minute / AM·PM wheels (`TimePanel`). Value is `HH:mm`. Use when time is independent of date.
+`TimePicker` — button trigger (no text entry) with a branded clock mark. Opens hour / minute / AM·PM wheels (`TimePanel`). Value is `HH:mm`. Use when time is independent of date. Event schedule rows compose `DatePicker` + `TimePicker` plus **Set to now**.
 
-`DateTimePicker` — button trigger (no text entry) showing date and time, branded calendar mark. Click the field or icon to open a side-by-side panel: month grid + hour / minute / AM·PM. Hour and minute are infinite vertical wheels; the selected (or current) time sits at the top on open. AM/PM is top-aligned. Time pane is only as wide as the columns. Selected day and time use `--accent`. `min` / `max` as `YYYY-MM-DDTHH:mm`. Opens has no `min` — past dates are allowed. When empty, `anchorYear` opens the grid on that event year. Use for event schedule. Date-only fields (live scores) keep `DatePicker`.
+`DateTimePicker` — button trigger (no text entry) showing date and time, branded calendar mark. Click the field or icon to open a side-by-side panel: month grid + hour / minute / AM·PM. Hour and minute are infinite vertical wheels; the selected (or current) time sits at the top on open. AM/PM is top-aligned. Time pane is only as wide as the columns. Selected day and time use `--accent`. `min` / `max` as `YYYY-MM-DDTHH:mm`. Kept for gallery / combined cases. Event schedule uses split date + time pickers instead.
 
-`Dialog` — dimmed overlay (`bg-black/50`) + `--panel` surface with a display title and ✕ close. Escape, the close control, and clicking the dimmed edge close it. Default: `--line` border, ink title (create event). `tone="danger"`: `--danger` border and title. Confirm with filled `danger`; cancel stays bordered. Event delete also requires typing the year. Do not invent a second modal chrome.
+`Dialog` — dimmed overlay (`bg-black/50`) + `--panel` surface with a display title and ✕ close. Escape, the close control, and clicking the dimmed edge close it. Default (`placement="modal"`): `--line` border, ink title. `tone="danger"`: `--danger` border and title. `placement="contained"`: centered like a modal, capped to the viewport (`max-h`), sticky title, scrolling body — use for tall pickers (Add categories). Confirm with filled `danger`; cancel stays bordered. Event delete also requires typing the year. Do not invent a second modal chrome.
 
 ## Section rule
 
@@ -159,8 +159,9 @@ Open voting uses the same primitives on events and personal GOTY lists.
 | GOTY ranking | Wrapping cover grid (`BallotRankGrid`); place in front of the title; drag to reorder while open; cap 10. Closed / Your ballot uses the same grid |
 | `CategoryVoteHeading` | Display category name (`text-2xl`) + optional description |
 | `CategoryPickCard` | Large cover (`w-28` / `sm:w-32`) + heading + picked title + optional **Clear** |
-| `CategoryVotesEditor` | Added awards: search + standings-style group filter + **Add category** (top and bottom). Empty heading + `GameSearchField`, or `CategoryPickCard`. Catalog grid opens in a `Dialog` with its own search + group filter. Eligibility copy only when it is not current year. List editor may pass `locked` + sign-in CTA for signed-out visitors. |
-| `PinnedSaveBar` | After an edit: `--panel` band pinned to the viewport bottom with Save. Hidden when clean. List editor and edition ballot reuse this — do not invent a second sticky save. |
+| `CategoryVotesEditor` | Award picks editor. **Site GOTY** (`catalogMode="optional"`, default): search + group filter + **Add category** dialog. **Edition ballots** (`catalogMode="fixed"`): every event award is listed; no add/remove. Empty slot + `GameSearchField`, or `CategoryPickCard`. List editor may pass `locked` + sign-in CTA for signed-out visitors. |
+| `CategoryPickerGrid` | Shared award grid: search + group filter + square tiles. **Site GOTY** Add-category dialog: unused awards, select adds and closes. **Create event / Edition settings** contained dialog: full catalog, selected tiles stay with **Added**, tap again to unselect; dialog stays open for multi-select. |
+| `PinnedSaveBar` | After an edit: `--panel` band pinned to the viewport bottom with Save. Hidden when clean. List editor, edition ballot, and **Edition settings** reuse this — do not invent a second sticky save. |
 | Leave guard | `useUnsavedChangesGuard` — in-app **Unsaved changes** dialog (Stay / Leave). Tab close uses the browser prompt |
 
 Do not invent a second search dropdown, a smaller one-off category thumbnail, or a second sticky save treatment.

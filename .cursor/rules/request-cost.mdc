@@ -5,26 +5,31 @@ alwaysApply: true
 
 # Request cost (compute · egress · scale)
 
-Before freezing data, caching, or serving lists, ask how the **hot path** behaves under load—not only what the UI shows.
+Before freezing data, caching, **searching**, or serving lists, ask how the **hot path** behaves under load—not only what the UI shows. Full guide: `docs/request-cost.md`.
 
 ## Check every read path
 
-1. **DB egress** — Does one page view pull a whole blob / full table when it only needs a page?
+1. **DB egress** — Does one page view pull a whole blob / full table / full roster when it only needs a page?
 2. **Compute** — Parse/serialize cost on Vercel and Cloudflare Workers for that payload size.
-3. **Scaling** — What happens at 10× voters/games/traffic? Same pattern still cheap?
+3. **Scaling** — What happens at 10× members/voters/games/traffic? Same pattern still cheap?
 
 ## Prefer
 
-- Normalized rows + `LIMIT`/`OFFSET` (or keyset) for boards and voter lists
-- Small meta rows; join catalog tables when freeze immutability allows
-- Client receives only the page it renders
+- Normalized rows + `LIMIT`/`OFFSET` (or keyset) for **any** list that can grow
+- Default views that are small and purposeful (current Hosts, first page)—still capped
+- **Search in SQL** (`ILIKE` + hit cap). Blank query → no dump; show the default set
+- Client receives only the page/hits it renders
+- Same rules on host/admin/settings as on public boards
+- After a one-row write: optimistic UI + narrow revalidate, not a full-collection reload
 
 ## Avoid
 
-- Fat `jsonb` (or equivalent) snapshots that force full read+parse per request just to slice in memory
-- “Pagination in the UI” that still loads everything server-side
+- Fat `jsonb` snapshots that force full read+parse per request just to slice in memory
+- “Pagination in the UI” or “search in the UI” that still loads everything server-side
+- Unbounded `SELECT` (“load all members/games, the client will filter”)
+- Revalidating the whole community after a single roster/category row change
 
 ## Related
 
 - Live lock and edition freeze: store paged standings as rows, not one giant payload
-- Broader notes: `docs/engineering.md` → Request cost
+- `docs/request-cost.md` · `docs/engineering.md` → Request cost

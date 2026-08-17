@@ -1209,11 +1209,15 @@ function CeremonySummary({
   communityName,
   topTen,
   categoryPodiums,
+  resultsHref,
+  continueLabel,
 }: {
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
+  resultsHref: string;
+  continueLabel: string;
 }) {
   const gotyAsc = [...topTen]
     .filter((r) => r.rank >= 1 && r.rank <= 10)
@@ -1335,9 +1339,29 @@ function CeremonySummary({
           </div>
         ) : null}
 
-        <p className="mt-12 font-serif text-sm text-muted">
-          Continue in Results for the full board.
-        </p>
+        <nav
+          className="mt-12 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+          aria-label="After the reveal"
+        >
+          <Link
+            href={resultsHref}
+            className="font-semibold text-accent hover:underline"
+          >
+            {continueLabel}
+          </Link>
+          <span className="text-muted" aria-hidden>
+            ·
+          </span>
+          <button
+            type="button"
+            className="text-muted transition-colors hover:text-ink"
+            onClick={() => {
+              window.scrollTo({ top: 0, behavior: "smooth" });
+            }}
+          >
+            Return to top
+          </button>
+        </nav>
       </div>
     </section>
   );
@@ -1364,7 +1388,7 @@ function RevealOpener({
       </div>
       <div className="relative mx-auto max-w-xl text-center">
         <h2 className="font-display text-[clamp(2.15rem,8.5vw,2.85rem)] leading-[0.95] tracking-wide text-ink">
-          Welcome to the {communityName} community {year} Game of the Year
+          Welcome to the {communityName} community {year} Video Game Awards
         </h2>
         <p className="mt-4 font-serif text-base leading-relaxed text-muted sm:text-lg">
           A countdown of the top 10, then the category awards.
@@ -1391,11 +1415,15 @@ export function EditionRevealView({
   communityName,
   topTen,
   categoryPodiums,
+  resultsHref,
+  continueLabel = "Continue to full results",
 }: {
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
+  resultsHref: string;
+  continueLabel?: string;
 }) {
   const categories = useEditionCategoryPodiums(categoryPodiums);
   const gotyDesc = groupByRank(
@@ -1455,6 +1483,8 @@ export function EditionRevealView({
           communityName={communityName}
           topTen={topTen}
           categoryPodiums={categories}
+          resultsHref={resultsHref}
+          continueLabel={continueLabel}
         />
       </div>
     </ReducedMotionProvider>

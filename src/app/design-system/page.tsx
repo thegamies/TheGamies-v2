@@ -227,8 +227,10 @@ export default function DesignSystemPage() {
           Helpers: <code className="text-ink">YearPicker</code>,{" "}
           <code className="text-ink">DatePicker</code>,{" "}
           <code className="text-ink">TimePicker</code>,{" "}
-          <code className="text-ink">DateTimePicker</code>.{" "}
-          <code className="text-ink">Dialog</code> for create;{" "}
+          <code className="text-ink">DateTimePicker</code>. Event schedule
+          uses split date and time.{" "}
+          <code className="text-ink">Dialog</code> modal or{" "}
+          <code className="text-ink">{`placement="contained"`}</code>;{" "}
           <code className="text-ink">{`tone="danger"`}</code> for delete.
         </p>
         <DatePickerFixture />

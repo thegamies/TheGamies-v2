@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, or, sql } from "drizzle-orm";
 import {
   communities,
   communityMembers,
@@ -161,12 +161,26 @@ export async function getCommunityBySlug(
 export async function listCommunityMembersPage(
   communityId: string,
   pageRaw: number,
-  db: Db = getDb(),
+  opts: { q?: string; db?: Db } = {},
 ): Promise<CommunityMembersPage> {
+  const db = opts.db ?? getDb();
+  const q = opts.q?.trim() ?? "";
+  const search =
+    q.length > 0
+      ? or(
+          sql`${profiles.displayName} ILIKE ${`%${q}%`}`,
+          sql`${profiles.username} ILIKE ${`%${q}%`}`,
+        )
+      : undefined;
+  const where = search
+    ? and(eq(communityMembers.communityId, communityId), search)
+    : eq(communityMembers.communityId, communityId);
+
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(communityMembers)
-    .where(eq(communityMembers.communityId, communityId));
+    .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
+    .where(where);
   const total = Number(countRow?.n ?? 0);
   const { page, offset, totalPages } = paginateCommunityMembers(
     pageRaw,
@@ -183,7 +197,7 @@ export async function listCommunityMembersPage(
     })
     .from(communityMembers)
     .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
-    .where(eq(communityMembers.communityId, communityId))
+    .where(where)
     .orderBy(asc(profiles.displayName), asc(profiles.username))
     .limit(COMMUNITY_MEMBERS_PAGE_SIZE)
     .offset(offset);

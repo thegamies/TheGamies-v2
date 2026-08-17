@@ -10,6 +10,7 @@ import {
   editionOverviewStatusLabel,
   editionOverviewTitle,
   editionScheduleDateBounds,
+  editionScheduleFieldNotice,
   editionScheduleSaveWarning,
   editionStatusLabel,
   formatEditionDateInput,
@@ -22,7 +23,7 @@ import {
   showEditionNav,
   validateEditionSchedule,
 } from "./edition-status";
-import { pickFeaturedEdition, type CommunityEditionPublic } from "./editions";
+import { pickFeaturedEdition, pickOverviewEditions, parseEditionCreateRankMode, type CommunityEditionPublic } from "./editions";
 
 describe("computeEditionStatus", () => {
   const opensAt = new Date("2026-11-01T00:00:00.000Z");
@@ -209,6 +210,73 @@ describe("editionScheduleSaveWarning", () => {
   });
 });
 
+describe("editionScheduleFieldNotice", () => {
+  it("stays quiet until a field is filled", () => {
+    expect(
+      editionScheduleFieldNotice({
+        opens: "",
+        closes: "",
+        publishes: "",
+        previousStatus: "draft",
+      }),
+    ).toBeNull();
+  });
+
+  it("points missing times at the first empty field", () => {
+    expect(
+      editionScheduleFieldNotice({
+        opens: "",
+        closes: "2026-08-18T09:00",
+        publishes: "2026-08-19T09:00",
+        previousStatus: "draft",
+      }),
+    ).toMatchObject({ field: "opens", tone: "error" });
+  });
+
+  it("points order errors at closes or publishes", () => {
+    expect(
+      editionScheduleFieldNotice({
+        opens: "2026-08-18T09:00",
+        closes: "2026-08-17T09:00",
+        publishes: "2026-08-19T09:00",
+        previousStatus: "draft",
+      }),
+    ).toMatchObject({ field: "closes", tone: "error" });
+    expect(
+      editionScheduleFieldNotice({
+        opens: "2026-08-17T09:00",
+        closes: "2026-08-19T09:00",
+        publishes: "2026-08-18T09:00",
+        previousStatus: "draft",
+      }),
+    ).toMatchObject({ field: "publishes", tone: "error" });
+  });
+
+  it("does not block draft → scheduled", () => {
+    expect(
+      editionScheduleFieldNotice({
+        opens: "2026-11-01T09:00",
+        closes: "2026-12-01T09:00",
+        publishes: "2026-12-15T09:00",
+        previousStatus: "draft",
+        now: new Date("2026-10-01T00:00:00"),
+      }),
+    ).toBeNull();
+  });
+
+  it("warns on the field that would change live status", () => {
+    expect(
+      editionScheduleFieldNotice({
+        opens: "2026-08-01T09:00",
+        closes: "2026-12-01T09:00",
+        publishes: "2026-12-15T09:00",
+        previousStatus: "scheduled",
+        now: new Date("2026-08-17T12:00:00"),
+      }),
+    ).toMatchObject({ field: "opens", tone: "warning" });
+  });
+});
+
 describe("editionDeleteConfirmMatches", () => {
   it("requires the exact year", () => {
     expect(editionDeleteConfirmMatches(2026, "2026")).toBe(true);
@@ -227,6 +295,22 @@ describe("editionBallotCountCopy", () => {
   });
 });
 
+describe("parseEditionCreateRankMode", () => {
+  it("defaults new events to dense", () => {
+    expect(parseEditionCreateRankMode(undefined)).toBe("dense");
+    expect(parseEditionCreateRankMode(null)).toBe("dense");
+    expect(parseEditionCreateRankMode("")).toBe("dense");
+    expect(parseEditionCreateRankMode("dense")).toBe("dense");
+  });
+
+  it("accepts competition and rejects other values", () => {
+    expect(parseEditionCreateRankMode("competition")).toBe("competition");
+    expect(parseEditionCreateRankMode("skip")).toEqual({
+      error: "Choose how tied games are numbered.",
+    });
+  });
+});
+
 describe("pickFeaturedEdition", () => {
   function edition(
     partial: Partial<CommunityEditionPublic> & {
@@ -241,6 +325,9 @@ describe("pickFeaturedEdition", () => {
       closesAt: null,
       publishesAt: null,
       rankMode: "competition",
+      freezeStatus: "idle",
+      freezeStartedAt: null,
+      freezeError: null,
       createdAt: new Date(),
       updatedAt: new Date(),
       ...partial,
@@ -263,5 +350,62 @@ describe("pickFeaturedEdition", () => {
         2026,
       )?.year,
     ).toBe(2024);
+  });
+});
+
+describe("pickOverviewEditions", () => {
+  function edition(
+    partial: Partial<CommunityEditionPublic> & {
+      year: number;
+      status: CommunityEditionPublic["status"];
+      createdAt: Date;
+    },
+  ): CommunityEditionPublic {
+    return {
+      id: String(partial.year),
+      communityId: "c",
+      opensAt: null,
+      closesAt: null,
+      publishesAt: null,
+      rankMode: "dense",
+      freezeStatus: "idle",
+      freezeStartedAt: null,
+      freezeError: null,
+      updatedAt: partial.createdAt,
+      ...partial,
+    };
+  }
+
+  it("orders open, coming soon, closed, results, then newest created", () => {
+    const older = new Date("2024-01-01T00:00:00Z");
+    const newer = new Date("2025-06-01T00:00:00Z");
+    const newest = new Date("2026-01-01T00:00:00Z");
+    const picked = pickOverviewEditions(
+      [
+        edition({ year: 2022, status: "published", createdAt: newer }),
+        edition({ year: 2023, status: "published", createdAt: newest }),
+        edition({ year: 2024, status: "scheduled", createdAt: older }),
+        edition({ year: 2025, status: "open", createdAt: older }),
+        edition({ year: 2021, status: "closed", createdAt: newer }),
+        edition({ year: 2020, status: "draft", createdAt: newest }),
+      ],
+      5,
+    );
+    expect(picked.map((e) => e.year)).toEqual([2025, 2024, 2021, 2023, 2022]);
+  });
+
+  it("returns at most three and skips drafts", () => {
+    const createdAt = new Date("2026-01-01T00:00:00Z");
+    const picked = pickOverviewEditions(
+      [
+        edition({ year: 2026, status: "open", createdAt }),
+        edition({ year: 2025, status: "scheduled", createdAt }),
+        edition({ year: 2024, status: "published", createdAt }),
+        edition({ year: 2023, status: "published", createdAt }),
+        edition({ year: 2022, status: "draft", createdAt }),
+      ],
+      3,
+    );
+    expect(picked.map((e) => e.year)).toEqual([2026, 2025, 2024]);
   });
 });

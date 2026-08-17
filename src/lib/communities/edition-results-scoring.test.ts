@@ -8,6 +8,7 @@ import {
   parseEditionResultsView,
   placeEditionCategoryTallies,
   placeEditionGotyTallies,
+  resolveEditionHostSettings,
   storageModeFor,
   type GameMeta,
 } from "./edition-results-scoring";
@@ -79,16 +80,69 @@ describe("editionResultsHref", () => {
 });
 
 describe("parseEditionResultsView", () => {
-  it("defaults to reveal and accepts results, overview, standings, categories, voters, ballot, and settings", () => {
+  it("defaults to reveal and accepts results views plus settings and show", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
-    expect(parseEditionResultsView("reveal")).toBe("reveal");
-    expect(parseEditionResultsView("overview")).toBe("overview");
-    expect(parseEditionResultsView("results")).toBe("overview");
-    expect(parseEditionResultsView("standings")).toBe("standings");
-    expect(parseEditionResultsView("categories")).toBe("categories");
-    expect(parseEditionResultsView("voters")).toBe("voters");
-    expect(parseEditionResultsView("ballot")).toBe("ballot");
     expect(parseEditionResultsView("settings")).toBe("settings");
+    expect(parseEditionResultsView("show")).toBe("show");
+    expect(parseEditionResultsView("hosts")).toBe("hosts");
+    expect(parseEditionResultsView("preview")).toBe("preview");
+  });
+
+  it("resolves settings panels and legacy host tool views", () => {
+    expect(resolveEditionHostSettings("settings", undefined)).toEqual({
+      view: "settings",
+      panel: "edition",
+    });
+    expect(resolveEditionHostSettings("settings", "hosts")).toEqual({
+      view: "settings",
+      panel: "hosts",
+    });
+    expect(resolveEditionHostSettings("settings", "preview")).toEqual({
+      view: "settings",
+      panel: "preview",
+    });
+    expect(resolveEditionHostSettings("hosts", undefined)).toEqual({
+      view: "settings",
+      panel: "hosts",
+    });
+    expect(resolveEditionHostSettings("preview", undefined)).toEqual({
+      view: "settings",
+      panel: "preview",
+    });
+  });
+});
+
+describe("parseEditionShowSource", () => {
+  it("defaults to demo and requires live for real freeze", async () => {
+    const { parseEditionShowSource } = await import("./edition-results-scoring");
+    expect(parseEditionShowSource(undefined)).toBe("demo");
+    expect(parseEditionShowSource("demo")).toBe("demo");
+    expect(parseEditionShowSource("live")).toBe("live");
+    expect(parseEditionShowSource("real")).toBe("demo");
+  });
+});
+
+describe("editionHostRevealShowHref", () => {
+  it("uses view=show and sets source=live for freeze", async () => {
+    const { editionHostRevealShowHref } = await import("./edition-results-href");
+    expect(editionHostRevealShowHref("demo", 2026)).toBe(
+      "/communities/demo/edition/2026?view=show",
+    );
+    expect(editionHostRevealShowHref("demo", 2026, { source: "live" })).toBe(
+      "/communities/demo/edition/2026?view=show&source=live",
+    );
+    expect(
+      editionHostRevealShowHref("demo", 2026, {
+        view: "overview",
+        source: "live",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=results&source=live");
+    expect(
+      editionHostRevealShowHref("demo", 2026, {
+        view: "standings",
+        source: "demo",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=standings");
   });
 });
 

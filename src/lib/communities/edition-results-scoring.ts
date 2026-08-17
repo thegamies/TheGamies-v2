@@ -19,15 +19,32 @@ export function editionBoardLabel(
   return mode === "voices" ? "Hosts" : "Community";
 }
 
-/** Ceremony narrative, full GOTY board, category awards, voters, viewer ballot, or host settings. */
+/** Ceremony / results / ballot / host settings shell. */
 export type EditionResultsViewId =
   | "reveal"
   | "overview"
   | "standings"
   | "categories"
+  | "category"
   | "voters"
   | "ballot"
-  | "settings";
+  | "settings"
+  /** Host results preview while closed (`?view=show` / results / standings / categories). */
+  | "show"
+  /** @deprecated Prefer `?view=settings&panel=hosts`. */
+  | "hosts"
+  /** @deprecated Prefer `?view=settings&panel=preview`. */
+  | "preview";
+
+/** Sub-tabs inside Event Settings (`?view=settings&panel=`). */
+export type EditionSettingsPanelId = "edition" | "hosts" | "preview";
+
+/** Host results preview data: placeholders vs real freeze (separate request). */
+export type EditionShowSource = "demo" | "live";
+
+export function parseEditionShowSource(raw: unknown): EditionShowSource {
+  return raw === "live" ? "live" : "demo";
+}
 
 /** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
@@ -50,11 +67,36 @@ export function parseEditionResultsView(
   if (raw === "overview" || raw === "results") return "overview";
   if (raw === "standings") return "standings";
   if (raw === "categories") return "categories";
+  if (raw === "category") return "category";
   if (raw === "voters") return "voters";
   if (raw === "ballot") return "ballot";
   if (raw === "settings") return "settings";
+  if (raw === "hosts") return "hosts";
+  if (raw === "preview") return "preview";
+  if (raw === "show") return "show";
   if (raw === "reveal") return "reveal";
   return "reveal";
+}
+
+export function parseEditionSettingsPanel(
+  raw: string | undefined,
+): EditionSettingsPanelId {
+  if (raw === "hosts") return "hosts";
+  if (raw === "preview") return "preview";
+  return "edition";
+}
+
+/** Normalize legacy `?view=hosts|preview` into settings + panel. */
+export function resolveEditionHostSettings(
+  view: EditionResultsViewId,
+  panelRaw: string | undefined,
+): { view: EditionResultsViewId; panel: EditionSettingsPanelId } {
+  if (view === "hosts") return { view: "settings", panel: "hosts" };
+  if (view === "preview") return { view: "settings", panel: "preview" };
+  if (view === "settings") {
+    return { view: "settings", panel: parseEditionSettingsPanel(panelRaw) };
+  }
+  return { view, panel: "edition" };
 }
 
 export type RankedBallotLine = {

@@ -304,7 +304,7 @@ export function EditionGotyHighlights({
   }
 
   return (
-    <section>
+    <section className="pb-8 sm:pb-10">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <h3 className="font-display text-3xl tracking-wide text-ink">
           Game of the Year

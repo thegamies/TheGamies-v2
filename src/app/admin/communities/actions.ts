@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import {
   clearCommunitySeeds,
+  clearEditionFreezeForAdmin,
   countCommunitySeeds,
   publishEditionForSeed,
   refreshPublishedEditionResultsForSeed,
@@ -113,6 +114,32 @@ export async function refreshCommunityEditionResultsAction(input: {
   revalidatePath(`/communities/${slug}/edition`);
   revalidatePath(`/communities/${slug}/edition/${year}`);
   return result;
+}
+
+export async function clearCommunityEditionFreezeAction(input: {
+  communitySlug: string;
+  year: number;
+}): Promise<{ ok: true; editionId: string; path: string } | { error: string }> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const result = await clearEditionFreezeForAdmin(
+    input.communitySlug,
+    input.year,
+  );
+  if ("error" in result) return result;
+
+  const slug = input.communitySlug.trim().toLowerCase();
+  const year = Math.floor(input.year);
+  revalidatePath("/admin/communities");
+  revalidatePath(`/communities/${slug}`);
+  revalidatePath(`/communities/${slug}/edition`);
+  revalidatePath(`/communities/${slug}/edition/${year}`);
+  return {
+    ok: true,
+    editionId: result.editionId,
+    path: `/communities/${slug}/edition/${year}`,
+  };
 }
 
 export async function clearCommunitySeedsAction(input: {

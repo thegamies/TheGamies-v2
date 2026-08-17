@@ -9,14 +9,24 @@ import {
 import { EditionBallotPreview } from "@/components/communities/EditionBallotPreview";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
+import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
 import {
   EditionResultsView,
-  EditionResultsViewNav,
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
+import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
 import { EditionYearSettings } from "@/components/communities/EditionYearSettings";
+import { EditionEventHostsPanel } from "@/components/communities/EditionEventHostsPanel";
+import type { AwardCategoryOption } from "@/components/lists/CategoryVotesEditor";
+import { EditionHostPreview } from "@/app/communities/[slug]/settings/EditionHostPreview";
+import { EditionHostResultsPreview } from "@/components/communities/EditionHostResultsPreview";
+import {
+  editionHostPreviewHref,
+} from "@/lib/communities/edition-results-href";
+import { buildEditionRevealDemoStandings } from "@/lib/communities/edition-reveal-demo";
+import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -29,13 +39,18 @@ import {
   canSubmitEditionBallot,
   countEditionSubmittedBallots,
   getEditionBallotForProfile,
+  getEditionBallotSubmittersPage,
   getLiveEditionVotersPage,
-  listEditionBallotSubmitters,
+  HOST_PREVIEW_PAGE_SIZE,
 } from "@/lib/communities/ballots";
 import {
   CATEGORY_RANKED_TOP,
+  CATEGORY_RESULTS_PAGE_SIZE,
   ensurePublishedEditionResults,
+  getEditionCategoryPage,
   getEditionCategoryResults,
+  getEditionComparisonBundle,
+  getEditionGotyPage,
   getEditionGotyThroughRank,
   getEditionResultsMeta,
   getEditionVotersPage,
@@ -43,10 +58,14 @@ import {
   listEditionCategoryMeta,
   parseEditionResultMode,
   parseEditionResultsView,
+  parseEditionShowSource,
+  resolveEditionHostSettings,
   type EditionBallotMatrix,
   type EditionCategoryComparisonMatrix,
   type EditionCategoryMeta,
   type EditionCategoryStandingBlock,
+  type EditionCategoryStandingRow,
+  type EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
 import {
   getEditionByCommunityYear,
@@ -57,8 +76,11 @@ import {
 import { showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { listMembersWithEditionVoiceFlags } from "@/lib/communities/voices";
-import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
+import { listEditionHostRoster } from "@/lib/communities/voices";
+import {
+  listEditionAwardCategories,
+  listEditionCategorySettings,
+} from "@/lib/communities/edition-categories";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { getOwnedGotyItemsForYear } from "@/lib/lists/service";
 
@@ -112,6 +134,18 @@ export default async function CommunityEditionYearPage({
       : 1;
   const votersQ = (first(sp.q) ?? "").trim();
   const voterUsername = (first(sp.voter) ?? "").trim();
+  const categoryId = (first(sp.category) ?? "").trim() || null;
+  const categoryPageRaw = Number(first(sp.page) ?? "1");
+  const categoryPageNum =
+    Number.isFinite(categoryPageRaw) && categoryPageRaw >= 1
+      ? Math.floor(categoryPageRaw)
+      : 1;
+  const previewPageRaw = Number(first(sp.previewPage) ?? "1");
+  const previewPageNum =
+    Number.isFinite(previewPageRaw) && previewPageRaw >= 1
+      ? Math.floor(previewPageRaw)
+      : 1;
+  const showSource = parseEditionShowSource(first(sp.source));
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -187,12 +221,37 @@ export default async function CommunityEditionYearPage({
     edition.status === "scheduled" ||
     (profile && isMember) ||
     (edition.status === "published" && voterUsername.length > 0)
-      ? await listActiveAwardCategories().catch(() => [])
+      ? await listEditionAwardCategories(edition.id).catch(() => [])
       : [];
 
-  const requestedView = parseEditionResultsView(first(sp.view));
-  let view = requestedView;
+  const requestedViewEarly = parseEditionResultsView(first(sp.view));
+  const resolvedHost = resolveEditionHostSettings(
+    requestedViewEarly,
+    first(sp.panel),
+  );
+  let view = resolvedHost.view;
+  let settingsPanel = resolvedHost.panel;
   if (view === "settings" && !canManage) {
+    view = "reveal";
+  }
+  if (
+    settingsPanel === "preview" &&
+    edition.status !== "open" &&
+    edition.status !== "closed"
+  ) {
+    settingsPanel = "edition";
+  }
+  if (
+    (view === "show" ||
+      view === "overview" ||
+      view === "standings" ||
+      view === "categories") &&
+    !(canManage && edition.status === "closed") &&
+    edition.status !== "published"
+  ) {
+    view = "ballot";
+  }
+  if (view === "show" && edition.status === "published") {
     view = "reveal";
   }
   if (
@@ -202,14 +261,34 @@ export default async function CommunityEditionYearPage({
   ) {
     view = "reveal";
   }
+  if (view === "category" && !categoryId) {
+    view = "categories";
+  }
   const showHostSettings = canManage && view === "settings";
+  const showEditionSettings = showHostSettings && settingsPanel === "edition";
+  const showManageHosts = showHostSettings && settingsPanel === "hosts";
+  const showHostPreview =
+    showHostSettings &&
+    settingsPanel === "preview" &&
+    (edition.status === "open" || edition.status === "closed");
+  const showHostResultsPreview =
+    canManage &&
+    edition.status === "closed" &&
+    (view === "show" ||
+      view === "overview" ||
+      view === "standings" ||
+      view === "categories");
   const showLiveVoters =
     edition.status === "open" || edition.status === "closed";
   const prePublishView = showHostSettings
     ? "settings"
-    : showLiveVoters && view === "voters"
-      ? "voters"
-      : "ballot";
+    : showHostResultsPreview
+      ? view
+      : showLiveVoters && view === "voters"
+        ? "voters"
+        : "ballot";
+  const includeSettingsPreviewTab = showLiveVoters;
+  const includeRevealShowTab = canManage && edition.status === "closed";
 
   let ballotCount: number | null = null;
   if (
@@ -248,18 +327,62 @@ export default async function CommunityEditionYearPage({
     }
   }
 
-  let submitters: Awaited<ReturnType<typeof listEditionBallotSubmitters>> = [];
+  let submitters: Awaited<
+    ReturnType<typeof getEditionBallotSubmittersPage>
+  >["rows"] = [];
+  let submittersPage = 1;
+  let submittersPageSize = HOST_PREVIEW_PAGE_SIZE;
+  let submittersTotal = 0;
+  let submittersTotalPages = 1;
   let voiceMembers: Awaited<
-    ReturnType<typeof listMembersWithEditionVoiceFlags>
+    ReturnType<typeof listEditionHostRoster>
   > = [];
-  if (showHostSettings) {
+  let categoryOptions: Awaited<
+    ReturnType<typeof listEditionCategorySettings>
+  > = [];
+  let siteCategoryCatalog: AwardCategoryOption[] = [];
+  let hostRevealTopTen: EditionGotyStandingRow[] = [];
+  let hostRevealGotyBoard: EditionGotyStandingRow[] = [];
+  let hostRevealGotyTotal = 0;
+  let hostRevealCategoryPodiums: EditionCategoryStandingBlock[] = [];
+  let hostRevealMatrix: EditionBallotMatrix = {
+    showYou: false,
+    hasGames: false,
+    voiceColumns: [],
+    rows: [],
+  };
+  let hostRevealCategoryComparison: EditionCategoryComparisonMatrix = {
+    showYou: false,
+    hasGames: false,
+    voiceColumns: [],
+    rows: [],
+  };
+  let hostRevealLiveReady = false;
+
+  if (showEditionSettings) {
     try {
-      submitters = await listEditionBallotSubmitters(edition.id);
+      const [enabled, siteCats] = await Promise.all([
+        listEditionCategorySettings(edition.id),
+        listActiveAwardCategories(),
+      ]);
+      categoryOptions = enabled;
+      siteCategoryCatalog = siteCats.map((c) => ({
+        id: c.id,
+        label: c.label,
+        description: c.description,
+        sortOrder: c.sortOrder,
+        categoryGroup: c.categoryGroup,
+        eligibility: c.eligibility,
+        allowEditions: c.allowEditions,
+      }));
     } catch {
-      submitters = [];
+      categoryOptions = [];
+      siteCategoryCatalog = [];
     }
+  }
+  if (showManageHosts) {
     try {
-      voiceMembers = await listMembersWithEditionVoiceFlags(
+      voiceMembers = await listEditionHostRoster(
         community.id,
         edition.id,
       );
@@ -267,19 +390,141 @@ export default async function CommunityEditionYearPage({
       voiceMembers = [];
     }
   }
+  if (showHostPreview) {
+    try {
+      const preview = await getEditionBallotSubmittersPage(edition.id, {
+        page: previewPageNum,
+        pageSize: HOST_PREVIEW_PAGE_SIZE,
+      });
+      submitters = preview.rows;
+      submittersPage = preview.page;
+      submittersPageSize = preview.pageSize;
+      submittersTotal = preview.total;
+      submittersTotalPages = preview.totalPages;
+    } catch {
+      submitters = [];
+    }
+  }
+  if (showHostResultsPreview) {
+    const loadComparison = view === "overview";
+    if (showSource === "live") {
+      try {
+        const meta = await getEditionResultsMeta(edition.id);
+        if (meta) {
+          const [topTen, categoryPodiums, gotyPage, comparison] =
+            await Promise.all([
+              getEditionGotyThroughRank(edition.id, "community", {
+                maxRank: 10,
+                rankMode: edition.rankMode,
+              }),
+              getEditionCategoryResults(edition.id, "community", {
+                maxRank: CATEGORY_RANKED_TOP,
+                rankMode: edition.rankMode,
+              }),
+              getEditionGotyPage(edition.id, "community", {
+                page: 1,
+                pageSize: STANDINGS_PAGE_SIZE,
+                rankMode: edition.rankMode,
+              }),
+              loadComparison
+                ? getEditionComparisonBundle(edition.id, {
+                    viewerProfileId: profile?.id ?? null,
+                    rankMode: edition.rankMode,
+                  })
+                : Promise.resolve(null),
+            ]);
+          hostRevealTopTen = topTen;
+          hostRevealCategoryPodiums = categoryPodiums;
+          hostRevealGotyBoard = gotyPage.rows;
+          hostRevealGotyTotal = gotyPage.total;
+          if (comparison) {
+            hostRevealMatrix = comparison.matrix;
+            hostRevealCategoryComparison = comparison.categoryComparison;
+          }
+          hostRevealLiveReady = true;
+        }
+      } catch {
+        hostRevealLiveReady = false;
+      }
+    } else {
+      try {
+        const cats = await listEditionAwardCategories(edition.id);
+        const demo = buildEditionRevealDemoStandings(
+          cats.map((c) => ({
+            id: c.id,
+            label: c.label,
+            description: c.description,
+          })),
+        );
+        hostRevealTopTen = demo.topTen;
+        hostRevealGotyBoard = demo.gotyBoard;
+        hostRevealGotyTotal = demo.gotyBoard.length;
+        hostRevealCategoryPodiums = demo.categoryPodiums;
+        if (loadComparison) {
+          hostRevealMatrix = demo.matrix;
+          hostRevealCategoryComparison = demo.categoryComparison;
+        }
+      } catch {
+        const demo = buildEditionRevealDemoStandings([]);
+        hostRevealTopTen = demo.topTen;
+        hostRevealGotyBoard = demo.gotyBoard;
+        hostRevealGotyTotal = demo.gotyBoard.length;
+        hostRevealCategoryPodiums = demo.categoryPodiums;
+        if (loadComparison) {
+          hostRevealMatrix = demo.matrix;
+          hostRevealCategoryComparison = demo.categoryComparison;
+        }
+      }
+    }
+  }
 
-  const yearSettings = showHostSettings ? (
-    <EditionYearSettings
-      slug={community.slug}
-      year={edition.year}
-      status={edition.status}
-      opensAt={edition.opensAt?.toISOString() ?? null}
-      closesAt={edition.closesAt?.toISOString() ?? null}
-      publishesAt={edition.publishesAt?.toISOString() ?? null}
-      rankMode={edition.rankMode}
-      submitters={submitters}
-      voiceMembers={voiceMembers}
-    />
+  const hostToolPanel = showHostSettings ? (
+    <div>
+      <EditionSettingsTabs
+        slug={community.slug}
+        year={edition.year}
+        active={settingsPanel}
+        includePreview={includeSettingsPreviewTab}
+      />
+      {showEditionSettings ? (
+        <div className="mt-6">
+          <EditionYearSettings
+            slug={community.slug}
+            year={edition.year}
+            status={edition.status}
+            opensAt={edition.opensAt?.toISOString() ?? null}
+            closesAt={edition.closesAt?.toISOString() ?? null}
+            publishesAt={edition.publishesAt?.toISOString() ?? null}
+            rankMode={edition.rankMode}
+            categoryOptions={categoryOptions}
+            siteCategoryCatalog={siteCategoryCatalog}
+          />
+        </div>
+      ) : showManageHosts ? (
+        <EditionEventHostsPanel
+          slug={community.slug}
+          year={edition.year}
+          status={edition.status}
+          voiceMembers={voiceMembers}
+        />
+      ) : showHostPreview ? (
+        <div className="mt-6">
+          <EditionHostPreview
+            status={edition.status}
+            submitters={submitters}
+            page={submittersPage}
+            pageSize={submittersPageSize}
+            total={submittersTotal}
+            totalPages={submittersTotalPages}
+            pageHref={(previewPage) =>
+              editionHostPreviewHref(community.slug, edition.year, {
+                previewPage,
+              })
+            }
+          />
+        </div>
+      ) : null}
+    </div>
   ) : null;
 
   let resultsBundle: {
@@ -288,6 +533,13 @@ export default async function CommunityEditionYearPage({
     categoryPodiums: EditionCategoryStandingBlock[];
     categoryComparison: EditionCategoryComparisonMatrix;
     categoryMeta: EditionCategoryMeta[];
+    categoryPage: {
+      page: number;
+      pageSize: number;
+      total: number;
+      totalPages: number;
+      rows: EditionCategoryStandingRow[];
+    } | null;
     voters: Awaited<ReturnType<typeof getEditionVotersPage>> & { q: string };
     matrix: EditionBallotMatrix;
     publicBallot: {
@@ -347,18 +599,34 @@ export default async function CommunityEditionYearPage({
             categoryPodiums: [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
+            categoryPage: null,
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
           };
-        } else if (view === "categories") {
+        } else if (view === "categories" || view === "category") {
           const categoryMeta = await listEditionCategoryMeta(edition.id, mode);
+          const categoryPage =
+            view === "category" && categoryId
+              ? await getEditionCategoryPage(edition.id, mode, categoryId, {
+                  page: categoryPageNum,
+                  pageSize: CATEGORY_RESULTS_PAGE_SIZE,
+                  rankMode,
+                })
+              : null;
           resultsBundle = {
             meta,
             topTen: [],
-            categoryPodiums: [],
+            categoryPodiums:
+              view === "categories"
+                ? await getEditionCategoryResults(edition.id, mode, {
+                    maxRank: CATEGORY_RANKED_TOP,
+                    rankMode,
+                  })
+                : [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta,
+            categoryPage,
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
@@ -376,6 +644,7 @@ export default async function CommunityEditionYearPage({
             categoryPodiums: [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
+            categoryPage: null,
             voters: { ...voters, q: votersQ },
             matrix: emptyMatrix,
             publicBallot: null,
@@ -432,6 +701,7 @@ export default async function CommunityEditionYearPage({
             categoryPodiums: [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
+            categoryPage: null,
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot,
@@ -455,6 +725,7 @@ export default async function CommunityEditionYearPage({
             categoryPodiums,
             categoryComparison: emptyCategoryComparison,
             categoryMeta: [],
+            categoryPage: null,
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
@@ -498,11 +769,13 @@ export default async function CommunityEditionYearPage({
             mode={mode}
             rankMode={rankMode}
             view={view}
+            categoryId={categoryId}
             meta={resultsBundle.meta}
             topTen={resultsBundle.topTen}
             categoryPodiums={resultsBundle.categoryPodiums}
             categoryComparison={resultsBundle.categoryComparison}
             categoryMeta={resultsBundle.categoryMeta}
+            categoryPage={resultsBundle.categoryPage}
             voters={resultsBundle.voters}
             matrix={resultsBundle.matrix}
             yourProfileId={profile?.id ?? null}
@@ -520,6 +793,22 @@ export default async function CommunityEditionYearPage({
             canManage={canManage}
           />
         </section>
+      ) : edition.status === "published" && !showHostSettings ? (
+        <section className="mt-8">
+          <EditionSectionHeader
+            status={edition.status}
+            slug={community.slug}
+            year={edition.year}
+            years={yearOptions}
+            view={view}
+            mode={mode}
+            opensAt={edition.opensAt}
+            closesAt={edition.closesAt}
+            publishesAt={edition.publishesAt}
+            ballotCount={ballotCount}
+          />
+          <EditionResultsCalculatingBanner status={edition.freezeStatus} />
+        </section>
       ) : (
         <section className="mt-8">
           <EditionSectionHeader
@@ -535,17 +824,24 @@ export default async function CommunityEditionYearPage({
             ballotCount={ballotCount}
           />
 
+          {edition.status === "closed" &&
+          (edition.freezeStatus === "pending" ||
+            edition.freezeStatus === "computing" ||
+            edition.freezeStatus === "failed") ? (
+            <EditionResultsCalculatingBanner status={edition.freezeStatus} />
+          ) : null}
+
           {edition.status === "published" && showHostSettings ? (
             <>
-              <EditionResultsViewNav
+              <EditionEventTabs
                 slug={community.slug}
                 year={edition.year}
-                mode={mode}
-                view="settings"
-                hasYourBallot={Boolean(profile && isMember)}
                 canManage
+                includeVoters={false}
+                mode={mode}
+                active="settings"
               />
-              {yearSettings}
+              {hostToolPanel}
             </>
           ) : (
             <>
@@ -554,20 +850,46 @@ export default async function CommunityEditionYearPage({
                 year={edition.year}
                 canManage={canManage}
                 includeVoters={showLiveVoters}
+                includeRevealShow={includeRevealShowTab}
                 mode={mode}
                 active={
                   prePublishView === "settings"
                     ? "settings"
-                    : prePublishView === "voters"
-                      ? "voters"
-                      : "ballot"
+                    : showHostResultsPreview
+                      ? "show"
+                      : prePublishView === "voters"
+                        ? "voters"
+                        : "ballot"
                 }
                 ballotLabel={
                   edition.status === "scheduled" ? "On the ballot" : "Ballot"
                 }
               />
               {showHostSettings ? (
-                yearSettings
+                hostToolPanel
+              ) : showHostResultsPreview ? (
+                <EditionHostResultsPreview
+                  slug={community.slug}
+                  year={edition.year}
+                  communityName={community.name}
+                  source={showSource}
+                  previewView={
+                    view === "overview" ||
+                    view === "standings" ||
+                    view === "categories"
+                      ? view
+                      : "show"
+                  }
+                  topTen={hostRevealTopTen}
+                  gotyBoard={hostRevealGotyBoard}
+                  gotyTotal={hostRevealGotyTotal}
+                  categoryPodiums={hostRevealCategoryPodiums}
+                  matrix={hostRevealMatrix}
+                  categoryComparison={hostRevealCategoryComparison}
+                  freezeStatus={edition.freezeStatus}
+                  liveReady={hostRevealLiveReady}
+                  rankMode={edition.rankMode}
+                />
               ) : prePublishView === "voters" && liveVoters ? (
                 <div className="mt-6">
                   <EditionVotersList

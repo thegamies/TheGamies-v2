@@ -1,8 +1,20 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
-import { DateTimePicker } from "@/components/ui/DateTimePicker";
-import { formatEditionDateTimeInput } from "@/lib/communities/edition-status";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { TimePicker } from "@/components/ui/TimePicker";
+import {
+  formatEditionDateTimeInput,
+  type EditionScheduleFieldNotice,
+} from "@/lib/communities/edition-status";
+import { todayIsoDate } from "@/lib/ui/calendar-month";
+import {
+  clampIsoDateTime,
+  datePart,
+  mergeIsoDateAndTime,
+  parseIsoDateTime,
+  timePart,
+} from "@/lib/ui/time-picker";
 
 export function EditionScheduleFields({
   opens,
@@ -15,6 +27,7 @@ export function EditionScheduleFields({
   onCloses,
   onPublishes,
   year,
+  notice,
 }: {
   opens: string;
   closes: string;
@@ -31,6 +44,7 @@ export function EditionScheduleFields({
   onCloses: (next: string) => void;
   onPublishes: (next: string) => void;
   year?: number;
+  notice?: EditionScheduleFieldNotice | null;
 }) {
   return (
     <>
@@ -42,6 +56,7 @@ export function EditionScheduleFields({
         max={bounds.opensMax}
         disabled={disabled}
         year={year}
+        notice={notice?.field === "opens" ? notice : null}
         onChange={onOpens}
       />
       <ScheduleDateTimeField
@@ -53,6 +68,7 @@ export function EditionScheduleFields({
         max={bounds.closesMax}
         disabled={disabled}
         year={year}
+        notice={notice?.field === "closes" ? notice : null}
         onChange={onCloses}
       />
       <ScheduleDateTimeField
@@ -63,6 +79,7 @@ export function EditionScheduleFields({
         min={bounds.publishesMin}
         disabled={disabled}
         year={year}
+        notice={notice?.field === "publishes" ? notice : null}
         onChange={onPublishes}
       />
     </>
@@ -78,6 +95,7 @@ function ScheduleDateTimeField({
   max,
   disabled,
   year,
+  notice,
   onChange,
 }: {
   idPrefix: string;
@@ -88,27 +106,75 @@ function ScheduleDateTimeField({
   max?: string;
   disabled: boolean;
   year?: number;
+  notice?: EditionScheduleFieldNotice | null;
   onChange: (next: string) => void;
 }) {
-  const inputId = `${idPrefix}-${name}`;
+  const dateId = `${idPrefix}-${name}-date`;
+  const timeId = `${idPrefix}-${name}-time`;
+  const parsed = parseIsoDateTime(value);
+  const date = parsed?.date ?? "";
+  const time = value ? timePart(value) : "";
+  const dateMin = min ? datePart(min) : undefined;
+  const dateMax = max ? datePart(max) : undefined;
+  const selectedDate = date || todayIsoDate();
+  const minTime =
+    min && datePart(min) === selectedDate ? timePart(min) : undefined;
+  const maxTime =
+    max && datePart(max) === selectedDate ? timePart(max) : undefined;
+
+  function emit(next: string) {
+    const clamped = clampIsoDateTime(next, min, max);
+    if (clamped == null) return;
+    onChange(clamped);
+  }
+
+  function onDate(nextDate: string) {
+    const now = new Date();
+    emit(
+      mergeIsoDateAndTime(nextDate, time, {
+        hours: parsed?.hours ?? now.getHours(),
+        minutes: parsed?.minutes ?? now.getMinutes(),
+      }),
+    );
+  }
+
+  function onTime(nextTime: string) {
+    const now = new Date();
+    emit(
+      mergeIsoDateAndTime(date || todayIsoDate(), nextTime, {
+        hours: now.getHours(),
+        minutes: now.getMinutes(),
+      }),
+    );
+  }
+
   return (
     <div>
-      <label htmlFor={inputId} className="block text-sm text-muted">
-        {label}
-      </label>
+      <p className="block text-sm text-muted">{label}</p>
+      <input type="hidden" name={name} value={value} />
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <DateTimePicker
-          id={inputId}
-          name={name}
-          value={value}
-          min={min}
-          max={max}
+        <DatePicker
+          id={dateId}
+          value={date}
+          min={dateMin}
+          max={dateMax}
           required
           disabled={disabled}
-          className="min-w-0 flex-1"
-          aria-label={label}
+          className="min-w-[10rem] flex-1"
+          aria-label={`${label} date`}
           anchorYear={year}
-          onChange={onChange}
+          onChange={onDate}
+        />
+        <TimePicker
+          id={timeId}
+          value={time}
+          min={minTime}
+          max={maxTime}
+          required
+          disabled={disabled}
+          className="w-[9.5rem] shrink-0"
+          aria-label={`${label} time`}
+          onChange={onTime}
         />
         <Button
           type="button"
@@ -121,6 +187,14 @@ function ScheduleDateTimeField({
           Set to now
         </Button>
       </div>
+      {notice ? (
+        <p
+          className="mt-1 text-sm text-accent"
+          role={notice.tone === "error" ? "alert" : "status"}
+        >
+          {notice.message}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,7 +1,10 @@
 "use client";
 
-import { useActionState, useId, useMemo, useState } from "react";
-import { setEditionVoiceAction } from "@/app/communities/actions";
+import { useEffect, useId, useState, useTransition } from "react";
+import {
+  searchEditionHostMembersAction,
+  setEditionVoiceAction,
+} from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
 
 export type EditionVoiceMemberOption = {
@@ -13,21 +16,19 @@ export type EditionVoiceMemberOption = {
   isVoice: boolean;
 };
 
-function memberMatchesQuery(
-  member: EditionVoiceMemberOption,
-  q: string,
-): boolean {
-  if (!q) return true;
-  const needle = q.toLowerCase();
-  return (
-    member.displayName.toLowerCase().includes(needle) ||
-    member.username.toLowerCase().includes(needle)
-  );
-}
-
 function roleLabel(member: EditionVoiceMemberOption): string {
   if (member.isVoice || member.role === "admin") return "Host";
   return "Member";
+}
+
+function applyVoiceFlag(
+  rows: EditionVoiceMemberOption[],
+  profileId: string,
+  isVoice: boolean,
+): EditionVoiceMemberOption[] {
+  return rows.map((row) =>
+    row.profileId === profileId ? { ...row, isVoice } : row,
+  );
 }
 
 export function EditionVoicesForm({
@@ -44,23 +45,87 @@ export function EditionVoicesForm({
   locked: boolean;
 }) {
   const searchId = useId();
+  const [roster, setRoster] = useState(members);
+  const [membersSnapshot, setMembersSnapshot] = useState(members);
   const [query, setQuery] = useState("");
-  const [state, formAction, pending] = useActionState(
-    setEditionVoiceAction,
-    null,
-  );
+  const [hits, setHits] = useState<EditionVoiceMemberOption[]>([]);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [mutateError, setMutateError] = useState<string | null>(null);
+  const [searching, startSearch] = useTransition();
+  const [mutating, startMutate] = useTransition();
+
+  // Reset optimistic roster when the server list identity changes (nav / refresh).
+  if (members !== membersSnapshot) {
+    setMembersSnapshot(members);
+    setRoster(members);
+  }
+
+  useEffect(() => {
+    if (locked) return;
+    const q = query.trim();
+    if (q.length < 1) return;
+    const handle = window.setTimeout(() => {
+      startSearch(async () => {
+        const result = await searchEditionHostMembersAction({
+          slug,
+          year,
+          q,
+        });
+        if ("error" in result) {
+          setHits([]);
+          setSearchError(result.error);
+          return;
+        }
+        setSearchError(null);
+        setHits(result.results);
+      });
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [query, slug, year, locked]);
 
   const trimmed = query.trim();
-  const visible = useMemo(() => {
-    if (trimmed) {
-      return members.filter((m) => memberMatchesQuery(m, trimmed));
-    }
-    // Default: community hosts and current Hosts — search to reach everyone else.
-    return members.filter((m) => m.role === "admin" || m.isVoice);
-  }, [members, trimmed]);
+  const visible = trimmed ? hits : roster;
+  const defaultEmpty = !trimmed && visible.length === 0;
 
-  const defaultEmpty =
-    !trimmed && visible.length === 0 && members.length > 0;
+  function onQueryChange(value: string) {
+    setQuery(value);
+    if (value.trim().length < 1) {
+      setHits([]);
+      setSearchError(null);
+    }
+  }
+
+  function toggleVoice(member: EditionVoiceMemberOption) {
+    const nextVoice = !member.isVoice;
+    const previousRoster = roster;
+    const previousHits = hits;
+    setMutateError(null);
+    setRoster((rows) => {
+      const updated = applyVoiceFlag(rows, member.profileId, nextVoice);
+      if (nextVoice) {
+        return updated.some((row) => row.profileId === member.profileId)
+          ? updated
+          : [...updated, { ...member, isVoice: true }];
+      }
+      if (member.role === "admin") return updated;
+      return updated.filter((row) => row.profileId !== member.profileId);
+    });
+    setHits((rows) => applyVoiceFlag(rows, member.profileId, nextVoice));
+
+    startMutate(async () => {
+      const formData = new FormData();
+      formData.set("slug", slug);
+      formData.set("year", String(year));
+      formData.set("profileId", member.profileId);
+      formData.set("isVoice", nextVoice ? "1" : "0");
+      const result = await setEditionVoiceAction(null, formData);
+      if (result?.error) {
+        setRoster(previousRoster);
+        setHits(previousHits);
+        setMutateError(result.error);
+      }
+    });
+  }
 
   return (
     <div className="mt-8 border-t border-line pt-6">
@@ -77,85 +142,76 @@ export function EditionVoicesForm({
         </p>
       ) : null}
 
-      {members.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">No members yet.</p>
-      ) : (
-        <>
-          <div className="mt-4">
-            <label htmlFor={searchId} className="sr-only">
-              Search members
-            </label>
-            <input
-              id={searchId}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search members by name or @username"
-              className="w-full max-w-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted"
-              autoComplete="off"
-            />
-          </div>
+      <div className="mt-4">
+        <label htmlFor={searchId} className="sr-only">
+          Search members
+        </label>
+        <input
+          id={searchId}
+          type="search"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="Search members by name or @username"
+          className="w-full max-w-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted"
+          autoComplete="off"
+          disabled={locked}
+        />
+      </div>
 
-          {defaultEmpty ? (
-            <p className="mt-4 text-sm text-muted">
-              No Hosts designated yet. Search members to add one.
-            </p>
-          ) : null}
+      {searching ? (
+        <p className="mt-4 text-sm text-muted">Searching…</p>
+      ) : null}
 
-          {trimmed && visible.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">No members match that search.</p>
-          ) : null}
+      {defaultEmpty ? (
+        <p className="mt-4 text-sm text-muted">
+          No Hosts designated yet. Search members to add one.
+        </p>
+      ) : null}
 
-          {visible.length > 0 ? (
-            <ul className="mt-4 divide-y divide-line border-y border-line">
-              {visible.map((member) => (
-                <li
-                  key={member.profileId}
-                  className="flex flex-wrap items-center justify-between gap-3 py-3"
+      {trimmed && !searching && visible.length === 0 && !searchError ? (
+        <p className="mt-4 text-sm text-muted">No members match that search.</p>
+      ) : null}
+
+      {visible.length > 0 ? (
+        <ul className="mt-4 divide-y divide-line border-y border-line">
+          {visible.map((member) => (
+            <li
+              key={member.profileId}
+              className="flex flex-wrap items-center justify-between gap-3 py-3"
+            >
+              <div>
+                <p className="text-ink">{member.displayName}</p>
+                <p className="text-sm text-muted">
+                  @{member.username}
+                  <span className="text-muted"> · {roleLabel(member)}</span>
+                </p>
+              </div>
+              {locked ? (
+                <p className="text-sm text-muted">{roleLabel(member)}</p>
+              ) : (
+                <Button
+                  type="button"
+                  variant="bordered"
+                  disabled={mutating}
+                  className="text-sm"
+                  onClick={() => toggleVoice(member)}
                 >
-                  <div>
-                    <p className="text-ink">{member.displayName}</p>
-                    <p className="text-sm text-muted">
-                      @{member.username}
-                      <span className="text-muted"> · {roleLabel(member)}</span>
-                    </p>
-                  </div>
-                  {locked ? (
-                    <p className="text-sm text-muted">{roleLabel(member)}</p>
-                  ) : (
-                    <form action={formAction}>
-                      <input type="hidden" name="slug" value={slug} />
-                      <input type="hidden" name="year" value={String(year)} />
-                      <input
-                        type="hidden"
-                        name="profileId"
-                        value={member.profileId}
-                      />
-                      <input
-                        type="hidden"
-                        name="isVoice"
-                        value={member.isVoice ? "0" : "1"}
-                      />
-                      <Button
-                        type="submit"
-                        variant="bordered"
-                        disabled={pending}
-                        className="text-sm"
-                      >
-                        {member.isVoice ? "Remove Host" : "Make Host"}
-                      </Button>
-                    </form>
-                  )}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </>
-      )}
+                  {member.isVoice ? "Remove Host" : "Make Host"}
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-      {state?.error ? (
+      {searchError ? (
         <p className="mt-3 text-sm text-accent" role="alert">
-          {state.error}
+          {searchError}
+        </p>
+      ) : null}
+      {mutateError ? (
+        <p className="mt-3 text-sm text-accent" role="alert">
+          {mutateError}
         </p>
       ) : null}
     </div>

@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/session";
 import {
   createCommunity,
+  getCommunityBySlug,
   joinCommunity,
   leaveCommunity,
   setCommunityLiveScoresVisibleFrom,
@@ -17,16 +18,30 @@ import {
 } from "@/lib/communities/service";
 import { COMMUNITY_ROLES } from "@/lib/communities/schema";
 import {
+  addEditionCategory,
+  editionCategoriesWriteBlockedReason,
+  removeEditionCategory,
+  searchSiteAwardCategories,
+  setCommunityEditionCategories,
+} from "@/lib/communities/edition-categories";
+import {
   createCommunityEdition,
   deleteCommunityEdition,
+  getEditionByCommunityYear,
   setCommunityEditionRankMode,
   setCommunityEditionSchedule,
   setCommunityEditionTimestampNow,
 } from "@/lib/communities/editions";
+import { computeEditionStatus } from "@/lib/communities/edition-status";
+import { canManageCommunity } from "@/lib/communities/rules";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import { editionHostSettingsHref } from "@/lib/communities/edition-results-href";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
-import { setEditionVoice } from "@/lib/communities/voices";
+import {
+  searchEditionHostMembers,
+  setEditionVoice,
+} from "@/lib/communities/voices";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -279,13 +294,25 @@ export async function createCommunityEditionAction(
     opensAt: String(formData.get("opensAt") ?? ""),
     closesAt: String(formData.get("closesAt") ?? ""),
     publishesAt: String(formData.get("publishesAt") ?? ""),
+    rankMode: String(formData.get("rankMode") ?? ""),
   });
   if ("error" in result) return { error: result.error };
 
+  const categoryIds = formData
+    .getAll("categoryIds")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+  if (categoryIds.length > 0) {
+    const categories = await setCommunityEditionCategories(
+      slug,
+      gate.profile.id,
+      { year: result.year, categoryIds },
+    );
+    if ("error" in categories) return { error: categories.error };
+  }
+
   revalidateCommunity(slug, gate.profile.username);
-  redirect(
-    communitySettingsHref(slug, { tab: "events", year: result.year }),
-  );
+  redirect(editionHostSettingsHref(slug, result.year));
 }
 
 export async function deleteCommunityEditionAction(
@@ -332,6 +359,63 @@ export async function setCommunityEditionScheduleAction(
 
   revalidateCommunity(slug, gate.profile.username);
   return null;
+}
+
+/** Schedule + categories + tie numbering — one Save on Edition settings. */
+export async function saveEditionSettingsAction(
+  _prev: { error: string } | { ok: true } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const yearRaw = formData.get("year");
+  const year = Number(yearRaw);
+  if (!Number.isFinite(year)) return { error: "Choose a valid year." };
+
+  const detail = await getCommunityBySlug(slug, gate.profile.id);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can update editions." };
+  }
+
+  const edition = await getEditionByCommunityYear(detail.id, Math.floor(year));
+  if (!edition) return { error: "Event not found." };
+
+  // Apply category edits against the current status (before schedule may close voting).
+  const status = computeEditionStatus(edition);
+  if (!editionCategoriesWriteBlockedReason(status)) {
+    const categoryIds = formData
+      .getAll("categoryIds")
+      .map((v) => String(v).trim())
+      .filter(Boolean);
+    const categories = await setCommunityEditionCategories(
+      slug,
+      gate.profile.id,
+      { year: yearRaw, categoryIds },
+    );
+    if ("error" in categories) return { error: categories.error };
+  }
+
+  const schedule = await setCommunityEditionSchedule(slug, gate.profile.id, {
+    year: yearRaw,
+    opensAt: String(formData.get("opensAt") ?? ""),
+    closesAt: String(formData.get("closesAt") ?? ""),
+    publishesAt: String(formData.get("publishesAt") ?? ""),
+  });
+  if ("error" in schedule) return { error: schedule.error };
+
+  const rank = await setCommunityEditionRankMode(slug, gate.profile.id, {
+    year: yearRaw,
+    rankMode: String(formData.get("rankMode") ?? ""),
+  });
+  if ("error" in rank) return { error: rank.error };
+
+  revalidateEditionCategories(slug, Math.floor(year));
+  return { ok: true };
 }
 
 export async function setCommunityEditionTimestampNowAction(
@@ -386,6 +470,118 @@ export async function setCommunityEditionRankModeAction(
   return null;
 }
 
+export async function setCommunityEditionCategoriesAction(
+  _prev: { error: string } | { ok: true } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const categoryIds = formData
+    .getAll("categoryIds")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+
+  const result = await setCommunityEditionCategories(slug, gate.profile.id, {
+    year: formData.get("year"),
+    categoryIds,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const year = Number(formData.get("year"));
+  revalidateCommunity(slug, gate.profile.username);
+  if (Number.isFinite(year)) {
+    revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
+  }
+  return { ok: true };
+}
+
+function revalidateEditionCategories(slug: string, year: number) {
+  // Keep this narrow — full community revalidation makes add/remove feel multi-second.
+  revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}/edition/${year}`);
+}
+
+export async function searchEditionCategoriesAction(input: {
+  slug: string;
+  year: number;
+  q: string;
+  excludeIds?: string[];
+}): Promise<
+  | { ok: true; results: Array<{ id: string; label: string; description: string | null }> }
+  | { error: string }
+> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const detail = await getCommunityBySlug(slug, gate.profile.id);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can edit event categories." };
+  }
+
+  const results = await searchSiteAwardCategories({
+    q: input.q,
+    excludeIds: input.excludeIds,
+    limit: 20,
+  });
+  return { ok: true, results };
+}
+
+export async function addEditionCategoryAction(
+  _prev: { error: string } | { ok: true } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const year = Number(formData.get("year"));
+  const categoryId = String(formData.get("categoryId") ?? "").trim();
+  const result = await addEditionCategory(slug, gate.profile.id, {
+    year,
+    categoryId,
+  });
+  if ("error" in result) return { error: result.error };
+
+  if (Number.isFinite(year)) {
+    revalidateEditionCategories(slug, Math.floor(year));
+  }
+  return { ok: true };
+}
+
+export async function removeEditionCategoryAction(
+  _prev: { error: string } | { ok: true } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const year = Number(formData.get("year"));
+  const categoryId = String(formData.get("categoryId") ?? "").trim();
+  const result = await removeEditionCategory(slug, gate.profile.id, {
+    year,
+    categoryId,
+  });
+  if ("error" in result) return { error: result.error };
+
+  if (Number.isFinite(year)) {
+    revalidateEditionCategories(slug, Math.floor(year));
+  }
+  return { ok: true };
+}
+
 export async function setEditionVoiceAction(
   _prev: { error: string } | null,
   formData: FormData,
@@ -410,7 +606,48 @@ export async function setEditionVoiceAction(
   );
   if ("error" in result) return { error: result.error };
 
-  revalidateCommunity(slug, gate.profile.username);
   revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
   return null;
+}
+
+export async function searchEditionHostMembersAction(input: {
+  slug: string;
+  year: number;
+  q: string;
+}): Promise<
+  | {
+      ok: true;
+      results: Array<{
+        profileId: string;
+        username: string;
+        displayName: string;
+        role: "admin" | "member";
+        isVoice: boolean;
+      }>;
+    }
+  | { error: string }
+> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+  if (!Number.isFinite(input.year)) return { error: "Pick a valid year." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const detail = await getCommunityBySlug(slug, gate.profile.id);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can edit the Hosts roster." };
+  }
+
+  const edition = await getEditionByCommunityYear(
+    detail.id,
+    Math.floor(input.year),
+  );
+  if (!edition) return { error: "Event not found." };
+
+  const results = await searchEditionHostMembers(detail.id, edition.id, {
+    q: input.q,
+  });
+  return { ok: true, results };
 }

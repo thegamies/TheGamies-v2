@@ -22,7 +22,11 @@ import {
   ensureAwardCategories,
   listActiveAwardCategories,
 } from "@/lib/live-aggregate/categories";
-import { rebuildEditionResultsFrozen } from "./edition-results";
+import {
+  clearEditionResultsFrozen,
+  rebuildEditionResultsFrozen,
+} from "./edition-results";
+import { seedEditionCategories } from "./edition-categories";
 import { computeEditionStatus } from "./edition-status";
 
 export const SEED_COMMUNITY_AUTH_PREFIX = "seed:community:";
@@ -268,6 +272,8 @@ export async function publishEditionForSeed(
 
   const frozen = await rebuildEditionResultsFrozen(edition.id, db);
   if (frozen && "error" in frozen) return frozen;
+  const { markEditionFreezeReady } = await import("./edition-freeze");
+  await markEditionFreezeReady(edition.id, db);
   return { ok: true, editionId: edition.id };
 }
 
@@ -313,7 +319,45 @@ export async function refreshPublishedEditionResultsForSeed(
 
   const frozen = await rebuildEditionResultsFrozen(edition.id, db);
   if (frozen && "error" in frozen) return frozen;
+  const { markEditionFreezeReady } = await import("./edition-freeze");
+  await markEditionFreezeReady(edition.id, db);
   return { ok: true, editionId: edition.id, refreshed: true, status };
+}
+
+/** Admin: delete frozen result rows for a community year (ballots kept). */
+export async function clearEditionFreezeForAdmin(
+  communitySlug: string,
+  year: number,
+  db: Db = getDb(),
+): Promise<{ ok: true; editionId: string } | { error: string }> {
+  const slug = communitySlug.trim().toLowerCase();
+  const y = Math.floor(year);
+  if (!slug) return { error: "Enter a community slug." };
+  if (!Number.isFinite(y) || y < 1970 || y > 2100) {
+    return { error: "Pick a valid year." };
+  }
+
+  const [community] = await db
+    .select()
+    .from(communities)
+    .where(eq(communities.slug, slug))
+    .limit(1);
+  if (!community) return { error: "Community not found." };
+
+  const [edition] = await db
+    .select()
+    .from(communityEditions)
+    .where(
+      and(
+        eq(communityEditions.communityId, community.id),
+        eq(communityEditions.year, y),
+      ),
+    )
+    .limit(1);
+  if (!edition) return { error: "Edition not found." };
+
+  await clearEditionResultsFrozen(edition.id, db);
+  return { ok: true, editionId: edition.id };
 }
 
 export async function seedCommunityEditionBallots(
@@ -381,6 +425,7 @@ export async function seedCommunityEditionBallots(
         "No active award categories found after syncing the catalog. Check award category migrations.",
     };
   }
+  await seedEditionCategories(edition.id, db);
 
   const wantedAuthIds = indices.map(seedCommunityAuthUserId);
   const wantedUsernames = indices.map(seedCommunityUsername);
@@ -610,6 +655,8 @@ export async function seedCommunityEditionBallots(
         error: `Ballots were written, but rebuilding published results failed (${frozen.error}). Use Publish / rebuild results.`,
       };
     }
+    const { markEditionFreezeReady } = await import("./edition-freeze");
+    await markEditionFreezeReady(edition.id, db);
     resultsRefreshed = true;
   }
 

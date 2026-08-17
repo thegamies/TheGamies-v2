@@ -10,11 +10,9 @@ import { EDITION_PUBLIC_LABEL } from "@/lib/communities/edition-status";
 export function CommunitySettingsTabs({
   slug,
   tab,
-  year,
 }: {
   slug: string;
   tab: CommunitySettingsTab;
-  year?: number | null;
 }) {
   return (
     <nav
@@ -28,7 +26,7 @@ export function CommunitySettingsTabs({
         {LIVE_PUBLIC_LABEL}
       </Link>
       <Link
-        href={communitySettingsHref(slug, { tab: "events", year })}
+        href={communitySettingsHref(slug, { tab: "events" })}
         className={navItemClass("secondary", tab === "events")}
       >
         {EDITION_PUBLIC_LABEL}

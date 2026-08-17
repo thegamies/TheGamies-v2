@@ -38,6 +38,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Architecture | `docs/architecture.md` |
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` (includes App Router layout + `cache()` rules) |
+| Request cost (lists, search, scale) | `docs/request-cost.md` |
 | Deployment (dual host) | `docs/deployment.md` |
 | Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
@@ -55,7 +56,7 @@ Full rules: `docs/engineering.md`. Short form:
 3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
 5. **Features ship with tests** in the same PR: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI. See `docs/engineering.md`.
-6. **Request cost:** before freeze/list/cache designs, check DB egress, compute (Vercel + Workers), and 10× scale — prefer SQL-paginated rows over fat blobs. See `docs/engineering.md` / `.cursor/rules/request-cost.mdc`.
+6. **Request cost:** before freeze/list/cache/**search** designs, check DB egress, compute (Vercel + Workers), and 10× scale — SQL-paginated rows; search in the database, never dump a full list for the client to filter. See `docs/request-cost.md`.
 7. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification

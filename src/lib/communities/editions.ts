@@ -14,12 +14,19 @@ import {
 } from "./edition-status";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
-import {
-  ensureEditionResultsFrozen,
-  rebuildEditionResultsFrozen,
-} from "./edition-results";
+import { maybeKickEditionFreeze } from "./edition-freeze";
+import type { SharedRankMode } from "@/lib/standings/shared-rank";
 
 export type CommunityEdition = typeof communityEditions.$inferSelect;
+
+/** New events default to dense. Invalid values are rejected. */
+export function parseEditionCreateRankMode(
+  raw: unknown,
+): SharedRankMode | { error: string } {
+  if (raw === "competition") return "competition";
+  if (raw === "dense" || raw == null || raw === "") return "dense";
+  return { error: "Choose how tied games are numbered." };
+}
 
 export type CommunityEditionPublic = CommunityEdition & {
   status: EditionStatus;
@@ -40,8 +47,8 @@ function withStatus(
 }
 
 /**
- * Freeze on first publish. If the edition left published (reopened) and
- * publishes again, rebuild so new ballots are included.
+ * Kick freeze when closed/published. Prefer after()+cron over blocking the
+ * schedule write; rebuild when re-entering published.
  */
 async function afterEditionWrite(
   edition: CommunityEdition,
@@ -50,12 +57,22 @@ async function afterEditionWrite(
   previousStatus?: EditionStatus,
 ): Promise<CommunityEditionPublic> {
   const publicEdition = withStatus(edition, now);
-  if (publicEdition.status === "published") {
-    if (previousStatus != null && previousStatus !== "published") {
-      await rebuildEditionResultsFrozen(edition.id, db);
-    } else {
-      await ensureEditionResultsFrozen(edition.id, db);
-    }
+  if (
+    publicEdition.status === "closed" ||
+    publicEdition.status === "published"
+  ) {
+    await maybeKickEditionFreeze(
+      edition,
+      {
+        rebuild:
+          previousStatus != null &&
+          previousStatus !== "published" &&
+          publicEdition.status === "published",
+        previousStatus,
+      },
+      db,
+      now,
+    );
   }
   return publicEdition;
 }
@@ -105,6 +122,42 @@ export function pickFeaturedEdition(
   return current ?? editions[0] ?? null;
 }
 
+/**
+ * Overview home: up to `limit` non-draft events.
+ * Order: open → coming soon → closed → results, then newest `createdAt`.
+ */
+export function pickOverviewEditions(
+  editions: CommunityEditionPublic[],
+  limit = 3,
+): CommunityEditionPublic[] {
+  const cap = Math.max(0, Math.floor(limit));
+  if (cap === 0) return [];
+
+  const rank = (status: EditionStatus): number => {
+    switch (status) {
+      case "open":
+        return 0;
+      case "scheduled":
+        return 1;
+      case "closed":
+        return 2;
+      case "published":
+        return 3;
+      case "draft":
+        return 4;
+    }
+  };
+
+  return [...editions]
+    .filter((edition) => edition.status !== "draft")
+    .sort((a, b) => {
+      const byStatus = rank(a.status) - rank(b.status);
+      if (byStatus !== 0) return byStatus;
+      return b.createdAt.getTime() - a.createdAt.getTime();
+    })
+    .slice(0, cap);
+}
+
 export async function getEditionByCommunityYear(
   communityId: string,
   year: number,
@@ -131,6 +184,7 @@ export async function createCommunityEdition(
     opensAt: string;
     closesAt: string;
     publishesAt: string;
+    rankMode?: unknown;
   },
   db: Db = getDb(),
 ): Promise<CommunityEditionPublic | { error: string }> {
@@ -150,6 +204,9 @@ export async function createCommunityEdition(
     publishes.date,
   );
   if (scheduleError) return { error: scheduleError };
+
+  const rankMode = parseEditionCreateRankMode(input.rankMode);
+  if (typeof rankMode !== "string") return rankMode;
 
   const detail = await getCommunityBySlug(slug, profileId, db);
   if (!detail) return { error: "Community not found." };
@@ -175,6 +232,7 @@ export async function createCommunityEdition(
         opensAt: opens.date,
         closesAt: closes.date,
         publishesAt: publishes.date,
+        rankMode,
       })
       .returning();
     if (!created) return { error: "Could not create that event." };

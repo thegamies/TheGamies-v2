@@ -1,5 +1,5 @@
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
-import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
+import { CategoryPickCard, CategoryVoteHeading } from "@/components/ui/CategoryPickCard";
 import { SectionRule } from "@/components/ui/SectionRule";
 import { BallotRankGrid } from "@/components/communities/BallotRankGrid";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
@@ -38,14 +38,11 @@ export function EditionBallotReadonly({
   categories,
   emptyMessage,
 }: Props) {
-  if (items.length === 0 && categoryVotes.length === 0) {
+  if (items.length === 0 && categoryVotes.length === 0 && categories.length === 0) {
     return <p className="mt-6 max-w-xl text-muted">{emptyMessage}</p>;
   }
 
-  const labelById = new Map(categories.map((c) => [c.id, c.label]));
-  const descriptionById = new Map(
-    categories.map((c) => [c.id, c.description ?? null]),
-  );
+  const voteById = new Map(categoryVotes.map((v) => [v.categoryId, v]));
   const ranked = [...items].sort((a, b) => a.rank - b.rank);
 
   return (
@@ -71,7 +68,7 @@ export function EditionBallotReadonly({
         <p className="text-muted">No Game of the Year ranking on this ballot.</p>
       )}
 
-      {categoryVotes.length > 0 ? (
+      {categories.length > 0 ? (
         <section>
           <SectionRule />
           <BallotChapterHeader
@@ -80,16 +77,29 @@ export function EditionBallotReadonly({
             title="Award picks"
           />
           <ul className="mt-8 divide-y divide-line border-y border-line">
-            {categoryVotes.map((vote) => (
-              <li key={vote.categoryId} className="py-6">
-                <CategoryPickCard
-                  label={labelById.get(vote.categoryId) ?? vote.categoryId}
-                  description={descriptionById.get(vote.categoryId)}
-                  title={vote.title}
-                  coverUrl={vote.coverUrl}
-                />
-              </li>
-            ))}
+            {categories.map((category) => {
+              const vote = voteById.get(category.id);
+              return (
+                <li key={category.id} className="py-6">
+                  {vote ? (
+                    <CategoryPickCard
+                      label={category.label}
+                      description={category.description}
+                      title={vote.title}
+                      coverUrl={vote.coverUrl}
+                    />
+                  ) : (
+                    <div>
+                      <CategoryVoteHeading
+                        label={category.label}
+                        description={category.description}
+                      />
+                      <p className="mt-3 text-sm text-muted">No pick</p>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

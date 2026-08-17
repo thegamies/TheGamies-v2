@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   communityEditionVoices,
   communityMembers,
@@ -119,41 +119,116 @@ export async function setEditionVoice(
   return { ok: true };
 }
 
-export async function listMembersWithEditionVoiceFlags(
-  communityId: string,
-  editionId: string,
-  db: Db = getDb(),
-): Promise<
-  Array<{
-    profileId: string;
-    username: string;
-    displayName: string;
-    role: "admin" | "member";
-    isVoice: boolean;
-  }>
-> {
-  const members = await db
+export type EditionHostMemberRow = {
+  profileId: string;
+  username: string;
+  displayName: string;
+  role: "admin" | "member";
+  isVoice: boolean;
+};
+
+/** Default Manage Hosts list: community hosts + current event Hosts. Still capped. */
+export const EDITION_HOST_ROSTER_LIMIT = 50;
+/** Typeahead hits for Manage Hosts — SQL search, not a client filter. */
+export const EDITION_HOST_SEARCH_LIMIT = 20;
+
+function mapHostMemberRow(row: {
+  profileId: string;
+  username: string;
+  displayName: string;
+  role: string;
+  voiceProfileId: string | null;
+}): EditionHostMemberRow {
+  return {
+    profileId: row.profileId,
+    username: row.username,
+    displayName: row.displayName,
+    role: row.role === "admin" ? "admin" : "member",
+    isVoice: Boolean(row.voiceProfileId),
+  };
+}
+
+function hostMemberJoins(editionId: string, db: Db) {
+  return db
     .select({
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
       role: communityMembers.role,
+      voiceProfileId: communityEditionVoices.profileId,
     })
     .from(communityMembers)
     .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
-    .where(eq(communityMembers.communityId, communityId))
-    .orderBy(asc(profiles.displayName), asc(profiles.username));
+    .leftJoin(
+      communityEditionVoices,
+      and(
+        eq(communityEditionVoices.editionId, editionId),
+        eq(communityEditionVoices.profileId, communityMembers.profileId),
+      ),
+    );
+}
 
-  if (members.length === 0) return [];
+export async function listEditionHostRoster(
+  communityId: string,
+  editionId: string,
+  db: Db = getDb(),
+): Promise<EditionHostMemberRow[]> {
+  const voiceOnEdition = exists(
+    db
+      .select({ one: sql`1` })
+      .from(communityEditionVoices)
+      .where(
+        and(
+          eq(communityEditionVoices.editionId, editionId),
+          eq(communityEditionVoices.profileId, communityMembers.profileId),
+        ),
+      ),
+  );
 
-  const voiceIds = await listEditionVoiceProfileIds(editionId, db);
-  return members.map((m) => ({
-    profileId: m.profileId,
-    username: m.username,
-    displayName: m.displayName,
-    role: m.role === "admin" ? "admin" : "member",
-    isVoice: voiceIds.has(m.profileId),
-  }));
+  const rows = await hostMemberJoins(editionId, db)
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        or(eq(communityMembers.role, "admin"), voiceOnEdition),
+      ),
+    )
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(EDITION_HOST_ROSTER_LIMIT);
+
+  return rows.map(mapHostMemberRow);
+}
+
+/**
+ * SQL member search for Manage Hosts. Blank query returns no hits
+ * (default roster is a separate query — never dump the full membership).
+ */
+export async function searchEditionHostMembers(
+  communityId: string,
+  editionId: string,
+  opts: { q: string; limit?: number },
+  db?: Db,
+): Promise<EditionHostMemberRow[]> {
+  const q = opts.q.trim();
+  if (q.length < 1) return [];
+
+  const database = db ?? getDb();
+  const limit = Math.min(
+    EDITION_HOST_SEARCH_LIMIT,
+    Math.max(1, opts.limit ?? EDITION_HOST_SEARCH_LIMIT),
+  );
+  const term = `%${q}%`;
+
+  const rows = await hostMemberJoins(editionId, database)
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        or(ilike(profiles.displayName, term), ilike(profiles.username, term)),
+      ),
+    )
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(limit);
+
+  return rows.map(mapHostMemberRow);
 }
 
 /** Used by freeze to resolve voice set without joining twice. */
