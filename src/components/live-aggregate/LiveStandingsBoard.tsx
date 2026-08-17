@@ -10,6 +10,7 @@ import {
 } from "@/components/live-aggregate/LiveCategoriesPanel";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
   StandingsGameRow,
   StandingsPage,
@@ -135,7 +136,7 @@ function LiveStandingsViewNav({
     page.view === "categories" || page.view === "category";
 
   return (
-    <div className="mt-5 flex flex-wrap gap-5 border-b border-line pb-0">
+    <ScrollableNav aria-label="Standings view" className="mt-5">
       {views.map((v) => {
         const active =
           v.id === "categories" ? categoriesActive : page.view === v.id;
@@ -152,7 +153,7 @@ function LiveStandingsViewNav({
           </Link>
         );
       })}
-    </div>
+    </ScrollableNav>
   );
 }
 

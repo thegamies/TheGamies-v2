@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CopyInviteButton } from "@/components/communities/CopyInviteButton";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   EDITION_PUBLIC_LABEL,
   showEditionNav,
@@ -67,19 +68,22 @@ export function CommunityNav({
   }
 
   return (
-    <nav aria-label="Community">
-      <div className="scrollbar-none flex flex-nowrap gap-2 overflow-x-auto">
-        {items.map((item) => (
-          <Link
-            key={item.key}
-            href={item.href}
-            className={`shrink-0 ${navItemClass("primary", active === item.key)}`}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </div>
-    </nav>
+    <ScrollableNav
+      aria-label="Community"
+      border={false}
+      fadeFrom="panel"
+      rowClassName="items-center gap-2"
+    >
+      {items.map((item) => (
+        <Link
+          key={item.key}
+          href={item.href}
+          className={navItemClass("primary", active === item.key)}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </ScrollableNav>
   );
 }
 

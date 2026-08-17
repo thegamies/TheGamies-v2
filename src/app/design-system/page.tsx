@@ -18,6 +18,7 @@ import { GameCover } from "@/components/ui/GameCover";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { SectionRule } from "@/components/ui/SectionRule";
@@ -88,32 +89,43 @@ function MastheadResultsFixture() {
         year={2026}
         years={[2026, 2025]}
       />
-      <div className="mt-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line">
-        <div className="flex flex-wrap gap-5">
+      <div className="mt-8 flex min-w-0 items-end justify-between gap-x-6 border-b border-line pb-0">
+        <ScrollableNav
+          aria-label="Results view"
+          border={false}
+          className="min-w-0 flex-1"
+        >
           {RESULTS_VIEWS.map((label, i) => (
-            <span
-              key={label}
-              className={navItemClass("secondary", i === 0)}
-            >
+            <span key={label} className={navItemClass("secondary", i === 0)}>
               {label}
             </span>
           ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-2 pb-1.5">
+        </ScrollableNav>
+        <ScrollableNav
+          aria-label="Results board"
+          border={false}
+          className="shrink-0"
+          rowClassName="items-center gap-x-2 pb-1.5"
+        >
           <span className={navItemClass("tertiary", true)}>Community</span>
           <span className="text-muted" aria-hidden>
             ·
           </span>
           <span className={navItemClass("tertiary", false)}>Hosts</span>
-        </div>
+        </ScrollableNav>
       </div>
-      <div className="mt-6 flex flex-wrap items-center gap-x-2">
+      <ScrollableNav
+        aria-label="Results layout"
+        border={false}
+        className="mt-6"
+        rowClassName="items-center gap-x-2"
+      >
         <span className={navItemClass("tertiary", true)}>Ranked</span>
         <span className="text-muted" aria-hidden>
           ·
         </span>
         <span className={navItemClass("tertiary", false)}>Comparison</span>
-      </div>
+      </ScrollableNav>
       <p className="mt-6 text-sm text-muted">Standings content starts here…</p>
     </div>
   );
@@ -245,7 +257,9 @@ export default function DesignSystemPage() {
         <p className="mb-4 max-w-2xl text-sm text-muted">
           Primary chips for community masthead. Secondary underlines only under
           a local heading (Results, Community Settings). Tertiary for board
-          filters. Helper:{" "}
+          filters. Tab strips use{" "}
+          <code className="text-ink">ScrollableNav</code> — single line,
+          horizontal scroll, edge fade when tabs overflow. Styles:{" "}
           <code className="text-ink">navItemClass()</code>.
         </p>
         <div className="space-y-8">
@@ -253,48 +267,64 @@ export default function DesignSystemPage() {
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
               Primary · bordered chips
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <span className={navItemClass("primary", true)}>Events</span>
-              <span className={navItemClass("primary", false)}>Overview</span>
-              <span className={navItemClass("primary", false)}>
-                Live Rankings
-              </span>
-              <span className={navItemClass("primary", false)}>Members</span>
-              <span className={navItemClass("primary", false)}>Settings</span>
+            <div className="mt-3 max-w-xs border border-line bg-panel p-3">
+              <ScrollableNav
+                aria-label="Primary fixture"
+                border={false}
+                fadeFrom="panel"
+                rowClassName="items-center gap-2"
+              >
+                <span className={navItemClass("primary", true)}>Events</span>
+                <span className={navItemClass("primary", false)}>Overview</span>
+                <span className={navItemClass("primary", false)}>
+                  Live Rankings
+                </span>
+                <span className={navItemClass("primary", false)}>Members</span>
+                <span className={navItemClass("primary", false)}>Settings</span>
+              </ScrollableNav>
             </div>
           </div>
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
               Secondary · underline on hairline
             </p>
-            <div className="mt-3 flex flex-wrap gap-5 border-b border-line">
-              <span className={navItemClass("secondary", true)}>Reveal</span>
-              <span className={navItemClass("secondary", false)}>Results</span>
-              <span className={navItemClass("secondary", false)}>
-                Full standings
-              </span>
-              <span className={navItemClass("secondary", false)}>Categories</span>
-              <span className={navItemClass("secondary", false)}>Voters</span>
-              <span className={navItemClass("secondary", false)}>Your ballot</span>
+            <div className="mt-3 max-w-sm">
+              <ScrollableNav aria-label="Secondary fixture">
+                <span className={navItemClass("secondary", true)}>Reveal</span>
+                <span className={navItemClass("secondary", false)}>Results</span>
+                <span className={navItemClass("secondary", false)}>
+                  Full standings
+                </span>
+                <span className={navItemClass("secondary", false)}>Categories</span>
+                <span className={navItemClass("secondary", false)}>Voters</span>
+                <span className={navItemClass("secondary", false)}>Your ballot</span>
+              </ScrollableNav>
             </div>
-            <div className="mt-6 flex flex-wrap gap-5 border-b border-line">
-              <span className={navItemClass("secondary", true)}>
-                Live Rankings
-              </span>
-              <span className={navItemClass("secondary", false)}>Events</span>
+            <div className="mt-6 max-w-xs">
+              <ScrollableNav aria-label="Settings fixture">
+                <span className={navItemClass("secondary", true)}>
+                  Live Rankings
+                </span>
+                <span className={navItemClass("secondary", false)}>Events</span>
+              </ScrollableNav>
             </div>
           </div>
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
               Tertiary · plain text
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-x-2">
+            <ScrollableNav
+              aria-label="Tertiary fixture"
+              border={false}
+              className="mt-3 max-w-[16rem]"
+              rowClassName="items-center gap-x-2"
+            >
               <span className={navItemClass("tertiary", true)}>Community</span>
               <span className="text-muted" aria-hidden>
                 ·
               </span>
               <span className={navItemClass("tertiary", false)}>Hosts</span>
-            </div>
+            </ScrollableNav>
           </div>
           <div>
             <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">

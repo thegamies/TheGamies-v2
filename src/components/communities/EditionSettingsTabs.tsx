@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   editionHostHostsHref,
   editionHostPreviewHref,
@@ -20,9 +21,11 @@ export function EditionSettingsTabs({
   includePreview: boolean;
 }) {
   return (
-    <nav
-      className="mt-6 flex flex-wrap gap-x-3 gap-y-1"
+    <ScrollableNav
       aria-label="Event settings"
+      className="mt-6"
+      border={false}
+      rowClassName="items-center gap-x-3"
     >
       <Link
         href={editionHostSettingsHref(slug, year)}
@@ -52,6 +55,6 @@ export function EditionSettingsTabs({
           </Link>
         </>
       ) : null}
-    </nav>
+    </ScrollableNav>
   );
 }

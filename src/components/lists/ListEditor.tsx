@@ -66,6 +66,7 @@ import {
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   buildListDraftPayload,
   draftMatchesEditor,
@@ -941,10 +942,12 @@ export function ListEditor({
       </div>
 
       {showCategoryTabs ? (
-        <div
-          className="flex flex-wrap gap-5 border-b border-line pb-0"
+        <ScrollableNav
+          as="div"
           role="tablist"
           aria-label="List sections"
+          border
+          rowClassName="gap-5"
         >
           <button
             type="button"
@@ -968,7 +971,7 @@ export function ListEditor({
           >
             Categories
           </button>
-        </div>
+        </ScrollableNav>
       ) : null}
 
       {showToolbar ? (
