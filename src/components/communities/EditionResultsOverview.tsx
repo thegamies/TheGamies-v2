@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
 import { EditionGotyHighlights } from "@/components/communities/EditionGotyHighlights";
 import { navItemClass } from "@/components/ui/navLevels";
@@ -56,40 +56,38 @@ export function EditionResultsOverview({
   categoryComparison: EditionCategoryComparisonMatrix;
   youBallotHref: string | null;
 }) {
+  const hasSsrComparison =
+    initialMatrix.hasGames || initialCategoryComparison.hasGames;
+
   const [layout, setLayout] = useState<ResultsBoardLayout>("ranked");
-  const [matrix, setMatrix] = useState(
-    initialMatrix.hasGames ? initialMatrix : EMPTY_MATRIX,
-  );
-  const [categoryComparison, setCategoryComparison] = useState(
-    initialCategoryComparison.hasGames
-      ? initialCategoryComparison
-      : EMPTY_CATEGORY_COMPARISON,
+  const [fetchedMatrix, setFetchedMatrix] = useState(EMPTY_MATRIX);
+  const [fetchedCategoryComparison, setFetchedCategoryComparison] = useState(
+    EMPTY_CATEGORY_COMPARISON,
   );
   const [comparisonStatus, setComparisonStatus] = useState<
     "idle" | "loading" | "ready" | "error"
-  >(
-    initialMatrix.hasGames || initialCategoryComparison.hasGames
-      ? "ready"
-      : "idle",
-  );
+  >("idle");
 
-  // Host Results preview SSRs comparison; soft-nav demo↔live must replace it.
-  // Published pages pass empty matrices and fetch on demand — don't wipe that.
-  useEffect(() => {
-    const hasSsr =
-      initialMatrix.hasGames || initialCategoryComparison.hasGames;
-    if (!hasSsr) return;
-    setMatrix(initialMatrix.hasGames ? initialMatrix : EMPTY_MATRIX);
-    setCategoryComparison(
-      initialCategoryComparison.hasGames
-        ? initialCategoryComparison
-        : EMPTY_CATEGORY_COMPARISON,
-    );
-    setComparisonStatus("ready");
-  }, [initialMatrix, initialCategoryComparison]);
+  const matrix = hasSsrComparison
+    ? initialMatrix.hasGames
+      ? initialMatrix
+      : EMPTY_MATRIX
+    : fetchedMatrix;
+  const categoryComparison = hasSsrComparison
+    ? initialCategoryComparison.hasGames
+      ? initialCategoryComparison
+      : EMPTY_CATEGORY_COMPARISON
+    : fetchedCategoryComparison;
+  const effectiveComparisonStatus = hasSsrComparison
+    ? "ready"
+    : comparisonStatus;
 
   const loadComparison = useCallback(async () => {
-    if (comparisonStatus === "ready" || comparisonStatus === "loading") {
+    if (
+      hasSsrComparison ||
+      comparisonStatus === "ready" ||
+      comparisonStatus === "loading"
+    ) {
       return;
     }
     setComparisonStatus("loading");
@@ -102,13 +100,13 @@ export function EditionResultsOverview({
         matrix: EditionBallotMatrix;
         categoryComparison: EditionCategoryComparisonMatrix;
       };
-      setMatrix(data.matrix);
-      setCategoryComparison(data.categoryComparison);
+      setFetchedMatrix(data.matrix);
+      setFetchedCategoryComparison(data.categoryComparison);
       setComparisonStatus("ready");
     } catch {
       setComparisonStatus("error");
     }
-  }, [comparisonStatus, slug, year]);
+  }, [comparisonStatus, hasSsrComparison, slug, year]);
 
   const selectLayout = (next: ResultsBoardLayout) => {
     setLayout(next);
@@ -122,9 +120,10 @@ export function EditionResultsOverview({
   const showGoty = topTen.length > 0 || matrix.hasGames;
   const comparisonPending =
     layout === "comparison" &&
-    (comparisonStatus === "loading" || comparisonStatus === "idle");
+    (effectiveComparisonStatus === "loading" ||
+      effectiveComparisonStatus === "idle");
   const comparisonFailed =
-    layout === "comparison" && comparisonStatus === "error";
+    layout === "comparison" && effectiveComparisonStatus === "error";
 
   if (!showGoty && !showCategories && layout === "ranked") {
     return <p className="text-muted">No results for this board yet.</p>;

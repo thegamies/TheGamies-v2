@@ -12,7 +12,6 @@ import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
 import {
   EditionResultsView,
-  EditionResultsViewNav,
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";

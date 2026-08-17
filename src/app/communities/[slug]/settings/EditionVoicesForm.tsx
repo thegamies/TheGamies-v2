@@ -46,6 +46,7 @@ export function EditionVoicesForm({
 }) {
   const searchId = useId();
   const [roster, setRoster] = useState(members);
+  const [membersSnapshot, setMembersSnapshot] = useState(members);
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<EditionVoiceMemberOption[]>([]);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -53,18 +54,16 @@ export function EditionVoicesForm({
   const [searching, startSearch] = useTransition();
   const [mutating, startMutate] = useTransition();
 
-  useEffect(() => {
+  // Reset optimistic roster when the server list identity changes (nav / refresh).
+  if (members !== membersSnapshot) {
+    setMembersSnapshot(members);
     setRoster(members);
-  }, [members]);
+  }
 
   useEffect(() => {
     if (locked) return;
     const q = query.trim();
-    if (q.length < 1) {
-      setHits([]);
-      setSearchError(null);
-      return;
-    }
+    if (q.length < 1) return;
     const handle = window.setTimeout(() => {
       startSearch(async () => {
         const result = await searchEditionHostMembersAction({
@@ -87,6 +86,14 @@ export function EditionVoicesForm({
   const trimmed = query.trim();
   const visible = trimmed ? hits : roster;
   const defaultEmpty = !trimmed && visible.length === 0;
+
+  function onQueryChange(value: string) {
+    setQuery(value);
+    if (value.trim().length < 1) {
+      setHits([]);
+      setSearchError(null);
+    }
+  }
 
   function toggleVoice(member: EditionVoiceMemberOption) {
     const nextVoice = !member.isVoice;
@@ -143,7 +150,7 @@ export function EditionVoicesForm({
           id={searchId}
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => onQueryChange(e.target.value)}
           placeholder="Search members by name or @username"
           className="w-full max-w-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted"
           autoComplete="off"

@@ -19,6 +19,7 @@ export function EditionEventHostsPanel({
   return (
     <div className="mt-6">
       <EditionVoicesForm
+        key={`${year}-${status}`}
         slug={slug}
         year={year}
         status={status}

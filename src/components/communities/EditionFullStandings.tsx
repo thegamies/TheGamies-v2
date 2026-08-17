@@ -37,21 +37,13 @@ export function EditionFullStandings({
   initialRows?: EditionGotyStandingRow[];
 }) {
   const ssrOnly = initialRows != null;
-  const [rows, setRows] = useState<EditionGotyStandingRow[]>(
-    initialRows ?? [],
-  );
-  const [page, setPage] = useState(ssrOnly ? 1 : 0);
+  const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
+  const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  useEffect(() => {
-    if (initialRows == null) return;
-    setRows(initialRows);
-    setPage(1);
-    setTotalPages(1);
-    setError(null);
-  }, [initialRows]);
+  const displayRows = ssrOnly ? initialRows : rows;
 
   async function fetchPage(nextPage: number): Promise<StandingsPayload> {
     const params = new URLSearchParams({
@@ -131,14 +123,14 @@ export function EditionFullStandings({
 
       {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
 
-      {rows.length === 0 && pending ? (
+      {displayRows.length === 0 && pending ? (
         <p className="mt-6 text-sm text-muted">Loading standings…</p>
       ) : null}
 
-      {rows.length > 0 ? (
+      {displayRows.length > 0 ? (
         <>
           <StandingGameCardGrid>
-            {rows.map((row) => (
+            {displayRows.map((row) => (
               <li key={row.gameId}>
                 <StandingGameCard
                   place={row.rank}
@@ -162,10 +154,10 @@ export function EditionFullStandings({
               </button>
             </div>
           ) : null}
-          {ssrOnly && rows.length < totalGames ? (
+          {ssrOnly && displayRows.length < totalGames ? (
             <p className="mt-6 text-sm text-muted">
-              Showing the first {rows.length} of {totalGames}. The full board
-              opens when results publish.
+              Showing the first {displayRows.length} of {totalGames}. The full
+              board opens when results publish.
             </p>
           ) : null}
         </>
