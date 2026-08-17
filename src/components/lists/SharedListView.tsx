@@ -11,14 +11,21 @@ import { ListExportPoster } from "@/components/list-export/ListExportAwardsLayou
 import { EXPORT_LAYOUT_DEFAULT } from "@/components/list-export/exportDimensions";
 import { rankChromeForStyle } from "@/components/list-export/rankChrome";
 import { Button } from "@/components/ui/Button";
+import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
+import { navItemClass } from "@/components/ui/navLevels";
 import { RankMarker } from "@/components/ui/RankMarker";
 import {
   parseStoredListFormat,
   parseStoredRankStyle,
   type ListFormat,
 } from "@/lib/lists/schema";
+import {
+  listShareViewHref,
+  withListShareView,
+  type ListShareView,
+} from "@/lib/lists/urls";
 
 type SharedListItem = {
   gameId: string;
@@ -28,6 +35,15 @@ type SharedListItem = {
   coverUrl: string | null;
   rank: number;
   blurb: string | null;
+};
+
+type SharedCategoryPick = {
+  categoryId: string;
+  label: string;
+  description: string | null;
+  slug: string;
+  title: string;
+  coverUrl: string | null;
 };
 
 type SharedListViewData = {
@@ -54,6 +70,9 @@ type SharedListViewProps = {
   isSignedIn: boolean;
   alreadyOwned: boolean;
   editHref: string;
+  sharePath: string;
+  view?: ListShareView;
+  categoryPicks?: SharedCategoryPick[];
   saved?: boolean;
   error?: string | null;
 };
@@ -65,10 +84,14 @@ export function SharedListView({
   isSignedIn,
   alreadyOwned,
   editHref,
+  sharePath,
+  view = "goty",
+  categoryPicks = [],
   saved = false,
   error = null,
 }: SharedListViewProps) {
   const isGoty = data.list.listType !== "custom";
+  const onCategories = isGoty && view === "categories";
   const [viewFormat, setViewFormat] = useState<ListFormat>(() =>
     parseStoredListFormat(data.list.listFormat),
   );
@@ -76,6 +99,15 @@ export function SharedListView({
   const rankFormat = data.list.showSuffix ? "ordinal" : "number";
   const year = data.list.year ?? new Date().getUTCFullYear();
   const listType = isGoty ? "goty" : "custom";
+  const count = onCategories ? categoryPicks.length : data.items.length;
+  const countLabel = onCategories
+    ? count === 1
+      ? "pick"
+      : "picks"
+    : count === 1
+      ? "game"
+      : "games";
+  const tabOpts = { saved, error };
 
   return (
     <main className="relative mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
@@ -112,8 +144,7 @@ export function SharedListView({
           )}
           <span className="text-muted">
             {" "}
-            · {data.items.length}{" "}
-            {data.items.length === 1 ? "game" : "games"}
+            · {count} {countLabel}
           </span>
         </p>
 
@@ -133,11 +164,36 @@ export function SharedListView({
           alreadyOwned={alreadyOwned}
         />
 
+        {isGoty ? (
+          <nav
+            className="mt-8 flex flex-wrap gap-5 border-b border-line"
+            aria-label="List"
+          >
+            <Link
+              href={listShareViewHref(sharePath, { ...tabOpts, view: "goty" })}
+              className={navItemClass("secondary", !onCategories)}
+            >
+              Game of the Year
+            </Link>
+            <Link
+              href={listShareViewHref(sharePath, {
+                ...tabOpts,
+                view: "categories",
+              })}
+              className={navItemClass("secondary", onCategories)}
+            >
+              Categories
+            </Link>
+          </nav>
+        ) : null}
+
         <div className="mt-8 flex flex-wrap items-center gap-2">
-          <ListFormatControl
-            value={viewFormat}
-            onChange={setViewFormat}
-          />
+          {onCategories ? null : (
+            <ListFormatControl
+              value={viewFormat}
+              onChange={setViewFormat}
+            />
+          )}
           {alreadyOwned ? null : (
             <Link href="/create">
               <Button type="button" size="sm">
@@ -146,20 +202,22 @@ export function SharedListView({
             </Link>
           )}
           <CopyLinkButton />
-          <ShareExportButton
-            games={data.items.map((item) => ({
-              id: item.gameId,
-              title: item.title,
-              imageUrl: item.coverUrl,
-            }))}
-            year={year}
-            title={data.list.title}
-            listType={listType}
-            rankStyle={rankStyle}
-            rankFormat={rankFormat}
-          />
+          {onCategories ? null : (
+            <ShareExportButton
+              games={data.items.map((item) => ({
+                id: item.gameId,
+                title: item.title,
+                imageUrl: item.coverUrl,
+              }))}
+              year={year}
+              title={data.list.title}
+              listType={listType}
+              rankStyle={rankStyle}
+              rankFormat={rankFormat}
+            />
+          )}
           {canEdit ? (
-            <Link href={editHref}>
+            <Link href={withListShareView(editHref, view)}>
               <Button type="button" variant="bordered" size="sm">
                 Edit
               </Button>
@@ -167,7 +225,9 @@ export function SharedListView({
           ) : null}
         </div>
 
-        {viewFormat === "poster" ? (
+        {onCategories ? (
+          <SharedCategoryPicks picks={categoryPicks} />
+        ) : viewFormat === "poster" ? (
           <SharedPoster
             items={data.items}
             year={year}
@@ -237,6 +297,29 @@ export function SharedListView({
         )}
       </div>
     </main>
+  );
+}
+
+function SharedCategoryPicks({ picks }: { picks: SharedCategoryPick[] }) {
+  if (picks.length === 0) {
+    return <p className="mt-10 text-muted">No category picks yet.</p>;
+  }
+
+  return (
+    <ul className="mt-10 divide-y divide-line border-y border-line">
+      {picks.map((pick) => (
+        <li key={pick.categoryId} className="py-6">
+          <Link href={`/games/${pick.slug}`} className="group block">
+            <CategoryPickCard
+              label={pick.label}
+              description={pick.description}
+              title={pick.title}
+              coverUrl={pick.coverUrl}
+            />
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 

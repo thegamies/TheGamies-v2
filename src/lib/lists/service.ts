@@ -1,8 +1,10 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import {
+  awardCategories,
   createDb,
   covers,
   games,
+  listCategoryVotes,
   listItems,
   lists,
   profiles,
@@ -269,6 +271,13 @@ async function loadListItems(
     year: r.year,
     coverUrl: coverUrlFromImageId(r.coverImageId),
   }));
+}
+
+export async function getShareListItems(
+  listId: string,
+  db: Db = getDb(),
+) {
+  return loadListItems(listId, db);
 }
 
 export type HydratedDraftGame = {
@@ -579,14 +588,61 @@ export type ShareListPayload = {
   owner: { username: string; displayName: string } | null;
 };
 
+export type ShareListCategoryPick = {
+  categoryId: string;
+  label: string;
+  description: string | null;
+  gameId: string;
+  slug: string;
+  title: string;
+  coverUrl: string | null;
+};
+
+export async function getShareListCategoryPicks(
+  listId: string,
+  db: Db = getDb(),
+): Promise<ShareListCategoryPick[]> {
+  const rows = await db
+    .select({
+      categoryId: listCategoryVotes.categoryId,
+      label: awardCategories.label,
+      description: awardCategories.description,
+      gameId: games.id,
+      slug: games.slug,
+      title: games.title,
+      coverImageId: covers.imageId,
+    })
+    .from(listCategoryVotes)
+    .innerJoin(
+      awardCategories,
+      eq(awardCategories.id, listCategoryVotes.categoryId),
+    )
+    .innerJoin(games, eq(games.id, listCategoryVotes.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(eq(listCategoryVotes.listId, listId))
+    .orderBy(asc(awardCategories.sortOrder), asc(awardCategories.label));
+
+  return rows.map((row) => ({
+    categoryId: row.categoryId,
+    label: row.label,
+    description: row.description,
+    gameId: row.gameId,
+    slug: row.slug,
+    title: row.title,
+    coverUrl: coverUrlFromImageId(row.coverImageId),
+  }));
+}
+
 export async function getShareListByPublicId(
   publicId: string,
-  db: Db = getDb(),
+  opts: { db?: Db; includeItems?: boolean } = {},
 ): Promise<ShareListPayload | null> {
+  const db = opts.db ?? getDb();
   const list = await getListByPublicId(publicId, db);
   if (!list) return null;
 
-  const items = await loadListItems(list.id, db);
+  const includeItems = opts.includeItems !== false;
+  const items = includeItems ? await loadListItems(list.id, db) : [];
   let owner: { username: string; displayName: string } | null = null;
   if (list.profileId) {
     const [profile] = await db
@@ -611,8 +667,9 @@ export async function getShareListByPublicId(
 export async function getShareListByUsernameSlug(
   username: string,
   slug: string,
-  db: Db = getDb(),
+  opts: { db?: Db; includeItems?: boolean } = {},
 ): Promise<ShareListPayload | null> {
+  const db = opts.db ?? getDb();
   const [row] = await db
     .select({
       list: lists,
@@ -626,7 +683,8 @@ export async function getShareListByUsernameSlug(
 
   if (!row) return null;
 
-  const items = await loadListItems(row.list.id, db);
+  const includeItems = opts.includeItems !== false;
+  const items = includeItems ? await loadListItems(row.list.id, db) : [];
   return {
     list: row.list,
     items,

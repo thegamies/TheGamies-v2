@@ -71,7 +71,7 @@ Create UI mirrors the Social Gamer Card prototype:
 ## URLs
 
 - Create: `/create`, `/create/goty`, `/create/custom`
-- Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`)
+- Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`). GOTY lists use secondary tabs **Game of the Year** (default) and **Categories** (`?view=categories`). Categories loads only that list’s picks (not the full award catalog). **Edit** on Categories opens `/create/goty?id=…&view=categories`. Switching tabs in the GOTY editor updates the same `?view=` query. Custom lists have no tabs.
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
 - Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL

@@ -82,6 +82,10 @@ import {
   type ListAuthIntent,
 } from "@/lib/lists/auth-intent";
 import { LIST_BLURB_MAX, LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import {
+  withListShareView,
+  type ListShareView,
+} from "@/lib/lists/urls";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 
 const SLOT_PRESETS = [5, 10, 20, 50] as const;
@@ -117,6 +121,8 @@ type ListEditorProps = {
   returnPath?: string;
   awardCategories?: AwardCategoryOption[];
   initialCategoryVotes?: CategoryVoteSelection[];
+  /** Public GOTY share Categories tab opens the editor on Categories. */
+  initialView?: "goty" | "categories";
 };
 
 function withRanks(items: EditorItem[]): EditorItem[] {
@@ -174,10 +180,10 @@ export function ListEditor({
   returnPath: returnPathProp,
   awardCategories = [],
   initialCategoryVotes = [],
+  initialView = "goty",
 }: ListEditorProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const returnPath = returnPathProp ?? pathname;
   const currentYear = new Date().getUTCFullYear();
   const searchRef = useRef<HTMLInputElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
@@ -214,7 +220,13 @@ export function ListEditor({
     useState<CategoryVoteSelection[]>(initialCategoryVotes);
   const showCategoryTabs =
     listType === "goty" && awardCategories.length > 0;
-  const [editorView, setEditorView] = useState<"goty" | "categories">("goty");
+  const [editorView, setEditorView] = useState<ListShareView>(
+    initialView === "categories" ? "categories" : "goty",
+  );
+  const returnPath = withListShareView(
+    returnPathProp ?? pathname,
+    editorView,
+  );
   const [items, setItems] = useState<EditorItem[]>(() =>
     withRanks(
       initialItems.map((item) => ({
@@ -768,6 +780,19 @@ export function ListEditor({
     return id ? `/l/${id}` : "/create";
   }
 
+  function selectEditorView(next: ListShareView) {
+    setEditorView(next);
+    if (next === "categories") {
+      setPanelOpen(false);
+      setSettingsOpen(false);
+    }
+    const current = `${pathname}${window.location.search}`;
+    const href = withListShareView(current, next);
+    if (href !== current) {
+      window.history.replaceState(window.history.state, "", href);
+    }
+  }
+
   function onDone() {
     if (dirty) {
       setLeavePrompt("done");
@@ -926,7 +951,7 @@ export function ListEditor({
             role="tab"
             aria-selected={editorView === "goty"}
             onClick={() => {
-              setEditorView("goty");
+              selectEditorView("goty");
             }}
             className={navItemClass("secondary", editorView === "goty")}
           >
@@ -937,9 +962,7 @@ export function ListEditor({
             role="tab"
             aria-selected={editorView === "categories"}
             onClick={() => {
-              setPanelOpen(false);
-              setSettingsOpen(false);
-              setEditorView("categories");
+              selectEditorView("categories");
             }}
             className={navItemClass("secondary", editorView === "categories")}
           >

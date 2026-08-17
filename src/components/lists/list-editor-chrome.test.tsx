@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
 
 import type { ReactNode } from "react";
+import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchGamesForList } from "@/lib/lists/search-games-client";
@@ -52,6 +53,7 @@ vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 
 afterEach(() => {
   cleanup();
+  window.history.replaceState({}, "", "/");
 });
 
 describe("ListDragHandle", () => {
@@ -143,5 +145,64 @@ describe("ListEditor chrome", () => {
     });
     fireEvent.click(screen.getByTitle("Hades II"));
     expect(input).toHaveProperty("value", "hades");
+  });
+
+  it("opens on Categories when initialView is categories", () => {
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+        initialView="categories"
+        awardCategories={[
+          {
+            id: "best-debut",
+            label: "Best Debut",
+            description: null,
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("tab", { name: "Categories" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Award picks")).toBeTruthy();
+    expect(
+      screen.queryByRole("textbox", { name: "Search games" }),
+    ).toBeNull();
+  });
+
+  it("updates the create URL when switching GOTY and Categories tabs", () => {
+    window.history.replaceState({}, "", "/create/goty?id=abc");
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+        awardCategories={[
+          {
+            id: "best-debut",
+            label: "Best Debut",
+            description: null,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Categories" }));
+    expect(
+      screen.getByRole("tab", { name: "Categories" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?id=abc&view=categories");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Game of the Year" }));
+    expect(
+      screen.getByRole("tab", { name: "Game of the Year" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?id=abc");
   });
 });

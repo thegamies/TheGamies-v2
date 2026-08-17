@@ -4,8 +4,8 @@ import { SharedListView } from "@/components/lists/SharedListView";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
-import { getShareListByPublicId } from "@/lib/lists/service";
-import { listSharePath } from "@/lib/lists/urls";
+import { getShareListByPublicId, getShareListCategoryPicks, getShareListItems } from "@/lib/lists/service";
+import { listSharePath, listShareViewHref, parseListShareView } from "@/lib/lists/urls";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 type Params = Promise<{ publicId: string }>;
@@ -21,7 +21,9 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { publicId } = await params;
-  const data = await getShareListByPublicId(publicId).catch(() => null);
+  const data = await getShareListByPublicId(publicId, {
+    includeItems: false,
+  }).catch(() => null);
   if (!data) return { title: "List" };
   return {
     title: data.list.title,
@@ -43,22 +45,36 @@ export default async function SharedListByPublicIdPage({
   const error = first(sp.error);
   const saved = first(sp.saved) === "1";
 
-  const data = await getShareListByPublicId(publicId).catch(() => null);
+  const data = await getShareListByPublicId(publicId, {
+    includeItems: false,
+  }).catch(() => null);
   if (!data) notFound();
 
+  const view =
+    data.list.listType === "goty"
+      ? parseListShareView(first(sp.view))
+      : "goty";
+
   if (data.owner && data.list.slug) {
-    const qs = new URLSearchParams();
-    if (saved) qs.set("saved", "1");
-    if (error) qs.set("error", error);
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     permanentRedirect(
-      `${listSharePath({
-        publicId: data.list.publicId,
-        slug: data.list.slug,
-        username: data.owner.username,
-      })}${suffix}`,
+      listShareViewHref(
+        listSharePath({
+          publicId: data.list.publicId,
+          slug: data.list.slug,
+          username: data.owner.username,
+        }),
+        { view, saved, error },
+      ),
     );
   }
+
+  if (view !== "categories") {
+    data.items = await getShareListItems(data.list.id).catch(() => []);
+  }
+  const categoryPicks =
+    view === "categories"
+      ? await getShareListCategoryPicks(data.list.id).catch(() => [])
+      : [];
 
   const cookie = await readListEditCookie();
   let profileId: string | null = null;
@@ -98,6 +114,9 @@ export default async function SharedListByPublicIdPage({
         isSignedIn={isSignedIn}
         alreadyOwned={alreadyOwned}
         editHref={editHref}
+        sharePath={listSharePath({ publicId })}
+        view={view}
+        categoryPicks={categoryPicks}
         saved={saved}
         error={error}
       />

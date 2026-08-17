@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SharedListView } from "./SharedListView";
@@ -69,6 +70,8 @@ const data = {
   },
 };
 
+const sharePath = "/u/eric4/goty-2026";
+
 describe("SharedListView", () => {
   it("hides Make your own on your own list and skips GOTY year chrome", () => {
     render(
@@ -79,6 +82,7 @@ describe("SharedListView", () => {
         isSignedIn
         alreadyOwned
         editHref="/create/goty?id=pub"
+        sharePath={sharePath}
       />,
     );
 
@@ -100,8 +104,86 @@ describe("SharedListView", () => {
         isSignedIn
         alreadyOwned={false}
         editHref="/create/goty?id=pub"
+        sharePath={sharePath}
       />,
     );
     expect(screen.getByRole("link", { name: "Make your own" })).toBeTruthy();
+  });
+
+  it("links Game of the Year and Categories tabs on GOTY lists", () => {
+    render(
+      <SharedListView
+        data={data}
+        canEdit
+        canClaim={false}
+        isSignedIn
+        alreadyOwned
+        editHref="/create/goty?id=pub"
+        sharePath={sharePath}
+      />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "Game of the Year" }),
+    ).toHaveAttribute("href", sharePath);
+    expect(screen.getByRole("link", { name: "Categories" })).toHaveAttribute(
+      "href",
+      `${sharePath}?view=categories`,
+    );
+  });
+
+  it("shows category picks and hides format controls on the Categories tab", () => {
+    render(
+      <SharedListView
+        data={data}
+        canEdit
+        canClaim={false}
+        isSignedIn
+        alreadyOwned
+        editHref="/create/goty?id=pub"
+        sharePath={sharePath}
+        view="categories"
+        categoryPicks={[
+          {
+            categoryId: "best-debut",
+            label: "Best Debut",
+            description: null,
+            slug: "hades-ii",
+            title: "Hades II",
+            coverUrl: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole("group", { name: "List format" })).toBeNull();
+    expect(screen.getByText("Best Debut")).toBeTruthy();
+    expect(screen.getByText(/1 pick/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute(
+      "href",
+      "/create/goty?id=pub&view=categories",
+    );
+  });
+
+  it("omits GOTY tabs on custom lists", () => {
+    render(
+      <SharedListView
+        data={{
+          ...data,
+          list: { ...data.list, listType: "custom", title: "Favorites" },
+        }}
+        canEdit={false}
+        canClaim={false}
+        isSignedIn
+        alreadyOwned={false}
+        editHref="/create/custom?id=pub"
+        sharePath="/u/eric4/favorites"
+      />,
+    );
+
+    expect(screen.queryByRole("link", { name: "Categories" })).toBeNull();
+    expect(
+      screen.queryByRole("link", { name: "Game of the Year" }),
+    ).toBeNull();
   });
 });

@@ -22,6 +22,7 @@ import {
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { parseStoredListFormat, parseStoredRankStyle } from "@/lib/lists/schema";
 import { createGotyEntryMode } from "@/lib/lists/create-goty-entry";
+import { parseListShareView } from "@/lib/lists/urls";
 import {
   getCategoryVotesForList,
   listActiveAwardCategories,
@@ -63,6 +64,7 @@ export default async function CreateGotyPage({
   const yearParam = first(params.year);
   const resume = first(params.resume) === "1";
   const error = first(params.error) ?? null;
+  const editorView = parseListShareView(first(params.view));
   const authIntent = parseListAuthIntent(first(params.intent));
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
@@ -341,6 +343,7 @@ export default async function CreateGotyPage({
           }
           awardCategories={awardCategories}
           initialCategoryVotes={editor.categoryVotes ?? []}
+          initialView={editorView}
         />
       </div>
     );

@@ -4,7 +4,12 @@ import { SharedListView } from "@/components/lists/SharedListView";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
-import { getShareListByUsernameSlug } from "@/lib/lists/service";
+import {
+  getShareListByUsernameSlug,
+  getShareListCategoryPicks,
+  getShareListItems,
+} from "@/lib/lists/service";
+import { listSharePath, parseListShareView } from "@/lib/lists/urls";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
 
 type Params = Promise<{ username: string; listSlug: string }>;
@@ -20,9 +25,9 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { username, listSlug } = await params;
-  const data = await getShareListByUsernameSlug(username, listSlug).catch(
-    () => null,
-  );
+  const data = await getShareListByUsernameSlug(username, listSlug, {
+    includeItems: false,
+  }).catch(() => null);
   if (!data) return { title: "List" };
   return {
     title: data.list.title,
@@ -44,10 +49,22 @@ export default async function OwnedListBySlugPage({
   const error = first(sp.error);
   const saved = first(sp.saved) === "1";
 
-  const data = await getShareListByUsernameSlug(username, listSlug).catch(
-    () => null,
-  );
+  const data = await getShareListByUsernameSlug(username, listSlug, {
+    includeItems: false,
+  }).catch(() => null);
   if (!data) notFound();
+
+  const view =
+    data.list.listType === "goty"
+      ? parseListShareView(first(sp.view))
+      : "goty";
+  if (view !== "categories") {
+    data.items = await getShareListItems(data.list.id).catch(() => []);
+  }
+  const categoryPicks =
+    view === "categories"
+      ? await getShareListCategoryPicks(data.list.id).catch(() => [])
+      : [];
 
   const cookie = await readListEditCookie();
   let profileId: string | null = null;
@@ -77,6 +94,11 @@ export default async function OwnedListBySlugPage({
     data.list.listType === "goty"
       ? `/create/goty?id=${publicId}`
       : `/create/custom?id=${publicId}`;
+  const sharePath = listSharePath({
+    publicId,
+    slug: data.list.slug,
+    username: data.owner?.username,
+  });
 
   return (
     <>
@@ -87,6 +109,9 @@ export default async function OwnedListBySlugPage({
         isSignedIn={isSignedIn}
         alreadyOwned={alreadyOwned}
         editHref={editHref}
+        sharePath={sharePath}
+        view={view}
+        categoryPicks={categoryPicks}
         saved={saved}
         error={error}
       />
