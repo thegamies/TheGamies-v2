@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { profileHref, type ProfileTab } from "@/lib/profile/profile-page";
 
 export function ProfileTabs({
@@ -10,10 +11,7 @@ export function ProfileTabs({
   tab: ProfileTab;
 }) {
   return (
-    <nav
-      className="mt-10 flex flex-wrap gap-5 border-b border-line"
-      aria-label="Profile"
-    >
+    <ScrollableNav aria-label="Profile" className="mt-10">
       <Link
         href={profileHref(username, { tab: "lists" })}
         className={navItemClass("secondary", tab === "lists")}
@@ -26,6 +24,6 @@ export function ProfileTabs({
       >
         Communities
       </Link>
-    </nav>
+    </ScrollableNav>
   );
 }

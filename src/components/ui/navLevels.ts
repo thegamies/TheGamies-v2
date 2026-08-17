@@ -3,6 +3,7 @@
  *
  * Primary: bordered chips — community masthead section switcher (inside CommunityHeader).
  * Secondary: underline tabs on a hairline — in-page views under a local heading only.
+ * Wrap strips in ScrollableNav (single line + edge fade when overflowing).
  * Tertiary: plain text toggle (board / filter).
  * Multi-year: `YearSelect` / `EditionYearSelect` beside the section heading (not nav levels).
  * Community Settings Events: same control, always shown, plus Open event.

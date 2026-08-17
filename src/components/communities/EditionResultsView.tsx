@@ -13,6 +13,7 @@ import { EditionResultsOverview } from "@/components/communities/EditionResultsO
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
   EditionBallotMatrix,
   EditionCategoryComparisonMatrix,
@@ -93,8 +94,8 @@ export function EditionResultsViewNav({
   const modes: EditionResultsPublicMode[] = ["community", "voices"];
 
   return (
-    <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3 border-b border-line pb-0">
-      <div className="flex flex-wrap gap-5" aria-label="Results view">
+    <div className="mt-6 border-b border-line pb-0">
+      <ScrollableNav aria-label="Results view" border={false}>
         {views.map((v) => {
           const active =
             v.id === "settings"
@@ -125,12 +126,14 @@ export function EditionResultsViewNav({
             </Link>
           );
         })}
-      </div>
+      </ScrollableNav>
 
       {showBoardModes ? (
-        <div
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 pb-1.5"
+        <ScrollableNav
           aria-label="Results board"
+          border={false}
+          className="mt-3"
+          rowClassName="items-center gap-x-2"
         >
           {modes.map((m, i) => (
             <span key={m} className="contents">
@@ -155,7 +158,7 @@ export function EditionResultsViewNav({
             </span>
           ))}
           <EditionCategoryDebugBar />
-        </div>
+        </ScrollableNav>
       ) : null}
     </div>
   );

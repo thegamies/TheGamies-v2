@@ -5,6 +5,7 @@ import { EditionResultsCalculatingBanner } from "@/components/communities/Editio
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
   EditionBallotMatrix,
   EditionCategoryComparisonMatrix,
@@ -129,10 +130,7 @@ export function EditionHostResultsPreview({
         </div>
       </div>
 
-      <nav
-        className="mt-6 flex flex-wrap gap-5 border-b border-line"
-        aria-label="Results preview view"
-      >
+      <ScrollableNav aria-label="Results preview view" className="mt-6">
         {PREVIEW_VIEWS.map((v) => (
           <Link
             key={v.id}
@@ -145,7 +143,7 @@ export function EditionHostResultsPreview({
             {v.label}
           </Link>
         ))}
-      </nav>
+      </ScrollableNav>
 
       {isLive && !liveReady ? (
         <div className="mt-8">

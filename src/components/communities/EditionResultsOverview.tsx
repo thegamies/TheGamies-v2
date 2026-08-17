@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
 import { EditionGotyHighlights } from "@/components/communities/EditionGotyHighlights";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
   EditionBallotMatrix,
   EditionCategoryComparisonMatrix,
@@ -131,9 +132,11 @@ export function EditionResultsOverview({
 
   return (
     <div>
-      <div
-        className="mb-6 flex flex-wrap items-center gap-x-2"
+      <ScrollableNav
         aria-label="Results layout"
+        border={false}
+        className="mb-6"
+        rowClassName="items-center gap-x-2"
       >
         {LAYOUTS.map((opt, i) => (
           <span key={opt.id} className="contents">
@@ -152,7 +155,7 @@ export function EditionResultsOverview({
             </button>
           </span>
         ))}
-      </div>
+      </ScrollableNav>
 
       {comparisonPending ? (
         <p className="text-muted">Loading comparison…</p>

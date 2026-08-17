@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LIVE_PUBLIC_LABEL } from "@/components/communities/CommunityHeader";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   communitySettingsHref,
   type CommunitySettingsTab,
@@ -15,10 +16,7 @@ export function CommunitySettingsTabs({
   tab: CommunitySettingsTab;
 }) {
   return (
-    <nav
-      className="mt-6 flex flex-wrap gap-5 border-b border-line"
-      aria-label="Settings"
-    >
+    <ScrollableNav aria-label="Settings" className="mt-6">
       <Link
         href={communitySettingsHref(slug, { tab: "live" })}
         className={navItemClass("secondary", tab === "live")}
@@ -43,6 +41,6 @@ export function CommunitySettingsTabs({
       >
         Invite
       </Link>
-    </nav>
+    </ScrollableNav>
   );
 }

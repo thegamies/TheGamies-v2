@@ -15,6 +15,7 @@ import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { RankMarker } from "@/components/ui/RankMarker";
 import {
   parseStoredListFormat,
@@ -165,10 +166,7 @@ export function SharedListView({
         />
 
         {isGoty ? (
-          <nav
-            className="mt-8 flex flex-wrap gap-5 border-b border-line"
-            aria-label="List"
-          >
+          <ScrollableNav aria-label="List" className="mt-8">
             <Link
               href={listShareViewHref(sharePath, { ...tabOpts, view: "goty" })}
               className={navItemClass("secondary", !onCategories)}
@@ -184,7 +182,7 @@ export function SharedListView({
             >
               Categories
             </Link>
-          </nav>
+          </ScrollableNav>
         ) : null}
 
         <div className="mt-8 flex flex-wrap items-center gap-2">

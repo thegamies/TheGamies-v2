@@ -5,6 +5,7 @@ import {
   editionVoterBallotHref,
 } from "@/lib/communities/edition-results-href";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   editionBoardLabel,
   type EditionResultsPublicMode,
@@ -45,9 +46,11 @@ export function EditionVotersList({
           {mode === "voices" ? " · Hosts" : ""}
         </p>
         {showBoardModes ? (
-          <div
-            className="flex flex-wrap items-center gap-x-2 gap-y-1"
+          <ScrollableNav
             aria-label="Voters board"
+            border={false}
+            className="shrink-0"
+            rowClassName="items-center gap-x-2"
           >
             {modes.map((m, i) => (
               <span key={m} className="contents">
@@ -69,7 +72,7 @@ export function EditionVotersList({
                 </Link>
               </span>
             ))}
-          </div>
+          </ScrollableNav>
         ) : null}
       </div>
       <form className="mt-4 flex flex-wrap gap-2" method="get">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { navItemClass } from "@/components/ui/navLevels";
+import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
   editionHostRevealShowHref,
   editionHostSettingsHref,
@@ -36,10 +37,7 @@ export function EditionEventTabs({
   });
 
   return (
-    <nav
-      className="mt-6 flex flex-wrap gap-5 border-b border-line"
-      aria-label="Event view"
-    >
+    <ScrollableNav aria-label="Event view" className="mt-6">
       {includeRevealShow ? (
         <Link
           href={editionHostRevealShowHref(slug, year)}
@@ -70,6 +68,6 @@ export function EditionEventTabs({
           Settings
         </Link>
       ) : null}
-    </nav>
+    </ScrollableNav>
   );
 }
