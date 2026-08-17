@@ -26,18 +26,32 @@ export function EditionFullStandings({
   mode,
   rankMode = "competition",
   totalGames,
+  initialRows,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
   rankMode?: SharedRankMode;
   totalGames: number;
+  /** When set, render these rows and skip the published standings API. */
+  initialRows?: EditionGotyStandingRow[];
 }) {
-  const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
-  const [page, setPage] = useState(0);
+  const ssrOnly = initialRows != null;
+  const [rows, setRows] = useState<EditionGotyStandingRow[]>(
+    initialRows ?? [],
+  );
+  const [page, setPage] = useState(ssrOnly ? 1 : 0);
   const [totalPages, setTotalPages] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (initialRows == null) return;
+    setRows(initialRows);
+    setPage(1);
+    setTotalPages(1);
+    setError(null);
+  }, [initialRows]);
 
   async function fetchPage(nextPage: number): Promise<StandingsPayload> {
     const params = new URLSearchParams({
@@ -54,6 +68,7 @@ export function EditionFullStandings({
   }
 
   useEffect(() => {
+    if (ssrOnly) return;
     let cancelled = false;
     startTransition(async () => {
       setRows([]);
@@ -75,7 +90,7 @@ export function EditionFullStandings({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- board identity only
-  }, [slug, year, mode, rankMode]);
+  }, [slug, year, mode, rankMode, ssrOnly]);
 
   function loadMore() {
     startTransition(async () => {
@@ -135,7 +150,7 @@ export function EditionFullStandings({
               </li>
             ))}
           </StandingGameCardGrid>
-          {page < totalPages ? (
+          {!ssrOnly && page < totalPages ? (
             <div className="mt-8">
               <button
                 type="button"
@@ -146,6 +161,12 @@ export function EditionFullStandings({
                 {pending ? "Loading…" : "Load more"}
               </button>
             </div>
+          ) : null}
+          {ssrOnly && rows.length < totalGames ? (
+            <p className="mt-6 text-sm text-muted">
+              Showing the first {rows.length} of {totalGames}. The full board
+              opens when results publish.
+            </p>
           ) : null}
         </>
       ) : null}

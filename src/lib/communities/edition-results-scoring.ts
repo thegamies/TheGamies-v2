@@ -29,6 +29,8 @@ export type EditionResultsViewId =
   | "voters"
   | "ballot"
   | "settings"
+  /** Host results preview while closed (`?view=show` / results / standings / categories). */
+  | "show"
   /** @deprecated Prefer `?view=settings&panel=hosts`. */
   | "hosts"
   /** @deprecated Prefer `?view=settings&panel=preview`. */
@@ -36,6 +38,13 @@ export type EditionResultsViewId =
 
 /** Sub-tabs inside Event Settings (`?view=settings&panel=`). */
 export type EditionSettingsPanelId = "edition" | "hosts" | "preview";
+
+/** Host results preview data: placeholders vs real freeze (separate request). */
+export type EditionShowSource = "demo" | "live";
+
+export function parseEditionShowSource(raw: unknown): EditionShowSource {
+  return raw === "live" ? "live" : "demo";
+}
 
 /** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
@@ -64,6 +73,7 @@ export function parseEditionResultsView(
   if (raw === "settings") return "settings";
   if (raw === "hosts") return "hosts";
   if (raw === "preview") return "preview";
+  if (raw === "show") return "show";
   if (raw === "reveal") return "reveal";
   return "reveal";
 }

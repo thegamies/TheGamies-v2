@@ -42,7 +42,7 @@ export function editionCategoriesWriteBlockedReason(
 
 /**
  * Ops / QA helper: attach every active site category to an edition.
- * Product create leaves categories empty — hosts add via settings.
+ * Product create can attach a subset on `/create/event`; hosts may also add later.
  */
 export async function seedEditionCategories(
   editionId: string,

@@ -17,41 +17,60 @@ import {
 
 /** Shared award picker: search + group filter + square grid (ballot + event settings). */
 export function CategoryPickerGrid({
-  unused,
-  onAdd,
+  categories,
+  selectedIds,
+  onSelect,
+  className = "mt-4",
+  stickyToolbar = false,
 }: {
-  unused: FilterableAwardCategory[];
-  onAdd: (id: string) => void;
+  categories: FilterableAwardCategory[];
+  /** When set, selected tiles stay in the grid and show Added. */
+  selectedIds?: ReadonlySet<string>;
+  onSelect: (id: string) => void;
+  className?: string;
+  /** Pin search/filter while the grid scrolls (contained dialog). */
+  stickyToolbar?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [group, setGroup] = useState<StandingsCategoryGroupFilter>("all");
 
   const filtered = useMemo(
-    () => filterAwardCategories(unused, { query, group }),
-    [group, query, unused],
+    () => filterAwardCategories(categories, { query, group }),
+    [categories, group, query],
   );
-  const filterOptions = useMemo(() => awardGroupsPresent(unused), [unused]);
+  const filterOptions = useMemo(
+    () => awardGroupsPresent(categories),
+    [categories],
+  );
   const showGroupTag = group === "all";
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="min-w-[12rem] flex-1">
-          <span className="sr-only">Search awards</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search awards"
-            autoComplete="off"
-            className="w-full border border-line bg-transparent px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+    <div className={className}>
+      <div
+        className={
+          stickyToolbar
+            ? "sticky top-0 z-10 bg-panel pb-3"
+            : undefined
+        }
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="min-w-[12rem] flex-1">
+            <span className="sr-only">Search awards</span>
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search awards"
+              autoComplete="off"
+              className="w-full border border-line bg-transparent px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none"
+            />
+          </label>
+          <CategoryGroupFilterButton
+            value={group}
+            options={filterOptions}
+            onChange={setGroup}
           />
-        </label>
-        <CategoryGroupFilterButton
-          value={group}
-          options={filterOptions}
-          onChange={setGroup}
-        />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -65,12 +84,18 @@ export function CategoryPickerGrid({
               eligibility === "current_year"
                 ? null
                 : AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility];
+            const selected = selectedIds?.has(cat.id) ?? false;
             return (
               <li key={cat.id}>
                 <button
                   type="button"
-                  className="flex aspect-square w-full flex-col items-center justify-center border border-line px-2 py-2 text-center transition-colors hover:border-accent"
-                  onClick={() => onAdd(cat.id)}
+                  aria-pressed={selectedIds ? selected : undefined}
+                  className={`flex aspect-square w-full flex-col items-center justify-center border px-2 py-2 text-center transition-colors ${
+                    selected
+                      ? "border-accent"
+                      : "border-line hover:border-accent"
+                  }`}
+                  onClick={() => onSelect(cat.id)}
                 >
                   {showGroupTag ? (
                     <span className="text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
@@ -80,7 +105,11 @@ export function CategoryPickerGrid({
                   <span className="mt-1 line-clamp-3 font-display text-base leading-tight tracking-wide text-ink sm:text-lg">
                     {cat.label}
                   </span>
-                  {extra ? (
+                  {selected ? (
+                    <span className="mt-1 text-[10px] font-extrabold tracking-[0.14em] text-accent uppercase">
+                      Added
+                    </span>
+                  ) : extra ? (
                     <span className="mt-1 text-[10px] leading-snug text-muted sm:text-xs">
                       {extra}
                     </span>

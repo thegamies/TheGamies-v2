@@ -13,6 +13,8 @@ export function editionResultsHref(
     view?: EditionResultsViewId;
     /** Settings sub-tab (`?view=settings&panel=`). */
     panel?: EditionSettingsPanelId;
+    /** Host results preview: demo placeholders vs live freeze. */
+    source?: "demo" | "live";
     votersPage?: number;
     q?: string;
     voter?: string;
@@ -29,6 +31,16 @@ export function editionResultsHref(
   else if (view !== "reveal") params.set("view", view);
   if (view === "settings" && opts.panel && opts.panel !== "edition") {
     params.set("panel", opts.panel);
+  }
+  if (
+    opts.source === "live" &&
+    (view === "show" ||
+      view === "overview" ||
+      view === "standings" ||
+      view === "categories" ||
+      view === "category")
+  ) {
+    params.set("source", "live");
   }
   if (opts.votersPage && opts.votersPage > 1) {
     params.set("votersPage", String(opts.votersPage));
@@ -60,7 +72,7 @@ export function editionHostHostsHref(slug: string, year: number) {
   });
 }
 
-/** Host Settings → Host preview. */
+/** Host Settings → Host preview (submitted ballots). */
 export function editionHostPreviewHref(
   slug: string,
   year: number,
@@ -70,6 +82,21 @@ export function editionHostPreviewHref(
     view: "settings",
     panel: "preview",
     previewPage: opts.previewPage,
+  });
+}
+
+/** Host results preview (Reveal / Results / standings / categories) while closed. */
+export function editionHostRevealShowHref(
+  slug: string,
+  year: number,
+  opts: {
+    source?: "demo" | "live";
+    view?: "show" | "overview" | "standings" | "categories";
+  } = {},
+) {
+  return editionResultsHref(slug, year, {
+    view: opts.view ?? "show",
+    source: opts.source ?? "demo",
   });
 }
 

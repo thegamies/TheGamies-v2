@@ -106,6 +106,96 @@ export function editionScheduleSaveWarning(
   return "These dates will change the event’s current status.";
 }
 
+export type EditionScheduleField = "opens" | "closes" | "publishes";
+
+export type EditionScheduleFieldNotice = {
+  field: EditionScheduleField;
+  message: string;
+  tone: "error" | "warning";
+};
+
+/**
+ * Inline schedule copy for the field that needs it. Errors block submit;
+ * warnings (status jumps) do not.
+ */
+export function editionScheduleFieldNotice(input: {
+  opens: string;
+  closes: string;
+  publishes: string;
+  previousStatus: EditionStatus;
+  now?: Date;
+}): EditionScheduleFieldNotice | null {
+  const labeled = [
+    ["opens", input.opens],
+    ["closes", input.closes],
+    ["publishes", input.publishes],
+  ] as const;
+
+  if (labeled.every(([, raw]) => !raw.trim())) {
+    return null;
+  }
+
+  for (const [field, raw] of labeled) {
+    if (!raw.trim()) {
+      return {
+        field,
+        tone: "error",
+        message:
+          "Set when voting opens, when it closes, and when results go live.",
+      };
+    }
+    const parsed = parseEditionScheduleInput(raw);
+    if ("error" in parsed) {
+      return { field, tone: "error", message: parsed.error };
+    }
+  }
+
+  const opens = parseEditionScheduleInput(input.opens);
+  const closes = parseEditionScheduleInput(input.closes);
+  const publishes = parseEditionScheduleInput(input.publishes);
+  if ("error" in opens || "error" in closes || "error" in publishes) {
+    return null;
+  }
+
+  const order = validateEditionSchedule(
+    opens.date,
+    closes.date,
+    publishes.date,
+  );
+  if (order) {
+    if (order.includes("open before")) {
+      return { field: "closes", tone: "error", message: order };
+    }
+    return { field: "publishes", tone: "error", message: order };
+  }
+
+  const nextStatus = computeEditionStatus(
+    {
+      opensAt: opens.date,
+      closesAt: closes.date,
+      publishesAt: publishes.date,
+    },
+    input.now ?? new Date(),
+  );
+  const warning = editionScheduleSaveWarning(input.previousStatus, nextStatus);
+  if (!warning) return null;
+
+  if (
+    warning.includes("hide results") ||
+    warning.includes("publish results immediately")
+  ) {
+    return { field: "publishes", tone: "warning", message: warning };
+  }
+  if (
+    warning.includes("reopen") ||
+    warning.includes("close voting") ||
+    warning.includes("skip open")
+  ) {
+    return { field: "closes", tone: "warning", message: warning };
+  }
+  return { field: "opens", tone: "warning", message: warning };
+}
+
 /** Public nav / section label. Code and URLs stay `edition`. */
 export const EDITION_PUBLIC_LABEL = "Events";
 

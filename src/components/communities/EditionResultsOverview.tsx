@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
 import { EditionGotyHighlights } from "@/components/communities/EditionGotyHighlights";
 import { navItemClass } from "@/components/ui/navLevels";
@@ -72,6 +72,21 @@ export function EditionResultsOverview({
       ? "ready"
       : "idle",
   );
+
+  // Host Results preview SSRs comparison; soft-nav demo↔live must replace it.
+  // Published pages pass empty matrices and fetch on demand — don't wipe that.
+  useEffect(() => {
+    const hasSsr =
+      initialMatrix.hasGames || initialCategoryComparison.hasGames;
+    if (!hasSsr) return;
+    setMatrix(initialMatrix.hasGames ? initialMatrix : EMPTY_MATRIX);
+    setCategoryComparison(
+      initialCategoryComparison.hasGames
+        ? initialCategoryComparison
+        : EMPTY_CATEGORY_COMPARISON,
+    );
+    setComparisonStatus("ready");
+  }, [initialMatrix, initialCategoryComparison]);
 
   const loadComparison = useCallback(async () => {
     if (comparisonStatus === "ready" || comparisonStatus === "loading") {
@@ -162,7 +177,8 @@ export function EditionResultsOverview({
             />
           ) : null}
 
-          {showCategories || (layout === "comparison" && categoryComparison.hasGames) ? (
+          {showCategories ||
+          (layout === "comparison" && categoryComparison.hasGames) ? (
             <EditionCategoriesHighlights
               slug={slug}
               year={year}

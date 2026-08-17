@@ -22,6 +22,8 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 5. **Summary** — sticky chapter header (`{year} Summary`) with Top 10 + category #1 boards; tied category winners use the rotating stack  
 6. **Continue to full results** + **Return to top**
 
+**Host results preview** (while voting is **closed**, before publish): secondary tab **Results preview** before Ballot (`?view=show`), community hosts only. Inner nav: Reveal · Results · Full standings · Categories (same URLs as public results views, host-gated while closed). Default **demo** uses placeholder covers and Game 1… titles for GOTY + each event award. Results keeps **Ranked · Comparison** (SSR matrices; no published-only API). **Show real results** navigates to `&source=live` (separate request) and SSR-loads freeze boards. Public standings/comparison APIs stay published-only; host Full standings uses SSR rows (first page when live).
+
 **Results** (`?view=results`, also accepts `overview`)
 
 Tertiary **Ranked · Comparison** at the top of the page (default Ranked) applies to both GOTY and Categories. SSR loads Ranked data only (GOTY through 10 + category podiums); Comparison matrices fetch on first Comparison click (`/api/.../comparison`).
@@ -57,7 +59,7 @@ Community = all submitted ballots. Hosts = designated Host ballots only.
 
 Freeze rows keep a unique **board order** `place` (sort key + pagination cursor). The number on cards is **derived at read** from equal GOTY **points** or category **votes**. Secondary keys (#1s, appearances, `gameId`) sort only — they do not split a rank.
 
-Host setting on the event (Event Settings → Tie numbering). Default **competition**. Hosts may change it anytime; displayed rank is derived at read. Not a public URL chooser.
+Host setting on the event (Event Settings → Tie numbering). Default **dense** for new events. Hosts may change it anytime; displayed rank is derived at read. Not a public URL chooser.
 
 - **Competition** — SQL `RANK`: equal scores share a number; next score skips (1–1–3)
 - **Dense** — SQL `DENSE_RANK`: equal scores share a number; next score is the next number (1–1–2)

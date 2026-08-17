@@ -56,10 +56,12 @@ export {
   parseEditionResultMode,
   parseEditionResultsView,
   parseEditionSettingsPanel,
+  parseEditionShowSource,
   resolveEditionHostSettings,
   type EditionResultsPublicMode,
   type EditionResultsViewId,
   type EditionSettingsPanelId,
+  type EditionShowSource,
   type SharedRankMode,
 } from "./edition-results-scoring";
 

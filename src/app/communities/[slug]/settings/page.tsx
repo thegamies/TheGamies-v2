@@ -8,14 +8,12 @@ import {
 } from "@/lib/auth/session";
 import {
   parseCommunitySettingsTab,
-  pickSettingsEditionYear,
 } from "@/lib/communities/community-settings-href";
 import {
   listEditionsForCommunity,
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
-import { parseEditionYear } from "@/lib/communities/edition-status";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
 import {
   getCommunityBySlug,
@@ -70,8 +68,6 @@ export default async function CommunitySettingsPage({
 
   const sp = await searchParams;
   const tab = parseCommunitySettingsTab(first(sp.tab));
-  const yearParsed = parseEditionYear(first(sp.year));
-  const requestedYear = "ok" in yearParsed ? yearParsed.year : null;
 
   let editions: CommunityEditionPublic[] = [];
   try {
@@ -82,15 +78,6 @@ export default async function CommunitySettingsPage({
   const featured = pickFeaturedEdition(editions);
   const featuredStatus =
     featured && featured.status !== "draft" ? featured.status : null;
-  const selectedYear = pickSettingsEditionYear(
-    editions.map((edition) => edition.year),
-    requestedYear,
-    featured?.year ?? null,
-  );
-  const selected =
-    selectedYear == null
-      ? null
-      : (editions.find((edition) => edition.year === selectedYear) ?? null);
 
   let hostMembers: Awaited<ReturnType<typeof listCommunityMemberOptions>> = [];
   if (tab === "community") {
@@ -121,11 +108,7 @@ export default async function CommunitySettingsPage({
         <p className="mt-2 max-w-xl text-sm text-muted">
           Live rankings, yearly awards, and community admins.
         </p>
-        <CommunitySettingsTabs
-          slug={community.slug}
-          tab={tab}
-          year={selectedYear}
-        />
+        <CommunitySettingsTabs slug={community.slug} tab={tab} />
 
         {tab === "live" ? (
           <>
@@ -150,11 +133,7 @@ export default async function CommunitySettingsPage({
             />
           </>
         ) : tab === "events" ? (
-          <EditionSettings
-            slug={community.slug}
-            editions={editions}
-            selectedYear={selectedYear}
-          />
+          <EditionSettings slug={community.slug} editions={editions} />
         ) : (
           <>
             <p className="mt-6 max-w-xl text-sm text-muted">

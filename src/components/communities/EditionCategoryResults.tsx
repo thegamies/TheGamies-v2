@@ -194,11 +194,14 @@ export function EditionCategoryResults({
   year,
   mode,
   categoryPodiums,
+  showFullStandingsLinks = true,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
   categoryPodiums: EditionCategoryStandingBlock[];
+  /** Host closed preview: hide links to unpublished category detail. */
+  showFullStandingsLinks?: boolean;
 }) {
   if (categoryPodiums.length === 0) {
     return (
@@ -236,12 +239,14 @@ export function EditionCategoryResults({
                 description={cat.description}
                 showRule={index > 0}
                 action={
-                  <Link
-                    href={fullHref}
-                    className="text-sm text-accent hover:underline"
-                  >
-                    View full category standings
-                  </Link>
+                  showFullStandingsLinks ? (
+                    <Link
+                      href={fullHref}
+                      className="text-sm text-accent hover:underline"
+                    >
+                      View full category standings
+                    </Link>
+                  ) : null
                 }
               />
               {cat.rows.length === 0 ? (

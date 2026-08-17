@@ -324,7 +324,7 @@ export const communityEditions = pgTable(
     /** Displayed tie numbering. Not a viewer chooser. */
     rankMode: text("rank_mode")
       .notNull()
-      .default("competition")
+      .default("dense")
       .$type<"competition" | "dense">(),
     /**
      * Results freeze job: idle until close, then pending → computing → ready|failed.

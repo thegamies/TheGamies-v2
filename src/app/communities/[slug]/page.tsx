@@ -12,11 +12,12 @@ import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules"
 import {
   listEditionsForCommunity,
   pickFeaturedEdition,
+  pickOverviewEditions,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
 import { EDITION_PUBLIC_LABEL } from "@/lib/communities/edition-status";
+import { communityCreateEventHref } from "@/lib/communities/community-settings-href";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { CreateEditionForm } from "./settings/CreateEditionForm";
 import { MembershipActions } from "./MembershipActions";
 
 type Params = Promise<{ slug: string }>;
@@ -73,10 +74,11 @@ export default async function CommunityHomePage({
     editions = [];
   }
   const featuredEdition = pickFeaturedEdition(editions);
-  const publicEdition =
+  const overviewEditions = pickOverviewEditions(editions, 3);
+  const navEditionStatus =
     featuredEdition && featuredEdition.status !== "draft"
-      ? featuredEdition
-      : null;
+      ? featuredEdition.status
+      : (overviewEditions[0]?.status ?? null);
   const showCreateEvent = canManage && editions.length === 0;
 
   return (
@@ -86,19 +88,15 @@ export default async function CommunityHomePage({
         slug={community.slug}
         liveEnabled={community.liveRankingsEnabled}
         canManage={canManage}
-        editionStatus={publicEdition?.status ?? null}
+        editionStatus={navEditionStatus}
         active="overview"
       />
 
-      {publicEdition ? (
+      {overviewEditions.length > 0 ? (
         <div className="mt-10">
           <CommunityEventsOverview
             slug={community.slug}
-            year={publicEdition.year}
-            status={publicEdition.status}
-            opensAt={publicEdition.opensAt}
-            closesAt={publicEdition.closesAt}
-            publishesAt={publicEdition.publishesAt}
+            editions={overviewEditions}
           />
         </div>
       ) : showCreateEvent ? (
@@ -109,19 +107,26 @@ export default async function CommunityHomePage({
           <p className="mt-4 max-w-xl text-sm text-muted">
             Create an event to open a yearly awards vote.
           </p>
-          <CreateEditionForm
-            slug={community.slug}
-            defaultYear={new Date().getUTCFullYear()}
-            existingYears={[]}
-          />
+          <p className="mt-6">
+            <Link
+              href={communityCreateEventHref(community.slug)}
+              className="inline-flex items-center justify-center rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold tracking-wide text-ink transition-[color,border-color] duration-[var(--motion-fast)] hover:border-accent"
+            >
+              Create event
+            </Link>
+          </p>
         </section>
       ) : null}
 
-      {publicEdition || showCreateEvent ? (
-        <SectionRule className="mt-14 mb-8" />
+      {overviewEditions.length > 0 || showCreateEvent ? (
+        <SectionRule className="mt-10 mb-8" />
       ) : null}
 
-      <section className={publicEdition || showCreateEvent ? "" : "mt-10"}>
+      <section
+        className={
+          overviewEditions.length > 0 || showCreateEvent ? "" : "mt-10"
+        }
+      >
         <h2 className="font-display text-3xl tracking-wide text-ink">About</h2>
         {community.description ? (
           <p className="mt-4 max-w-2xl font-serif text-lg leading-relaxed text-muted">

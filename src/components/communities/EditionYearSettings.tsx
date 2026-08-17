@@ -11,44 +11,22 @@ import {
 } from "react";
 import { DeleteEditionForm } from "@/app/communities/[slug]/settings/DeleteEditionForm";
 import { EditionScheduleFields } from "@/app/communities/[slug]/settings/EditionScheduleFields";
-import { CategoryPickerGrid } from "@/components/lists/CategoryPickerGrid";
+import { EditionCategoriesDraft } from "@/components/communities/EditionCategoriesDraft";
+import { EditionRankModeFields } from "@/components/communities/EditionRankModeFields";
 import type { AwardCategoryOption } from "@/components/lists/CategoryVotesEditor";
 import { Button } from "@/components/ui/Button";
-import { Dialog } from "@/components/ui/Dialog";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
-import { RadioOption } from "@/components/ui/Radio";
 import { saveEditionSettingsAction } from "@/app/communities/actions";
 import type { EditionAwardCategoryOption } from "@/lib/communities/edition-categories";
 import {
-  computeEditionStatus,
   editionScheduleDateBounds,
-  editionScheduleSaveWarning,
+  editionScheduleFieldNotice,
   editionStatusLabel,
   formatEditionDateTimeInput,
-  parseEditionScheduleInput,
-  validateEditionSchedule,
   type EditionStatus,
 } from "@/lib/communities/edition-status";
-import { sortedAwardCategories } from "@/lib/lists/category-filter";
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
-
-const RANK_OPTIONS: Array<{
-  id: SharedRankMode;
-  label: string;
-  hint: string;
-}> = [
-  {
-    id: "competition",
-    label: "Competition",
-    hint: "Tied games share a place. The next place skips (1 · 1 · 3).",
-  },
-  {
-    id: "dense",
-    label: "Dense",
-    hint: "Tied games share a place. The next place is the next number (1 · 1 · 2).",
-  },
-];
 
 function fieldFromIso(iso: string | null): string {
   if (!iso) return "";
@@ -69,6 +47,22 @@ function settingsDraftKey(input: {
     closes: input.closes,
     publishes: input.publishes,
     categoryIds: input.categoryIds,
+    rankMode: input.rankMode,
+  });
+}
+
+function editionSettingsSyncKey(input: {
+  opensAt: string | null;
+  closesAt: string | null;
+  publishesAt: string | null;
+  rankMode: SharedRankMode;
+  categoryOptions: EditionAwardCategoryOption[];
+}): string {
+  return settingsDraftKey({
+    opens: fieldFromIso(input.opensAt),
+    closes: fieldFromIso(input.closesAt),
+    publishes: fieldFromIso(input.publishesAt),
+    categoryIds: input.categoryOptions.map((c) => c.id),
     rankMode: input.rankMode,
   });
 }
@@ -94,9 +88,57 @@ export function EditionYearSettings({
   publishesAt: string | null;
   rankMode: SharedRankMode;
   categoryOptions?: EditionAwardCategoryOption[];
-  /** Full active site award catalog for the Add category dialog. */
+  /** Full active site award catalog for the Add category sheet. */
   siteCategoryCatalog?: AwardCategoryOption[];
   showHeading?: boolean;
+}) {
+  const syncKey = editionSettingsSyncKey({
+    opensAt,
+    closesAt,
+    publishesAt,
+    rankMode,
+    categoryOptions,
+  });
+
+  return (
+    <EditionYearSettingsForm
+      key={syncKey}
+      slug={slug}
+      year={year}
+      status={status}
+      opensAt={opensAt}
+      closesAt={closesAt}
+      publishesAt={publishesAt}
+      rankMode={rankMode}
+      categoryOptions={categoryOptions}
+      siteCategoryCatalog={siteCategoryCatalog}
+      showHeading={showHeading}
+    />
+  );
+}
+
+function EditionYearSettingsForm({
+  slug,
+  year,
+  status,
+  opensAt,
+  closesAt,
+  publishesAt,
+  rankMode,
+  categoryOptions,
+  siteCategoryCatalog,
+  showHeading,
+}: {
+  slug: string;
+  year: number;
+  status: EditionStatus;
+  opensAt: string | null;
+  closesAt: string | null;
+  publishesAt: string | null;
+  rankMode: SharedRankMode;
+  categoryOptions: EditionAwardCategoryOption[];
+  siteCategoryCatalog: AwardCategoryOption[];
+  showHeading: boolean;
 }) {
   const categoriesLocked = status === "closed" || status === "published";
   const [state, formAction, pending] = useActionState(
@@ -108,9 +150,7 @@ export function EditionYearSettings({
   const [publishes, setPublishes] = useState(() => fieldFromIso(publishesAt));
   const [selected, setSelected] = useState(categoryOptions);
   const [draftRankMode, setDraftRankMode] = useState(rankMode);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [clientError, setClientError] = useState<string | null>(null);
-  const [statusWarning, setStatusWarning] = useState<string | null>(null);
   const submittedKeyRef = useRef<string | null>(null);
 
   const [savedKey, setSavedKey] = useState(() =>
@@ -122,42 +162,6 @@ export function EditionYearSettings({
       rankMode,
     }),
   );
-
-  const serverKey = useMemo(
-    () =>
-      settingsDraftKey({
-        opens: fieldFromIso(opensAt),
-        closes: fieldFromIso(closesAt),
-        publishes: fieldFromIso(publishesAt),
-        categoryIds: categoryOptions.map((c) => c.id),
-        rankMode,
-      }),
-    // categoryOptions identity is unstable; ids + schedule/rank are the baseline.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- ids joined below
-    [
-      opensAt,
-      closesAt,
-      publishesAt,
-      rankMode,
-      categoryOptions.map((c) => c.id).join("|"),
-    ],
-  );
-
-  useEffect(() => {
-    const nextOpens = fieldFromIso(opensAt);
-    const nextCloses = fieldFromIso(closesAt);
-    const nextPublishes = fieldFromIso(publishesAt);
-    setOpens(nextOpens);
-    setCloses(nextCloses);
-    setPublishes(nextPublishes);
-    setSelected(categoryOptions);
-    setDraftRankMode(rankMode);
-    setSavedKey(serverKey);
-    setClientError(null);
-    setStatusWarning(null);
-    // Sync only when the server baseline key changes — not on every categoryOptions reference.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverKey]);
 
   const currentKey = settingsDraftKey({
     opens,
@@ -177,7 +181,6 @@ export function EditionYearSettings({
     if (!state) return;
     if ("ok" in state && state.ok && submittedKeyRef.current) {
       setSavedKey(submittedKeyRef.current);
-      setStatusWarning(null);
       setClientError(null);
     }
     submittedKeyRef.current = null;
@@ -188,101 +191,35 @@ export function EditionYearSettings({
     [opens, closes, publishes],
   );
 
-  const catalog = useMemo(
-    () => sortedAwardCategories(siteCategoryCatalog),
-    [siteCategoryCatalog],
-  );
-  const selectedIds = useMemo(
-    () => new Set(selected.map((c) => c.id)),
-    [selected],
-  );
-  const unusedCatalog = useMemo(
-    () => catalog.filter((c) => !selectedIds.has(c.id)),
-    [catalog, selectedIds],
+  const scheduleNotice = useMemo(
+    () =>
+      editionScheduleFieldNotice({
+        opens,
+        closes,
+        publishes,
+        previousStatus: status,
+      }),
+    [opens, closes, publishes, status],
   );
 
   const error =
-    clientError ??
-    (statusWarning ? null : state && "error" in state ? state.error : null);
-
-  function clearSaveNotices() {
-    setClientError(null);
-    setStatusWarning(null);
-  }
-
-  function addCategoryFromCatalog(id: string) {
-    const hit = catalog.find((c) => c.id === id);
-    if (!hit) return;
-    clearSaveNotices();
-    setSelected((rows) =>
-      rows.some((row) => row.id === hit.id)
-        ? rows
-        : [
-            ...rows,
-            {
-              id: hit.id,
-              label: hit.label,
-              description: hit.description,
-              sortOrder: hit.sortOrder ?? rows.length + 1,
-              enabled: true,
-            },
-          ],
-    );
-    setPickerOpen(false);
-  }
+    clientError ?? (state && "error" in state ? state.error : null);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
-    const parsedOpens = parseEditionScheduleInput(opens);
-    const parsedCloses = parseEditionScheduleInput(closes);
-    const parsedPublishes = parseEditionScheduleInput(publishes);
     if (
-      "error" in parsedOpens ||
-      "error" in parsedCloses ||
-      "error" in parsedPublishes
+      !opens.trim() ||
+      !closes.trim() ||
+      !publishes.trim() ||
+      scheduleNotice?.tone === "error"
     ) {
       event.preventDefault();
-      setStatusWarning(null);
-      setClientError(
-        "Set when voting opens, when it closes, and when results go live.",
-      );
       return;
     }
-
-    const invalid = validateEditionSchedule(
-      parsedOpens.date,
-      parsedCloses.date,
-      parsedPublishes.date,
-    );
-    if (invalid) {
-      event.preventDefault();
-      setStatusWarning(null);
-      setClientError(invalid);
-      return;
-    }
-
-    const nextStatus = computeEditionStatus(
-      {
-        opensAt: parsedOpens.date,
-        closesAt: parsedCloses.date,
-        publishesAt: parsedPublishes.date,
-      },
-      new Date(),
-    );
-    const warning = editionScheduleSaveWarning(status, nextStatus);
-    if (warning && statusWarning !== warning) {
-      event.preventDefault();
-      setClientError(null);
-      setStatusWarning(warning);
-      return;
-    }
-
     submittedKeyRef.current = currentKey;
   }
 
   const saveBarMessage = error ? (
     <span className="text-accent">{error}</span>
-  ) : statusWarning ? (
-    <span className="text-accent">{statusWarning}</span>
   ) : (
     "Unsaved changes"
   );
@@ -342,18 +279,10 @@ export function EditionYearSettings({
             disabled={pending}
             idPrefix="edition-settings"
             year={year}
-            onOpens={(next) => {
-              clearSaveNotices();
-              setOpens(next);
-            }}
-            onCloses={(next) => {
-              clearSaveNotices();
-              setCloses(next);
-            }}
-            onPublishes={(next) => {
-              clearSaveNotices();
-              setPublishes(next);
-            }}
+            notice={scheduleNotice}
+            onOpens={setOpens}
+            onCloses={setCloses}
+            onPublishes={setPublishes}
           />
         </section>
 
@@ -366,68 +295,13 @@ export function EditionYearSettings({
               ? "Category awards for this event are locked after voting closes."
               : "Add site awards to this event’s ballot. Changes apply when you save."}
           </p>
-
-          <div>
-            <h5 className="text-sm font-semibold tracking-wide text-ink">
-              Selected awards
-            </h5>
-            {selected.length === 0 ? (
-              <p className="mt-2 text-sm text-muted">No awards selected yet.</p>
-            ) : (
-              <ul className="mt-2 space-y-2">
-                {selected.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-start justify-between gap-3 border-b border-line py-2 text-sm text-ink"
-                  >
-                    <span>
-                      <span className="font-semibold">{c.label}</span>
-                      {c.description ? (
-                        <span className="mt-0.5 block text-muted">
-                          {c.description}
-                        </span>
-                      ) : null}
-                    </span>
-                    {categoriesLocked ? null : (
-                      <Button
-                        type="button"
-                        variant="bordered"
-                        size="sm"
-                        disabled={pending}
-                        onClick={() => {
-                          clearSaveNotices();
-                          setSelected((rows) =>
-                            rows.filter((row) => row.id !== c.id),
-                          );
-                        }}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          {categoriesLocked ? null : (
-            <div className="pt-2">
-              <Button
-                type="button"
-                variant="bordered"
-                size="sm"
-                disabled={pending || unusedCatalog.length === 0}
-                onClick={() => setPickerOpen(true)}
-              >
-                Add category
-              </Button>
-              {unusedCatalog.length === 0 && catalog.length > 0 ? (
-                <p className="mt-2 text-sm text-muted">
-                  Every site award is already on this event.
-                </p>
-              ) : null}
-            </div>
-          )}
+          <EditionCategoriesDraft
+            catalog={siteCategoryCatalog}
+            selected={selected}
+            disabled={pending}
+            locked={categoriesLocked}
+            onChange={setSelected}
+          />
         </section>
 
         <section className="space-y-3 border-t border-line pt-6">
@@ -438,54 +312,23 @@ export function EditionYearSettings({
             How this event numbers ties on the public boards. Changing this does
             not rescore ballots.
           </p>
-          <fieldset className="space-y-3">
-            <legend className="sr-only">Tie numbering</legend>
-            {RANK_OPTIONS.map((opt) => (
-              <RadioOption
-                key={opt.id}
-                name="rankMode"
-                value={opt.id}
-                checked={draftRankMode === opt.id}
-                onChange={() => {
-                  clearSaveNotices();
-                  setDraftRankMode(opt.id);
-                }}
-                hint={opt.hint}
-              >
-                {opt.label}
-              </RadioOption>
-            ))}
-          </fieldset>
+          <EditionRankModeFields
+            value={draftRankMode}
+            disabled={pending}
+            onChange={setDraftRankMode}
+          />
         </section>
 
         {dirty ? (
           <PinnedSaveBar message={saveBarMessage}>
             <Button type="submit" disabled={pending}>
-              {pending
-                ? "Saving…"
-                : statusWarning
-                  ? "Save anyway"
-                  : "Save settings"}
+              {pending ? "Saving…" : "Save settings"}
             </Button>
           </PinnedSaveBar>
         ) : null}
       </form>
 
       <DeleteEditionForm slug={slug} year={year} />
-      <Dialog
-        open={pickerOpen}
-        title="Add a category"
-        onClose={() => setPickerOpen(false)}
-        className="w-full max-w-3xl"
-      >
-        <p className="mt-2 text-sm text-muted">
-          Choose a site award to put on this event’s ballot.
-        </p>
-        <CategoryPickerGrid
-          unused={unusedCatalog}
-          onAdd={addCategoryFromCatalog}
-        />
-      </Dialog>
       {unsavedDialog}
     </div>
   );

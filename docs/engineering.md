@@ -63,20 +63,20 @@ Rules:
 
 ## Request cost (compute · egress · scale)
 
-Every hot read path should be cheap under growth—not only correct for a small fixture.
+Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`.
 
-Before choosing freeze/cache/list storage, walk the request:
+Before choosing freeze/cache/**search**/list storage, walk the request:
 
-1. **DB egress** — Bytes from Neon to the app per page view. Avoid patterns that pull an entire freeze blob to serve 50 rows.
+1. **DB egress** — Bytes from Neon to the app per page view. Avoid pulling an entire table, roster, or freeze blob to serve a page.
 2. **Compute** — Parse/serialize and memory on Vercel **and** Cloudflare Workers for that payload.
-3. **Scale** — Behavior at 10× ballots, games, or traffic. Prefer SQL `LIMIT`/`OFFSET` (or keyset) on normalized freeze rows over “load all, slice in memory.”
+3. **Scale** — Behavior at 10× members, ballots, games, or traffic.
 
-**Do:** page-sized queries; small meta; client gets only what it renders.  
-**Don’t:** fat `jsonb` snapshots on the hot path for boards or voter matrices.
+**Do:** SQL `LIMIT`/`OFFSET` (or keyset); small default views; **search in the database** with a hit cap; client gets only what it renders.  
+**Don’t:** unbounded `SELECT`; client `filter`/`includes` over a full dump billed as “search”; fat `jsonb` snapshots on the hot path; revalidate the whole community after a one-row write.
 
-**Never load an unbounded list without SQL pagination** (or an equivalent keyset/`LIMIT`) on the read path—public boards, voter lists, **and** host/admin/settings surfaces. “Hosts are few” or “we’ll scroll in the UI” does not justify pulling every row. Same 10× rule: one page view should stay cheap when membership, ballots, or catalog size grows.
+**Never load an unbounded list** on public boards, voter lists, **or** host/admin/settings. “We’ll scroll / search in the UI” still pulls every row—that is a filter, not a search.
 
-Live lock and edition results freeze into **tables**, not one giant payload. See `.cursor/rules/request-cost.mdc`.
+Live lock and edition results freeze into **tables**, not one giant payload.
 
 ## Deployment
 

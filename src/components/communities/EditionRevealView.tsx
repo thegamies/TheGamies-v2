@@ -1210,12 +1210,14 @@ function CeremonySummary({
   topTen,
   categoryPodiums,
   resultsHref,
+  continueLabel,
 }: {
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
   resultsHref: string;
+  continueLabel: string;
 }) {
   const gotyAsc = [...topTen]
     .filter((r) => r.rank >= 1 && r.rank <= 10)
@@ -1345,7 +1347,7 @@ function CeremonySummary({
             href={resultsHref}
             className="font-semibold text-accent hover:underline"
           >
-            Continue to full results
+            {continueLabel}
           </Link>
           <span className="text-muted" aria-hidden>
             ·
@@ -1414,12 +1416,14 @@ export function EditionRevealView({
   topTen,
   categoryPodiums,
   resultsHref,
+  continueLabel = "Continue to full results",
 }: {
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
   resultsHref: string;
+  continueLabel?: string;
 }) {
   const categories = useEditionCategoryPodiums(categoryPodiums);
   const gotyDesc = groupByRank(
@@ -1480,6 +1484,7 @@ export function EditionRevealView({
           topTen={topTen}
           categoryPodiums={categories}
           resultsHref={resultsHref}
+          continueLabel={continueLabel}
         />
       </div>
     </ReducedMotionProvider>

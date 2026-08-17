@@ -301,7 +301,7 @@ export function CategoryVotesEditor({
           <p className="mt-2 text-sm text-muted">
             Choose an award to add to your list.
           </p>
-          <CategoryPickerGrid unused={unused} onAdd={addCategory} />
+          <CategoryPickerGrid categories={unused} onSelect={addCategory} />
         </Dialog>
       )}
     </section>

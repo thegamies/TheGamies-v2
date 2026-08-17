@@ -35,9 +35,13 @@ import {
 import { computeEditionStatus } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import { editionHostSettingsHref } from "@/lib/communities/edition-results-href";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
-import { setEditionVoice } from "@/lib/communities/voices";
+import {
+  searchEditionHostMembers,
+  setEditionVoice,
+} from "@/lib/communities/voices";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -290,13 +294,25 @@ export async function createCommunityEditionAction(
     opensAt: String(formData.get("opensAt") ?? ""),
     closesAt: String(formData.get("closesAt") ?? ""),
     publishesAt: String(formData.get("publishesAt") ?? ""),
+    rankMode: String(formData.get("rankMode") ?? ""),
   });
   if ("error" in result) return { error: result.error };
 
+  const categoryIds = formData
+    .getAll("categoryIds")
+    .map((v) => String(v).trim())
+    .filter(Boolean);
+  if (categoryIds.length > 0) {
+    const categories = await setCommunityEditionCategories(
+      slug,
+      gate.profile.id,
+      { year: result.year, categoryIds },
+    );
+    if ("error" in categories) return { error: categories.error };
+  }
+
   revalidateCommunity(slug, gate.profile.username);
-  redirect(
-    communitySettingsHref(slug, { tab: "events", year: result.year }),
-  );
+  redirect(editionHostSettingsHref(slug, result.year));
 }
 
 export async function deleteCommunityEditionAction(
@@ -590,7 +606,48 @@ export async function setEditionVoiceAction(
   );
   if ("error" in result) return { error: result.error };
 
-  revalidateCommunity(slug, gate.profile.username);
   revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
   return null;
+}
+
+export async function searchEditionHostMembersAction(input: {
+  slug: string;
+  year: number;
+  q: string;
+}): Promise<
+  | {
+      ok: true;
+      results: Array<{
+        profileId: string;
+        username: string;
+        displayName: string;
+        role: "admin" | "member";
+        isVoice: boolean;
+      }>;
+    }
+  | { error: string }
+> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+  if (!Number.isFinite(input.year)) return { error: "Pick a valid year." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const detail = await getCommunityBySlug(slug, gate.profile.id);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only hosts can edit the Hosts roster." };
+  }
+
+  const edition = await getEditionByCommunityYear(
+    detail.id,
+    Math.floor(input.year),
+  );
+  if (!edition) return { error: "Event not found." };
+
+  const results = await searchEditionHostMembers(detail.id, edition.id, {
+    q: input.q,
+  });
+  return { ok: true, results };
 }

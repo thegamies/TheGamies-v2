@@ -80,9 +80,10 @@ describe("editionResultsHref", () => {
 });
 
 describe("parseEditionResultsView", () => {
-  it("defaults to reveal and accepts results views plus settings", () => {
+  it("defaults to reveal and accepts results views plus settings and show", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
     expect(parseEditionResultsView("settings")).toBe("settings");
+    expect(parseEditionResultsView("show")).toBe("show");
     expect(parseEditionResultsView("hosts")).toBe("hosts");
     expect(parseEditionResultsView("preview")).toBe("preview");
   });
@@ -108,6 +109,40 @@ describe("parseEditionResultsView", () => {
       view: "settings",
       panel: "preview",
     });
+  });
+});
+
+describe("parseEditionShowSource", () => {
+  it("defaults to demo and requires live for real freeze", async () => {
+    const { parseEditionShowSource } = await import("./edition-results-scoring");
+    expect(parseEditionShowSource(undefined)).toBe("demo");
+    expect(parseEditionShowSource("demo")).toBe("demo");
+    expect(parseEditionShowSource("live")).toBe("live");
+    expect(parseEditionShowSource("real")).toBe("demo");
+  });
+});
+
+describe("editionHostRevealShowHref", () => {
+  it("uses view=show and sets source=live for freeze", async () => {
+    const { editionHostRevealShowHref } = await import("./edition-results-href");
+    expect(editionHostRevealShowHref("demo", 2026)).toBe(
+      "/communities/demo/edition/2026?view=show",
+    );
+    expect(editionHostRevealShowHref("demo", 2026, { source: "live" })).toBe(
+      "/communities/demo/edition/2026?view=show&source=live",
+    );
+    expect(
+      editionHostRevealShowHref("demo", 2026, {
+        view: "overview",
+        source: "live",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=results&source=live");
+    expect(
+      editionHostRevealShowHref("demo", 2026, {
+        view: "standings",
+        source: "demo",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=standings");
   });
 });
 

@@ -107,6 +107,42 @@ export function isIsoDateTimeInRange(
   return true;
 }
 
+/** `YYYY-MM-DD` + `HH:mm` → `YYYY-MM-DDTHH:mm`. Empty date stays empty. */
+export function mergeIsoDateAndTime(
+  date: string,
+  time: string,
+  fallback: { hours: number; minutes: number },
+): string {
+  if (!date) return "";
+  const parsed = parseIsoTime(time);
+  return toIsoDateTime(
+    date,
+    parsed?.hours ?? fallback.hours,
+    parsed?.minutes ?? fallback.minutes,
+  );
+}
+
+/**
+ * Clamp to min/max when the value is on the same calendar day as the bound.
+ * Returns null when the value is out of range on another day.
+ */
+export function clampIsoDateTime(
+  value: string,
+  min?: string,
+  max?: string,
+): string | null {
+  if (!value) return "";
+  let clamped = value;
+  if (min && clamped < min && datePart(clamped) === datePart(min)) {
+    clamped = min;
+  }
+  if (max && clamped > max && datePart(clamped) === datePart(max)) {
+    clamped = max;
+  }
+  if (!isIsoDateTimeInRange(clamped, min, max)) return null;
+  return clamped;
+}
+
 export function minuteChoices(current?: number): number[] {
   const steps: number[] = [];
   for (let m = 0; m < 60; m += MINUTE_STEP) steps.push(m);

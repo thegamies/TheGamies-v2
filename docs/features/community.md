@@ -33,19 +33,20 @@ Table `community_editions`: one row per `(communityId, year)` with `opensAt`, `c
 - before `publishesAt` → `closed` (results pending)
 - else → `published`
 
-Hosts create events from Overview (when none exist yet) or Settings → Events (**Create event** opens a dialog): year picker plus all three dates and times. The open date may be in the past (voting already open). Close cannot precede open, and publish cannot precede close — including on the same day. Each schedule field has a **Set to now** shortcut. Saving warns if the times are out of order, or if they would skip ahead to closed/published or change a live event’s status. New events always have a full schedule — not a draft. Hosts can **delete** an event after typing that year to confirm (ballots and results go with it). Public home and the Events tab both use **{year} Video Game Awards**. Overview adds a **Community vote ·** status kicker (Opens / Closes / Reveals times, then Results). Nav: **Events** tab (year switcher inside) when any non-draft event exists — ballot and results share that surface. While voting is **open** or **closed**, Events also shows **Voters** (paginated names; picks stay hidden until publish) and the awards header shows how many ballots were submitted. Public UI says **Events** and **Live Rankings**; URLs stay `/edition` and `/live`.
+Hosts create events from Overview (when none exist yet) or Settings → Events (**Create event** goes to `/create/event`): year, schedule, categories, and tie numbering (dense by default) in one submit. Leaving with a draft prompts to stay or leave. The open date may be in the past (voting already open). Close cannot precede open, and publish cannot precede close — including on the same day. Each schedule field is a split date + time picker with a **Set to now** shortcut. Order errors and status-change copy appear under the field that caused them; Create/Save is one click when the order is valid (status-change copy is informational, not a second confirm). New events always have a full schedule — not a draft. Hosts can **delete** an event after typing that year to confirm (ballots and results go with it). Public home and the Events tab both use **{year} Video Game Awards**. Overview lists up to **three** public events (open → coming soon → closed → results, then newest created) with a **Community vote ·** status kicker (Opens / Closes / Reveals times, then Results). Nav: **Events** tab (year switcher inside) when any non-draft event exists — ballot and results share that surface. While voting is **open** or **closed**, Events also shows **Voters** (paginated names; picks stay hidden until publish) and the awards header shows how many ballots were submitted. Public UI says **Events** and **Live Rankings**; URLs stay `/edition` and `/live`.
 
 ### URLs
 
 - `/communities` — public directory
 - `/communities/new` — signed-in create (requires profile)
-- `/communities/[slug]` — public home (identity, about, join/leave for members, featured event; hosts with no events yet see **Create event**)
+- `/communities/[slug]` — public home (identity, about, join/leave for members; up to three public events ordered open → coming soon → closed → results, then newest created; hosts with no events yet see **Create event**)
 - `/communities/[slug]/members` — paged member roster
 - `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
 - `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY event (vote + results by schedule)
 - `/communities/[slug]/ballot` → redirects to edition
 - `/communities/[slug]/results` → redirects to edition
-- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events&year=`), and **Community** (`?tab=community`). Events: **Create event**, year selector, links to event **Edition settings** / **Manage hosts** / **Host preview**. Community: add/remove admins (last admin cannot be removed) and leave.
+- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), and **Community** (`?tab=community`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: add/remove admins (last admin cannot be removed) and leave.
+- `/communities/[slug]/create/event` — hosts only. Create event: year, schedule, categories, tie numbering. Redirects to that year’s Edition settings.
 - Profile `/u/[username]` lists communities the person belongs to
 
 ### Non-goals (next slices)
@@ -70,7 +71,7 @@ Overview    Live Rankings    Events    Members
 
 Exact tab labels: **Live Rankings** and **Events** (not Live / Edition). Vote and results share the Events tab with a year switcher. Settings is hosts only, with Live Rankings · Events · Community as secondary tabs.
 
-Settings and event management live on a separate administrative surface. Community Settings Events creates years and edits one year at a time; **Open event** opens that year on the event page with Settings selected.
+Settings and event management live on a separate administrative surface. Community Settings → Events lists every year and links into that year’s Edition settings / Manage hosts / Host preview.
 
 ## Live rankings
 
@@ -92,7 +93,7 @@ Settings and event management live on a separate administrative surface. Communi
 5. Voting closed; results pending (`closed`) — member ballot read-only; Events heading shows the reveal datetime
 6. Final results published (`published` + frozen normalized boards)
 7. Individual voter exploration (paged voter list on results; deeper matrix later)
-8. Event **Settings** tab (`?view=settings`) with tertiary panels: **Edition settings** (default — schedule, categories, and tie numbering share one Save), **Manage hosts** (`&panel=hosts`), **Host preview** (`&panel=preview`, paged, while open/closed). Community Settings → Events creates years and links into those panels.
+8. Event **Settings** tab (`?view=settings`) with tertiary panels: **Edition settings** (default — schedule, categories, and tie numbering share one Save), **Manage hosts** (`&panel=hosts`), **Host preview** (`&panel=preview`, paged, while open/closed). While **closed**, hosts also get a secondary **Results preview** tab before Ballot (`?view=show`): inner Reveal · Results · Full standings · Categories. Default **demo** uses placeholder covers and Game 1… names; **Show real results** navigates to `&source=live` (separate request) and SSR-loads freeze standings (no published-only APIs). Community Settings → Events links to **Create event** and into those panels. Category add on create + Edition settings is a viewport-contained modal: search stays pinned, tiles stay in the grid with **Added**, tap again to unselect.
 
 ### Ballots (shipped)
 
@@ -115,11 +116,11 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Hosts (shipped)
 
-Community hosts designate **Hosts** **per edition** under Settings → **Manage hosts** (`?view=settings&panel=hosts`, `community_edition_voices`). The list defaults to **community hosts + current Hosts**; they **search members** by name or @username to designate others. Roster is year-specific and locks after publish. Public UI says Host / Hosts; URLs stay `?mode=voices`. Schedule and categories live under Settings → **Edition settings**.
+Community hosts designate **Hosts** **per edition** under Settings → **Manage hosts** (`?view=settings&panel=hosts`, `community_edition_voices`). Default list is **community hosts + current Hosts** (SQL-capped). Search is a **server query** (name / @username, hit cap)—not a client filter of the full roster. Roster is year-specific and locks after publish. Public UI says Host / Hosts; URLs stay `?mode=voices`. Schedule and categories live under Settings → **Edition settings**.
 
 ### Results (shipped)
 
-On publish, write-once freeze into normalized tables (`community_edition_result_*`) for **GOTY boards, category tallies, and the voter roster only**. Individual voter GOTY ranks and category picks are **not** copied into freeze tables — Results Comparison and voter ballot views read them from `community_edition_ballot_*` (read-only after close). Public mode switcher is **Community · Hosts** (Combined hidden until weighted scoring). Displayed rank is derived at read from equal points/votes using the event’s **tie numbering** setting (competition 1–1–3 default, or dense 1–1–2). Hosts set this in Event Settings and may change it after publish (no freeze rebuild). Unique freeze `place` stays board order. GOTY and voters are **SQL-paginated** (50 games, not 50 ranks). Categories load in full (small).
+On publish, write-once freeze into normalized tables (`community_edition_result_*`) for **GOTY boards, category tallies, and the voter roster only**. Individual voter GOTY ranks and category picks are **not** copied into freeze tables — Results Comparison and voter ballot views read them from `community_edition_ballot_*` (read-only after close). Public mode switcher is **Community · Hosts** (Combined hidden until weighted scoring). Displayed rank is derived at read from equal points/votes using the event’s **tie numbering** setting (dense 1–1–2 default for new events, or competition 1–1–3). Hosts set this in Event Settings and may change it after publish (no freeze rebuild). Unique freeze `place` stays board order. GOTY and voters are **SQL-paginated** (50 games, not 50 ranks). Categories load in full (small).
 
 Board tallies are computed with **SQL `GROUP BY`** on ballot tables (same `pointsForRank` / plurality rules as before), then chunked into freeze rows for Neon HTTP. Hosts boards join `community_edition_voices`. Category top-N reads use window `RANK` / `DENSE_RANK` (not a correlated scan over full tallies). Reveal and Results Ranked SSR load GOTY through 10 + category podiums only; Comparison matrices load on demand. If a freeze fails mid-write, tables are cleared so the next ensure/rebuild can retry a complete snapshot. Rebuild no longer photocopies every voter’s category picks (that was the multi-minute / timeout path at a few hundred ballots).
 
