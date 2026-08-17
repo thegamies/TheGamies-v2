@@ -94,12 +94,8 @@ export function EditionResultsViewNav({
   const modes: EditionResultsPublicMode[] = ["community", "voices"];
 
   return (
-    <div className="mt-6 flex min-w-0 items-end justify-between gap-x-6 border-b border-line pb-0">
-      <ScrollableNav
-        aria-label="Results view"
-        border={false}
-        className="min-w-0 flex-1"
-      >
+    <div className="mt-6 border-b border-line pb-0">
+      <ScrollableNav aria-label="Results view" border={false}>
         {views.map((v) => {
           const active =
             v.id === "settings"
@@ -136,8 +132,8 @@ export function EditionResultsViewNav({
         <ScrollableNav
           aria-label="Results board"
           border={false}
-          className="shrink-0"
-          rowClassName="items-center gap-x-2 pb-1.5"
+          className="mt-3"
+          rowClassName="items-center gap-x-2"
         >
           {modes.map((m, i) => (
             <span key={m} className="contents">

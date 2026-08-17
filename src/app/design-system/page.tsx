@@ -89,12 +89,8 @@ function MastheadResultsFixture() {
         year={2026}
         years={[2026, 2025]}
       />
-      <div className="mt-8 flex min-w-0 items-end justify-between gap-x-6 border-b border-line pb-0">
-        <ScrollableNav
-          aria-label="Results view"
-          border={false}
-          className="min-w-0 flex-1"
-        >
+      <div className="mt-8 border-b border-line pb-0">
+        <ScrollableNav aria-label="Results view" border={false}>
           {RESULTS_VIEWS.map((label, i) => (
             <span key={label} className={navItemClass("secondary", i === 0)}>
               {label}
@@ -104,8 +100,8 @@ function MastheadResultsFixture() {
         <ScrollableNav
           aria-label="Results board"
           border={false}
-          className="shrink-0"
-          rowClassName="items-center gap-x-2 pb-1.5"
+          className="mt-3"
+          rowClassName="items-center gap-x-2"
         >
           <span className={navItemClass("tertiary", true)}>Community</span>
           <span className="text-muted" aria-hidden>
