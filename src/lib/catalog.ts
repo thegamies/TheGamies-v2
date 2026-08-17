@@ -152,6 +152,8 @@ export async function getGameBySlug(slug: string) {
       rating: games.rating,
       ratingCount: games.ratingCount,
       isAdult: games.isAdult,
+      parentGameIgdbId: games.parentGameIgdbId,
+      versionParentIgdbId: games.versionParentIgdbId,
       coverImageId: covers.imageId,
       gameType: gameTypes.type,
     })

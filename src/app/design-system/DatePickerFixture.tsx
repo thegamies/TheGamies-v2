@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { DateTimePicker } from "@/components/ui/DateTimePicker";
 import { Dialog } from "@/components/ui/Dialog";
+import { Select } from "@/components/ui/Select";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { YearPicker } from "@/components/ui/YearPicker";
 
@@ -14,6 +15,7 @@ export function DatePickerFixture() {
   const [empty, setEmpty] = useState("");
   const [dateOnly, setDateOnly] = useState("2026-11-01");
   const [year, setYear] = useState(2026);
+  const [sort, setSort] = useState("popularity");
   const [time, setTime] = useState("18:00");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
@@ -25,6 +27,21 @@ export function DatePickerFixture() {
           Year
         </p>
         <YearPicker value={year} onChange={setYear} />
+      </div>
+      <div>
+        <p className="mb-2 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+          Select
+        </p>
+        <Select
+          value={sort}
+          options={[
+            { value: "popularity", label: "Popularity" },
+            { value: "name", label: "Name" },
+            { value: "first_release_date", label: "Release date" },
+          ]}
+          className="max-w-[11rem]"
+          onChange={setSort}
+        />
       </div>
       <div>
         <p className="mb-2 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">

@@ -1,10 +1,19 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { GameGotyRankings } from "@/components/games/GameGotyRankings";
+import { GameSummary } from "@/components/games/GameSummary";
 import { GameCover } from "@/components/ui/GameCover";
 import { getGameBySlug } from "@/lib/catalog";
+import {
+  getGameDetailGotyRankings,
+  type GameGotyRankings as GameGotyRankingsData,
+} from "@/lib/live-aggregate/game-rankings";
 
 type Params = Promise<{ slug: string }>;
+
+const COVER_WIDTH = 240;
+const COVER_HEIGHT = 320;
 
 export async function generateMetadata({
   params,
@@ -29,6 +38,12 @@ function formatHours(seconds: number | null | undefined): string | null {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
+const TIME_TO_BEAT_LABELS = [
+  ["hastily", "Main story"],
+  ["normally", "Story + extras"],
+  ["completely", "Completionist"],
+] as const;
+
 export default async function GameDetailPage({ params }: { params: Params }) {
   const { slug } = await params;
   let game: Awaited<ReturnType<typeof getGameBySlug>> = null;
@@ -38,6 +53,13 @@ export default async function GameDetailPage({ params }: { params: Params }) {
     notFound();
   }
   if (!game) notFound();
+
+  let rankings: GameGotyRankingsData = { byYear: [], viaParent: null };
+  try {
+    rankings = await getGameDetailGotyRankings(game);
+  } catch {
+    rankings = { byYear: [], viaParent: null };
+  }
 
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);
@@ -52,26 +74,29 @@ export default async function GameDetailPage({ params }: { params: Params }) {
           {game.year ? ` · ${game.year}` : null}
         </p>
 
-        <div className="mt-6 grid gap-10 md:grid-cols-[12rem_1fr] lg:grid-cols-[14rem_1fr]">
-          <div className="max-w-[14rem]">
+        <div className="mt-6 flex flex-col gap-8 sm:flex-row sm:items-start">
+          <div className="w-[240px] shrink-0">
             <GameCover
               title={game.title}
               imageUrl={game.coverUrl}
+              width={COVER_WIDTH}
+              height={COVER_HEIGHT}
               priority
             />
           </div>
-          <div>
-            <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
+
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
               {game.title}
             </h1>
-            {game.gameType ? (
-              <p className="mt-2 text-sm text-muted">{game.gameType}</p>
-            ) : null}
-            {game.summary ? (
-              <p className="mt-6 max-w-2xl font-serif text-lg leading-relaxed text-ink/90">
-                {game.summary}
-              </p>
-            ) : null}
+
+            {game.summary ? <GameSummary text={game.summary} /> : null}
+
+            <GameGotyRankings
+              stats={rankings}
+              layout="broadcast-compact"
+              className="mt-8"
+            />
 
             <dl className="mt-8 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
               <div>
@@ -122,16 +147,19 @@ export default async function GameDetailPage({ params }: { params: Params }) {
                 </div>
               ) : null}
               {game.timeToBeat ? (
-                <div>
+                <div className="sm:col-span-2">
                   <dt className="text-muted">Time to beat</dt>
-                  <dd className="mt-1 text-ink">
-                    {[
-                      formatHours(game.timeToBeat.hastily),
-                      formatHours(game.timeToBeat.normally),
-                      formatHours(game.timeToBeat.completely),
-                    ]
-                      .filter(Boolean)
-                      .join(" / ") || "—"}
+                  <dd className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
+                    {TIME_TO_BEAT_LABELS.map(([key, label]) => {
+                      const hours = formatHours(game.timeToBeat?.[key]);
+                      if (!hours) return null;
+                      return (
+                        <div key={key}>
+                          <p className="tabular-nums text-ink">{hours}</p>
+                          <p className="mt-0.5 text-xs text-muted">{label}</p>
+                        </div>
+                      );
+                    })}
                   </dd>
                 </div>
               ) : null}

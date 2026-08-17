@@ -72,6 +72,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - `/admin/seed` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
 - `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes
+- `/games/[slug]` — 240px cover on the left; title, description, site GOTY **rank** per year (Broadcast compact), and credits to the right. Description clamps to four lines with Show more / Show less. Rank is always public. Votes, points, and the list-position chart follow the reveal gate. Query is this game’s score rows plus a higher-score count for place — not the full year board. Editions with no scores inherit the parent title’s standings.
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
 - Year switching uses the shared top-right `YearSelect` (not a button row)
 - Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights

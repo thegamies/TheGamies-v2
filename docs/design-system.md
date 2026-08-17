@@ -93,6 +93,7 @@ Rules:
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
 - Community Settings → Events lists every year with status and host links (Edition settings / Manage hosts / Host preview). Year switching on the public event page stays `EditionYearSelect`.
 - Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY. Category group filter is a single pop-open button with an **All** option; search filters chapters by name. Each chapter shows top-3 ranks in a horizontal strip, vote totals, and links to full category standings (`?view=category&category=`).
+- Game detail (`/games/[slug]`): 240px cover on the left. Title, four-line description (Show more / Show less), **Broadcast compact**, then credits — all to the right of the cover.
 
 ## Controls
 
@@ -101,6 +102,8 @@ Rules:
 `DatePicker` — button trigger (no text entry) with a branded calendar mark: `--accent` header bar, `--paper` rings, `--ink` day ticks. Opens a month grid in `--panel` with a hard `--line` border. Selected day uses `--accent`; today gets an accent ring; `min` / `max` disable out-of-range days. Hidden input when `name` is set. Event schedule pairs this with `TimePicker`. Do not use native `<input type="date">` in product UI.
 
 `YearPicker` — same trigger language, calendar mark, year number on the button. Opens a 12-year grid with prev/next and focuses the selected year. Selected year uses `--accent`; the current year gets an accent ring. `min` / `max` default 1970–2100; `disabledYears` greys out taken years. Use for create-event year, create-list year (GOTY and optional custom), and GOTY year in list settings. Do not use a number input for calendar years.
+
+`Select` — same trigger language as the pickers, chevron on the right. Opens a scrollable listbox in `--panel`; the selected option uses `--accent`. Hidden input when `name` is set (empty values are omitted). Use for Games browse year / sort / direction / release. Games year includes **All years**, then current+2 down to 1970. Do not use a native `<select>` on Games browse.
 
 `TimePicker` — button trigger (no text entry) with a branded clock mark. Opens hour / minute / AM·PM wheels (`TimePanel`). Value is `HH:mm`. Use when time is independent of date. Event schedule rows compose `DatePicker` + `TimePicker` plus **Set to now**.
 
@@ -144,7 +147,7 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
 
 Planned: `EventNavigation`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 

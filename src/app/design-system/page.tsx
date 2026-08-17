@@ -4,6 +4,7 @@ import {
   GameSearchFieldFixture,
 } from "@/app/design-system/BallotFixtures";
 import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
+import { GameGotyRankingsFixture } from "@/app/design-system/GameGotyRankingsFixture";
 import { StandingCardLayoutFixture } from "@/app/design-system/StandingCardLayoutFixture";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
@@ -225,10 +226,13 @@ export default function DesignSystemPage() {
         <p className="mt-10 mb-4 max-w-2xl text-sm text-muted">
           Year, date, time, and combined date-time pickers: no typing. Click
           the field to open a year grid, month grid, or scrolling time.
-          Helpers: <code className="text-ink">YearPicker</code>,{" "}
+          Short option lists use <code className="text-ink">Select</code> with
+          the same trigger. Helpers:{" "}
+          <code className="text-ink">YearPicker</code>,{" "}
           <code className="text-ink">DatePicker</code>,{" "}
           <code className="text-ink">TimePicker</code>,{" "}
-          <code className="text-ink">DateTimePicker</code>. Event schedule
+          <code className="text-ink">DateTimePicker</code>,{" "}
+          <code className="text-ink">Select</code>. Event schedule
           uses split date and time.{" "}
           <code className="text-ink">Dialog</code> modal or{" "}
           <code className="text-ink">{`placement="contained"`}</code>;{" "}
@@ -469,6 +473,15 @@ export default function DesignSystemPage() {
           mix short and long titles so stacking tightness is obvious.
         </p>
         <StandingCardLayoutFixture />
+      </Section>
+
+      <Section title="Game detail · GOTY">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Treatments for a title’s site Game of the Year line. The game page
+          uses Broadcast compact to the right of a 240px cover, after the
+          description. The others are for comparison.
+        </p>
+        <GameGotyRankingsFixture />
       </Section>
 
       <Section title="Horizontal scroll">

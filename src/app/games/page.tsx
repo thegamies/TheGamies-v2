@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { GamesBrowseFilters } from "@/components/games/GamesBrowseFilters";
 import { GameCover } from "@/components/ui/GameCover";
 import { browseGames } from "@/lib/catalog";
 
@@ -45,75 +46,18 @@ export default async function GamesPage({
   return (
     <>
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Catalog</p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-7xl">
+        <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
           Games
         </h1>
-        <p className="mt-3 max-w-xl text-muted">
-          Browse the synced IGDB catalog. Artwork first, filters second.
-        </p>
 
-        <form className="mt-8 flex flex-wrap items-end gap-4 border-y border-line py-5">
-          <label className="text-sm text-muted">
-            Search
-            <input
-              name="q"
-              defaultValue={q}
-              className="mt-1 block min-w-[12rem] border border-line bg-panel px-3 py-2 text-ink"
-              placeholder="Title"
-            />
-          </label>
-          <label className="text-sm text-muted">
-            Year
-            <input
-              name="year"
-              type="number"
-              defaultValue={yearRaw ?? ""}
-              className="mt-1 block w-28 border border-line bg-panel px-3 py-2 text-ink"
-            />
-          </label>
-          <label className="text-sm text-muted">
-            Sort
-            <select
-              name="sort"
-              defaultValue={sort}
-              className="mt-1 block border border-line bg-panel px-3 py-2 text-ink"
-            >
-              <option value="popularity">Popularity</option>
-              <option value="name">Name</option>
-              <option value="first_release_date">Release date</option>
-            </select>
-          </label>
-          <label className="text-sm text-muted">
-            Direction
-            <select
-              name="sortDir"
-              defaultValue={sortDir}
-              className="mt-1 block border border-line bg-panel px-3 py-2 text-ink"
-            >
-              <option value="desc">Desc</option>
-              <option value="asc">Asc</option>
-            </select>
-          </label>
-          <label className="text-sm text-muted">
-            Release
-            <select
-              name="releaseStatus"
-              defaultValue={releaseStatus}
-              className="mt-1 block border border-line bg-panel px-3 py-2 text-ink"
-            >
-              <option value="all">All</option>
-              <option value="released">Released</option>
-              <option value="upcoming">Upcoming</option>
-            </select>
-          </label>
-          <button
-            type="submit"
-            className="rounded-[var(--radius-control)] bg-accent px-4 py-2 text-sm font-semibold text-white"
-          >
-            Apply
-          </button>
-        </form>
+        <GamesBrowseFilters
+          key={`${q}|${year ?? ""}|${sort}|${sortDir}|${releaseStatus}`}
+          q={q}
+          year={year && !Number.isNaN(year) ? year : undefined}
+          sort={sort}
+          sortDir={sortDir}
+          releaseStatus={releaseStatus}
+        />
 
         {error ? (
           <p className="mt-8 text-accent">
