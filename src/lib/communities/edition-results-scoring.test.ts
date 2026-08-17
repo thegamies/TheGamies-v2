@@ -8,6 +8,7 @@ import {
   parseEditionResultsView,
   placeEditionCategoryTallies,
   placeEditionGotyTallies,
+  resolveEditionHostSettings,
   storageModeFor,
   type GameMeta,
 } from "./edition-results-scoring";
@@ -79,16 +80,34 @@ describe("editionResultsHref", () => {
 });
 
 describe("parseEditionResultsView", () => {
-  it("defaults to reveal and accepts results, overview, standings, categories, voters, ballot, and settings", () => {
+  it("defaults to reveal and accepts results views plus settings", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
-    expect(parseEditionResultsView("reveal")).toBe("reveal");
-    expect(parseEditionResultsView("overview")).toBe("overview");
-    expect(parseEditionResultsView("results")).toBe("overview");
-    expect(parseEditionResultsView("standings")).toBe("standings");
-    expect(parseEditionResultsView("categories")).toBe("categories");
-    expect(parseEditionResultsView("voters")).toBe("voters");
-    expect(parseEditionResultsView("ballot")).toBe("ballot");
     expect(parseEditionResultsView("settings")).toBe("settings");
+    expect(parseEditionResultsView("hosts")).toBe("hosts");
+    expect(parseEditionResultsView("preview")).toBe("preview");
+  });
+
+  it("resolves settings panels and legacy host tool views", () => {
+    expect(resolveEditionHostSettings("settings", undefined)).toEqual({
+      view: "settings",
+      panel: "edition",
+    });
+    expect(resolveEditionHostSettings("settings", "hosts")).toEqual({
+      view: "settings",
+      panel: "hosts",
+    });
+    expect(resolveEditionHostSettings("settings", "preview")).toEqual({
+      view: "settings",
+      panel: "preview",
+    });
+    expect(resolveEditionHostSettings("hosts", undefined)).toEqual({
+      view: "settings",
+      panel: "hosts",
+    });
+    expect(resolveEditionHostSettings("preview", undefined)).toEqual({
+      view: "settings",
+      panel: "preview",
+    });
   });
 });
 

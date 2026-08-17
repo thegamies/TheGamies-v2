@@ -9,7 +9,10 @@ export function parseCommunitySettingsTab(raw: unknown): CommunitySettingsTab {
 /** Host community settings (`?tab=` / `?year=`). Default tab is Live Rankings. */
 export function communitySettingsHref(
   slug: string,
-  opts: { tab?: CommunitySettingsTab; year?: number | null } = {},
+  opts: {
+    tab?: CommunitySettingsTab;
+    year?: number | null;
+  } = {},
 ) {
   const params = new URLSearchParams();
   const tab = opts.tab ?? "live";

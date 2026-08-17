@@ -45,7 +45,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY event (vote + results by schedule)
 - `/communities/[slug]/ballot` → redirects to edition
 - `/communities/[slug]/results` → redirects to edition
-- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events&year=`), and **Community** (`?tab=community`). Events: **Create event** dialog (year + full schedule; open may be in the past), year selector, **Open event** (that year with Settings selected), **Delete event** (type the year to confirm). Per-year schedule, Hosts, host preview. Community: add/remove admins (last admin cannot be removed) and leave.
+- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events&year=`), and **Community** (`?tab=community`). Events: **Create event**, year selector, links to event **Edition settings** / **Manage hosts** / **Host preview**. Community: add/remove admins (last admin cannot be removed) and leave.
 - Profile `/u/[username]` lists communities the person belongs to
 
 ### Non-goals (next slices)
@@ -54,7 +54,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - Invite-only or approval join, bans, extra roles
 - Cover/avatar upload
 - Site-admin-only create gate
-- Per-community / multi / ranked edition category modes
+- Per-community custom defs / multi / ranked edition category modes
 - Full all-member ballot matrix virtualization
 
 ## Public shell
@@ -92,7 +92,7 @@ Settings and event management live on a separate administrative surface. Communi
 5. Voting closed; results pending (`closed`) — member ballot read-only; Events heading shows the reveal datetime
 6. Final results published (`published` + frozen normalized boards)
 7. Individual voter exploration (paged voter list on results; deeper matrix later)
-8. Event Settings tab for hosts (`?view=settings`): schedule, tie numbering, Hosts, host preview of submitted ballots, **Delete event** (type the year). Community Settings Events creates years (full schedule, no draft) and switches year; **Open event** lands on this tab.
+8. Event **Settings** tab (`?view=settings`) with tertiary panels: **Edition settings** (default — schedule, categories, and tie numbering share one Save), **Manage hosts** (`&panel=hosts`), **Host preview** (`&panel=preview`, paged, while open/closed). Community Settings → Events creates years and links into those panels.
 
 ### Ballots (shipped)
 
@@ -100,7 +100,8 @@ Separate tables from personal lists / live contrib:
 
 - `community_edition_ballots` — one per `(editionId, profileId)`
 - `community_edition_ballot_items` — ranked GOTY (up to 10; scoring uses `pointsForRank`)
-- `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only
+- `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only (enabled subset from `community_edition_categories`)
+- `community_edition_categories` — which site awards are on this event (+ order). Reveal / Results / Categories join freeze rows to this set so awards removed from settings no longer appear. Removing an award while voting is open also deletes that award’s ballot picks.
 
 **Eligibility:** signed-in profile that is a community member (including hosts). Non-members see join / sign-in CTAs.
 
@@ -114,7 +115,7 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Hosts (shipped)
 
-Community hosts designate **Hosts** **per edition** under Settings (`community_edition_voices`). The list defaults to **community hosts + current Hosts**; they **search members** by name or @username to designate others. Roster is year-specific and locks after publish. Public UI says Host / Hosts; URLs stay `?mode=voices`.
+Community hosts designate **Hosts** **per edition** under Settings → **Manage hosts** (`?view=settings&panel=hosts`, `community_edition_voices`). The list defaults to **community hosts + current Hosts**; they **search members** by name or @username to designate others. Roster is year-specific and locks after publish. Public UI says Host / Hosts; URLs stay `?mode=voices`. Schedule and categories live under Settings → **Edition settings**.
 
 ### Results (shipped)
 
@@ -126,7 +127,7 @@ Board tallies are computed with **SQL `GROUP BY`** on ballot tables (same `point
 
 **Views:** Reveal · Results · Full standings · Categories · Voters · Your ballot (`?view=`; default is Reveal / `reveal`; Results is `?view=results`, `overview` still works) as **secondary** underline tabs; Community · Hosts as **tertiary** text toggle on the same toolbar (hidden on Your ballot; Hosts filters the Voters list). Your ballot is members only. Multi-year switching is a pop-open year control to the right of **{year} Video Game Awards** — only when 2+ public years exist. Switching years keeps the current view and Community · Hosts board. Reveal is a sticky-scroll ceremony (DOM-scrubbed; GOTY #10→#1 with park-right numbers and per-cover tied beats; categories slide full-size #1·#2·#3 columns in from off-screen left #3→#2→#1 so earlier ranks push right smoothly). Results GOTY and Categories share **Ranked · Comparison**; Categories tab loads paginated cover-card tallies (10/page); Voters is SQL-paginated with search. Host / voter **display names** open `?view=ballot&voter=username` (frozen ballot); **@username** goes to profile.
 
-**Recalc rules:** first time status becomes `published`, freeze from current ballots. While still published, schedule tweaks do **not** rebuild. If the edition leaves published (reopen voting) and publishes again, results **rebuild**. Ops `/admin/communities` “Publish / rebuild results” always rebuilds.
+**Recalc rules:** freeze begins when voting **closes** (cron + schedule `after()` kick), with exclusive `freeze_status` claim. Results become public when `publishesAt` is reached **and** freeze is ready. While computing, the edition page shows a calculating message. While still published, schedule tweaks do **not** rebuild. If the edition leaves published (reopen voting) and publishes again, results **rebuild**. Ops `/admin/communities` “Publish / rebuild results” always rebuilds.
 
 ### Results (later polish)
 

@@ -54,6 +54,14 @@ export function CommunityEventsOverview({
           <span className="font-semibold tracking-wide">{statusLabel}</span>
         )}
       </p>
+      <p className="mt-4">
+        <Link
+          href={href}
+          className="inline-flex h-9 items-center justify-center border border-line px-3 text-sm font-semibold tracking-wide text-ink transition-[color,border-color] duration-[var(--motion-fast)] hover:border-accent"
+        >
+          Go to event
+        </Link>
+      </p>
     </section>
   );
 }

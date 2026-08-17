@@ -162,6 +162,20 @@
       "when": 1787097600000,
       "tag": "0022_list_format_default_grid",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787184000000,
+      "tag": "0023_community_edition_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787270400000,
+      "tag": "0024_edition_freeze_status",
+      "breakpoints": true
     }
   ]
 }

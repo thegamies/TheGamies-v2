@@ -4,7 +4,10 @@ import {
   EditionCategoryDebugBar,
   EditionCategoryDebugProvider,
 } from "@/components/communities/EditionCategoryDebug";
-import { EditionCategoryResults } from "@/components/communities/EditionCategoryResults";
+import {
+  EditionCategoryDetail,
+  EditionCategoryResults,
+} from "@/components/communities/EditionCategoryResults";
 import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
@@ -15,6 +18,7 @@ import type {
   EditionCategoryComparisonMatrix,
   EditionCategoryMeta,
   EditionCategoryStandingBlock,
+  EditionCategoryStandingRow,
   EditionGotyStandingRow,
   EditionResultsMeta,
   EditionVoterListRow,
@@ -53,6 +57,7 @@ export function EditionResultsViewNav({
   year,
   mode,
   view,
+  categoryId = null,
   votersPage = 1,
   votersQ = "",
   hasYourBallot,
@@ -63,6 +68,7 @@ export function EditionResultsViewNav({
   year: number;
   mode: EditionResultsPublicMode;
   view: EditionResultsViewId;
+  categoryId?: string | null;
   votersPage?: number;
   votersQ?: string;
   hasYourBallot: boolean;
@@ -97,7 +103,9 @@ export function EditionResultsViewNav({
                 ? viewingYourBallot
                 : v.id === "voters"
                   ? view === "voters" || viewingPublicBallot
-                  : v.id === view && !viewingPublicBallot;
+                  : v.id === "categories"
+                    ? view === "categories" || view === "category"
+                    : v.id === view && !viewingPublicBallot;
           return (
             <Link
               key={v.id}
@@ -137,6 +145,8 @@ export function EditionResultsViewNav({
                   view,
                   votersPage: 1,
                   q: votersQ,
+                  category:
+                    view === "category" ? categoryId ?? undefined : undefined,
                 })}
                 className={navItemClass("tertiary", m === mode)}
               >
@@ -158,11 +168,13 @@ export function EditionResultsView({
   mode,
   rankMode = "competition",
   view,
+  categoryId = null,
   meta,
   topTen,
   categoryPodiums,
   categoryComparison,
   categoryMeta,
+  categoryPage = null,
   voters,
   matrix,
   yourProfileId,
@@ -177,11 +189,19 @@ export function EditionResultsView({
   mode: EditionResultsPublicMode;
   rankMode?: SharedRankMode;
   view: EditionResultsViewId;
+  categoryId?: string | null;
   meta: EditionResultsMeta;
   topTen: EditionGotyStandingRow[];
   categoryPodiums: EditionCategoryStandingBlock[];
   categoryComparison: EditionCategoryComparisonMatrix;
   categoryMeta: EditionCategoryMeta[];
+  categoryPage?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    rows: EditionCategoryStandingRow[];
+  } | null;
   voters: {
     page: number;
     pageSize: number;
@@ -216,6 +236,10 @@ export function EditionResultsView({
     mode,
     view: "categories",
   });
+  const resultsHref = editionResultsHref(slug, year, {
+    mode,
+    view: "overview",
+  });
   const votersHref = editionResultsHref(slug, year, {
     mode,
     view: "voters",
@@ -231,7 +255,10 @@ export function EditionResultsView({
     view === "ballot" &&
     !requestedPublicVoter &&
     yourBallot != null;
-
+  const selectedCategory =
+    view === "category" && categoryId
+      ? (categoryMeta.find((c) => c.categoryId === categoryId) ?? null)
+      : null;
   return (
     <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
     <div className="mt-6 space-y-10">
@@ -240,6 +267,7 @@ export function EditionResultsView({
         year={year}
         mode={mode}
         view={view}
+        categoryId={categoryId}
         votersPage={voters.page}
         votersQ={voters.q}
         hasYourBallot={yourBallot != null}
@@ -255,13 +283,37 @@ export function EditionResultsView({
           rankMode={rankMode}
           totalGames={gotyTotal}
         />
+      ) : view === "category" ? (
+        selectedCategory && categoryPage ? (
+          <EditionCategoryDetail
+            slug={slug}
+            year={year}
+            mode={mode}
+            category={selectedCategory}
+            page={categoryPage.page}
+            pageSize={categoryPage.pageSize}
+            total={categoryPage.total}
+            totalPages={categoryPage.totalPages}
+            rows={categoryPage.rows}
+          />
+        ) : (
+          <section>
+            <p className="text-sm text-muted">
+              <Link href={categoriesHref} className="text-accent hover:underline">
+                ← Categories
+              </Link>
+            </p>
+            <p className="mt-4 text-muted">
+              That category was not found on this board.
+            </p>
+          </section>
+        )
       ) : view === "categories" ? (
         <EditionCategoryResults
           slug={slug}
           year={year}
           mode={mode}
-          rankMode={rankMode}
-          categories={categoryMeta}
+          categoryPodiums={categoryPodiums}
         />
       ) : viewingPublicBallot && publicBallot ? (
         <section>
@@ -322,16 +374,17 @@ export function EditionResultsView({
           communityName={communityName}
           topTen={topTen}
           categoryPodiums={categoryPodiums}
+          resultsHref={resultsHref}
         />
       ) : (
         <EditionResultsOverview
           slug={slug}
           year={year}
+          mode={mode}
           topTen={topTen}
           matrix={matrix}
           gotyTotal={gotyTotal}
           standingsHref={standingsHref}
-          categoriesHref={categoriesHref}
           categoryPodiums={categoryPodiums}
           categoryComparison={categoryComparison}
           youBallotHref={youBallotHref}

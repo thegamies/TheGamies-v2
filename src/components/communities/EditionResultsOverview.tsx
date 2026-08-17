@@ -10,6 +10,7 @@ import type {
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
+import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
 
 export type ResultsBoardLayout = "ranked" | "comparison";
 
@@ -35,22 +36,22 @@ const EMPTY_CATEGORY_COMPARISON: EditionCategoryComparisonMatrix = {
 export function EditionResultsOverview({
   slug,
   year,
+  mode = "community",
   topTen,
   matrix: initialMatrix,
   gotyTotal,
   standingsHref,
-  categoriesHref,
   categoryPodiums,
   categoryComparison: initialCategoryComparison,
   youBallotHref,
 }: {
   slug: string;
   year: number;
+  mode?: EditionResultsPublicMode;
   topTen: EditionGotyStandingRow[];
   matrix: EditionBallotMatrix;
   gotyTotal: number;
   standingsHref: string;
-  categoriesHref: string;
   categoryPodiums: EditionCategoryStandingBlock[];
   categoryComparison: EditionCategoryComparisonMatrix;
   youBallotHref: string | null;
@@ -165,7 +166,7 @@ export function EditionResultsOverview({
             <EditionCategoriesHighlights
               slug={slug}
               year={year}
-              categoriesHref={categoriesHref}
+              mode={mode}
               categoryPodiums={categoryPodiums}
               categoryComparison={categoryComparison}
               youBallotHref={youBallotHref}

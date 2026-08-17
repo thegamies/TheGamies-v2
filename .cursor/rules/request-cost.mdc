@@ -15,14 +15,16 @@ Before freezing data, caching, or serving lists, ask how the **hot path** behave
 
 ## Prefer
 
-- Normalized rows + `LIMIT`/`OFFSET` (or keyset) for boards and voter lists
+- Normalized rows + `LIMIT`/`OFFSET` (or keyset) for **any** list that can grow
 - Small meta rows; join catalog tables when freeze immutability allows
 - Client receives only the page it renders
+- Same pagination rules on host/admin/settings reads as on public boards
 
 ## Avoid
 
 - Fat `jsonb` (or equivalent) snapshots that force full read+parse per request just to slice in memory
 - “Pagination in the UI” that still loads everything server-side
+- Unbounded list queries (“load all, hosts will scroll”) on any surface
 
 ## Related
 

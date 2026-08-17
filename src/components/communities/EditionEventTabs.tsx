@@ -18,7 +18,7 @@ export function EditionEventTabs({
   slug: string;
   year: number;
   canManage: boolean;
-  active: "ballot" | "settings" | "voters";
+  active: "ballot" | "voters" | "settings";
   ballotLabel?: string;
   includeVoters?: boolean;
   mode?: EditionResultsPublicMode;
@@ -30,7 +30,6 @@ export function EditionEventTabs({
     mode,
     view: "voters",
   });
-  const settingsHref = editionHostSettingsHref(slug, year);
 
   return (
     <nav
@@ -53,7 +52,7 @@ export function EditionEventTabs({
       ) : null}
       {canManage ? (
         <Link
-          href={settingsHref}
+          href={editionHostSettingsHref(slug, year)}
           className={navItemClass("secondary", active === "settings")}
         >
           Settings

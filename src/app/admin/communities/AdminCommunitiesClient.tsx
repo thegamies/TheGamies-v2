@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import {
+  clearCommunityEditionFreezeAction,
   clearCommunitySeedsAction,
   loadCommunitySeedStatsAction,
   publishCommunityEditionSeedAction,
@@ -509,6 +510,37 @@ export function AdminCommunitiesClient({
           }
         >
           Publish / rebuild results
+        </Button>
+        <Button
+          type="button"
+          variant="danger-bordered"
+          disabled={busy}
+          onClick={() =>
+            startTransition(async () => {
+              setMessage(null);
+              if (
+                !window.confirm(
+                  `Delete frozen results for ${slug.trim() || "(slug)"} ${year}? Ballots stay; boards clear until rebuilt.`,
+                )
+              ) {
+                return;
+              }
+              const result = await clearCommunityEditionFreezeAction({
+                communitySlug: slug,
+                year,
+              });
+              if ("error" in result) {
+                setMessage(result.error);
+                return;
+              }
+              setMessage(
+                `Cleared freeze data. Use Publish / rebuild results to recompute. ${result.path}`,
+              );
+              await refreshStats();
+            })
+          }
+        >
+          Delete freeze data
         </Button>
         <Button
           type="button"

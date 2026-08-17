@@ -74,6 +74,8 @@ Before choosing freeze/cache/list storage, walk the request:
 **Do:** page-sized queries; small meta; client gets only what it renders.  
 **Don’t:** fat `jsonb` snapshots on the hot path for boards or voter matrices.
 
+**Never load an unbounded list without SQL pagination** (or an equivalent keyset/`LIMIT`) on the read path—public boards, voter lists, **and** host/admin/settings surfaces. “Hosts are few” or “we’ll scroll in the UI” does not justify pulling every row. Same 10× rule: one page view should stay cheap when membership, ballots, or catalog size grows.
+
 Live lock and edition results freeze into **tables**, not one giant payload. See `.cursor/rules/request-cost.mdc`.
 
 ## Deployment

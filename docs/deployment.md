@@ -25,7 +25,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 | File | Role |
 |---|---|
-| `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys |
+| `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys; cron for edition freeze |
 | `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
@@ -38,6 +38,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 ## Cloudflare notes
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
+- **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). On Cloudflare, schedule an HTTP cron (or Worker Cron that `fetch`es the Worker URL) with `Authorization: Bearer $CRON_SECRET` — OpenNext does not auto-route CF Cron Triggers to App Router routes.
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 
 ## Account setup (one-time)

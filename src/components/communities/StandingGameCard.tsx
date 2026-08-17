@@ -269,7 +269,7 @@ export function StandingGameCardGrid({
 
 /** Horizontal rank strip: cover row + caption row so art shares a bottom edge. */
 export const standingStripListClass =
-  "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] gap-x-4";
+  "grid w-max grid-flow-col grid-rows-[auto_auto] justify-start gap-x-4";
 
 export function standingStripColClass(featured: boolean): string {
   return `group row-span-2 grid grid-rows-subgrid ${
@@ -297,8 +297,8 @@ const RUNNER_MAX = {
 
 function podiumColClass(size: "winner" | "runner"): string {
   return size === "winner"
-    ? "min-w-0 flex-[1.35] max-w-[206px]"
-    : "min-w-0 flex-1 max-w-[148px]";
+    ? "w-[168px] shrink-0 sm:w-[190px] md:w-[206px]"
+    : "w-[118px] shrink-0 sm:w-[132px] md:w-[148px]";
 }
 
 function PodiumCoverStack({
@@ -392,12 +392,12 @@ export function WinnerPodium({
         </p>
       ) : null}
       <div className={eyebrow ? "mt-6" : "mt-0"}>
-        <div className="flex w-full max-w-full items-end gap-2 sm:gap-4 md:gap-8">
+        <div className="flex max-w-full items-end justify-start gap-2 sm:gap-4 md:gap-8">
           {columns.map(({ entry, size }) => (
             <PodiumCoverStack key={entry.gameId} entry={entry} size={size} />
           ))}
         </div>
-        <div className="flex w-full max-w-full items-start gap-2 sm:gap-4 md:gap-8">
+        <div className="flex max-w-full items-start justify-start gap-2 sm:gap-4 md:gap-8">
           {columns.map(({ entry, size }) => (
             <PodiumCaption key={entry.gameId} entry={entry} size={size} />
           ))}

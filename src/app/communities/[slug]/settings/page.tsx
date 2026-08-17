@@ -6,7 +6,6 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { listEditionBallotSubmitters } from "@/lib/communities/ballots";
 import {
   parseCommunitySettingsTab,
   pickSettingsEditionYear,
@@ -22,15 +21,12 @@ import {
   getCommunityBySlug,
   listCommunityMemberOptions,
 } from "@/lib/communities/service";
-import { listMembersWithEditionVoiceFlags } from "@/lib/communities/voices";
 import { CommunityHostsForm } from "./CommunityHostsForm";
 import { CommunityLeaveForm } from "./CommunityLeaveForm";
 import { EditionSettings } from "./EditionSettings";
-import type { EditionHostPreviewSubmitter } from "./EditionHostPreview";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
-import type { EditionVoiceMemberOption } from "./EditionVoicesForm";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -96,26 +92,6 @@ export default async function CommunitySettingsPage({
       ? null
       : (editions.find((edition) => edition.year === selectedYear) ?? null);
 
-  let voices: EditionVoiceMemberOption[] = [];
-  let submitters: EditionHostPreviewSubmitter[] = [];
-  if (tab === "events" && selected) {
-    try {
-      voices = await listMembersWithEditionVoiceFlags(
-        community.id,
-        selected.id,
-      );
-    } catch {
-      voices = [];
-    }
-    if (selected.status !== "published") {
-      try {
-        submitters = await listEditionBallotSubmitters(selected.id);
-      } catch {
-        submitters = [];
-      }
-    }
-  }
-
   let hostMembers: Awaited<ReturnType<typeof listCommunityMemberOptions>> = [];
   if (tab === "community") {
     try {
@@ -178,8 +154,6 @@ export default async function CommunitySettingsPage({
             slug={community.slug}
             editions={editions}
             selectedYear={selectedYear}
-            voices={voices}
-            submitters={submitters}
           />
         ) : (
           <>

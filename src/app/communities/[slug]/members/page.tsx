@@ -21,10 +21,13 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function membersHref(slug: string, page: number): string {
+function membersHref(slug: string, page: number, q?: string): string {
   const base = `/communities/${encodeURIComponent(slug)}/members`;
-  if (page <= 1) return base;
-  return `${base}?page=${page}`;
+  const params = new URLSearchParams();
+  if (page > 1) params.set("page", String(page));
+  if (q) params.set("q", q);
+  const qs = params.toString();
+  return qs ? `${base}?${qs}` : base;
 }
 
 export async function generateMetadata({
@@ -55,6 +58,7 @@ export default async function CommunityMembersPage({
   const { slug } = await params;
   const sp = await searchParams;
   const pageRaw = Number(first(sp.page) ?? "1");
+  const q = (first(sp.q) ?? "").trim();
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -84,7 +88,7 @@ export default async function CommunityMembersPage({
 
   let membersPage;
   try {
-    membersPage = await listCommunityMembersPage(community.id, pageRaw);
+    membersPage = await listCommunityMembersPage(community.id, pageRaw, { q });
   } catch {
     membersPage = {
       members: [],
@@ -125,8 +129,26 @@ export default async function CommunityMembersPage({
           {community.memberCount === 1 ? "member" : "members"}
         </p>
 
+        <form className="mt-6 flex flex-wrap gap-2" method="get">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="Search members"
+            className="border border-line bg-paper px-3 py-2 text-sm text-ink"
+            aria-label="Search members"
+          />
+          <button
+            type="submit"
+            className="border border-line px-3 py-2 text-sm text-ink hover:border-accent"
+          >
+            Search
+          </button>
+        </form>
+
         {membersPage.members.length === 0 ? (
-          <p className="mt-8 text-muted">No members yet.</p>
+          <p className="mt-8 text-muted">
+            {q ? "No members match that search." : "No members yet."}
+          </p>
         ) : (
           <ul className="mt-8 divide-y divide-line border-y border-line">
             {membersPage.members.map((member) => (
@@ -155,7 +177,7 @@ export default async function CommunityMembersPage({
             <div className="flex gap-2">
               {membersPage.page > 1 ? (
                 <Link
-                  href={membersHref(community.slug, membersPage.page - 1)}
+                  href={membersHref(community.slug, membersPage.page - 1, q)}
                   className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                 >
                   Previous
@@ -163,7 +185,7 @@ export default async function CommunityMembersPage({
               ) : null}
               {membersPage.page < membersPage.totalPages ? (
                 <Link
-                  href={membersHref(community.slug, membersPage.page + 1)}
+                  href={membersHref(community.slug, membersPage.page + 1, q)}
                   className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                 >
                   Next

@@ -326,6 +326,16 @@ export const communityEditions = pgTable(
       .notNull()
       .default("competition")
       .$type<"competition" | "dense">(),
+    /**
+     * Results freeze job: idle until close, then pending → computing → ready|failed.
+     * Ready also implies `community_edition_result_meta` exists.
+     */
+    freezeStatus: text("freeze_status")
+      .notNull()
+      .default("idle")
+      .$type<"idle" | "pending" | "computing" | "ready" | "failed">(),
+    freezeStartedAt: timestamp("freeze_started_at", { mode: "date" }),
+    freezeError: text("freeze_error"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
@@ -335,6 +345,7 @@ export const communityEditions = pgTable(
       t.year,
     ),
     index("community_editions_community_id_idx").on(t.communityId),
+    index("community_editions_freeze_status_idx").on(t.freezeStatus),
   ],
 );
 
@@ -452,6 +463,27 @@ export const awardCategories = pgTable("award_categories", {
   eligibility: text("eligibility").notNull().default("current_year"),
   allowEditions: boolean("allow_editions").notNull().default(false),
 });
+
+/**
+ * Site award categories enabled for one edition (subset + host order).
+ * Empty until seeded — readers fall back to all active site categories.
+ */
+export const communityEditionCategories = pgTable(
+  "community_edition_categories",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    categoryId: text("category_id")
+      .notNull()
+      .references(() => awardCategories.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.editionId, t.categoryId] }),
+    index("community_edition_categories_edition_id_idx").on(t.editionId),
+  ],
+);
 
 /** One game pick per category on an owned GOTY list. */
 export const listCategoryVotes = pgTable(

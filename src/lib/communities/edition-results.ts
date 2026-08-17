@@ -1,9 +1,13 @@
 import { and, asc, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
 import {
-  awardCategories,
+  listEditionAwardCategories,
+  listEditionEnabledCategoryIds,
+} from "@/lib/communities/edition-categories";
+import {
   communityEditionBallotCategoryVotes,
   communityEditionBallotItems,
   communityEditionBallots,
+  communityEditionCategories,
   communityEditionResultCategories,
   communityEditionResultGoty,
   communityEditionResultMeta,
@@ -11,6 +15,7 @@ import {
   communityEditionResultVoterRanks,
   communityEditionResultVoters,
   communityEditionVoices,
+  communityEditions,
   covers,
   createDb,
   games,
@@ -50,8 +55,11 @@ export {
   parseEditionRankMode,
   parseEditionResultMode,
   parseEditionResultsView,
+  parseEditionSettingsPanel,
+  resolveEditionHostSettings,
   type EditionResultsPublicMode,
   type EditionResultsViewId,
+  type EditionSettingsPanelId,
   type SharedRankMode,
 } from "./edition-results-scoring";
 
@@ -152,6 +160,23 @@ export async function rebuildEditionResultsFrozen(
 ): Promise<EditionResultsMeta | { error: string }> {
   await clearEditionResultTables(editionId, db);
   return freezeEditionResults(editionId, db);
+}
+
+/** Delete freeze snapshot rows only (ballots unchanged). Resets freeze job status. */
+export async function clearEditionResultsFrozen(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<void> {
+  await clearEditionResultTables(editionId, db);
+  await db
+    .update(communityEditions)
+    .set({
+      freezeStatus: "idle",
+      freezeStartedAt: null,
+      freezeError: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(communityEditions.id, editionId));
 }
 
 async function clearEditionResultTables(editionId: string, db: Db) {
@@ -443,23 +468,17 @@ async function freezeEditionResults(
 
   const voiceIds = await listEditionVoiceProfileIds(editionId, db);
 
-  const [communityGoty, voicesGoty, communityCats, voicesCats, categoryDefs] =
+  const [communityGoty, voicesGoty, communityCats, voicesCats, editionCats] =
     await Promise.all([
       sqlAggregateEditionGoty(editionId, false, db),
       sqlAggregateEditionGoty(editionId, true, db),
       sqlAggregateEditionCategories(editionId, false, db),
       sqlAggregateEditionCategories(editionId, true, db),
-      db
-        .select({
-          id: awardCategories.id,
-          label: awardCategories.label,
-          description: awardCategories.description,
-          sortOrder: awardCategories.sortOrder,
-        })
-        .from(awardCategories),
+      listEditionAwardCategories(editionId, db),
     ]);
 
-  const catDefById = new Map(categoryDefs.map((c) => [c.id, c]));
+  const catDefById = new Map(editionCats.map((c) => [c.id, c]));
+  const enabledCategoryIds = new Set(editionCats.map((c) => c.id));
 
   const ballotCountCommunity = ballots.length;
   const ballotCountVoices = ballots.filter((b) =>
@@ -494,23 +513,25 @@ async function freezeEditionResults(
 
   const categoryRows = (["community", "voices"] as const).flatMap((mode) => {
     const rows = mode === "community" ? communityCats : voicesCats;
-    return rows.map((row) => {
-      const def = catDefById.get(row.categoryId);
-      return {
-        editionId,
-        mode,
-        categoryId: row.categoryId,
-        label: def?.label ?? row.categoryId,
-        description: def?.description ?? null,
-        sortOrder: def?.sortOrder ?? 0,
-        place: row.place,
-        gameId: row.gameId,
-        slug: row.slug,
-        title: row.title,
-        coverUrl: row.coverUrl,
-        votes: row.votes,
-      };
-    });
+    return rows
+      .filter((row) => enabledCategoryIds.has(row.categoryId))
+      .map((row) => {
+        const def = catDefById.get(row.categoryId);
+        return {
+          editionId,
+          mode,
+          categoryId: row.categoryId,
+          label: def?.label ?? row.categoryId,
+          description: def?.description ?? null,
+          sortOrder: def?.sortOrder ?? 0,
+          place: row.place,
+          gameId: row.gameId,
+          slug: row.slug,
+          title: row.title,
+          coverUrl: row.coverUrl,
+          votes: row.votes,
+        };
+      });
   });
 
   const voterRows = ballots.map((b) => ({
@@ -572,7 +593,7 @@ async function freezeEditionResults(
   return meta;
 }
 
-/** Public ensure: freeze only when edition status is published. */
+/** Public ensure: kick freeze when published; return meta if ready (non-blocking). */
 export async function ensurePublishedEditionResults(
   communityId: string,
   year: number,
@@ -580,8 +601,22 @@ export async function ensurePublishedEditionResults(
 ): Promise<EditionResultsMeta | null | { error: string }> {
   const edition = await getEditionByCommunityYear(communityId, year, db);
   if (!edition) return null;
-  if (edition.status !== "published") return null;
-  return freezeEditionResults(edition.id, db);
+  if (edition.status !== "published" && edition.status !== "closed") {
+    return null;
+  }
+
+  const existing = await getEditionResultsMeta(edition.id, db);
+  if (existing) {
+    if (edition.freezeStatus !== "ready") {
+      const { markEditionFreezeReady } = await import("./edition-freeze");
+      await markEditionFreezeReady(edition.id, db);
+    }
+    return existing;
+  }
+
+  const { maybeKickEditionFreeze } = await import("./edition-freeze");
+  await maybeKickEditionFreeze(edition, {}, db);
+  return null;
 }
 
 export async function getEditionGotyPage(
@@ -806,8 +841,32 @@ export async function getEditionCategoryResults(
 
   if (maxRank == null) {
     const rows = await db
-      .select()
+      .select({
+        categoryId: communityEditionResultCategories.categoryId,
+        label: communityEditionResultCategories.label,
+        description: communityEditionResultCategories.description,
+        sortOrder: communityEditionResultCategories.sortOrder,
+        place: communityEditionResultCategories.place,
+        gameId: communityEditionResultCategories.gameId,
+        slug: communityEditionResultCategories.slug,
+        title: communityEditionResultCategories.title,
+        coverUrl: communityEditionResultCategories.coverUrl,
+        votes: communityEditionResultCategories.votes,
+      })
       .from(communityEditionResultCategories)
+      .innerJoin(
+        communityEditionCategories,
+        and(
+          eq(
+            communityEditionCategories.editionId,
+            communityEditionResultCategories.editionId,
+          ),
+          eq(
+            communityEditionCategories.categoryId,
+            communityEditionResultCategories.categoryId,
+          ),
+        ),
+      )
       .where(baseWhere)
       .orderBy(
         asc(communityEditionResultCategories.sortOrder),
@@ -828,8 +887,8 @@ export async function getEditionCategoryResults(
   } else {
     const displayRankExpr =
       rankMode === "dense"
-        ? sql`dense_rank() over (partition by category_id order by votes desc)`
-        : sql`rank() over (partition by category_id order by votes desc)`;
+        ? sql`dense_rank() over (partition by r.category_id order by r.votes desc)`
+        : sql`rank() over (partition by r.category_id order by r.votes desc)`;
 
     const result = await db.execute(sql`
       select
@@ -845,20 +904,23 @@ export async function getEditionCategoryResults(
         votes
       from (
         select
-          category_id,
-          label,
-          description,
-          sort_order,
-          place,
-          game_id,
-          slug,
-          title,
-          cover_url,
-          votes,
+          r.category_id,
+          r.label,
+          r.description,
+          r.sort_order,
+          r.place,
+          r.game_id,
+          r.slug,
+          r.title,
+          r.cover_url,
+          r.votes,
           ${displayRankExpr} as display_rank
-        from community_edition_result_categories
-        where edition_id = ${editionId}
-          and mode = ${storage}
+        from community_edition_result_categories r
+        inner join community_edition_categories cec
+          on cec.edition_id = r.edition_id
+         and cec.category_id = r.category_id
+        where r.edition_id = ${editionId}
+          and r.mode = ${storage}
       ) ranked
       where display_rank <= ${maxRank}
       order by sort_order asc, place asc
@@ -943,6 +1005,19 @@ export async function listEditionCategoryMeta(
       total: sql<number>`count(*)::int`,
     })
     .from(communityEditionResultCategories)
+    .innerJoin(
+      communityEditionCategories,
+      and(
+        eq(
+          communityEditionCategories.editionId,
+          communityEditionResultCategories.editionId,
+        ),
+        eq(
+          communityEditionCategories.categoryId,
+          communityEditionResultCategories.categoryId,
+        ),
+      ),
+    )
     .where(
       and(
         eq(communityEditionResultCategories.editionId, editionId),
@@ -987,6 +1062,17 @@ export async function getEditionCategoryPage(
     50,
     Math.max(1, Math.floor(opts.pageSize ?? CATEGORY_RESULTS_PAGE_SIZE)),
   );
+
+  const enabledIds = await listEditionEnabledCategoryIds(editionId, db);
+  if (!enabledIds.includes(categoryId)) {
+    return {
+      page: 1,
+      pageSize,
+      total: 0,
+      totalPages: 1,
+      rows: [],
+    };
+  }
 
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })

@@ -67,6 +67,7 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging only (or use `VERCEL_STAGING_ALIAS`) |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging only |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |
+| `CRON_SECRET` | same | Vercel Cron + scheduled HTTP to `/api/cron/edition-freeze` (Bearer or `?secret=`) |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
 

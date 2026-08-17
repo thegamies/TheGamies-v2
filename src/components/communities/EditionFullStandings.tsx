@@ -130,7 +130,6 @@ export function EditionFullStandings({
                   slug={row.slug}
                   title={row.title}
                   coverUrl={row.coverUrl}
-                  year={row.year}
                   points={row.points}
                 />
               </li>

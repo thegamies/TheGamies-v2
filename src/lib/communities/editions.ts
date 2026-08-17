@@ -14,10 +14,7 @@ import {
 } from "./edition-status";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
-import {
-  ensureEditionResultsFrozen,
-  rebuildEditionResultsFrozen,
-} from "./edition-results";
+import { maybeKickEditionFreeze } from "./edition-freeze";
 
 export type CommunityEdition = typeof communityEditions.$inferSelect;
 
@@ -40,8 +37,8 @@ function withStatus(
 }
 
 /**
- * Freeze on first publish. If the edition left published (reopened) and
- * publishes again, rebuild so new ballots are included.
+ * Kick freeze when closed/published. Prefer after()+cron over blocking the
+ * schedule write; rebuild when re-entering published.
  */
 async function afterEditionWrite(
   edition: CommunityEdition,
@@ -50,12 +47,22 @@ async function afterEditionWrite(
   previousStatus?: EditionStatus,
 ): Promise<CommunityEditionPublic> {
   const publicEdition = withStatus(edition, now);
-  if (publicEdition.status === "published") {
-    if (previousStatus != null && previousStatus !== "published") {
-      await rebuildEditionResultsFrozen(edition.id, db);
-    } else {
-      await ensureEditionResultsFrozen(edition.id, db);
-    }
+  if (
+    publicEdition.status === "closed" ||
+    publicEdition.status === "published"
+  ) {
+    await maybeKickEditionFreeze(
+      edition,
+      {
+        rebuild:
+          previousStatus != null &&
+          previousStatus !== "published" &&
+          publicEdition.status === "published",
+        previousStatus,
+      },
+      db,
+      now,
+    );
   }
   return publicEdition;
 }

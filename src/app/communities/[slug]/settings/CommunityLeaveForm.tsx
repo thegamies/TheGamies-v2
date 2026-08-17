@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { leaveCommunityAction } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { Dialog } from "@/components/ui/Dialog";
 import { LAST_ADMIN_LEAVE_NOTE } from "@/lib/communities/rules";
 
 export function CommunityLeaveForm({
@@ -16,6 +17,7 @@ export function CommunityLeaveForm({
     leaveCommunityAction,
     null,
   );
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   return (
     <div className="mt-10 border-t border-line pt-6">
@@ -23,13 +25,45 @@ export function CommunityLeaveForm({
         Leave community
       </h3>
       {canLeave ? (
-        <form action={formAction} className="mt-4">
-          <input type="hidden" name="slug" value={slug} />
-          <input type="hidden" name="from" value="settings" />
-          <Button type="submit" variant="bordered" disabled={pending}>
-            {pending ? "Leaving…" : "Leave community"}
+        <>
+          <Button
+            type="button"
+            variant="bordered"
+            className="mt-4"
+            disabled={pending}
+            onClick={() => setConfirmOpen(true)}
+          >
+            Leave community
           </Button>
-        </form>
+          <Dialog
+            open={confirmOpen}
+            title="Leave community?"
+            onClose={() => setConfirmOpen(false)}
+            className="w-full max-w-md"
+          >
+            <p className="mt-3 text-sm leading-relaxed text-muted">
+              You will leave this community. You can join again later if it
+              stays open.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <form action={formAction}>
+                <input type="hidden" name="slug" value={slug} />
+                <input type="hidden" name="from" value="settings" />
+                <Button type="submit" variant="bordered" disabled={pending}>
+                  {pending ? "Leaving…" : "Leave community"}
+                </Button>
+              </form>
+              <Button
+                type="button"
+                variant="bordered"
+                disabled={pending}
+                onClick={() => setConfirmOpen(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          </Dialog>
+        </>
       ) : (
         <p className="mt-2 max-w-xl text-sm text-muted">
           {LAST_ADMIN_LEAVE_NOTE}

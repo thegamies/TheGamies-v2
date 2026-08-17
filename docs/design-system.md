@@ -159,8 +159,9 @@ Open voting uses the same primitives on events and personal GOTY lists.
 | GOTY ranking | Wrapping cover grid (`BallotRankGrid`); place in front of the title; drag to reorder while open; cap 10. Closed / Your ballot uses the same grid |
 | `CategoryVoteHeading` | Display category name (`text-2xl`) + optional description |
 | `CategoryPickCard` | Large cover (`w-28` / `sm:w-32`) + heading + picked title + optional **Clear** |
-| `CategoryVotesEditor` | Added awards: search + standings-style group filter + **Add category** (top and bottom). Empty heading + `GameSearchField`, or `CategoryPickCard`. Catalog grid opens in a `Dialog` with its own search + group filter. Eligibility copy only when it is not current year. List editor may pass `locked` + sign-in CTA for signed-out visitors. |
-| `PinnedSaveBar` | After an edit: `--panel` band pinned to the viewport bottom with Save. Hidden when clean. List editor and edition ballot reuse this — do not invent a second sticky save. |
+| `CategoryVotesEditor` | Award picks editor. **Site GOTY** (`catalogMode="optional"`, default): search + group filter + **Add category** dialog. **Edition ballots** (`catalogMode="fixed"`): every event award is listed; no add/remove. Empty slot + `GameSearchField`, or `CategoryPickCard`. List editor may pass `locked` + sign-in CTA for signed-out visitors. |
+| `CategoryPickerGrid` | Shared Add-category dialog body: search + group filter + square award grid. Used by ballot `CategoryVotesEditor` and **Edition settings**. |
+| `PinnedSaveBar` | After an edit: `--panel` band pinned to the viewport bottom with Save. Hidden when clean. List editor, edition ballot, and **Edition settings** reuse this — do not invent a second sticky save. |
 | Leave guard | `useUnsavedChangesGuard` — in-app **Unsaved changes** dialog (Stay / Leave). Tab close uses the browser prompt |
 
 Do not invent a second search dropdown, a smaller one-off category thumbnail, or a second sticky save treatment.

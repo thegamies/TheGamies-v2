@@ -19,6 +19,7 @@ import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-catego
 import { categoryEligibilityError } from "@/lib/live-aggregate/category-eligibility";
 import type { EditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
+import { listEditionEnabledCategoryIds } from "./edition-categories";
 import {
   EDITION_BALLOT_MAX_ITEMS,
   saveEditionBallotCategoryVotesSchema,
@@ -155,62 +156,98 @@ export async function getEditionBallotForProfile(
 }
 
 /** Live (pre-freeze) submitters — for hosts while voting is open/closed. */
-export async function listEditionBallotSubmitters(
+export const HOST_PREVIEW_PAGE_SIZE = 50;
+
+/**
+ * One Neon round-trip: page of submitters + total via `count(*) over()`,
+ * Host flag via `exists`, GOTY item counts via scalar subquery.
+ */
+export async function getEditionBallotSubmittersPage(
   editionId: string,
+  opts: { page?: number; pageSize?: number } = {},
   db: Db = getDb(),
-): Promise<
-  Array<{
+): Promise<{
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  rows: Array<{
     profileId: string;
     displayName: string;
     username: string;
     isVoice: boolean;
     itemCount: number;
     submittedAt: Date;
-  }>
-> {
-  const rows = await db
-    .select({
-      profileId: communityEditionBallots.profileId,
-      displayName: profiles.displayName,
-      username: profiles.username,
-      submittedAt: communityEditionBallots.submittedAt,
-      ballotId: communityEditionBallots.id,
-    })
-    .from(communityEditionBallots)
-    .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
-    .where(eq(communityEditionBallots.editionId, editionId))
-    .orderBy(asc(profiles.displayName), asc(profiles.username));
-
-  if (rows.length === 0) return [];
-
-  const voiceRows = await db
-    .select({ profileId: communityEditionVoices.profileId })
-    .from(communityEditionVoices)
-    .where(eq(communityEditionVoices.editionId, editionId));
-  const voiceIds = new Set(voiceRows.map((r) => r.profileId));
-
-  const ballotIds = rows.map((r) => r.ballotId);
-  const itemCountRows = await db
-    .select({
-      ballotId: communityEditionBallotItems.ballotId,
-      n: sql<number>`count(*)::int`,
-    })
-    .from(communityEditionBallotItems)
-    .where(inArray(communityEditionBallotItems.ballotId, ballotIds))
-    .groupBy(communityEditionBallotItems.ballotId);
-
-  const countByBallot = new Map(
-    itemCountRows.map((row) => [row.ballotId, Number(row.n)]),
+  }>;
+}> {
+  const pageSize = Math.min(
+    200,
+    Math.max(1, Math.floor(opts.pageSize ?? HOST_PREVIEW_PAGE_SIZE)),
   );
+  const requested = Math.max(1, Math.floor(opts.page ?? 1));
 
-  return rows.map((row) => ({
-    profileId: row.profileId,
-    displayName: row.displayName,
-    username: row.username,
-    isVoice: voiceIds.has(row.profileId),
-    itemCount: countByBallot.get(row.ballotId) ?? 0,
-    submittedAt: row.submittedAt,
-  }));
+  const selectPage = (page: number) => {
+    const offset = (page - 1) * pageSize;
+    return db
+      .select({
+        profileId: communityEditionBallots.profileId,
+        displayName: profiles.displayName,
+        username: profiles.username,
+        submittedAt: communityEditionBallots.submittedAt,
+        total: sql<number>`count(*) over()`.mapWith(Number),
+        isVoice: sql<boolean>`exists (
+          select 1 from ${communityEditionVoices} v
+          where v.edition_id = ${communityEditionBallots.editionId}
+            and v.profile_id = ${communityEditionBallots.profileId}
+        )`,
+        itemCount: sql<number>`(
+          select count(*)::int from ${communityEditionBallotItems} i
+          where i.ballot_id = ${communityEditionBallots.id}
+        )`.mapWith(Number),
+      })
+      .from(communityEditionBallots)
+      .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
+      .where(eq(communityEditionBallots.editionId, editionId))
+      .orderBy(asc(profiles.displayName), asc(profiles.username))
+      .limit(pageSize)
+      .offset(offset);
+  };
+
+  let page = requested;
+  let rows = await selectPage(page);
+
+  // Past-last-page: cheap count, clamp, retry once.
+  if (rows.length === 0 && page > 1) {
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityEditionBallots)
+      .where(eq(communityEditionBallots.editionId, editionId));
+    const total = Number(countRow?.n ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+    page = Math.min(page, totalPages);
+    rows = total === 0 ? [] : await selectPage(page);
+    if (rows.length === 0) {
+      return { page: 1, pageSize, total: 0, totalPages: 1, rows: [] };
+    }
+  }
+
+  const total = rows[0] ? Number(rows[0].total) : 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+
+  return {
+    page,
+    pageSize,
+    total,
+    totalPages,
+    rows: rows.map((row) => ({
+      profileId: row.profileId,
+      displayName: row.displayName,
+      username: row.username,
+      isVoice: Boolean(row.isVoice),
+      itemCount: Number(row.itemCount ?? 0),
+      submittedAt: row.submittedAt,
+    })),
+  };
 }
 
 export async function countEditionSubmittedBallots(
@@ -386,6 +423,17 @@ export async function upsertEditionBallot(input: {
   const votes = votesParsed.data;
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
+    const enabledIds = new Set(
+      await listEditionEnabledCategoryIds(edition.id, db),
+    );
+    if (
+      categoryIds.some((id) => !enabledIds.has(id)) ||
+      enabledIds.size === 0
+    ) {
+      return {
+        error: "One or more categories are not on this event’s ballot.",
+      };
+    }
     const activeCats = await db
       .select({
         id: awardCategories.id,

@@ -12,9 +12,9 @@ export type RankedStandingItem = {
 
 function categoryColClass(place: number): string {
   if (place === 1) {
-    return "min-w-0 flex-[1.5] max-w-[168px] sm:max-w-[190px] md:max-w-[206px]";
+    return "w-[168px] shrink-0 sm:w-[190px] md:w-[206px]";
   }
-  return "min-w-0 flex-1 max-w-[128px] sm:max-w-[148px] md:max-w-[168px]";
+  return "w-[128px] shrink-0 sm:w-[148px] md:w-[168px]";
 }
 
 function RankedCard({
