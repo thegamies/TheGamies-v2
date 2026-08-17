@@ -1,16 +1,30 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { auth } from "@/lib/auth/server";
-import { listCommunitiesForProfile } from "@/lib/communities/service";
-import { listOwnedForProfile } from "@/lib/lists/service";
-import { listSharePath } from "@/lib/lists/urls";
+import { ProfileListPreviewCard } from "@/components/profile/ProfileListPreviewCard";
+import { ProfilePager } from "@/components/profile/ProfilePager";
+import { ProfileTabs } from "@/components/profile/ProfileTabs";
+import { getRequestSessionUser } from "@/lib/auth/session";
+import { listCommunitiesForProfilePage } from "@/lib/communities/service";
+import { listOwnedForProfilePage } from "@/lib/lists/service";
+import {
+  parseProfilePage,
+  parseProfileTab,
+  profileHref,
+  PROFILE_COMMUNITIES_PAGE_SIZE,
+  PROFILE_LISTS_PAGE_SIZE,
+} from "@/lib/profile/profile-page";
 import {
   getProfileByUsername,
   ownsProfile,
 } from "@/lib/profile/service";
 
 type Params = Promise<{ username: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function first(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 export async function generateMetadata({
   params,
@@ -30,8 +44,10 @@ export async function generateMetadata({
 
 export default async function PublicProfilePage({
   params,
+  searchParams,
 }: {
   params: Params;
+  searchParams: SearchParams;
 }) {
   const { username } = await params;
   const profile = await getProfileByUsername(username).catch(() => null);
@@ -39,12 +55,16 @@ export default async function PublicProfilePage({
     notFound();
   }
 
-  const { data: session } = await auth.getSession();
-  const isOwner = ownsProfile(profile, session?.user?.id);
+  const sessionUser = await getRequestSessionUser();
+  const isOwner = ownsProfile(profile, sessionUser?.id);
 
   if (profile.visibility === "private" && !isOwner) {
     notFound();
   }
+
+  const sp = await searchParams;
+  const tab = parseProfileTab(first(sp.tab));
+  const pageRaw = parseProfilePage(first(sp.page));
 
   return (
     <>
@@ -66,8 +86,21 @@ export default async function PublicProfilePage({
           <p className="mt-6 text-muted">No bio yet.</p>
         )}
 
-        <ProfileLists profileId={profile.id} username={profile.username} />
-        <ProfileCommunities profileId={profile.id} />
+        <ProfileTabs username={profile.username} tab={tab} />
+
+        {tab === "communities" ? (
+          <ProfileCommunities
+            profileId={profile.id}
+            username={profile.username}
+            pageRaw={pageRaw}
+          />
+        ) : (
+          <ProfileLists
+            profileId={profile.id}
+            username={profile.username}
+            pageRaw={pageRaw}
+          />
+        )}
       </main>
     </>
   );
@@ -76,67 +109,135 @@ export default async function PublicProfilePage({
 async function ProfileLists({
   profileId,
   username,
+  pageRaw,
 }: {
   profileId: string;
   username: string;
+  pageRaw: number;
 }) {
-  const lists = await listOwnedForProfile(profileId).catch(() => []);
+  const result = await listOwnedForProfilePage(profileId, pageRaw).catch(
+    () => null,
+  );
+  const listsPage = result ?? {
+    lists: [],
+    page: 1,
+    pageSize: PROFILE_LISTS_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  };
+
+  if (listsPage.total === 0) {
+    return <p className="mt-6 text-muted">No lists yet.</p>;
+  }
+
+  const from = (listsPage.page - 1) * listsPage.pageSize + 1;
+  const to = Math.min(listsPage.page * listsPage.pageSize, listsPage.total);
+
   return (
-    <section className="mt-12 border-t border-line pt-8">
-      <h2 className="font-display text-3xl tracking-wide text-ink">Lists</h2>
-      {lists.length === 0 ? (
-        <p className="mt-4 text-muted">No lists yet.</p>
-      ) : (
-        <ul className="mt-6 divide-y divide-line border-y border-line">
-          {lists.map((list) => (
-            <li key={list.publicId} className="py-4">
-              <Link
-                href={listSharePath({
-                  publicId: list.publicId,
-                  slug: list.slug,
-                  username,
-                })}
-                className="text-lg text-ink hover:text-accent"
-              >
-                {list.title}
-              </Link>
-              <p className="text-sm text-muted">
-                {list.listType === "goty" ? "Game of the Year" : "Custom"}
-                {list.year ? ` · ${list.year}` : ""}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="mt-8 space-y-10">
+      {listsPage.lists.map((list) => (
+        <ProfileListPreviewCard
+          key={list.publicId}
+          username={username}
+          list={list}
+        />
+      ))}
+      <ProfilePager
+        label="List pages"
+        from={from}
+        to={to}
+        total={listsPage.total}
+        page={listsPage.page}
+        totalPages={listsPage.totalPages}
+        prevHref={
+          listsPage.page > 1
+            ? profileHref(username, {
+                tab: "lists",
+                page: listsPage.page - 1,
+              })
+            : null
+        }
+        nextHref={
+          listsPage.page < listsPage.totalPages
+            ? profileHref(username, {
+                tab: "lists",
+                page: listsPage.page + 1,
+              })
+            : null
+        }
+      />
+    </div>
   );
 }
 
-async function ProfileCommunities({ profileId }: { profileId: string }) {
-  const memberships = await listCommunitiesForProfile(profileId).catch(
-    () => [],
+async function ProfileCommunities({
+  profileId,
+  username,
+  pageRaw,
+}: {
+  profileId: string;
+  username: string;
+  pageRaw: number;
+}) {
+  const result = await listCommunitiesForProfilePage(profileId, pageRaw).catch(
+    () => null,
   );
+  const memberships = result ?? {
+    communities: [],
+    page: 1,
+    pageSize: PROFILE_COMMUNITIES_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  };
+
+  if (memberships.total === 0) {
+    return <p className="mt-6 text-muted">No communities yet.</p>;
+  }
+
+  const from = (memberships.page - 1) * memberships.pageSize + 1;
+  const to = Math.min(
+    memberships.page * memberships.pageSize,
+    memberships.total,
+  );
+
   return (
-    <section className="mt-12 border-t border-line pt-8">
-      <h2 className="font-display text-3xl tracking-wide text-ink">
-        Communities
-      </h2>
-      {memberships.length === 0 ? (
-        <p className="mt-4 text-muted">No communities yet.</p>
-      ) : (
-        <ul className="mt-6 divide-y divide-line border-y border-line">
-          {memberships.map((community) => (
-            <li key={community.slug} className="py-4">
-              <Link
-                href={`/communities/${community.slug}`}
-                className="text-lg text-ink hover:text-accent"
-              >
-                {community.name}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="mt-6">
+      <ul className="divide-y divide-line border-y border-line">
+        {memberships.communities.map((community) => (
+          <li key={community.slug} className="py-4">
+            <Link
+              href={`/communities/${community.slug}`}
+              className="text-lg text-ink hover:text-accent"
+            >
+              {community.name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <ProfilePager
+        label="Community pages"
+        from={from}
+        to={to}
+        total={memberships.total}
+        page={memberships.page}
+        totalPages={memberships.totalPages}
+        prevHref={
+          memberships.page > 1
+            ? profileHref(username, {
+                tab: "communities",
+                page: memberships.page - 1,
+              })
+            : null
+        }
+        nextHref={
+          memberships.page < memberships.totalPages
+            ? profileHref(username, {
+                tab: "communities",
+                page: memberships.page + 1,
+              })
+            : null
+        }
+      />
+    </div>
   );
 }

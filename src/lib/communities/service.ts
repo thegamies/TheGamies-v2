@@ -7,6 +7,10 @@ import {
   type Db,
 } from "@thegamies/db";
 import {
+  PROFILE_COMMUNITIES_PAGE_SIZE,
+  paginateProfileItems,
+} from "@/lib/profile/profile-page";
+import {
   canManageCommunity,
   leaveBlockedReason,
   setCommunityRoleBlockedReason,
@@ -60,6 +64,14 @@ export type ProfileCommunity = {
   name: string;
 };
 
+export type ProfileCommunitiesPage = {
+  communities: ProfileCommunity[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 function getDb(): Db {
   return createDb();
 }
@@ -111,7 +123,46 @@ export async function listCommunitiesForProfile(
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
     .where(eq(communityMembers.profileId, profileId))
-    .orderBy(asc(communities.name));
+    .orderBy(asc(communities.name))
+    .limit(PROFILE_COMMUNITIES_PAGE_SIZE);
+}
+
+export async function listCommunitiesForProfilePage(
+  profileId: string,
+  pageRaw: number,
+  db: Db = getDb(),
+): Promise<ProfileCommunitiesPage> {
+  const pageSize = PROFILE_COMMUNITIES_PAGE_SIZE;
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(communityMembers)
+    .where(eq(communityMembers.profileId, profileId));
+  const total = Number(countRow?.n ?? 0);
+  const { page, offset, totalPages } = paginateProfileItems(
+    pageRaw,
+    total,
+    pageSize,
+  );
+
+  const rows = await db
+    .select({
+      slug: communities.slug,
+      name: communities.name,
+    })
+    .from(communityMembers)
+    .innerJoin(communities, eq(communities.id, communityMembers.communityId))
+    .where(eq(communityMembers.profileId, profileId))
+    .orderBy(asc(communities.name))
+    .limit(pageSize)
+    .offset(offset);
+
+  return {
+    communities: rows,
+    page,
+    pageSize,
+    total,
+    totalPages,
+  };
 }
 
 export async function getCommunityBySlug(

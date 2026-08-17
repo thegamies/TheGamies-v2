@@ -47,7 +47,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - `/communities/[slug]/results` → redirects to edition
 - `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), and **Community** (`?tab=community`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: add/remove admins (last admin cannot be removed) and leave.
 - `/communities/[slug]/create/event` — hosts only. Create event: year, schedule, categories, tie numbering. Redirects to that year’s Edition settings.
-- Profile `/u/[username]` lists communities the person belongs to
+- Profile `/u/[username]` **Communities** tab (`?tab=communities`) lists communities the person belongs to (paged; 24 per page)
 
 ### Non-goals (next slices)
 

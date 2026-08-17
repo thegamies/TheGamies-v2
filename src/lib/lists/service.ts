@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import {
   createDb,
   covers,
@@ -30,6 +30,15 @@ import {
   slugifyListTitle,
 } from "@/lib/lists/rules";
 import { listSharePath } from "@/lib/lists/urls";
+import {
+  groupPreviewItemsByListId,
+  type ProfileListsPage,
+} from "@/lib/lists/profile-preview";
+import {
+  paginateProfileItems,
+  PROFILE_LIST_PREVIEW_ITEM_LIMIT,
+  PROFILE_LISTS_PAGE_SIZE,
+} from "@/lib/profile/profile-page";
 import {
   clearOwnedGotyContrib,
   syncOwnedGotyContribFromList,
@@ -644,6 +653,99 @@ export async function listOwnedForProfile(
     .from(lists)
     .where(eq(lists.profileId, profileId))
     .orderBy(asc(lists.year), asc(lists.title));
+}
+
+/** Paged owned lists plus SQL-capped top-N covers per list (`rank <= 5`). */
+export async function listOwnedForProfilePage(
+  profileId: string,
+  pageRaw: number,
+  db: Db = getDb(),
+): Promise<ProfileListsPage> {
+  const pageSize = PROFILE_LISTS_PAGE_SIZE;
+  const itemLimit = PROFILE_LIST_PREVIEW_ITEM_LIMIT;
+
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(lists)
+    .where(eq(lists.profileId, profileId));
+  const total = Number(countRow?.n ?? 0);
+  const { page, offset, totalPages } = paginateProfileItems(
+    pageRaw,
+    total,
+    pageSize,
+  );
+
+  const owned = await db
+    .select({
+      id: lists.id,
+      publicId: lists.publicId,
+      title: lists.title,
+      year: lists.year,
+      listType: lists.listType,
+      slug: lists.slug,
+    })
+    .from(lists)
+    .where(eq(lists.profileId, profileId))
+    .orderBy(
+      sql`case when ${lists.listType} = 'goty' then 0 else 1 end`,
+      sql`${lists.year} desc nulls last`,
+      asc(lists.title),
+    )
+    .limit(pageSize)
+    .offset(offset);
+
+  if (owned.length === 0) {
+    return { lists: [], page, pageSize, total, totalPages };
+  }
+
+  const itemRows = await db
+    .select({
+      listId: listItems.listId,
+      rank: listItems.rank,
+      gameId: games.id,
+      slug: games.slug,
+      title: games.title,
+      coverImageId: covers.imageId,
+    })
+    .from(listItems)
+    .innerJoin(games, eq(games.id, listItems.gameId))
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(
+      and(
+        inArray(
+          listItems.listId,
+          owned.map((row) => row.id),
+        ),
+        lte(listItems.rank, itemLimit),
+      ),
+    )
+    .orderBy(asc(listItems.listId), asc(listItems.rank));
+
+  const itemsByListId = groupPreviewItemsByListId(
+    itemRows.map((row) => ({
+      listId: row.listId,
+      gameId: row.gameId,
+      slug: row.slug,
+      title: row.title,
+      coverUrl: coverUrlFromImageId(row.coverImageId),
+      rank: row.rank,
+    })),
+  );
+
+  return {
+    lists: owned.map((row) => ({
+      publicId: row.publicId,
+      title: row.title,
+      year: row.year,
+      listType: row.listType,
+      slug: row.slug,
+      items: itemsByListId.get(row.id) ?? [],
+    })),
+    page,
+    pageSize,
+    total,
+    totalPages,
+  };
 }
 
 export async function getListShareTarget(

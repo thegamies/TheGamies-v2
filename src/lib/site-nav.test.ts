@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildPrimarySiteNavLinks, showDesignSystemNav } from "./site-nav";
+import {
+  buildAccountMenuGroups,
+  buildPrimarySiteNavLinks,
+  buildUtilitySiteNavLinks,
+  showDesignSystemNav,
+  siteCreateLink,
+} from "./site-nav";
 
 describe("showDesignSystemNav", () => {
   it("hides on Vercel production", () => {
@@ -47,25 +53,62 @@ describe("showDesignSystemNav", () => {
 });
 
 describe("buildPrimarySiteNavLinks", () => {
-  it("includes the core routes and admin", () => {
-    expect(buildPrimarySiteNavLinks({ includeDesignSystem: false })).toEqual([
+  it("is Games, GOTY, and Communities only", () => {
+    expect(buildPrimarySiteNavLinks()).toEqual([
       { href: "/games", label: "Games" },
-      { href: "/standings", label: "Standings" },
+      { href: "/standings", label: "GOTY" },
       { href: "/communities", label: "Communities" },
-      { href: "/create", label: "Create" },
+    ]);
+  });
+});
+
+describe("siteCreateLink", () => {
+  it("points at create with the plus label", () => {
+    expect(siteCreateLink()).toEqual({ href: "/create", label: "+ Create" });
+  });
+});
+
+describe("buildUtilitySiteNavLinks", () => {
+  it("always includes Admin", () => {
+    expect(buildUtilitySiteNavLinks({ includeDesignSystem: false })).toEqual([
       { href: "/admin", label: "Admin" },
     ]);
   });
 
-  it("inserts design system before admin when enabled", () => {
-    const links = buildPrimarySiteNavLinks({ includeDesignSystem: true });
-    expect(links.map((link) => link.href)).toEqual([
-      "/games",
-      "/standings",
-      "/communities",
-      "/create",
-      "/design-system",
-      "/admin",
+  it("appends Design system when enabled", () => {
+    expect(
+      buildUtilitySiteNavLinks({ includeDesignSystem: true }).map(
+        (link) => link.href,
+      ),
+    ).toEqual(["/admin", "/design-system"]);
+  });
+});
+
+describe("buildAccountMenuGroups", () => {
+  it("links a username to profile tabs", () => {
+    const groups = buildAccountMenuGroups({
+      username: "ecdm98",
+      includeDesignSystem: true,
+    });
+    expect(groups.flatMap((group) => group.items)).toEqual([
+      { href: "/u/ecdm98", label: "View Profile" },
+      { href: "/u/ecdm98", label: "My Lists" },
+      { href: "/u/ecdm98?tab=communities", label: "My Communities" },
+      { href: "/account", label: "Settings" },
+      { href: "/admin", label: "Admin" },
+      { href: "/design-system", label: "Design system" },
+    ]);
+  });
+
+  it("sends users without a username to account settings", () => {
+    const groups = buildAccountMenuGroups({
+      username: null,
+      includeDesignSystem: false,
+    });
+    expect(groups.flatMap((group) => group.items)).toEqual([
+      { href: "/account", label: "View Profile" },
+      { href: "/account", label: "Settings" },
+      { href: "/admin", label: "Admin" },
     ]);
   });
 });

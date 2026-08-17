@@ -75,6 +75,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
 - Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
+- Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs.
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`
 
 ## Non-goals (this feature)

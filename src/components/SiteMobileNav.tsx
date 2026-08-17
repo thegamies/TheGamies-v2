@@ -5,15 +5,21 @@ import { Suspense, useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { SignInLink } from "@/components/auth/SignInLink";
+import { SiteCreateLink } from "@/components/SiteCreateLink";
 import { Button } from "@/components/ui/Button";
 import type { SiteNavAccount, SiteNavLink } from "@/lib/site-nav";
 
 type SiteMobileNavProps = {
-  links: SiteNavLink[];
+  primaryLinks: SiteNavLink[];
+  utilityLinks: SiteNavLink[];
   account: SiteNavAccount;
 };
 
-export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
+export function SiteMobileNav({
+  primaryLinks,
+  utilityLinks,
+  account,
+}: SiteMobileNavProps) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
   const panelId = useId();
@@ -87,7 +93,7 @@ export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
               className="flex flex-1 flex-col overflow-y-auto px-[var(--gutter)] py-2"
               aria-label="Site"
             >
-              {links.map((link) => (
+              {primaryLinks.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
@@ -97,23 +103,27 @@ export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
                   {link.label}
                 </Link>
               ))}
+              <div className="border-b border-line py-4">
+                <SiteCreateLink className="w-full" onClick={close} />
+              </div>
               {account.status === "authenticated" ? (
                 <>
-                  <Link
-                    href={account.profileHref}
-                    className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
-                    onClick={close}
-                  >
+                  <p className="pt-4 text-xs uppercase tracking-[0.16em] text-muted">
                     {account.label}
-                  </Link>
-                  <Link
-                    href="/account"
-                    className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
-                    onClick={close}
-                  >
-                    Settings
-                  </Link>
-                  <form action={signOutAction} className="border-b border-line py-4">
+                  </p>
+                  {account.groups.map((group) =>
+                    group.items.map((item) => (
+                      <Link
+                        key={`${group.id}-${item.href}-${item.label}`}
+                        href={item.href}
+                        className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                        onClick={close}
+                      >
+                        {item.label}
+                      </Link>
+                    )),
+                  )}
+                  <form action={signOutAction} className="py-4">
                     <Button
                       type="submit"
                       variant="quiet"
@@ -124,22 +134,34 @@ export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
                   </form>
                 </>
               ) : (
-                <Suspense
-                  fallback={
+                <>
+                  <Suspense
+                    fallback={
+                      <Link
+                        href="/auth/sign-in"
+                        className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                        onClick={close}
+                      >
+                        Sign in
+                      </Link>
+                    }
+                  >
+                    <SignInLink
+                      className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                      onClick={close}
+                    />
+                  </Suspense>
+                  {utilityLinks.map((link) => (
                     <Link
-                      href="/auth/sign-in"
+                      key={link.href}
+                      href={link.href}
                       className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
                       onClick={close}
                     >
-                      Sign in
+                      {link.label}
                     </Link>
-                  }
-                >
-                  <SignInLink
-                    className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
-                    onClick={close}
-                  />
-                </Suspense>
+                  ))}
+                </>
               )}
             </nav>
           </aside>
@@ -153,7 +175,7 @@ export function SiteMobileNav({ links, account }: SiteMobileNavProps) {
       <button
         ref={buttonRef}
         type="button"
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center border border-line text-ink transition-colors hover:border-accent hover:text-accent lg:hidden"
+        className="inline-flex h-10 w-10 shrink-0 items-center justify-center border border-line text-ink transition-colors hover:border-accent hover:text-accent"
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? "Close menu" : "Open menu"}

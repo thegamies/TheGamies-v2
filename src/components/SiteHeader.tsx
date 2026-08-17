@@ -4,13 +4,15 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { signOutAction } from "@/app/auth/sign-out/actions";
 import { SignInLink } from "@/components/auth/SignInLink";
-import { Button } from "@/components/ui/Button";
+import { SiteAccountMenu } from "@/components/SiteAccountMenu";
 import { SiteBrand } from "@/components/SiteBrand";
+import { SiteCreateLink } from "@/components/SiteCreateLink";
 import { SiteMobileNav } from "@/components/SiteMobileNav";
 import {
+  buildAccountMenuGroups,
   buildPrimarySiteNavLinks,
+  buildUtilitySiteNavLinks,
   showDesignSystemNav,
   type SiteNavAccount,
 } from "@/lib/site-nav";
@@ -20,18 +22,21 @@ export async function SiteHeader() {
   const profile = user?.id
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
-  const links = buildPrimarySiteNavLinks({
-    includeDesignSystem: showDesignSystemNav({
-      vercelEnv: process.env.VERCEL_ENV,
-      nodeEnv: process.env.NODE_ENV,
-      showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
-    }),
+  const includeDesignSystem = showDesignSystemNav({
+    vercelEnv: process.env.VERCEL_ENV,
+    nodeEnv: process.env.NODE_ENV,
+    showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
   });
+  const primaryLinks = buildPrimarySiteNavLinks();
+  const utilityLinks = buildUtilitySiteNavLinks({ includeDesignSystem });
   const account: SiteNavAccount = user
     ? {
         status: "authenticated",
-        profileHref: profile ? `/u/${profile.username}` : "/account",
         label: profile?.displayName ?? user.name ?? "Account",
+        groups: buildAccountMenuGroups({
+          username: profile?.username ?? null,
+          includeDesignSystem,
+        }),
       }
     : { status: "anonymous" };
 
@@ -40,28 +45,17 @@ export async function SiteHeader() {
       <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-5">
         <SiteBrand />
         <nav
-          className="hidden flex-wrap items-center gap-5 text-sm text-muted lg:flex"
+          className="hidden items-center gap-5 text-sm text-muted lg:flex"
           aria-label="Site"
         >
-          {links.map((link) => (
+          {primaryLinks.map((link) => (
             <Link key={link.href} href={link.href} className="hover:text-ink">
               {link.label}
             </Link>
           ))}
+          <SiteCreateLink />
           {account.status === "authenticated" ? (
-            <>
-              <Link href={account.profileHref} className="hover:text-ink">
-                {account.label}
-              </Link>
-              <Link href="/account" className="hover:text-ink">
-                Settings
-              </Link>
-              <form action={signOutAction}>
-                <Button type="submit" variant="quiet" className="px-0 py-0">
-                  Sign out
-                </Button>
-              </form>
-            </>
+            <SiteAccountMenu label={account.label} groups={account.groups} />
           ) : (
             <Suspense
               fallback={
@@ -74,7 +68,14 @@ export async function SiteHeader() {
             </Suspense>
           )}
         </nav>
-        <SiteMobileNav links={links} account={account} />
+        <div className="flex items-center gap-3 lg:hidden">
+          <SiteCreateLink />
+          <SiteMobileNav
+            primaryLinks={primaryLinks}
+            utilityLinks={utilityLinks}
+            account={account}
+          />
+        </div>
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SiteMobileNav } from "./SiteMobileNav";
+import { buildAccountMenuGroups } from "@/lib/site-nav";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -29,9 +30,15 @@ vi.mock("@/app/auth/sign-out/actions", () => ({
   signOutAction: vi.fn(),
 }));
 
-const links = [
+const primaryLinks = [
   { href: "/games", label: "Games" },
+  { href: "/standings", label: "GOTY" },
   { href: "/communities", label: "Communities" },
+];
+
+const utilityLinks = [
+  { href: "/admin", label: "Admin" },
+  { href: "/design-system", label: "Design system" },
 ];
 
 afterEach(() => {
@@ -42,7 +49,11 @@ afterEach(() => {
 describe("SiteMobileNav", () => {
   it("opens a side drawer with site links over the page", () => {
     render(
-      <SiteMobileNav links={links} account={{ status: "anonymous" }} />,
+      <SiteMobileNav
+        primaryLinks={primaryLinks}
+        utilityLinks={utilityLinks}
+        account={{ status: "anonymous" }}
+      />,
     );
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -55,21 +66,70 @@ describe("SiteMobileNav", () => {
       "href",
       "/games",
     );
+    expect(within(drawer).getByRole("link", { name: "GOTY" })).toHaveAttribute(
+      "href",
+      "/standings",
+    );
     expect(
       within(drawer).getByRole("link", { name: "Communities" }),
     ).toHaveAttribute("href", "/communities");
+    expect(
+      within(drawer).getByRole("link", { name: "+ Create" }),
+    ).toHaveAttribute("href", "/create");
     expect(
       within(drawer).getByRole("link", { name: "Sign in" }),
     ).toHaveAttribute(
       "href",
       "/auth/sign-in?next=%2Fgame-of-the-year%2F2026",
     );
+    expect(within(drawer).getByRole("link", { name: "Admin" })).toHaveAttribute(
+      "href",
+      "/admin",
+    );
     expect(document.body.style.overflow).toBe("hidden");
+  });
+
+  it("lists signed-in account destinations in the drawer", () => {
+    render(
+      <SiteMobileNav
+        primaryLinks={primaryLinks}
+        utilityLinks={utilityLinks}
+        account={{
+          status: "authenticated",
+          label: "ecdm98",
+          groups: buildAccountMenuGroups({
+            username: "ecdm98",
+            includeDesignSystem: true,
+          }),
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    const drawer = screen.getByRole("dialog", { name: "Menu" });
+
+    expect(
+      within(drawer).getByRole("link", { name: "View Profile" }),
+    ).toHaveAttribute("href", "/u/ecdm98");
+    expect(
+      within(drawer).getByRole("link", { name: "My Lists" }),
+    ).toHaveAttribute("href", "/u/ecdm98");
+    expect(
+      within(drawer).getByRole("link", { name: "My Communities" }),
+    ).toHaveAttribute("href", "/u/ecdm98?tab=communities");
+    expect(
+      within(drawer).getByRole("link", { name: "Settings" }),
+    ).toHaveAttribute("href", "/account");
+    expect(within(drawer).getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 
   it("closes when Escape is pressed", () => {
     render(
-      <SiteMobileNav links={links} account={{ status: "anonymous" }} />,
+      <SiteMobileNav
+        primaryLinks={primaryLinks}
+        utilityLinks={utilityLinks}
+        account={{ status: "anonymous" }}
+      />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
