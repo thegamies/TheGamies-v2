@@ -22,7 +22,7 @@ Tables `community_edition_ballots` + `community_edition_ballot_items` — **not*
 ## Categories
 
 - Live alongside the main GOTY ballot; remain conceptually separate
-- **Edition ballots:** site `award_categories` **single-choice** only; hosts may enable a **subset** (and order) per edition in Event Settings. The ballot lists **every** enabled award (no Add category). Submit rejects picks outside that subset; removing an award while open deletes its ballot picks.
+- **Edition ballots:** site `award_categories` **single-choice** only; hosts may enable a **subset** (and order) per edition in Event Settings. The ballot lists **every** enabled award (no Add category). Submit keeps GOTY ranks and drops picks outside that subset; removing an award while open deletes its ballot picks.
 - Empty categories show overlay search; a pick uses `CategoryPickCard` (large cover). **Clear** restores the search field
 - **Site GOTY lists:** voters add awards from a **searchable square grid** (Add category dialog) with group filter. Eligibility is shown only when it is not current year.
 - Custom per-edition defs / multi / ranked edition category modes deferred

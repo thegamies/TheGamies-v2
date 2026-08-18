@@ -5,9 +5,12 @@ export const categoryVoteSchema = z.object({
   gameId: z.string().uuid(),
 });
 
+/** Site catalog is ~86 awards; keep headroom so a full event ballot can save. */
+export const MAX_CATEGORY_VOTES = 200;
+
 export const replaceCategoryVotesSchema = z
   .array(categoryVoteSchema)
-  .max(50)
+  .max(MAX_CATEGORY_VOTES)
   .superRefine((votes, ctx) => {
     const seen = new Set<string>();
     for (const vote of votes) {

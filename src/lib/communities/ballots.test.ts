@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   capEditionBallotItems,
   editionBallotDraftKey,
+  filterCategoryVotesToEnabled,
   saveEditionBallotCategoryVotesSchema,
   saveEditionBallotInputSchema,
   saveEditionBallotItemsSchema,
@@ -112,6 +113,38 @@ describe("editionBallotDraftKey", () => {
         categoryVotes: votes,
       }),
     );
+  });
+});
+
+describe("filterCategoryVotesToEnabled", () => {
+  it("drops picks that are not on the event so GOTY can still save", () => {
+    const votes = [
+      {
+        categoryId: "narrative",
+        gameId: "11111111-1111-4111-8111-111111111111",
+      },
+      {
+        categoryId: "removed",
+        gameId: "22222222-2222-4222-8222-222222222222",
+      },
+    ];
+    expect(
+      filterCategoryVotesToEnabled(votes, ["narrative", "indie"]),
+    ).toEqual([votes[0]]);
+  });
+
+  it("drops every pick when the event has no awards", () => {
+    expect(
+      filterCategoryVotesToEnabled(
+        [
+          {
+            categoryId: "narrative",
+            gameId: "11111111-1111-4111-8111-111111111111",
+          },
+        ],
+        [],
+      ),
+    ).toEqual([]);
   });
 });
 

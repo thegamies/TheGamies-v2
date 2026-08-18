@@ -4,6 +4,7 @@ import {
   communityEditionBallotCategoryVotes,
   communityEditionBallotItems,
   communityEditionBallots,
+  communityEditionCategories,
   communityEditionVoices,
   covers,
   createDb,
@@ -22,6 +23,7 @@ import { getEditionByCommunityYear } from "./editions";
 import { listEditionEnabledCategoryIds } from "./edition-categories";
 import {
   EDITION_BALLOT_MAX_ITEMS,
+  filterCategoryVotesToEnabled,
   saveEditionBallotCategoryVotesSchema,
   saveEditionBallotItemsSchema,
 } from "./ballot-schema";
@@ -128,6 +130,16 @@ export async function getEditionBallotForProfile(
     .innerJoin(
       games,
       eq(games.id, communityEditionBallotCategoryVotes.gameId),
+    )
+    .innerJoin(
+      communityEditionCategories,
+      and(
+        eq(communityEditionCategories.editionId, editionId),
+        eq(
+          communityEditionCategories.categoryId,
+          communityEditionBallotCategoryVotes.categoryId,
+        ),
+      ),
     )
     .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .where(eq(communityEditionBallotCategoryVotes.ballotId, ballot.id));
@@ -420,20 +432,12 @@ export async function upsertEditionBallot(input: {
     }
   }
 
-  const votes = votesParsed.data;
+  const enabledIds = new Set(
+    await listEditionEnabledCategoryIds(edition.id, db),
+  );
+  const votes = filterCategoryVotesToEnabled(votesParsed.data, enabledIds);
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
-    const enabledIds = new Set(
-      await listEditionEnabledCategoryIds(edition.id, db),
-    );
-    if (
-      categoryIds.some((id) => !enabledIds.has(id)) ||
-      enabledIds.size === 0
-    ) {
-      return {
-        error: "One or more categories are not on this event’s ballot.",
-      };
-    }
     const activeCats = await db
       .select({
         id: awardCategories.id,

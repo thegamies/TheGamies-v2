@@ -38,6 +38,21 @@ export function editionBallotDraftKey(input: {
   });
 }
 
+/**
+ * Keep only picks for awards currently on the event.
+ * Leftover votes (host removed an award, or an empty enabled set) must not
+ * block saving the GOTY ranking.
+ */
+export function filterCategoryVotesToEnabled<T extends { categoryId: string }>(
+  votes: readonly T[],
+  enabledIds: ReadonlySet<string> | readonly string[],
+): T[] {
+  const enabled =
+    enabledIds instanceof Set ? enabledIds : new Set(enabledIds);
+  if (enabled.size === 0) return [];
+  return votes.filter((vote) => enabled.has(vote.categoryId));
+}
+
 export const saveEditionBallotItemsSchema = z
   .array(editionBallotItemInputSchema)
   .max(EDITION_BALLOT_MAX_ITEMS, {

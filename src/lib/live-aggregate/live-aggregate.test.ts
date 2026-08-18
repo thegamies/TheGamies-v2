@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { replaceCategoryVotesSchema } from "./schema";
+import { MAX_CATEGORY_VOTES, replaceCategoryVotesSchema } from "./schema";
 import {
   aggregateGotyContribForGame,
   buildGotyContribRows,
@@ -184,6 +184,22 @@ describe("replaceCategoryVotesSchema", () => {
         { categoryId: "narrative", gameId: "11111111-1111-4111-8111-111111111111" },
         { categoryId: "narrative", gameId: "22222222-2222-4222-8222-222222222222" },
       ]).success,
+    ).toBe(false);
+  });
+
+  it("allows a full site-catalog set of award picks", () => {
+    const votes = Array.from({ length: 86 }, (_, i) => ({
+      categoryId: `cat-${i}`,
+      gameId: "11111111-1111-4111-8111-111111111111",
+    }));
+    expect(replaceCategoryVotesSchema.safeParse(votes).success).toBe(true);
+    expect(
+      replaceCategoryVotesSchema.safeParse(
+        Array.from({ length: MAX_CATEGORY_VOTES + 1 }, (_, i) => ({
+          categoryId: `cat-${i}`,
+          gameId: "11111111-1111-4111-8111-111111111111",
+        })),
+      ).success,
     ).toBe(false);
   });
 });

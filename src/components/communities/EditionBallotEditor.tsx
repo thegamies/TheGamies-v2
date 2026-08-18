@@ -40,6 +40,7 @@ import {
   capEditionBallotItems,
   editionBallotDraftKey,
   EDITION_BALLOT_MAX_ITEMS,
+  filterCategoryVotesToEnabled,
 } from "@/lib/communities/ballot-schema";
 
 export type EditionBallotEditorItem = {
@@ -92,12 +93,20 @@ export function EditionBallotEditor({
   const [items, setItems] = useState(() =>
     withRanks(capEditionBallotItems(initialItems)),
   );
-  const [categoryVotes, setCategoryVotes] = useState(initialCategoryVotes);
+  const [categoryVotes, setCategoryVotes] = useState(() =>
+    filterCategoryVotesToEnabled(
+      initialCategoryVotes,
+      awardCategories.map((category) => category.id),
+    ),
+  );
   const [confirmImport, setConfirmImport] = useState(false);
   const [savedKey, setSavedKey] = useState(() =>
     draftKey(
       withRanks(capEditionBallotItems(initialItems)),
-      initialCategoryVotes,
+      filterCategoryVotesToEnabled(
+        initialCategoryVotes,
+        awardCategories.map((category) => category.id),
+      ),
     ),
   );
   const submittedKeyRef = useRef<string | null>(null);
@@ -282,7 +291,10 @@ export function EditionBallotEditor({
             type="hidden"
             name="categoryVotesJson"
             value={JSON.stringify(
-              categoryVotes.map((v) => ({
+              filterCategoryVotesToEnabled(
+                categoryVotes,
+                awardCategories.map((category) => category.id),
+              ).map((v) => ({
                 categoryId: v.categoryId,
                 gameId: v.gameId,
               })),
