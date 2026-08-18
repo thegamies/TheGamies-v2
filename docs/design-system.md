@@ -80,6 +80,8 @@ Stacking identical treatments is forbidden — each level must read quieter than
 
 Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.
 
+Route progress: `NavigationProgress` — 2px `--accent` hairline at the top during App Router transitions. No spinner, no glow shadow. Mounted once in the root layout.
+
 Rules:
 
 - Community chrome uses `CommunityHeader`: eyebrow + name + primary chips on a `--panel` band — **no** meta between title and nav, **no** underline on the switcher
@@ -147,7 +149,7 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
 
 Planned: `EventNavigation`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 

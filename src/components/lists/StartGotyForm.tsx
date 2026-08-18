@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/useRouter";
 import { useState } from "react";
 import { startGotyDraftAction } from "@/app/create/actions";
 import { existingGotyPreviewHref } from "@/lib/lists/existing-goty";

@@ -256,7 +256,9 @@ export default function DesignSystemPage() {
           filters. Tab strips use{" "}
           <code className="text-ink">ScrollableNav</code> — single line,
           horizontal scroll, edge fade when tabs overflow. Styles:{" "}
-          <code className="text-ink">navItemClass()</code>.
+          <code className="text-ink">navItemClass()</code>. Route changes use{" "}
+          <code className="text-ink">NavigationProgress</code> — a 2px accent
+          hairline, no spinner, no glow.
         </p>
         <div className="space-y-8">
           <div>

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
 import { AppProviders } from "@/components/AppProviders";
+import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
@@ -52,6 +53,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
+        <NavigationProgress />
         <AppProviders>
           <SiteHeader />
           {children}
