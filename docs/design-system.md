@@ -202,6 +202,16 @@ Any client-loaded block with a known final shape must ship a matching skeleton. 
 
 Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimmer gradients that feel like SaaS dashboards.
 
+## Route loading / error
+
+Community pages (`/communities/[slug]` and every tab under it) use App Router `loading.tsx`, `error.tsx`, and `not-found.tsx` with `RouteStatus`.
+
+- Loading: square `--accent` spinner in a reserved page rail (`min-height`) so the layout does not collapse
+- Error: product copy + **Try again** (`reset()`)
+- Not found: product copy + back to communities
+
+Do not put CLI, env var names, or stack traces in these states. In-page client blocks still use skeletons.
+
 ## Responsive
 
 - Minimum layout width we design for: **360px** (phone)

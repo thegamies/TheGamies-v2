@@ -642,14 +642,20 @@ export default function DesignSystemPage() {
           <div className="border border-line bg-panel p-5">
             <p className="text-sm font-semibold text-ink">Loading</p>
             <p className="mt-2 text-sm text-muted">
-              Prefer skeletons that match final geometry over spinners.
+              In-page blocks use matching skeletons. Route waits use{" "}
+              <code className="text-ink">RouteStatus</code> — square accent
+              spinner in a reserved rail, not a collapsing void.
             </p>
             <SkeletonText lines={2} className="mt-4" />
+            <div className="mt-4 flex items-center gap-3">
+              <span className="route-spinner" aria-hidden />
+              <span className="text-sm text-muted">Loading</span>
+            </div>
           </div>
           <div className="border border-line p-5">
             <p className="text-sm font-semibold text-accent">Error</p>
             <p className="mt-2 text-sm text-muted">
-              Couldn’t load results. Keep the page chrome; replace the data block.
+              Couldn’t load this page. Keep the chrome; offer Try again.
             </p>
           </div>
         </div>
