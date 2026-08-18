@@ -46,6 +46,8 @@ export type StandingGameCardProps = {
    * `standingStripColClass`.
    */
   pinCover?: boolean;
+  /** Defaults to the game page. Category highlights may point at a year board. */
+  href?: string;
 };
 
 /**
@@ -70,6 +72,7 @@ export function StandingGameCard({
   placeSize = "md",
   rankScoreLayout = DEFAULT_RANK_SCORE_LAYOUT,
   pinCover = false,
+  href,
 }: StandingGameCardProps) {
   const chrome = standingCardChrome(rankScoreLayout, points != null);
   const scoreLabel =
@@ -212,7 +215,7 @@ export function StandingGameCard({
       : "group block";
 
   return (
-    <Link href={`/games/${slug}`} className={linkClass} draggable={false}>
+    <Link href={href ?? `/games/${slug}`} className={linkClass} draggable={false}>
       {body}
     </Link>
   );
@@ -277,6 +280,17 @@ export function standingStripColClass(featured: boolean): string {
       ? "w-[168px] shrink-0 sm:w-[190px]"
       : "w-[132px] shrink-0 sm:w-[148px]"
   }`;
+}
+
+/** Five equal columns that fill the row; extra items stay on one row and scroll. */
+export const standingFillFiveListClass =
+  "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_2rem)/5)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
+
+export const standingFillFiveFlowClass =
+  "grid w-max min-w-full grid-flow-col items-start justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_2rem)/5)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
+
+export function standingFillFiveColClass(): string {
+  return "group min-w-0 row-span-2 grid grid-rows-subgrid";
 }
 
 export type WinnerPodiumEntry = {

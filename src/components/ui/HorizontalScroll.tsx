@@ -97,7 +97,8 @@ function broadcastScrollSync(id: string, source: HTMLElement) {
  * Pan: drag (after a small move so links still click), prev/next when overflow
  * exists. Touch/trackpad use native scroll (including horizontal gestures).
  * Vertical wheel always scrolls the page — never remapped. Scrollbars stay
- * hidden; edge fades mark overflow.
+ * hidden; edge fades mark overflow. `overflow-y` is hidden so a 1px-tall
+ * mismatch cannot create a nested vertical scrollport.
  */
 export function HorizontalScroll({
   children,
@@ -240,7 +241,7 @@ export function HorizontalScroll({
   const showControls = showArrowControls && (canLeft || canRight);
   const overflowClass = /overflow-/.test(viewportClassName)
     ? ""
-    : "overflow-x-auto";
+    : "overflow-x-auto overflow-y-hidden";
 
   const viewportChrome = `scrollbar-none ${overflowClass} [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${
     showControls ? "cursor-grab [&_a]:cursor-grab" : ""
@@ -278,7 +279,7 @@ export function HorizontalScroll({
           <div
             ref={headerRef}
             // Mirror body scroll; links stay clickable (container ignores pan).
-            className="scrollbar-none w-full min-w-0 overflow-x-auto pointer-events-none [&_a]:pointer-events-auto"
+            className="scrollbar-none w-full min-w-0 overflow-x-auto overflow-y-hidden pointer-events-none [&_a]:pointer-events-auto"
           >
             {stickyHeader}
           </div>

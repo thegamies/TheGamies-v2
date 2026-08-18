@@ -19,6 +19,8 @@ export default async function AdminRankingsPage() {
   let initialStats = null;
   let initialLandingYears: number[] | null = null;
   let initialRankMode: SharedRankMode = "competition";
+  let initialPublicBoardMinLists = 5;
+  let initialPublicBoardMinCategoryVotes = 5;
   if (authorized) {
     try {
       const stats = await getYearStats(year);
@@ -38,9 +40,13 @@ export default async function AdminRankingsPage() {
       const settings = await getSiteSettings();
       initialLandingYears = settings.landingStandingsYears;
       initialRankMode = settings.rankMode;
+      initialPublicBoardMinLists = settings.publicBoardMinLists;
+      initialPublicBoardMinCategoryVotes = settings.publicBoardMinCategoryVotes;
     } catch {
       initialLandingYears = null;
       initialRankMode = "competition";
+      initialPublicBoardMinLists = 5;
+      initialPublicBoardMinCategoryVotes = 5;
     }
   }
 
@@ -58,7 +64,9 @@ export default async function AdminRankingsPage() {
         <p className="mt-3 max-w-2xl text-muted">
           Reveal detailed scores for a year, refresh dirty rollups, rebuild the
           year cache, choose homepage years, or set how ties are numbered on
-          the public boards.
+          the public boards, or set how many lists a year needs before Game of
+          the Year is public, or how many votes an award needs before that
+          category board is public.
         </p>
         <div className="mt-10">
           <AdminRankingsClient
@@ -67,6 +75,10 @@ export default async function AdminRankingsPage() {
             initialStats={initialStats}
             initialLandingYears={initialLandingYears}
             initialRankMode={initialRankMode}
+            initialPublicBoardMinLists={initialPublicBoardMinLists}
+            initialPublicBoardMinCategoryVotes={
+              initialPublicBoardMinCategoryVotes
+            }
           />
         </div>
       </main>

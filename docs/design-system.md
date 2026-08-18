@@ -95,7 +95,7 @@ Rules:
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
 - Community Settings → Events lists every year with status and host links (Edition settings / Manage hosts / Host preview). Year switching on the public event page stays `EditionYearSelect`.
 - Site Game of the Year and community Live Rankings use the shared `YearSelect` control top-right of the year heading (always shown). Secondary underline tabs switch **Game of the Year** · **Categories** (`?view=`). Categories sit on their own view (cover-card chapters ordered by most votes), not stacked under GOTY. Category group filter is a single pop-open button with an **All** option; search filters chapters by name. Each chapter shows top-3 ranks in a horizontal strip, vote totals, and links to full category standings (`?view=category&category=`).
-- Game detail (`/games/[slug]`): 240px cover on the left. Title, four-line description (Show more / Show less), **Broadcast compact**, then credits — all to the right of the cover.
+- Game detail (`/games/[slug]`): 240px cover on the left. Title, four-line description (Show more / Show less), **Broadcast compact**, site category #1s, then credits — all to the right of the cover.
 
 ## Controls
 
@@ -161,7 +161,7 @@ Open voting uses the same primitives on events and personal GOTY lists.
 |---|---|
 | `BallotChapterHeader` | Eyebrow + display title + optional deck / actions. GOTY: **Top 10** / Game of the Year. Categories: **Categories** / Award picks |
 | `GameSearchField` | Search input; results **overlay** following content (border + `--panel`, no shadow). Open field raises `z-index` so the menu sits above sibling rows |
-| GOTY ranking | Wrapping cover grid (`BallotRankGrid`); place in front of the title; drag to reorder while open; cap 10. Closed / Your ballot uses the same grid |
+| GOTY ranking | Wrapping cover grid (`BallotRankGrid`); place in front of the title; hold to reorder while open; cap 10. Closed / Your ballot uses the same grid |
 | `CategoryVoteHeading` | Display category name (`text-2xl`) + optional description |
 | `CategoryPickCard` | Large cover (`w-28` / `sm:w-32`) + heading + picked title + optional **Clear** |
 | `CategoryVotesEditor` | Award picks editor. **Site GOTY** (`catalogMode="optional"`, default): search + group filter + **Add category** dialog. **Edition ballots** (`catalogMode="fixed"`): every event award is listed; no add/remove. Empty slot + `GameSearchField`, or `CategoryPickCard`. List editor may pass `locked` + sign-in CTA for signed-out visitors. |

@@ -244,6 +244,8 @@ describe("redactStandingsPage", () => {
     view: "goty",
     categoryId: null,
     categoryGameTotal: 0,
+    gotyPublic: true,
+    categoriesPublic: true,
   };
 
   it("hides scores but keeps ranks when unrevealed", () => {

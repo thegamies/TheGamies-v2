@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { fitDisplayReservePx } from "@/components/ui/FitDisplayTitle";
-import { standingStripColClass } from "./StandingGameCard";
+import {
+  standingFillFiveColClass,
+  standingFillFiveListClass,
+  standingStripColClass,
+} from "./StandingGameCard";
 
 describe("standingStripColClass", () => {
   it("uses a 2-row subgrid so cover and caption sit on separate tracks", () => {
@@ -8,6 +12,16 @@ describe("standingStripColClass", () => {
     expect(standingStripColClass(false)).toContain("row-span-2");
     expect(standingStripColClass(true)).toContain("w-[168px]");
     expect(standingStripColClass(false)).toContain("w-[132px]");
+  });
+});
+
+describe("standingFillFiveColClass", () => {
+  it("sizes five equal columns from the row and keeps overflow on one track", () => {
+    expect(standingFillFiveListClass).toContain("grid-flow-col");
+    expect(standingFillFiveListClass).toContain("100cqi");
+    expect(standingFillFiveListClass).toContain("overflow-y-hidden");
+    expect(standingFillFiveColClass()).toContain("min-w-0");
+    expect(standingFillFiveColClass()).not.toContain("w-[132px]");
   });
 });
 

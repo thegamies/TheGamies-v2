@@ -184,6 +184,7 @@ export const profiles = pgTable("profiles", {
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
+  socialLinks: jsonb("social_links").$type<Record<string, string>>(),
   visibility: text("visibility").notNull().default("public"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -322,9 +323,9 @@ export const communityEditions = pgTable(
       .notNull()
       .references(() => communities.id, { onDelete: "cascade" }),
     year: integer("year").notNull(),
-    opensAt: timestamp("opens_at", { mode: "date" }),
-    closesAt: timestamp("closes_at", { mode: "date" }),
-    publishesAt: timestamp("publishes_at", { mode: "date" }),
+    opensAt: timestamp("opens_at", { withTimezone: true, mode: "date" }),
+    closesAt: timestamp("closes_at", { withTimezone: true, mode: "date" }),
+    publishesAt: timestamp("publishes_at", { withTimezone: true, mode: "date" }),
     /** Displayed tie numbering. Not a viewer chooser. */
     rankMode: text("rank_mode")
       .notNull()
@@ -852,6 +853,8 @@ export const liveCategoryDirty = pgTable(
  * Singleton site ops settings (landing featured standings years, tie numbering).
  * `landingStandingsYears` null/empty → default current + previous calendar year.
  * `rankMode` — competition (1–1–3) or dense (1–1–2) for site live boards.
+ * `publicBoardMinLists` — GOTY years stay hidden until this many lists.
+ * `publicBoardMinCategoryVotes` — a category board stays hidden until that award has this many votes.
  */
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey().default("default"),
@@ -860,5 +863,9 @@ export const siteSettings = pgTable("site_settings", {
     .notNull()
     .default("competition")
     .$type<"competition" | "dense">(),
+  publicBoardMinLists: integer("public_board_min_lists").notNull().default(5),
+  publicBoardMinCategoryVotes: integer("public_board_min_category_votes")
+    .notNull()
+    .default(5),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

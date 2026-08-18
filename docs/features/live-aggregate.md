@@ -68,22 +68,27 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## URLs
 
-- `/` — homepage Top 5 strips for featured years (default: current + previous; admin override on `/admin/rankings`)
+- `/` — homepage Top 5 strips for featured years that already meet the public list floor (default: current + previous; admin override on `/admin/rankings`)
+- `/standings` — all public years: Game of the Year top 5 plus the five most-voted category **#1s**; year CTA is **Full rankings**
 - `/admin/seed` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
-- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes
-- `/games/[slug]` — 240px cover on the left; title, description, site GOTY **rank** per year (Broadcast compact), and credits to the right. Description clamps to four lines with Show more / Show less. Rank is always public. Votes, points, and the list-position chart follow the reveal gate. Query is this game’s score rows plus a higher-score count for place — not the full year board. Editions with no scores inherit the parent title’s standings.
+- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes. Years below the public list floor show an editorial empty state (not a 404).
+- `/games/[slug]` — 240px cover on the left; title, description, site GOTY **rank** per public year (Broadcast compact), **site category #1s**, and credits to the right. Description clamps to four lines with Show more / Show less. Rank is always public. Votes, points, and the list-position chart follow the reveal gate. Query is this game’s score rows plus a higher-score count for place — not the full year board. Editions with no scores inherit the parent title’s standings. Suppressed years are omitted.
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
 - Year switching uses the shared top-right `YearSelect` (not a button row)
 - Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights
 
 - `/admin` — ops index (sync, rankings, seed)
-- `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense)
+- `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense) + **minimum lists before GOTY is public** + **minimum category votes before category boards are public**
+
+## Public board floors
+
+GOTY years stay off the homepage, `/standings`, year boards, and game-page ranks until `live_goty_year_stats.list_count` meets `site_settings.public_board_min_lists` (default **5**, admin-editable). Each category board, landing highlight, and game-page category #1 stays hidden until **that award’s** `sum(live_category_scores.vote_count)` meets `site_settings.public_board_min_category_votes` (default **5**, admin-editable, independent of the list floor). A year with many sparse category picks does not unlock awards still under the floor. Public UI does not mention the numbers. Admin rebuild tools are unchanged.
 
 ## Homepage / all-years highlights
 
-- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full.
-- Strip UI matches community event Comparison language: cover row in `HorizontalScroll` (scrolls on mobile or when ties overflow).
+- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full. Five equal cards fill one row (no featured #1 width). Extra ties stay on that row and scroll horizontally.
+- **Top Categories:** up to five most-voted awards in the same five-up row; category names clamp to one line. Every game tied at #1 rotates in the same tie stack as community boards. Category name → that category board; game name → game page. **All categories** opens `?view=categories`.
 - Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 
 ## Non-goals

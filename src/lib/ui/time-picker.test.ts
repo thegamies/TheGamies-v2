@@ -16,6 +16,7 @@ import {
   loopSelectedTopOffset,
   mergeIsoDateAndTime,
   clampIsoDateTime,
+  wallClockToIso,
 } from "./time-picker";
 
 describe("time-picker", () => {
@@ -81,6 +82,18 @@ describe("time-picker", () => {
     expect(
       mergeIsoDateAndTime("2026-11-01", "", { hours: 9, minutes: 15 }),
     ).toBe("2026-11-01T09:15");
+  });
+
+  it("converts picker wall clock to an ISO instant that round-trips locally", () => {
+    const iso = wallClockToIso("2026-11-01T18:30");
+    expect(iso.endsWith("Z")).toBe(true);
+    const parsed = new Date(iso);
+    expect(parsed.getFullYear()).toBe(2026);
+    expect(parsed.getMonth()).toBe(10);
+    expect(parsed.getDate()).toBe(1);
+    expect(parsed.getHours()).toBe(18);
+    expect(parsed.getMinutes()).toBe(30);
+    expect(wallClockToIso("bad")).toBe("bad");
   });
 
   it("clamps datetime values on the same day as the bound", () => {

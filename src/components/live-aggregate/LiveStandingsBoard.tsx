@@ -8,6 +8,7 @@ import {
   LiveCategoriesPanel,
   LiveCategoryDetailPanel,
 } from "@/components/live-aggregate/LiveCategoriesPanel";
+import { RankingsInfoControl } from "@/components/standings/RankingsInfoControl";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
@@ -172,6 +173,8 @@ export type LiveStandingsBoardProps = {
   headingLevel?: "h1" | "h2";
   /** Footer CTA (site GOTY only). */
   footer?: ReactNode;
+  /** Site GOTY explain control. Omit on community Live. */
+  showRankingsInfo?: boolean;
 };
 
 /**
@@ -189,6 +192,7 @@ export function LiveStandingsBoard({
   emptyCategories,
   headingLevel = "h1",
   footer,
+  showRankingsInfo = false,
 }: LiveStandingsBoardProps) {
   const revealed = page.detailedStatsRevealed;
   const yearBase = (y: number) => {
@@ -211,9 +215,12 @@ export function LiveStandingsBoard({
     <>
       <header>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-          <Heading className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
-            {title}
-          </Heading>
+          <div className="flex min-w-0 items-baseline gap-3">
+            <Heading className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+              {title}
+            </Heading>
+            {showRankingsInfo ? <RankingsInfoControl /> : null}
+          </div>
           <YearSelect
             year={page.year}
             options={yearOptionsLinks}

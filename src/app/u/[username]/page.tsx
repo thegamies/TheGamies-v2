@@ -3,7 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ProfileListPreviewCard } from "@/components/profile/ProfileListPreviewCard";
 import { ProfilePager } from "@/components/profile/ProfilePager";
+import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
+import { UserAvatar } from "@/components/profile/UserAvatar";
 import { getRequestSessionUser } from "@/lib/auth/session";
 import { listCommunitiesForProfilePage } from "@/lib/communities/service";
 import { listOwnedForProfilePage } from "@/lib/lists/service";
@@ -69,17 +71,28 @@ export default async function PublicProfilePage({
   return (
     <>
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">
-          @{profile.username}
-        </p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-          {profile.displayName}
-        </h1>
-        {profile.visibility === "private" && isOwner ? (
-          <p className="mt-2 text-sm text-muted">
-            This profile is private — only you can see it here.
-          </p>
-        ) : null}
+        <div className="flex items-start gap-5">
+          <UserAvatar
+            displayName={profile.displayName}
+            username={profile.username}
+            avatarUrl={profile.avatarUrl}
+            size={96}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted">
+              @{profile.username}
+            </p>
+            <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
+              {profile.displayName}
+            </h1>
+            {profile.visibility === "private" && isOwner ? (
+              <p className="mt-2 text-sm text-muted">
+                This profile is private — only you can see it here.
+              </p>
+            ) : null}
+            <ProfileSocialLinks value={profile.socialLinks} />
+          </div>
+        </div>
         {profile.bio ? (
           <p className="mt-6 max-w-2xl text-lg text-muted">{profile.bio}</p>
         ) : (

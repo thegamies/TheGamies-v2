@@ -14,6 +14,7 @@ import {
   mergeIsoDateAndTime,
   parseIsoDateTime,
   timePart,
+  wallClockToIso,
 } from "@/lib/ui/time-picker";
 
 export function EditionScheduleFields({
@@ -151,7 +152,7 @@ function ScheduleDateTimeField({
   return (
     <div>
       <p className="block text-sm text-muted">{label}</p>
-      <input type="hidden" name={name} value={value} />
+      <input type="hidden" name={name} value={value ? wallClockToIso(value) : ""} />
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <DatePicker
           id={dateId}

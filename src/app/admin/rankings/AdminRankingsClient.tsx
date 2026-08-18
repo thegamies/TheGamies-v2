@@ -10,6 +10,8 @@ import {
   rebuildYearAction,
   refreshYearAction,
   saveLandingYearsAction,
+  savePublicBoardMinCategoryVotesAction,
+  savePublicBoardMinListsAction,
   saveRankModeAction,
   setRevealAction,
 } from "./actions";
@@ -47,6 +49,8 @@ type Props = {
   initialStats: YearStats | null;
   initialLandingYears: number[] | null;
   initialRankMode: SharedRankMode;
+  initialPublicBoardMinLists: number;
+  initialPublicBoardMinCategoryVotes: number;
 };
 
 export function AdminRankingsClient({
@@ -55,6 +59,8 @@ export function AdminRankingsClient({
   initialStats,
   initialLandingYears,
   initialRankMode,
+  initialPublicBoardMinLists,
+  initialPublicBoardMinCategoryVotes,
 }: Props) {
   const [authorized, setAuthorized] = useState(initiallyAuthorized);
   const [secret, setSecret] = useState("");
@@ -67,6 +73,18 @@ export function AdminRankingsClient({
     initialLandingYears,
   );
   const [rankMode, setRankMode] = useState<SharedRankMode>(initialRankMode);
+  const [minListsInput, setMinListsInput] = useState(
+    String(initialPublicBoardMinLists),
+  );
+  const [minListsSaved, setMinListsSaved] = useState(
+    initialPublicBoardMinLists,
+  );
+  const [minCategoryVotesInput, setMinCategoryVotesInput] = useState(
+    String(initialPublicBoardMinCategoryVotes),
+  );
+  const [minCategoryVotesSaved, setMinCategoryVotesSaved] = useState(
+    initialPublicBoardMinCategoryVotes,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -196,6 +214,92 @@ export function AdminRankingsClient({
           {landingYearsSaved == null
             ? "none (current + previous)"
             : landingYearsSaved.join(", ")}
+        </p>
+      </section>
+
+      <section className="space-y-4 border-b border-line pb-10">
+        <h2 className="font-display text-2xl tracking-wide text-ink">
+          Public boards
+        </h2>
+        <p className="text-sm text-muted">
+          Minimum lists before Game of the Year for a year is public. A
+          category stays hidden until that award has this many votes.
+        </p>
+        <label className="block text-sm text-muted">
+          Minimum lists
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            className={`${fieldInputClass} mt-1`}
+            value={minListsInput}
+            onChange={(e) => setMinListsInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result = await savePublicBoardMinListsAction(minListsInput);
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.publicBoardMinLists != null) {
+                setMinListsSaved(result.publicBoardMinLists);
+                setMinListsInput(String(result.publicBoardMinLists));
+              }
+              setMessage("List minimum saved.");
+            })
+          }
+        >
+          Save list minimum
+        </Button>
+        <p className="text-xs text-muted">
+          Current list minimum: {minListsSaved}
+        </p>
+        <label className="block text-sm text-muted">
+          Minimum category votes
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            className={`${fieldInputClass} mt-1`}
+            value={minCategoryVotesInput}
+            onChange={(e) => setMinCategoryVotesInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result = await savePublicBoardMinCategoryVotesAction(
+                minCategoryVotesInput,
+              );
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.publicBoardMinCategoryVotes != null) {
+                setMinCategoryVotesSaved(result.publicBoardMinCategoryVotes);
+                setMinCategoryVotesInput(
+                  String(result.publicBoardMinCategoryVotes),
+                );
+              }
+              setMessage("Category vote minimum saved.");
+            })
+          }
+        >
+          Save category minimum
+        </Button>
+        <p className="text-xs text-muted">
+          Current category vote minimum: {minCategoryVotesSaved}
         </p>
       </section>
 

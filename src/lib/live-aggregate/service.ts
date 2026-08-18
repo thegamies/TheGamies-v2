@@ -1,5 +1,7 @@
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
-import { getSiteRankMode } from "@/lib/site-settings/service";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { getPublicBoardMinLists, getSiteRankMode, getSiteSettings } from "@/lib/site-settings/service";
+import { isPublicBoardReady } from "./public-board";
+import { getYearMaxCategoryVotes } from "./category-highlights";
 import {
   parseSharedRankMode,
   withDisplayRanks,
@@ -82,6 +84,10 @@ export type StandingsPage = {
   categoryId: string | null;
   /** Games on the full category board (detail view). */
   categoryGameTotal: number;
+  /** False until the year has enough GOTY lists. */
+  gotyPublic: boolean;
+  /** False until the year has enough category votes. */
+  categoriesPublic: boolean;
 };
 
 /** Keep rows whose displayed rank is within the top N places (ties included). */
@@ -245,11 +251,18 @@ async function fetchStandingsBundle(
   view: LiveStandingsViewId,
   categoryId: string | null,
   rankMode: SharedRankMode,
+  minCategoryVotes: number,
   db: Db,
 ): Promise<
   Omit<
     StandingsPage,
-    "year" | "pageSize" | "scoresFresh" | "view" | "categoryId"
+    | "year"
+    | "pageSize"
+    | "scoresFresh"
+    | "view"
+    | "categoryId"
+    | "gotyPublic"
+    | "categoriesPublic"
   > & {
     contribGeneration: number;
     scoresGeneration: number;
@@ -439,6 +452,7 @@ async function fetchStandingsBundle(
                   from live_category_scores s
                   where s.year = ${year}
                     and s.category_id = ac.id
+                  having sum(s.vote_count) >= ${minCategoryVotes}
                 )
             ) cat
           ),
@@ -606,8 +620,10 @@ export async function getStandingsPage(
   const categoryGroup = parseStandingsCategoryGroup(
     opts.categoryGroup ?? DEFAULT_STANDINGS_CATEGORY_GROUP,
   );
-  const rankMode =
-    opts.rankMode ?? parseSharedRankMode(await getSiteRankMode(db));
+  const settings = await getSiteSettings(db);
+  const rankMode = opts.rankMode ?? parseSharedRankMode(settings.rankMode);
+  const minLists = settings.publicBoardMinLists;
+  const minCategoryVotes = settings.publicBoardMinCategoryVotes;
 
   const bundle = await fetchStandingsBundle(
     year,
@@ -617,8 +633,13 @@ export async function getStandingsPage(
     view,
     categoryId,
     rankMode,
+    minCategoryVotes,
     db,
   );
+
+  const categoryVotes = await getYearMaxCategoryVotes(year, db);
+  const gotyPublic = isPublicBoardReady(bundle.listCount, minLists);
+  const categoriesPublic = isPublicBoardReady(categoryVotes, minCategoryVotes);
 
   const standings: StandingsPage = {
     year,
@@ -626,16 +647,18 @@ export async function getStandingsPage(
     detailedStatsRevealed: bundle.detailedStatsRevealed,
     standingsVersion: bundle.standingsVersion,
     scoresFresh: bundle.contribGeneration <= bundle.scoresGeneration,
-    page: bundle.page,
+    page: gotyPublic ? bundle.page : 1,
     pageSize,
-    gotyTotal: bundle.gotyTotal,
-    totalPages: bundle.totalPages,
-    goty: bundle.goty,
-    categories: bundle.categories,
+    gotyTotal: gotyPublic ? bundle.gotyTotal : 0,
+    totalPages: gotyPublic ? bundle.totalPages : 1,
+    goty: gotyPublic ? bundle.goty : [],
+    categories: categoriesPublic ? bundle.categories : [],
     categoryGroup: bundle.categoryGroup,
     view,
     categoryId,
-    categoryGameTotal: bundle.categoryGameTotal,
+    categoryGameTotal: categoriesPublic ? bundle.categoryGameTotal : 0,
+    gotyPublic,
+    categoriesPublic,
   };
 
   return redactStandingsPage(standings, { forceReveal: opts.forceReveal });
@@ -761,13 +784,19 @@ export async function getGotyThroughRank(
   };
 }
 
-/** Years that have live GOTY score rows, newest first. */
+/** Years that have live GOTY score rows and enough lists to publish, newest first. */
 export async function listYearsWithGotyScores(
   db: Db = getLiveAggregateDb(),
 ): Promise<number[]> {
+  const minLists = await getPublicBoardMinLists(db);
   const rows = await db
     .selectDistinct({ year: liveGotyScores.year })
     .from(liveGotyScores)
+    .innerJoin(
+      liveGotyYearStats,
+      eq(liveGotyYearStats.year, liveGotyScores.year),
+    )
+    .where(gte(liveGotyYearStats.listCount, minLists))
     .orderBy(desc(liveGotyScores.year));
   return rows.map((r) => r.year);
 }
@@ -798,4 +827,28 @@ export async function getGotyThroughRankForYears(
       getGotyThroughRank(year, { ...opts, rankMode }, db),
     ),
   );
+}
+
+/** Keep configured years that already meet the public GOTY list floor, original order. */
+export async function filterYearsWithPublicGoty(
+  years: readonly number[],
+  db: Db = getLiveAggregateDb(),
+): Promise<number[]> {
+  const unique = [...new Set(years.map((y) => Math.floor(y)))].filter((y) =>
+    Number.isFinite(y),
+  );
+  if (unique.length === 0) return [];
+
+  const minLists = await getPublicBoardMinLists(db);
+  const rows = await db
+    .select({ year: liveGotyYearStats.year })
+    .from(liveGotyYearStats)
+    .where(
+      and(
+        inArray(liveGotyYearStats.year, unique),
+        gte(liveGotyYearStats.listCount, minLists),
+      ),
+    );
+  const allowed = new Set(rows.map((r) => r.year));
+  return unique.filter((year) => allowed.has(year));
 }

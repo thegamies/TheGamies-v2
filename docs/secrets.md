@@ -70,6 +70,11 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | `CRON_SECRET` | same | Vercel Cron + scheduled HTTP to `/api/cron/edition-freeze` (Bearer or `?secret=`) |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
+| `R2_ACCOUNT_ID` | same | avatar uploads (Cloudflare R2) |
+| `R2_ACCESS_KEY_ID` | same | avatar uploads |
+| `R2_SECRET_ACCESS_KEY` | same | avatar uploads |
+| `R2_AVATAR_BUCKET` | same | avatar bucket (same name as the prior Gamies) |
+| `AVATAR_PUBLIC_BASE_URL` | same | public CDN base for `avatars/{id}/avatar.jpg` |
 
 PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
 

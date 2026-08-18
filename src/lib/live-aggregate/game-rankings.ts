@@ -128,6 +128,7 @@ export async function getGameGotyRankings(
     left join live_goty_year_stats ys on ys.year = s.year
     left join site_settings ss on ss.id = 'default'
     where s.game_id = ${gameId}
+      and coalesce(ys.list_count, 0) >= coalesce(ss.public_board_min_lists, 5)
     order by s.year desc
   `);
 
@@ -180,4 +181,89 @@ export async function getGameDetailGotyRankings(
   return hasGameGotyPresence(inheritedStats)
     ? inheritedStats
     : { byYear: [], viaParent: null };
+}
+
+export type GameCategoryWin = {
+  year: number;
+  categoryId: string;
+  label: string;
+};
+
+/** Site awards where this game is tied for #1 on a public category year. */
+export async function getGameCategoryWins(
+  gameId: string,
+  db: Db = getLiveAggregateDb(),
+): Promise<GameCategoryWin[]> {
+  const result = await db.execute(sql`
+    with category_votes as (
+      select year, category_id, coalesce(sum(vote_count), 0)::int as total
+      from live_category_scores
+      group by year, category_id
+    ),
+    vote_floor as (
+      select coalesce(
+        (select public_board_min_category_votes from site_settings where id = 'default'),
+        5
+      )::int as min
+    ),
+    winners as (
+      select
+        s.year,
+        s.category_id,
+        s.game_id
+      from live_category_scores s
+      where not exists (
+        select 1
+        from live_category_scores other
+        where other.year = s.year
+          and other.category_id = s.category_id
+          and other.vote_count > s.vote_count
+      )
+    )
+    select
+      w.year,
+      w.category_id as "categoryId",
+      ac.label
+    from winners w
+    inner join award_categories ac on ac.id = w.category_id
+    inner join category_votes cv
+      on cv.year = w.year and cv.category_id = w.category_id
+    cross join vote_floor f
+    where w.game_id = ${gameId}
+      and cv.total >= f.min
+    order by w.year desc, ac.sort_order, ac.label
+  `);
+
+  return (result.rows as Array<{
+    year: unknown;
+    categoryId: unknown;
+    label: unknown;
+  }>).map((row) => ({
+    year: asInt(row.year),
+    categoryId: String(row.categoryId),
+    label: String(row.label),
+  }));
+}
+
+export async function getGameDetailCategoryWins(
+  game: {
+    id: string;
+    versionParentIgdbId: number | null;
+    parentGameIgdbId: number | null;
+  },
+  db: Db = getLiveAggregateDb(),
+): Promise<{ wins: GameCategoryWin[]; viaParent: { slug: string; title: string } | null }> {
+  const own = await getGameCategoryWins(game.id, db);
+  if (own.length > 0) return { wins: own, viaParent: null };
+
+  const inheritIgdb = game.versionParentIgdbId ?? game.parentGameIgdbId;
+  if (inheritIgdb == null) return { wins: [], viaParent: null };
+
+  const parent = await getGameRefByIgdbId(inheritIgdb, db);
+  if (!parent || parent.id === game.id) return { wins: [], viaParent: null };
+
+  const inherited = await getGameCategoryWins(parent.id, db);
+  return inherited.length > 0
+    ? { wins: inherited, viaParent: { slug: parent.slug, title: parent.title } }
+    : { wins: [], viaParent: null };
 }

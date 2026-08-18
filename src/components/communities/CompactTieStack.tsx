@@ -197,10 +197,7 @@ export function CompactTieStack({
 
   if (count === 0) return null;
 
-  const visibleIndex = layerA.opacity >= layerB.opacity ? layerA.index : layerB.index;
-  const active = games[visibleIndex % count]!;
-  const titleA = games[layerA.index % count]!;
-  const titleB = games[layerB.index % count]!;
+  const shown = games[front % count]!;
 
   function cycle(e: MouseEvent) {
     e.preventDefault();
@@ -215,7 +212,7 @@ export function CompactTieStack({
         type="button"
         onClick={cycle}
         className="relative block aspect-[3/4] w-full overflow-hidden rounded-[var(--radius-artwork)] text-left"
-        aria-label={`Tied games, showing ${active.title}. Activate to show next.`}
+        aria-label={`Tied games, showing ${shown.title}. Activate to show next.`}
       >
         <span
           className="absolute inset-0 transition-opacity ease-in-out"
@@ -256,62 +253,19 @@ export function CompactTieStack({
         ) : null}
       </button>
 
-      <div className="relative mt-2 min-w-0">
-        <div className="invisible" aria-hidden>
-          <FitDisplayTitle
-            className="w-full"
-            maxPx={titleMaxPx}
-            minPx={titleMinPx}
-            lines={2}
-          >
-            {active.title}
-          </FitDisplayTitle>
-        </div>
-        <div
-          className="absolute inset-0 transition-opacity ease-in-out"
-          style={{
-            opacity: layerA.opacity,
-            transitionDuration: `${CROSSFADE_MS}ms`,
-          }}
+      <Link
+        href={`/games/${shown.slug}`}
+        className="group mt-2 block min-w-0"
+      >
+        <FitDisplayTitle
+          className="w-full group-hover:text-accent"
+          maxPx={titleMaxPx}
+          minPx={titleMinPx}
+          lines={2}
         >
-          <Link
-            href={`/games/${titleA.slug}`}
-            className="group/title block min-w-0"
-          >
-            <FitDisplayTitle
-              className="w-full group-hover/title:text-accent"
-              maxPx={titleMaxPx}
-              minPx={titleMinPx}
-              lines={2}
-            >
-              {titleA.title}
-            </FitDisplayTitle>
-          </Link>
-        </div>
-        {mounted ? (
-          <div
-            className="absolute inset-0 transition-opacity ease-in-out"
-            style={{
-              opacity: layerB.opacity,
-              transitionDuration: `${CROSSFADE_MS}ms`,
-            }}
-          >
-            <Link
-              href={`/games/${titleB.slug}`}
-              className="group/title block min-w-0"
-            >
-              <FitDisplayTitle
-                className="w-full group-hover/title:text-accent"
-                maxPx={titleMaxPx}
-                minPx={titleMinPx}
-                lines={2}
-              >
-                {titleB.title}
-              </FitDisplayTitle>
-            </Link>
-          </div>
-        ) : null}
-      </div>
+          {shown.title}
+        </FitDisplayTitle>
+      </Link>
     </div>
   );
 }

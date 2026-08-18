@@ -21,6 +21,7 @@ import {
   parseEditionScheduleInput,
   parseEditionYear,
   showEditionNav,
+  editionUsesPublishedResultsNav,
   validateEditionSchedule,
 } from "./edition-status";
 import { pickFeaturedEdition, pickOverviewEditions, parseEditionCreateRankMode, type CommunityEditionPublic } from "./editions";
@@ -84,6 +85,13 @@ describe("edition nav gates", () => {
     expect(showEditionNav("closed")).toBe(true);
     expect(showEditionNav("published")).toBe(true);
   });
+
+  it("uses results tabs after publish, including Settings", () => {
+    expect(editionUsesPublishedResultsNav("published")).toBe(true);
+    expect(editionUsesPublishedResultsNav("closed")).toBe(false);
+    expect(editionUsesPublishedResultsNav("open")).toBe(false);
+    expect(editionUsesPublishedResultsNav("scheduled")).toBe(false);
+  });
 });
 
 describe("edition public copy", () => {
@@ -143,6 +151,10 @@ describe("parseEditionYear / datetime", () => {
     expect(parseEditionYear("nope")).toEqual({ error: "Pick a valid year." });
     const parsed = parseEditionDateTimeInput("2026-11-01T18:30");
     expect("ok" in parsed).toBe(true);
+    if ("ok" in parsed) {
+      expect(parsed.date.getHours()).toBe(18);
+      expect(parsed.date.getMinutes()).toBe(30);
+    }
     expect(parseEditionDateTimeInput("bad")).toEqual({
       error: "Pick a valid date and time.",
     });
@@ -176,6 +188,14 @@ describe("edition date inputs", () => {
     expect(parseEditionScheduleInput("nope")).toEqual({
       error: "Pick a valid date.",
     });
+  });
+
+  it("treats ISO instants as absolute times, not server-local wall clock", () => {
+    const parsed = parseEditionScheduleInput("2026-11-01T18:30:00.000Z");
+    expect("ok" in parsed).toBe(true);
+    if ("ok" in parsed) {
+      expect(parsed.date.toISOString()).toBe("2026-11-01T18:30:00.000Z");
+    }
   });
 
   it("chains picker bounds so later instants cannot precede earlier ones", () => {

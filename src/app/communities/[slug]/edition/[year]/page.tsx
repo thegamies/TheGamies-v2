@@ -11,6 +11,7 @@ import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
 import {
   EditionResultsView,
+  EditionResultsViewNav,
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
@@ -73,7 +74,7 @@ import {
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
-import { showEditionNav } from "@/lib/communities/edition-status";
+import { editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
@@ -836,15 +837,15 @@ export default async function CommunityEditionYearPage({
             <EditionResultsCalculatingBanner status={edition.freezeStatus} />
           ) : null}
 
-          {edition.status === "published" && showHostSettings ? (
+          {editionUsesPublishedResultsNav(edition.status) && showHostSettings ? (
             <>
-              <EditionEventTabs
+              <EditionResultsViewNav
                 slug={community.slug}
                 year={edition.year}
-                canManage
-                includeVoters={false}
                 mode={mode}
-                active="settings"
+                view="settings"
+                hasYourBallot={Boolean(profile && isMember)}
+                canManage
               />
               {hostToolPanel}
             </>

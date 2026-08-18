@@ -29,6 +29,9 @@ importers:
       '@thegamies/igdb':
         specifier: workspace:*
         version: link:packages/igdb
+      aws4fetch:
+        specifier: ^1.0.20
+        version: 1.0.20
       drizzle-orm:
         specifier: ^0.44.2
         version: 0.44.7(@neondatabase/serverless@1.1.0)(kysely@0.28.17)

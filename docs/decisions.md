@@ -61,7 +61,8 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-14 | Award category catalog | Site `award_categories` expanded (sort 2–64) with **groups** and **eligibility**. Ballot/GOTY UI is a searchable award **grid**, not every slot at once. Standings load **one group** of category laterals (`?group=`). Current/active ≈ released this year or earlier until a live-ops flag exists. **Upcoming** excludes the list year. Remake/DLC allow editions. |
 | 2026-08-16 | Edition freeze scope | Freeze **boards only** (GOTY tallies, category tallies, voter roster). Individual voter ranks/category picks stay on `community_edition_ballot_*` and are read after publish (ballots are already read-only after close). Avoids photocopying tens of thousands of pick rows on rebuild. |
 | 2026-08-16 | Edition freeze tallies | Publish/rebuild computes GOTY + category boards with **SQL `GROUP BY`** on ballot tables (not loading every vote row into the app). Same scoring rules as `aggregateEditionGoty` / `aggregateEditionCategories`; Hosts boards join `community_edition_voices`. |
-| 2026-08-16 | Edition results read path | Reveal / Results Ranked SSR: GOTY through 10 + category podiums only. Comparison matrices load on first Comparison click. Category top-N uses SQL window `RANK`/`DENSE_RANK` (full ties at cutoff). |
+| 2026-08-18 | Profile avatars | **Cloudflare R2**, same env names and bucket as the prior Gamies (`R2_*` + `AVATAR_PUBLIC_BASE_URL`). Client resizes to 400×400 JPEG; `aws4fetch` PUT works on Vercel and Workers. |
+| 2026-08-18 | Public GOTY floor | A year stays off public GOTY boards until it meets `site_settings.public_board_min_lists` (default **5**). Each category board uses `public_board_min_category_votes` (default **5**) against **that award’s** vote total, not the year’s summed votes. Admin edits both on `/admin/rankings`. Public copy does not name the numbers. |
 
 ## Open (block dependent work until decided)
 
@@ -69,5 +70,4 @@ Record product and architecture decisions here. Do not invent answers to open it
 - Edition / community category voting modes beyond site single-choice
 - Approval membership and extra eligibility beyond invite-only members
 - Moderation and ballot invalidation workflow
-- Object storage for avatars / OG images (e.g. Vercel Blob, R2, S3)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)

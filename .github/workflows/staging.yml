@@ -85,6 +85,11 @@ jobs:
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
           STAGING_VERCEL_APP_URL: ${{ secrets.STAGING_VERCEL_APP_URL }}
           VERCEL_STAGING_ALIAS: ${{ secrets.VERCEL_STAGING_ALIAS }}
         run: |
@@ -109,7 +114,7 @@ jobs:
           fi
 
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -174,6 +179,11 @@ jobs:
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.STAGING_CF_APP_URL }}
         run: |
           WORKER="thegamies-v2-develop"
@@ -203,6 +213,11 @@ jobs:
             "ADMIN_SYNC_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
+            "R2_ACCOUNT_ID",
+            "R2_ACCESS_KEY_ID",
+            "R2_SECRET_ACCESS_KEY",
+            "R2_AVATAR_BUCKET",
+            "AVATAR_PUBLIC_BASE_URL",
             "NEXT_PUBLIC_APP_URL",
           ];
           const secrets = {};

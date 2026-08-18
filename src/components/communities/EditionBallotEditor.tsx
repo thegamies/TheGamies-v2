@@ -4,20 +4,21 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import {
+  cardTouchLockClassName,
+  mergeHoldDragListeners,
+  useDragBodyScrollLock,
+  useListCardDragSensors,
+} from "@/components/lists/cardChrome";
 import {
   saveEditionBallotAction,
   type SaveEditionBallotState,
@@ -123,12 +124,9 @@ export function EditionBallotEditor({
   const canImport = Boolean(siteGotyItems && siteGotyItems.length > 0);
   const addedIds = new Set(items.map((item) => item.gameId));
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
-  );
+  const sensors = useListCardDragSensors();
+  const [dragging, setDragging] = useState(false);
+  useDragBodyScrollLock(dragging);
 
   function addGame(hit: GameSearchHit) {
     if (items.some((i) => i.gameId === hit.id)) return;
@@ -171,6 +169,7 @@ export function EditionBallotEditor({
   }
 
   function onDragEnd(event: DragEndEvent) {
+    setDragging(false);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     setItems((prev) => {
@@ -187,7 +186,7 @@ export function EditionBallotEditor({
         <BallotChapterHeader
           eyebrow="Top 10"
           title="Game of the Year"
-          description={`Rank up to ${EDITION_BALLOT_MAX_ITEMS} games from ${year}. Drag to reorder.`}
+          description={`Rank up to ${EDITION_BALLOT_MAX_ITEMS} games from ${year}. Hold to reorder.`}
           actions={
             canImport ? (
               <Button
@@ -221,7 +220,9 @@ export function EditionBallotEditor({
             id={dndId}
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={() => setDragging(true)}
             onDragEnd={onDragEnd}
+            onDragCancel={() => setDragging(false)}
           >
             <SortableContext
               items={items.map((item) => item.gameId)}
@@ -241,7 +242,7 @@ export function EditionBallotEditor({
           </DndContext>
         )}
         <p className="mt-4 text-xs text-muted">
-          {items.length} of {EDITION_BALLOT_MAX_ITEMS} · drag to reorder
+          {items.length} of {EDITION_BALLOT_MAX_ITEMS} · hold to reorder
         </p>
       </section>
 
@@ -335,6 +336,7 @@ function BallotGridCard({
     transition,
     isDragging,
   } = useSortable({ id: item.gameId });
+  const holdListeners = mergeHoldDragListeners(listeners);
 
   return (
     <li
@@ -347,10 +349,11 @@ function BallotGridCard({
     >
       <button
         type="button"
-        className="w-full cursor-grab text-left active:cursor-grabbing"
-        aria-label={`Drag to reorder ${item.title}`}
+        className={`w-full cursor-grab text-left active:cursor-grabbing ${cardTouchLockClassName}`}
+        aria-label={`Hold to reorder ${item.title}`}
+        onContextMenu={(event) => event.preventDefault()}
         {...attributes}
-        {...listeners}
+        {...holdListeners}
       >
         <GameCover title={item.title} imageUrl={item.coverUrl} />
         <div className="mt-2 flex items-start gap-1">

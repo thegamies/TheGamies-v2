@@ -340,6 +340,10 @@ function SharedPoster({
   const [scale, setScale] = useState(0.4);
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const update = () => {
@@ -359,6 +363,8 @@ function SharedPoster({
           position: "relative",
           width: "100%",
           height: POSTER_H * scale,
+          overflow: "hidden",
+          overflowAnchor: "none",
         }}
       >
         <div

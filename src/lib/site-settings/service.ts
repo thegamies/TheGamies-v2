@@ -5,6 +5,12 @@ import {
   type SharedRankMode,
 } from "@/lib/standings/shared-rank";
 import { resolveLandingStandingsYears } from "./landing-years";
+import {
+  DEFAULT_PUBLIC_BOARD_MIN_CATEGORY_VOTES,
+  DEFAULT_PUBLIC_BOARD_MIN_LISTS,
+  parsePublicBoardMinCategoryVotes,
+  parsePublicBoardMinLists,
+} from "@/lib/live-aggregate/public-board";
 
 export {
   defaultLandingStandingsYears,
@@ -21,6 +27,8 @@ function getDb(): Db {
 export type SiteSettingsRow = {
   landingStandingsYears: number[] | null;
   rankMode: SharedRankMode;
+  publicBoardMinLists: number;
+  publicBoardMinCategoryVotes: number;
 };
 
 export async function getSiteSettings(
@@ -30,6 +38,8 @@ export async function getSiteSettings(
     .select({
       landingStandingsYears: siteSettings.landingStandingsYears,
       rankMode: siteSettings.rankMode,
+      publicBoardMinLists: siteSettings.publicBoardMinLists,
+      publicBoardMinCategoryVotes: siteSettings.publicBoardMinCategoryVotes,
     })
     .from(siteSettings)
     .where(eq(siteSettings.id, SETTINGS_ID))
@@ -38,6 +48,12 @@ export async function getSiteSettings(
   return {
     landingStandingsYears: row?.landingStandingsYears ?? null,
     rankMode: parseSharedRankMode(row?.rankMode),
+    publicBoardMinLists: parsePublicBoardMinLists(
+      row?.publicBoardMinLists ?? DEFAULT_PUBLIC_BOARD_MIN_LISTS,
+    ),
+    publicBoardMinCategoryVotes: parsePublicBoardMinCategoryVotes(
+      row?.publicBoardMinCategoryVotes ?? DEFAULT_PUBLIC_BOARD_MIN_CATEGORY_VOTES,
+    ),
   };
 }
 
@@ -107,6 +123,70 @@ export async function setSiteRankMode(
       target: siteSettings.id,
       set: {
         rankMode,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getPublicBoardMinLists(
+  db: Db = getDb(),
+): Promise<number> {
+  const settings = await getSiteSettings(db);
+  return settings.publicBoardMinLists;
+}
+
+/** Persist the public GOTY list floor. */
+export async function setPublicBoardMinLists(
+  min: number,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const publicBoardMinLists = parsePublicBoardMinLists(min);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      publicBoardMinLists,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        publicBoardMinLists,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getPublicBoardMinCategoryVotes(
+  db: Db = getDb(),
+): Promise<number> {
+  const settings = await getSiteSettings(db);
+  return settings.publicBoardMinCategoryVotes;
+}
+
+/** Persist the public category-board vote floor. */
+export async function setPublicBoardMinCategoryVotes(
+  min: number,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const publicBoardMinCategoryVotes = parsePublicBoardMinCategoryVotes(min);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      publicBoardMinCategoryVotes,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        publicBoardMinCategoryVotes,
         updatedAt: new Date(),
       },
     });

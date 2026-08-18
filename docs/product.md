@@ -71,8 +71,8 @@ Site
 - **Editorial list view** for sharing (static editorial composition from the `goty` proto; video/Remotion deferred)
 
 ### Users
-- Auth profiles (username, display, bio, avatar, basic visibility)
-- User pages with the same information intent as the prior app (lists, social counts, communities as applicable)
+- Auth profiles (username, display, bio, avatar upload, social links, basic visibility)
+- User pages with lists, communities, avatar, and social profiles (X, YouTube, Twitch, Bluesky handles; website as a full URL)
 - Anonymous list authors remain public via list URL until/unless claimed by sign-in
 
 ### Site aggregate

@@ -5,6 +5,12 @@ import {
   normalizeUsername,
   usernameSchema,
 } from "@/lib/profile/username";
+import {
+  mergeSocialLinks,
+  socialLinksForStorage,
+  validateAndNormalizeSocialLinksPatch,
+  type SocialLinks,
+} from "@/lib/profile/social-links";
 
 export type Profile = typeof profiles.$inferSelect;
 export { ownsProfile } from "@/lib/profile/ownership";
@@ -103,6 +109,7 @@ export async function updateOwnedProfile(input: {
   displayName: string;
   bio?: string;
   visibility: "public" | "private";
+  socialLinks?: SocialLinks;
 }): Promise<{ profile: Profile } | { error: string }> {
   const usernameParsed = usernameSchema.safeParse(input.username);
   if (!usernameParsed.success) {
@@ -123,6 +130,21 @@ export async function updateOwnedProfile(input: {
     return { error: "That username is taken." };
   }
 
+  let socialLinks: Record<string, string> | null | undefined;
+  if (input.socialLinks) {
+    try {
+      const patch = validateAndNormalizeSocialLinksPatch(input.socialLinks);
+      socialLinks = socialLinksForStorage(
+        mergeSocialLinks(existing.socialLinks, patch),
+      );
+    } catch (err) {
+      return {
+        error:
+          err instanceof Error ? err.message : "Check the social links and try again.",
+      };
+    }
+  }
+
   const updated = await db
     .update(profiles)
     .set({
@@ -130,6 +152,7 @@ export async function updateOwnedProfile(input: {
       displayName: displayParsed.data,
       bio: input.bio?.trim() ? input.bio.trim() : null,
       visibility: input.visibility,
+      ...(socialLinks !== undefined ? { socialLinks } : {}),
       updatedAt: new Date(),
     })
     .where(eq(profiles.authUserId, input.authUserId))
@@ -138,6 +161,32 @@ export async function updateOwnedProfile(input: {
   const profile = updated[0];
   if (!profile) {
     return { error: "Could not update profile." };
+  }
+  return { profile };
+}
+
+export async function updateOwnedAvatarUrl(input: {
+  authUserId: string;
+  avatarUrl: string | null;
+}): Promise<{ profile: Profile } | { error: string }> {
+  const db = getDb();
+  const existing = await getProfileByAuthUserId(input.authUserId, db);
+  if (!existing) {
+    return { error: "Profile not found." };
+  }
+
+  const updated = await db
+    .update(profiles)
+    .set({
+      avatarUrl: input.avatarUrl,
+      updatedAt: new Date(),
+    })
+    .where(eq(profiles.authUserId, input.authUserId))
+    .returning();
+
+  const profile = updated[0];
+  if (!profile) {
+    return { error: "Could not update photo." };
   }
   return { profile };
 }

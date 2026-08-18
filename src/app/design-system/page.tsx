@@ -557,7 +557,7 @@ export default function DesignSystemPage() {
             <BallotChapterHeader
               eyebrow="Top 10"
               title="Game of the Year"
-              description="Rank up to 10 games from 2026. Drag to reorder."
+              description="Rank up to 10 games from 2026. Hold to reorder."
             />
           </div>
           <div>

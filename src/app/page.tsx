@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
 import { SectionRule } from "@/components/ui/SectionRule";
+import { getCategoryHighlightsForYears } from "@/lib/live-aggregate/category-highlights";
 import {
+  filterYearsWithPublicGoty,
   getGotyThroughRankForYears,
   TOP_STANDINGS_RANK,
 } from "@/lib/live-aggregate/service";
@@ -19,13 +21,31 @@ export default async function HomePage() {
       score: number | null;
     }>;
     yearHref: string;
+    categoryWinners?: Array<{
+      categoryId: string;
+      label: string;
+      games: Array<{
+        gameId: string;
+        slug: string;
+        title: string;
+        coverUrl: string | null;
+      }>;
+    }>;
   }> = [];
 
   try {
-    const years = await getLandingStandingsYears();
-    const boards = await getGotyThroughRankForYears(years, {
-      maxRank: TOP_STANDINGS_RANK,
-    });
+    const years = await filterYearsWithPublicGoty(
+      await getLandingStandingsYears(),
+    );
+    const [boards, highlights] = await Promise.all([
+      getGotyThroughRankForYears(years, {
+        maxRank: TOP_STANDINGS_RANK,
+      }),
+      getCategoryHighlightsForYears(years),
+    ]);
+    const winnersByYear = new Map(
+      highlights.map((block) => [block.year, block.winners]),
+    );
     sections = boards.map((board) => ({
       year: board.year,
       yearHref: `/game-of-the-year/${board.year}`,
@@ -37,6 +57,7 @@ export default async function HomePage() {
         coverUrl: row.coverUrl,
         score: row.score,
       })),
+      categoryWinners: winnersByYear.get(board.year) ?? [],
     }));
   } catch {
     sections = [];

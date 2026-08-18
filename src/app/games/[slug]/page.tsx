@@ -1,12 +1,15 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { GameCategoryWins } from "@/components/games/GameCategoryWins";
 import { GameGotyRankings } from "@/components/games/GameGotyRankings";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameCover } from "@/components/ui/GameCover";
 import { getGameBySlug } from "@/lib/catalog";
 import {
+  getGameDetailCategoryWins,
   getGameDetailGotyRankings,
+  type GameCategoryWin,
   type GameGotyRankings as GameGotyRankingsData,
 } from "@/lib/live-aggregate/game-rankings";
 
@@ -55,10 +58,17 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   if (!game) notFound();
 
   let rankings: GameGotyRankingsData = { byYear: [], viaParent: null };
+  let categoryWins: GameCategoryWin[] = [];
   try {
     rankings = await getGameDetailGotyRankings(game);
   } catch {
     rankings = { byYear: [], viaParent: null };
+  }
+  try {
+    const awards = await getGameDetailCategoryWins(game);
+    categoryWins = awards.wins;
+  } catch {
+    categoryWins = [];
   }
 
   const developers = game.companies.filter((c) => c.developer);
@@ -97,6 +107,8 @@ export default async function GameDetailPage({ params }: { params: Params }) {
               layout="broadcast-compact"
               className="mt-8"
             />
+
+            <GameCategoryWins wins={categoryWins} className="mt-8" />
 
             <dl className="mt-8 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
               <div>

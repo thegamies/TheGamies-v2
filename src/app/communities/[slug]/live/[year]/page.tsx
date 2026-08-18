@@ -132,6 +132,8 @@ export default async function CommunityLiveYearPage({
       view: DEFAULT_LIVE_STANDINGS_VIEW,
       categoryId: null,
       categoryGameTotal: 0,
+      gotyPublic: true,
+      categoriesPublic: true,
     };
   }
 

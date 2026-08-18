@@ -31,6 +31,7 @@ import {
   syncSharedListAction,
   hydrateDraftGamesAction,
 } from "@/app/create/actions";
+import { DeleteListControl } from "@/components/lists/DeleteListControl";
 import {
   searchGamesForList,
 } from "@/lib/lists/search-games-client";
@@ -922,7 +923,7 @@ export function ListEditor({
       <div
         className={
           listType === "goty"
-            ? "-mt-6"
+            ? "flex flex-wrap items-end justify-between gap-x-4 gap-y-3 -mt-6"
             : "flex flex-wrap items-end gap-x-4 gap-y-3"
         }
       >
@@ -940,6 +941,22 @@ export function ListEditor({
             />
           </label>
         )}
+        {signedIn && publicId ? (
+          <div className="ml-auto shrink-0">
+            <DeleteListControl
+              publicId={publicId}
+              listType={listType}
+              title={
+                listType === "goty"
+                  ? `${yearNum} Game of the Year`
+                  : title.trim() || "This list"
+              }
+              returnPath={returnPath}
+              disabled={pending}
+              onBeforeDelete={allowLeave}
+            />
+          </div>
+        ) : null}
       </div>
 
       {showCategoryTabs ? (

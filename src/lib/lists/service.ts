@@ -11,7 +11,7 @@ import {
   type Db,
 } from "@thegamies/db";
 import { coverUrlFromImageId } from "@thegamies/igdb";
-import { canEditList } from "@/lib/lists/ownership";
+import { canEditList, ownsListByProfile } from "@/lib/lists/ownership";
 import { shareLinkPublishError } from "@/lib/lists/auth-intent";
 import {
   clientDraftUpsertSchema,
@@ -580,6 +580,36 @@ export async function resetDraft(
 
   await db.delete(lists).where(eq(lists.id, list.id));
   return { ok: true };
+}
+
+export async function deleteOwnedList(
+  publicId: string,
+  profileId: string,
+  db: Db = getDb(),
+): Promise<
+  | { ok: true; year: number | null; username: string }
+  | { error: string }
+> {
+  const list = await getListByPublicId(publicId, db);
+  if (!list) return { error: "List not found." };
+  if (!ownsListByProfile(list, profileId)) {
+    return { error: "You cannot delete this list." };
+  }
+
+  const [owner] = await db
+    .select({ username: profiles.username })
+    .from(profiles)
+    .where(eq(profiles.id, profileId))
+    .limit(1);
+  if (!owner?.username) return { error: "You cannot delete this list." };
+
+  if (list.listType === "goty") {
+    const cleared = await clearOwnedGotyContrib(list.id, db);
+    scheduleYearRefresh(cleared.years);
+  }
+
+  await db.delete(lists).where(eq(lists.id, list.id));
+  return { ok: true, year: list.year, username: owner.username };
 }
 
 export type ShareListPayload = {

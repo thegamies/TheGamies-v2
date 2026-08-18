@@ -340,6 +340,11 @@ export function showEditionNav(status: EditionStatus): boolean {
   return status !== "draft";
 }
 
+/** Published events keep Reveal / Results / Settings — not Ballot + Settings. */
+export function editionUsesPublishedResultsNav(status: EditionStatus): boolean {
+  return status === "published";
+}
+
 const DATE_INPUT_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_LOCAL_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 
@@ -382,7 +387,7 @@ export function addCalendarDays(isoDate: string, days: number): string {
   return formatEditionDateInput(next);
 }
 
-/** Parse `<input type="datetime-local">` value as a local Date. */
+/** Parse a wall-clock `YYYY-MM-DDTHH:mm` using this runtime's local zone. */
 export function parseEditionDateTimeInput(
   raw: string,
 ): { ok: true; date: Date } | { error: string } {
@@ -390,8 +395,18 @@ export function parseEditionDateTimeInput(
   if (!DATETIME_LOCAL_RE.test(value)) {
     return { error: "Pick a valid date and time." };
   }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
+  const [datePartRaw, timePartRaw] = value.split("T");
+  const [year, month, day] = datePartRaw.split("-").map(Number);
+  const [hours, minutes] = timePartRaw.split(":").map(Number);
+  const date = new Date(year, month - 1, day, hours, minutes);
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day ||
+    date.getHours() !== hours ||
+    date.getMinutes() !== minutes
+  ) {
     return { error: "Pick a valid date and time." };
   }
   return { ok: true, date };
@@ -405,15 +420,25 @@ export function formatEditionDateTimeInput(
   return `${formatEditionDateInput(date)}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
 }
 
+const ISO_INSTANT_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
 /**
- * Parse a schedule field from a date picker, datetime-local, or ISO instant
- * (“Set to now”).
+ * Parse a schedule field. Forms submit ISO instants from the browser.
+ * Picker validation still uses datetime-local wall-clock strings.
  */
 export function parseEditionScheduleInput(
   raw: string,
 ): { ok: true; date: Date } | { error: string } {
   const value = raw.trim();
   if (!value) return { error: "Pick a valid date." };
+  if (ISO_INSTANT_RE.test(value)) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return { error: "Pick a valid date." };
+    }
+    return { ok: true, date };
+  }
   if (DATE_INPUT_RE.test(value)) return parseEditionDateInput(value);
   if (DATETIME_LOCAL_RE.test(value)) return parseEditionDateTimeInput(value);
   const date = new Date(value);

@@ -245,7 +245,7 @@ export function PosterBuilder({
       onDragCancel={handleDragCancel}
     >
     <div ref={containerRef} className="w-full">
-      <div style={{ position: "relative", width: "100%", height: CANVAS_H * scale }}>
+      <div style={{ position: "relative", width: "100%", height: CANVAS_H * scale, overflow: "hidden", overflowAnchor: "none" }}>
         <div
           style={{
             position: "absolute",

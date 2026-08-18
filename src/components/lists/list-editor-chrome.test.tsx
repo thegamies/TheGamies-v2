@@ -33,6 +33,7 @@ vi.mock("@/app/create/actions", () => ({
   shareListAction: vi.fn(),
   syncSharedListAction: vi.fn(),
   hydrateDraftGamesAction: vi.fn(),
+  deleteOwnedListAction: vi.fn(),
 }));
 
 vi.mock("@/lib/lists/search-games-client", () => ({
@@ -119,6 +120,22 @@ describe("ListEditor chrome", () => {
     expect(screen.getByLabelText("Title")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
     expect(screen.getByRole("checkbox", { name: "Default view" })).toBeTruthy();
+  });
+
+  it("places delete on the title row", () => {
+    render(
+      <ListEditor
+        signedIn
+        publicId="list-1"
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+    const heading = screen.getByText("2026 Game of the Year");
+    const del = screen.getByRole("button", { name: "Delete list" });
+    expect(heading.parentElement).toBe(del.parentElement?.parentElement);
   });
 
   it("keeps search text after adding a game from results", async () => {

@@ -833,6 +833,8 @@ export async function getCommunityLiveStandings(
       view,
       categoryId,
       categoryGameTotal: categories[0]?.rows.length ?? 0,
+      gotyPublic: true,
+      categoriesPublic: true,
     });
   }
 
@@ -873,5 +875,7 @@ export async function getCommunityLiveStandings(
     categoryId,
     categoryGameTotal:
       view === "category" ? (live.categories[0]?.rows.length ?? 0) : 0,
+    gotyPublic: true,
+    categoriesPublic: true,
   });
 }

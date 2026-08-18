@@ -107,7 +107,20 @@ export function isIsoDateTimeInRange(
   return true;
 }
 
-/** `YYYY-MM-DD` + `HH:mm` → `YYYY-MM-DDTHH:mm`. Empty date stays empty. */
+/** `YYYY-MM-DDTHH:mm` wall clock in this runtime → ISO instant. Call from the browser. */
+export function wallClockToIso(value: string): string {
+  const parsed = parseIsoDateTime(value);
+  if (!parsed) return value;
+  const [year, month, day] = parsed.date.split("-").map(Number);
+  return new Date(
+    year,
+    month - 1,
+    day,
+    parsed.hours,
+    parsed.minutes,
+  ).toISOString();
+}
+
 export function mergeIsoDateAndTime(
   date: string,
   time: string,

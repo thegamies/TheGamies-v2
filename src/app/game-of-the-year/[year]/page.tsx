@@ -83,6 +83,8 @@ export default async function GameOfTheYearYearPage({
       view: DEFAULT_LIVE_STANDINGS_VIEW,
       categoryId: null,
       categoryGameTotal: 0,
+      gotyPublic: false,
+      categoriesPublic: false,
     };
   }
 

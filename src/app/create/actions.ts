@@ -23,8 +23,10 @@ import {
   shareListFromClientDraft,
   syncExistingSharedListFromClientDraft,
   syncLiveAggregateForOwnedList,
+  deleteOwnedList,
 } from "@/lib/lists/service";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { profileHref } from "@/lib/profile/profile-page";
 import { replaceCategoryVotesForList } from "@/lib/live-aggregate/contrib";
 import { replaceCategoryVotesSchema } from "@/lib/live-aggregate/schema";
 
@@ -427,4 +429,35 @@ export async function completeListAuthIntentAction(
     publicId: result.list.publicId,
     sharePath: share.path,
   };
+}
+
+export async function deleteOwnedListAction(formData: FormData) {
+  const publicId = String(formData.get("publicId") ?? "").trim();
+  const returnPath = String(formData.get("returnPath") ?? "").trim() || "/create";
+  if (!publicId) {
+    redirect(
+      `${returnPath}${returnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent("List not found.")}`,
+    );
+  }
+
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    redirect(`/auth/sign-in?next=${encodeURIComponent(returnPath)}`);
+  }
+
+  const result = await deleteOwnedList(publicId, profileId);
+  if ("error" in result) {
+    redirect(
+      `${returnPath}${returnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent(result.error)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/standings");
+  revalidatePath("/game-of-the-year");
+  if (result.year != null) {
+    revalidatePath(`/game-of-the-year/${result.year}`);
+  }
+  revalidatePath(profileHref(result.username, { tab: "lists" }));
+  redirect(profileHref(result.username, { tab: "lists" }));
 }

@@ -1,12 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import {
   StandingGameCard,
-  standingStripColClass,
-  standingStripListClass,
+  standingFillFiveColClass,
+  standingFillFiveFlowClass,
+  standingFillFiveListClass,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
+import type { CategoryHighlightWinner } from "@/lib/live-aggregate/category-highlights";
 
 export type YearTopFiveRow = {
   place: number;
@@ -21,21 +24,27 @@ export type YearTopFiveRow = {
 const outlinedLinkClass =
   "inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold tracking-wide text-ink transition-colors hover:border-accent";
 
+const fillFiveColClass = standingFillFiveColClass();
+
 /**
- * One year of Top 5 — community event Comparison strip language.
- * Year + Standings share a ruled header bar; covers sit tight under it.
+ * One year of Top 5. Year + Full rankings share a ruled header bar.
+ * Five equal cards fill the row; extra ties stay on one row and scroll.
  */
 export function YearTopFiveStrip({
   year,
   rows,
   yearHref,
+  categoryWinners = [],
   showRule = false,
 }: {
   year: number;
   rows: YearTopFiveRow[];
   yearHref: string;
+  categoryWinners?: CategoryHighlightWinner[];
   showRule?: boolean;
 }) {
+  const categoriesHref = `/game-of-the-year/${year}?view=categories`;
+
   return (
     <article className={showRule ? "mt-5 sm:mt-6" : undefined}>
       <div className="flex items-end justify-between gap-4 border-b border-line pb-2">
@@ -43,20 +52,17 @@ export function YearTopFiveStrip({
           {year}
         </h3>
         <Link href={yearHref} className={outlinedLinkClass}>
-          Standings
+          Full rankings
         </Link>
       </div>
 
       {rows.length === 0 ? (
         <p className="mt-2 text-sm text-muted">No rankings for this year yet.</p>
       ) : (
-        <HorizontalScroll className="mt-2" label={`${year} top five`}>
-          <ul className={standingStripListClass}>
+        <HorizontalScroll className="@container mt-2" label={`${year} top five`}>
+          <ul className={standingFillFiveListClass}>
             {rows.map((row) => (
-              <li
-                key={row.gameId}
-                className={standingStripColClass(row.place === 1)}
-              >
+              <li key={row.gameId} className={fillFiveColClass}>
                 <StandingGameCard
                   place={row.place}
                   placeSize="lg"
@@ -72,6 +78,53 @@ export function YearTopFiveStrip({
           </ul>
         </HorizontalScroll>
       )}
+
+      {categoryWinners.length > 0 ? (
+        <div className="mt-5">
+          <div className="flex items-end justify-between gap-4">
+            <p className="font-display text-xl leading-none tracking-wide text-ink sm:text-2xl">
+              Top Categories
+            </p>
+            <Link href={categoriesHref} className={outlinedLinkClass}>
+              All categories
+            </Link>
+          </div>
+          <HorizontalScroll
+            className="@container mt-3"
+            label={`${year} top categories`}
+          >
+            <ul className={standingFillFiveFlowClass}>
+              {categoryWinners.map((winner) => {
+                const categoryHref = `/game-of-the-year/${year}?view=category&category=${winner.categoryId}`;
+                const solo = winner.games[0];
+                return (
+                  <li key={winner.categoryId} className="min-w-0">
+                    <Link
+                      href={categoryHref}
+                      title={winner.label}
+                      className="mb-2 block truncate font-display text-lg leading-none tracking-wide text-ink hover:text-accent sm:text-xl"
+                    >
+                      {winner.label}
+                    </Link>
+                    {winner.games.length > 1 ? (
+                      <CompactTieStack
+                        games={winner.games}
+                        className="w-full"
+                      />
+                    ) : solo ? (
+                      <StandingGameCard
+                        slug={solo.slug}
+                        title={solo.title}
+                        coverUrl={solo.coverUrl}
+                      />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </HorizontalScroll>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -84,6 +137,7 @@ export function YearTopFiveSections({
     year: number;
     rows: YearTopFiveRow[];
     yearHref: string;
+    categoryWinners?: CategoryHighlightWinner[];
   }>;
   allYearsHref?: string | null;
 }) {
@@ -111,6 +165,7 @@ export function YearTopFiveSections({
           year={section.year}
           rows={section.rows}
           yearHref={section.yearHref}
+          categoryWinners={section.categoryWinners}
           showRule={index > 0}
         />
       ))}

@@ -9,6 +9,8 @@ import {
   getSiteSettings,
   parseLandingYearsInput,
   setLandingStandingsYears,
+  setPublicBoardMinCategoryVotes,
+  setPublicBoardMinLists,
   setSiteRankMode,
 } from "@/lib/site-settings/service";
 import { parseSharedRankMode } from "@/lib/standings/shared-rank";
@@ -140,6 +142,63 @@ export async function saveRankModeAction(
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Could not save numbering.",
+    };
+  }
+}
+
+export async function savePublicBoardMinListsAction(
+  raw: string,
+): Promise<{ error?: string; ok?: boolean; publicBoardMinLists?: number }> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return { error: "Enter a whole number of lists." };
+  }
+  try {
+    const saved = await setPublicBoardMinLists(parsed);
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year", "layout");
+    revalidatePath("/admin/rankings");
+    return { ok: true, publicBoardMinLists: saved.publicBoardMinLists };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error ? err.message : "Could not save the list minimum.",
+    };
+  }
+}
+
+export async function savePublicBoardMinCategoryVotesAction(
+  raw: string,
+): Promise<{
+  error?: string;
+  ok?: boolean;
+  publicBoardMinCategoryVotes?: number;
+}> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return { error: "Enter a whole number of votes." };
+  }
+  try {
+    const saved = await setPublicBoardMinCategoryVotes(parsed);
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year", "layout");
+    revalidatePath("/admin/rankings");
+    return {
+      ok: true,
+      publicBoardMinCategoryVotes: saved.publicBoardMinCategoryVotes,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save the category vote minimum.",
     };
   }
 }

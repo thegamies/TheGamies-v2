@@ -57,7 +57,7 @@ Work top to bottom.
 ## 4. GitHub (app secrets for deploys)
 
 - [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
-- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`
+- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, plus avatar R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_AVATAR_BUCKET`, `AVATAR_PUBLIC_BASE_URL`)
 - [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
 - [ ] Re-run **Staging dual deploy** on `develop` after importing or changing secrets
 - [ ] Confirm Cloudflare Worker `thegamies-v2-develop` → Settings → Variables and Secrets

@@ -34,6 +34,7 @@
     "@neondatabase/serverless": "^1.0.1",
     "@thegamies/db": "workspace:*",
     "@thegamies/igdb": "workspace:*",
+    "aws4fetch": "^1.0.20",
     "drizzle-orm": "^0.44.2",
     "html-to-image": "^1.11.13",
     "next": "16.3.0",

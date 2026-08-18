@@ -86,6 +86,11 @@ Configure on the repo:
 | `ADMIN_SYNC_SECRET` | Unlock `/admin/sync` (staging + PR previews) |
 | `IGDB_CLIENT_ID` | IGDB / Twitch client id |
 | `IGDB_CLIENT_SECRET` | IGDB / Twitch client secret |
+| `R2_ACCOUNT_ID` | Cloudflare account for avatar R2 |
+| `R2_ACCESS_KEY_ID` | R2 access key |
+| `R2_SECRET_ACCESS_KEY` | R2 secret key |
+| `R2_AVATAR_BUCKET` | Avatar bucket (same as the prior Gamies) |
+| `AVATAR_PUBLIC_BASE_URL` | Public base URL for avatar objects |
 | `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname; also used as public URL if `STAGING_VERCEL_APP_URL` unset |
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.

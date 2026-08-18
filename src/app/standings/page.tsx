@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { RankingsInfoControl } from "@/components/standings/RankingsInfoControl";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
+import {
+  getCategoryHighlightsForYears,
+  type CategoryHighlightWinner,
+} from "@/lib/live-aggregate/category-highlights";
 import {
   getGotyThroughRankForYears,
   listYearsWithGotyScores,
@@ -8,8 +13,8 @@ import {
 } from "@/lib/live-aggregate/service";
 
 export const metadata: Metadata = {
-  title: "Standings",
-  description: "Game of the Year top five for every year with live standings.",
+  title: "Game of the Year",
+  description: "Game of the Year rankings and category winners for every public year.",
 };
 
 export default async function StandingsLandingPage() {
@@ -24,14 +29,21 @@ export default async function StandingsLandingPage() {
       score: number | null;
     }>;
     yearHref: string;
+    categoryWinners: CategoryHighlightWinner[];
   }> = [];
   let error: string | null = null;
 
   try {
     const years = await listYearsWithGotyScores();
-    const boards = await getGotyThroughRankForYears(years, {
-      maxRank: TOP_STANDINGS_RANK,
-    });
+    const [boards, highlights] = await Promise.all([
+      getGotyThroughRankForYears(years, {
+        maxRank: TOP_STANDINGS_RANK,
+      }),
+      getCategoryHighlightsForYears(years),
+    ]);
+    const winnersByYear = new Map(
+      highlights.map((block) => [block.year, block.winners]),
+    );
     sections = boards.map((board) => ({
       year: board.year,
       yearHref: `/game-of-the-year/${board.year}`,
@@ -43,6 +55,7 @@ export default async function StandingsLandingPage() {
         coverUrl: row.coverUrl,
         score: row.score,
       })),
+      categoryWinners: winnersByYear.get(board.year) ?? [],
     }));
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
@@ -50,19 +63,18 @@ export default async function StandingsLandingPage() {
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-8 sm:py-10">
-      <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
-        Standings
-      </h1>
-      <p className="mt-2 max-w-xl text-muted">
-        Top {TOP_STANDINGS_RANK} for every year with site standings. Open a year
-        for the full board.
-      </p>
+      <div className="flex items-start gap-3">
+        <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
+          Game of the Year
+        </h1>
+        <RankingsInfoControl className="mt-2 md:mt-4" />
+      </div>
 
       {error ? (
-        <p className="mt-8 text-muted">Standings could not be loaded right now.</p>
+        <p className="mt-8 text-muted">Rankings could not be loaded right now.</p>
       ) : sections.length === 0 ? (
         <p className="mt-8 text-muted">
-          No standings yet.{" "}
+          No rankings yet.{" "}
           <Link href="/create" className="text-ink underline">
             Build a Game of the Year list
           </Link>{" "}
