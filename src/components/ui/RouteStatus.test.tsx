@@ -21,10 +21,13 @@ afterEach(() => {
 });
 
 describe("RouteStatus", () => {
-  it("shows a loading status with a spinner", () => {
-    const { container } = render(<RouteStatus status="loading" />);
-    expect(screen.getByRole("status")).toHaveTextContent("Loading");
+  it("renders an inset loading status without a page shell", () => {
+    const { container } = render(
+      <RouteStatus status="loading" inset />,
+    );
+    expect(container.querySelector("main")).toBeNull();
     expect(container.querySelector(".route-spinner")).toBeTruthy();
+    expect(screen.getByRole("status")).toHaveTextContent("Loading");
   });
 
   it("calls onRetry from the error action", () => {

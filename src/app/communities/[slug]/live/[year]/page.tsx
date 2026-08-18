@@ -1,17 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CommunityLiveView } from "@/components/communities/CommunityLiveView";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { getCommunityLiveStandings } from "@/lib/communities/live";
 import { isCommunityLiveScoresRevealed } from "@/lib/communities/live-reveal";
-import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
-import { canManageCommunity } from "@/lib/communities/rules";
-import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
@@ -82,25 +77,11 @@ export default async function CommunityLiveYearPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
-    return <CommunityPrivateView name={community.name} />;
-  }
+  if (!community.viewerRole) return null;
   if (!community.liveRankingsEnabled) notFound();
 
-  const canManage = canManageCommunity(community.viewerRole);
   const current = new Date().getUTCFullYear();
   const yearOptions = Array.from({ length: 6 }, (_, i) => current - i);
-
-  let featuredEdition = null;
-  try {
-    featuredEdition = await getFeaturedEditionForCommunity(community.id);
-  } catch {
-    featuredEdition = null;
-  }
-  const editionStatus =
-    featuredEdition && featuredEdition.status !== "draft"
-      ? featuredEdition.status
-      : null;
 
   let standings;
   try {
@@ -136,24 +117,12 @@ export default async function CommunityLiveYearPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
-      <CommunityHeader
-        name={community.name}
-        slug={community.slug}
-        liveEnabled
-        canManage={canManage}
-        editionStatus={editionStatus}
-        active="live"
-        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
-      />
-
-      <CommunityLiveView
-        slug={community.slug}
-        communityName={community.name}
-        page={standings}
-        yearOptions={yearOptions}
-        locked={community.liveRankingsLocked}
-      />
-    </main>
+    <CommunityLiveView
+      slug={community.slug}
+      communityName={community.name}
+      page={standings}
+      yearOptions={yearOptions}
+      locked={community.liveRankingsLocked}
+    />
   );
 }

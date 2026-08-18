@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import {
   CategoryVotesEditorFixture,
@@ -335,11 +336,13 @@ export default function DesignSystemPage() {
               <h3 className="font-display text-3xl tracking-wide text-ink">
                 2026 Video Game Awards
               </h3>
-              <EditionYearSelect
-                slug="example"
-                year={2026}
-                years={[2026, 2025, 2024]}
-              />
+              <Suspense fallback={null}>
+                <EditionYearSelect
+                  slug="example"
+                  year={2026}
+                  years={[2026, 2025, 2024]}
+                />
+              </Suspense>
             </div>
             <div className="mt-6 flex flex-wrap items-baseline justify-between gap-x-4 border-t border-line pt-6">
               <h3 className="font-display text-3xl tracking-wide text-ink">

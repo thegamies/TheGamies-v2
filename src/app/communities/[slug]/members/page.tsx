@@ -5,11 +5,6 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
-import { canManageCommunity } from "@/lib/communities/rules";
-import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
-import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   COMMUNITY_MEMBERS_PAGE_SIZE,
   getCommunityBySlug,
@@ -74,22 +69,7 @@ export default async function CommunityMembersPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
-    return <CommunityPrivateView name={community.name} />;
-  }
-
-  const canManage = canManageCommunity(community.viewerRole);
-
-  let featuredEdition = null;
-  try {
-    featuredEdition = await getFeaturedEditionForCommunity(community.id);
-  } catch {
-    featuredEdition = null;
-  }
-  const publicEdition =
-    featuredEdition && featuredEdition.status !== "draft"
-      ? featuredEdition
-      : null;
+  if (!community.viewerRole) return null;
 
   let membersPage;
   try {
@@ -115,18 +95,7 @@ export default async function CommunityMembersPage({
   const showPager = membersPage.total > membersPage.pageSize;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
-      <CommunityHeader
-        name={community.name}
-        slug={community.slug}
-        liveEnabled={community.liveRankingsEnabled}
-        canManage={canManage}
-        editionStatus={publicEdition?.status ?? null}
-        active="members"
-        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
-      />
-
-      <section className="mt-10">
+    <section className="mt-10">
         <h2 className="font-display text-3xl tracking-wide text-ink">
           Members
         </h2>
@@ -201,6 +170,5 @@ export default async function CommunityMembersPage({
           </nav>
         ) : null}
       </section>
-    </main>
   );
 }

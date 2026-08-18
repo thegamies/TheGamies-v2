@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { CommunityInviteSettings } from "./CommunityInviteSettings";
 import { CommunitySettingsTabs } from "@/components/communities/CommunitySettingsTabs";
 import {
@@ -12,11 +11,9 @@ import {
 } from "@/lib/communities/community-settings-href";
 import {
   listEditionsForCommunity,
-  pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
-import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   getCommunityBySlug,
   listCommunityMemberOptions,
@@ -77,9 +74,6 @@ export default async function CommunitySettingsPage({
   } catch {
     editions = [];
   }
-  const featured = pickFeaturedEdition(editions);
-  const featuredStatus =
-    featured && featured.status !== "draft" ? featured.status : null;
 
   let hostMembers: Awaited<ReturnType<typeof listCommunityMemberOptions>> = [];
   if (tab === "community") {
@@ -93,18 +87,7 @@ export default async function CommunitySettingsPage({
     leaveBlockedReason("admin", community.hostCount) == null;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
-      <CommunityHeader
-        name={community.name}
-        slug={community.slug}
-        liveEnabled={community.liveRankingsEnabled}
-        canManage
-        editionStatus={featuredStatus}
-        active="settings"
-        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
-      />
-
-      <section className="mt-10">
+    <section className="mt-10">
         <h2 className="font-display text-3xl tracking-wide text-ink">
           Settings
         </h2>
@@ -161,6 +144,5 @@ export default async function CommunitySettingsPage({
           </>
         )}
       </section>
-    </main>
   );
 }

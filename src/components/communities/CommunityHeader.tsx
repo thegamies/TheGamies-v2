@@ -1,94 +1,19 @@
 import Link from "next/link";
 import { CopyInviteButton } from "@/components/communities/CopyInviteButton";
-import { navItemClass } from "@/components/ui/navLevels";
-import { ScrollableNav } from "@/components/ui/ScrollableNav";
-import {
-  EDITION_PUBLIC_LABEL,
-  showEditionNav,
-  type EditionStatus,
-} from "@/lib/communities/edition-status";
+import { CommunityNav } from "@/components/communities/CommunityNav";
+import type { CommunityNavActive } from "@/lib/communities/community-nav";
+import type { EditionStatus } from "@/lib/communities/edition-status";
 
-export const LIVE_PUBLIC_LABEL = "Live Rankings";
+export { LIVE_PUBLIC_LABEL } from "@/components/communities/CommunityNav";
+export type { CommunityNavActive };
 
-export type CommunityNavActive =
-  | "overview"
-  | "live"
-  | "edition"
-  | "members"
-  | "settings";
-
-type NavProps = {
+type HeaderProps = {
+  name: string;
   slug: string;
   liveEnabled: boolean;
   canManage: boolean;
-  /** Non-draft featured edition status, or null if none public. */
   editionStatus: EditionStatus | null;
-  active: CommunityNavActive;
-};
-
-/**
- * Community section switcher — primary bordered chips.
- * Horizontally scrollable on small screens (no wrap, no underline).
- */
-export function CommunityNav({
-  slug,
-  liveEnabled,
-  canManage,
-  editionStatus,
-  active,
-}: NavProps) {
-  const items: { href: string; label: string; key: CommunityNavActive }[] = [
-    { href: `/communities/${slug}`, label: "Overview", key: "overview" },
-  ];
-  if (liveEnabled) {
-    items.push({
-      href: `/communities/${slug}/live`,
-      label: LIVE_PUBLIC_LABEL,
-      key: "live",
-    });
-  }
-  if (editionStatus && showEditionNav(editionStatus)) {
-    items.push({
-      href: `/communities/${slug}/edition`,
-      label: EDITION_PUBLIC_LABEL,
-      key: "edition",
-    });
-  }
-  items.push({
-    href: `/communities/${slug}/members`,
-    label: "Members",
-    key: "members",
-  });
-  if (canManage) {
-    items.push({
-      href: `/communities/${slug}/settings`,
-      label: "Settings",
-      key: "settings",
-    });
-  }
-
-  return (
-    <ScrollableNav
-      aria-label="Community"
-      border={false}
-      fadeFrom="panel"
-      rowClassName="items-center gap-2"
-    >
-      {items.map((item) => (
-        <Link
-          key={item.key}
-          href={item.href}
-          className={navItemClass("primary", active === item.key)}
-        >
-          {item.label}
-        </Link>
-      ))}
-    </ScrollableNav>
-  );
-}
-
-type HeaderProps = NavProps & {
-  name: string;
+  active?: CommunityNavActive;
   invitePath?: string | null;
 };
 
@@ -116,9 +41,7 @@ export function CommunityHeader({
         <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
           {name}
         </h1>
-        {invitePath ? (
-          <CopyInviteButton path={invitePath} />
-        ) : null}
+        {invitePath ? <CopyInviteButton path={invitePath} /> : null}
       </div>
       <div className="mt-6">
         <CommunityNav

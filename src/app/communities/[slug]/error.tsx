@@ -8,5 +8,5 @@ export default function CommunityError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  return <RouteStatus status="error" onRetry={reset} />;
+  return <RouteStatus status="error" inset onRetry={reset} />;
 }

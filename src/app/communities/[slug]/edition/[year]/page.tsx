@@ -7,15 +7,11 @@ import {
 } from "@/components/communities/EditionBallotEditor";
 import { EditionBallotPreview } from "@/components/communities/EditionBallotPreview";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
-import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
 import {
   EditionResultsView,
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
-import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
 import { EditionYearSettings } from "@/components/communities/EditionYearSettings";
 import { EditionEventHostsPanel } from "@/components/communities/EditionEventHostsPanel";
@@ -37,7 +33,6 @@ import {
 } from "@/lib/communities/ballot-schema";
 import {
   canSubmitEditionBallot,
-  countEditionSubmittedBallots,
   getEditionBallotForProfile,
   getEditionBallotSubmittersPage,
   getLiveEditionVotersPage,
@@ -69,14 +64,11 @@ import {
 } from "@/lib/communities/edition-results";
 import {
   getEditionByCommunityYear,
-  listEditionsForCommunity,
-  pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
 import { showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
-import { getCommunityBySlug } from "@/lib/communities/service";
-import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
+import { getRequestCommunityBySlug } from "@/lib/communities/community-chrome";
 import { listEditionHostRoster } from "@/lib/communities/voices";
 import {
   listEditionAwardCategories,
@@ -100,7 +92,7 @@ export async function generateMetadata({
   const { slug, year: yearRaw } = await params;
   const year = Number(yearRaw);
   try {
-    const community = await getCommunityBySlug(slug);
+    const community = await getRequestCommunityBySlug(slug);
     if (!community) return { title: "Event" };
     if (!Number.isFinite(year)) {
       return { title: `${community.name} event` };
@@ -155,20 +147,15 @@ export default async function CommunityEditionYearPage({
 
   let community;
   try {
-    community = await getCommunityBySlug(slug, profile?.id);
+    community = await getRequestCommunityBySlug(slug, profile?.id);
   } catch {
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
-    return <CommunityPrivateView name={community.name} />;
-  }
+  if (!community.viewerRole) return null;
 
   let edition: CommunityEditionPublic | null = null;
-  let publicEditions: CommunityEditionPublic[] = [];
   try {
-    const editions = await listEditionsForCommunity(community.id);
-    publicEditions = editions.filter((e) => showEditionNav(e.status));
     edition = await getEditionByCommunityYear(community.id, y);
   } catch {
     edition = null;
@@ -178,9 +165,6 @@ export default async function CommunityEditionYearPage({
 
   const rankMode = edition.rankMode;
   const canManage = canManageCommunity(community.viewerRole);
-  const featured = pickFeaturedEdition(publicEditions);
-  const navStatus = featured?.status ?? edition.status;
-  const yearOptions = publicEditions.map((e) => e.year).sort((a, b) => b - a);
 
   const isMember = canSubmitEditionBallot(community.viewerRole);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}/edition/${y}`;
@@ -292,20 +276,6 @@ export default async function CommunityEditionYearPage({
         ? "voters"
         : "ballot";
   const includeSettingsPreviewTab = showLiveVoters;
-  const includeRevealShowTab = canManage && edition.status === "closed";
-
-  let ballotCount: number | null = null;
-  if (
-    edition.status === "open" ||
-    edition.status === "closed" ||
-    edition.status === "published"
-  ) {
-    try {
-      ballotCount = await countEditionSubmittedBallots(edition.id);
-    } catch {
-      ballotCount = 0;
-    }
-  }
 
   let liveVoters: Awaited<ReturnType<typeof getLiveEditionVotersPage>> & {
     q: string;
@@ -742,93 +712,41 @@ export default async function CommunityEditionYearPage({
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
-      <CommunityHeader
-        name={community.name}
-        slug={community.slug}
-        liveEnabled={community.liveRankingsEnabled}
-        canManage={canManage}
-        editionStatus={navStatus}
-        active="edition"
-        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
-      />
-
+    <>
       {edition.status === "published" && resultsBundle ? (
-        <section className="mt-8">
-          <EditionSectionHeader
-            status={edition.status}
-            slug={community.slug}
-            year={edition.year}
-            years={yearOptions}
-            view={view}
-            mode={mode}
-            opensAt={edition.opensAt}
-            closesAt={edition.closesAt}
-            publishesAt={edition.publishesAt}
-            ballotCount={ballotCount}
-          />
-          <EditionResultsView
-            slug={community.slug}
-            year={edition.year}
-            communityName={community.name}
-            mode={mode}
-            rankMode={rankMode}
-            view={view}
-            categoryId={categoryId}
-            meta={resultsBundle.meta}
-            topTen={resultsBundle.topTen}
-            categoryPodiums={resultsBundle.categoryPodiums}
-            categoryComparison={resultsBundle.categoryComparison}
-            categoryMeta={resultsBundle.categoryMeta}
-            categoryPage={resultsBundle.categoryPage}
-            voters={resultsBundle.voters}
-            matrix={resultsBundle.matrix}
-            yourProfileId={profile?.id ?? null}
-            yourBallot={
-              profile && isMember
-                ? {
-                    items: ballot?.items ?? [],
-                    categoryVotes: ballot?.categoryVotes ?? [],
-                    categories: awardCategories,
-                  }
-                : null
-            }
-            publicBallot={resultsBundle.publicBallot}
-            voterUsername={voterUsername || null}
-            canManage={canManage}
-          />
-        </section>
+        <EditionResultsView
+          slug={community.slug}
+          year={edition.year}
+          communityName={community.name}
+          mode={mode}
+          rankMode={rankMode}
+          view={view}
+          categoryId={categoryId}
+          meta={resultsBundle.meta}
+          topTen={resultsBundle.topTen}
+          categoryPodiums={resultsBundle.categoryPodiums}
+          categoryComparison={resultsBundle.categoryComparison}
+          categoryMeta={resultsBundle.categoryMeta}
+          categoryPage={resultsBundle.categoryPage}
+          voters={resultsBundle.voters}
+          matrix={resultsBundle.matrix}
+          yourProfileId={profile?.id ?? null}
+          yourBallot={
+            profile && isMember
+              ? {
+                  items: ballot?.items ?? [],
+                  categoryVotes: ballot?.categoryVotes ?? [],
+                  categories: awardCategories,
+                }
+              : null
+          }
+          publicBallot={resultsBundle.publicBallot}
+          voterUsername={voterUsername || null}
+        />
       ) : edition.status === "published" && !showHostSettings ? (
-        <section className="mt-8">
-          <EditionSectionHeader
-            status={edition.status}
-            slug={community.slug}
-            year={edition.year}
-            years={yearOptions}
-            view={view}
-            mode={mode}
-            opensAt={edition.opensAt}
-            closesAt={edition.closesAt}
-            publishesAt={edition.publishesAt}
-            ballotCount={ballotCount}
-          />
-          <EditionResultsCalculatingBanner status={edition.freezeStatus} />
-        </section>
+        <EditionResultsCalculatingBanner status={edition.freezeStatus} />
       ) : (
-        <section className="mt-8">
-          <EditionSectionHeader
-            status={edition.status}
-            slug={community.slug}
-            year={edition.year}
-            years={yearOptions}
-            view={view}
-            mode={mode}
-            opensAt={edition.opensAt}
-            closesAt={edition.closesAt}
-            publishesAt={edition.publishesAt}
-            ballotCount={ballotCount}
-          />
-
+        <>
           {edition.status === "closed" &&
           (edition.freezeStatus === "pending" ||
             edition.freezeStatus === "computing" ||
@@ -836,130 +754,94 @@ export default async function CommunityEditionYearPage({
             <EditionResultsCalculatingBanner status={edition.freezeStatus} />
           ) : null}
 
-          {edition.status === "published" && showHostSettings ? (
-            <>
-              <EditionEventTabs
+          {showHostSettings ? (
+            hostToolPanel
+          ) : showHostResultsPreview ? (
+            <EditionHostResultsPreview
+              slug={community.slug}
+              year={edition.year}
+              communityName={community.name}
+              source={showSource}
+              previewView={
+                view === "overview" ||
+                view === "standings" ||
+                view === "categories"
+                  ? view
+                  : "show"
+              }
+              topTen={hostRevealTopTen}
+              gotyBoard={hostRevealGotyBoard}
+              gotyTotal={hostRevealGotyTotal}
+              categoryPodiums={hostRevealCategoryPodiums}
+              matrix={hostRevealMatrix}
+              categoryComparison={hostRevealCategoryComparison}
+              freezeStatus={edition.freezeStatus}
+              liveReady={hostRevealLiveReady}
+              rankMode={edition.rankMode}
+            />
+          ) : prePublishView === "voters" && liveVoters ? (
+            <div className="mt-6">
+              <EditionVotersList
                 slug={community.slug}
                 year={edition.year}
-                canManage
-                includeVoters={false}
                 mode={mode}
-                active="settings"
+                voters={liveVoters}
+                yourProfileId={profile?.id ?? null}
+                revealBallots={false}
+                showBoardModes
               />
-              {hostToolPanel}
-            </>
+            </div>
+          ) : edition.status === "scheduled" ? (
+            <EditionBallotPreview
+              year={edition.year}
+              categories={awardCategories}
+            />
+          ) : edition.status === "open" ? (
+            !user ? (
+              <p className="mt-6 max-w-xl text-muted">
+                <Link
+                  href={signInHref}
+                  className="text-accent hover:underline"
+                >
+                  Sign in
+                </Link>{" "}
+                and join this community to submit a ballot.
+              </p>
+            ) : !profile ? (
+              <p className="mt-6 max-w-xl text-muted">
+                <Link href="/account" className="text-accent hover:underline">
+                  Finish your profile
+                </Link>{" "}
+                to join this community and vote.
+              </p>
+            ) : !isMember ? (
+              <p className="mt-6 max-w-xl text-muted">
+                You need an invite to join this community and vote.
+              </p>
+            ) : (
+              <EditionBallotEditor
+                slug={community.slug}
+                year={edition.year}
+                initialItems={ballot?.items ?? []}
+                initialCategoryVotes={ballot?.categoryVotes ?? []}
+                awardCategories={awardCategories}
+                siteGotyItems={siteGotyItems}
+              />
+            )
+          ) : !user || !profile || !isMember ? (
+            <p className="mt-6 max-w-xl text-muted">
+              Voting has closed for this event.
+            </p>
           ) : (
-            <>
-              <EditionEventTabs
-                slug={community.slug}
-                year={edition.year}
-                canManage={canManage}
-                includeVoters={showLiveVoters}
-                includeRevealShow={includeRevealShowTab}
-                mode={mode}
-                active={
-                  prePublishView === "settings"
-                    ? "settings"
-                    : showHostResultsPreview
-                      ? "show"
-                      : prePublishView === "voters"
-                        ? "voters"
-                        : "ballot"
-                }
-                ballotLabel={
-                  edition.status === "scheduled" ? "On the ballot" : "Ballot"
-                }
-              />
-              {showHostSettings ? (
-                hostToolPanel
-              ) : showHostResultsPreview ? (
-                <EditionHostResultsPreview
-                  slug={community.slug}
-                  year={edition.year}
-                  communityName={community.name}
-                  source={showSource}
-                  previewView={
-                    view === "overview" ||
-                    view === "standings" ||
-                    view === "categories"
-                      ? view
-                      : "show"
-                  }
-                  topTen={hostRevealTopTen}
-                  gotyBoard={hostRevealGotyBoard}
-                  gotyTotal={hostRevealGotyTotal}
-                  categoryPodiums={hostRevealCategoryPodiums}
-                  matrix={hostRevealMatrix}
-                  categoryComparison={hostRevealCategoryComparison}
-                  freezeStatus={edition.freezeStatus}
-                  liveReady={hostRevealLiveReady}
-                  rankMode={edition.rankMode}
-                />
-              ) : prePublishView === "voters" && liveVoters ? (
-                <div className="mt-6">
-                  <EditionVotersList
-                    slug={community.slug}
-                    year={edition.year}
-                    mode={mode}
-                    voters={liveVoters}
-                    yourProfileId={profile?.id ?? null}
-                    revealBallots={false}
-                    showBoardModes
-                  />
-                </div>
-              ) : edition.status === "scheduled" ? (
-                <EditionBallotPreview
-                  year={edition.year}
-                  categories={awardCategories}
-                />
-              ) : edition.status === "open" ? (
-                !user ? (
-                  <p className="mt-6 max-w-xl text-muted">
-                    <Link
-                      href={signInHref}
-                      className="text-accent hover:underline"
-                    >
-                      Sign in
-                    </Link>{" "}
-                    and join this community to submit a ballot.
-                  </p>
-                ) : !profile ? (
-                  <p className="mt-6 max-w-xl text-muted">
-                    <Link href="/account" className="text-accent hover:underline">
-                      Finish your profile
-                    </Link>{" "}
-                    to join this community and vote.
-                  </p>
-                ) : !isMember ? (
-                  <p className="mt-6 max-w-xl text-muted">
-                    You need an invite to join this community and vote.
-                  </p>
-                ) : (
-                  <EditionBallotEditor
-                    slug={community.slug}
-                    year={edition.year}
-                    initialItems={ballot?.items ?? []}
-                    initialCategoryVotes={ballot?.categoryVotes ?? []}
-                    awardCategories={awardCategories}
-                    siteGotyItems={siteGotyItems}
-                  />
-                )
-              ) : !user || !profile || !isMember ? (
-                <p className="mt-6 max-w-xl text-muted">
-                  Voting has closed for this event.
-                </p>
-              ) : (
-                <EditionBallotReadonly
-                  items={ballot?.items ?? []}
-                  categoryVotes={ballot?.categoryVotes ?? []}
-                  categories={awardCategories}
-                  emptyMessage="You did not submit a ballot for this event."
-                />
-              )}
-            </>
+            <EditionBallotReadonly
+              items={ballot?.items ?? []}
+              categoryVotes={ballot?.categoryVotes ?? []}
+              categories={awardCategories}
+              emptyMessage="You did not submit a ballot for this event."
+            />
           )}
-        </section>
+        </>
       )}
-    </main>
+    </>
   );
 }

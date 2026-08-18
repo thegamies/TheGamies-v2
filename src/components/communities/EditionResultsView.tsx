@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
-import {
-  EditionCategoryDebugBar,
-  EditionCategoryDebugProvider,
-} from "@/components/communities/EditionCategoryDebug";
+import { EditionCategoryDebugProvider } from "@/components/communities/EditionCategoryDebug";
 import {
   EditionCategoryDetail,
   EditionCategoryResults,
@@ -12,8 +9,6 @@ import { EditionFullStandings } from "@/components/communities/EditionFullStandi
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
-import { navItemClass } from "@/components/ui/navLevels";
-import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
   EditionBallotMatrix,
   EditionCategoryComparisonMatrix,
@@ -26,15 +21,15 @@ import type {
 } from "@/lib/communities/edition-results";
 import {
   editionResultsHref,
-  editionHostSettingsHref,
   editionVoterBallotHref,
 } from "@/lib/communities/edition-results-href";
-import {
-  editionBoardLabel,
-  type EditionResultsPublicMode,
-  type EditionResultsViewId,
-  type SharedRankMode,
+import type {
+  EditionResultsPublicMode,
+  EditionResultsViewId,
+  SharedRankMode,
 } from "@/lib/communities/edition-results-scoring";
+
+export { EditionResultsViewNav } from "@/components/communities/EditionResultsViewNav";
 
 type BallotPayload = {
   items: Array<{
@@ -52,117 +47,6 @@ type BallotPayload = {
   }>;
   categories: Array<{ id: string; label: string }>;
 };
-
-export function EditionResultsViewNav({
-  slug,
-  year,
-  mode,
-  view,
-  categoryId = null,
-  votersPage = 1,
-  votersQ = "",
-  hasYourBallot,
-  canManage,
-  viewingPublicBallot = false,
-}: {
-  slug: string;
-  year: number;
-  mode: EditionResultsPublicMode;
-  view: EditionResultsViewId;
-  categoryId?: string | null;
-  votersPage?: number;
-  votersQ?: string;
-  hasYourBallot: boolean;
-  canManage: boolean;
-  viewingPublicBallot?: boolean;
-}) {
-  const views: Array<{ id: EditionResultsViewId; label: string }> = [
-    { id: "reveal", label: "Reveal" },
-    { id: "overview", label: "Results" },
-    { id: "standings", label: "Full standings" },
-    { id: "categories", label: "Categories" },
-    { id: "voters", label: "Voters" },
-  ];
-  if (hasYourBallot) {
-    views.push({ id: "ballot", label: "Your ballot" });
-  }
-  if (canManage) {
-    views.push({ id: "settings", label: "Settings" });
-  }
-  const viewingYourBallot = view === "ballot" && !viewingPublicBallot && hasYourBallot;
-  const showBoardModes = view !== "ballot" && view !== "settings";
-  const modes: EditionResultsPublicMode[] = ["community", "voices"];
-
-  return (
-    <div className="mt-6 border-b border-line pb-0">
-      <ScrollableNav aria-label="Results view" border={false}>
-        {views.map((v) => {
-          const active =
-            v.id === "settings"
-              ? view === "settings"
-              : v.id === "ballot"
-                ? viewingYourBallot
-                : v.id === "voters"
-                  ? view === "voters" || viewingPublicBallot
-                  : v.id === "categories"
-                    ? view === "categories" || view === "category"
-                    : v.id === view && !viewingPublicBallot;
-          return (
-            <Link
-              key={v.id}
-              href={
-                v.id === "settings"
-                  ? editionHostSettingsHref(slug, year)
-                  : editionResultsHref(slug, year, {
-                      mode,
-                      view: v.id,
-                      votersPage,
-                      q: votersQ,
-                    })
-              }
-              className={navItemClass("secondary", active)}
-            >
-              {v.label}
-            </Link>
-          );
-        })}
-      </ScrollableNav>
-
-      {showBoardModes ? (
-        <ScrollableNav
-          aria-label="Results board"
-          border={false}
-          className="mt-3"
-          rowClassName="items-center gap-x-2"
-        >
-          {modes.map((m, i) => (
-            <span key={m} className="contents">
-              {i > 0 ? (
-                <span className="text-muted" aria-hidden>
-                  ·
-                </span>
-              ) : null}
-              <Link
-                href={editionResultsHref(slug, year, {
-                  mode: m,
-                  view,
-                  votersPage: 1,
-                  q: votersQ,
-                  category:
-                    view === "category" ? categoryId ?? undefined : undefined,
-                })}
-                className={navItemClass("tertiary", m === mode)}
-              >
-                {editionBoardLabel(m)}
-              </Link>
-            </span>
-          ))}
-          <EditionCategoryDebugBar />
-        </ScrollableNav>
-      ) : null}
-    </div>
-  );
-}
 
 export function EditionResultsView({
   slug,
@@ -184,7 +68,6 @@ export function EditionResultsView({
   yourBallot,
   publicBallot,
   voterUsername = null,
-  canManage = false,
 }: {
   slug: string;
   year: number;
@@ -227,7 +110,6 @@ export function EditionResultsView({
   }) | null;
   /** Raw `?voter=` value — used when lookup misses. */
   voterUsername?: string | null;
-  canManage?: boolean;
 }) {
   const gotyTotal =
     mode === "voices" ? meta.gotyTotalVoices : meta.gotyTotalCommunity;
@@ -265,19 +147,6 @@ export function EditionResultsView({
   return (
     <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
     <div className="mt-6 space-y-10">
-      <EditionResultsViewNav
-        slug={slug}
-        year={year}
-        mode={mode}
-        view={view}
-        categoryId={categoryId}
-        votersPage={voters.page}
-        votersQ={voters.q}
-        hasYourBallot={yourBallot != null}
-        canManage={canManage}
-        viewingPublicBallot={viewingPublicBallot}
-      />
-
       {view === "standings" ? (
         <EditionFullStandings
           slug={slug}

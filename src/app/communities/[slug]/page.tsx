@@ -6,20 +6,16 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { CommunityEventsOverview } from "@/components/communities/CommunityEventsOverview";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { SectionRule } from "@/components/ui/SectionRule";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
 import {
   listEditionsForCommunity,
-  pickFeaturedEdition,
   pickOverviewEditions,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
 import { EDITION_PUBLIC_LABEL } from "@/lib/communities/edition-status";
 import { communityCreateEventHref } from "@/lib/communities/community-settings-href";
-import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
-import { getCommunityBySlug } from "@/lib/communities/service";
-import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
+import { getRequestCommunityBySlug } from "@/lib/communities/community-chrome";
 import { MembershipActions } from "./MembershipActions";
 
 type Params = Promise<{ slug: string }>;
@@ -31,7 +27,7 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const community = await getCommunityBySlug(slug);
+    const community = await getRequestCommunityBySlug(slug);
     if (!community) return { title: "Community" };
     return {
       title: community.name,
@@ -55,16 +51,9 @@ export default async function CommunityHomePage({
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
 
-  let community;
-  try {
-    community = await getCommunityBySlug(slug, profile?.id);
-  } catch {
-    community = null;
-  }
+  const community = await getRequestCommunityBySlug(slug, profile?.id);
   if (!community) notFound();
-  if (!community.viewerRole) {
-    return <CommunityPrivateView name={community.name} />;
-  }
+  if (!community.viewerRole) return null;
 
   const canLeave =
     leaveBlockedReason(community.viewerRole, community.hostCount) == null;
@@ -77,26 +66,11 @@ export default async function CommunityHomePage({
   } catch {
     editions = [];
   }
-  const featuredEdition = pickFeaturedEdition(editions);
   const overviewEditions = pickOverviewEditions(editions, 3);
-  const navEditionStatus =
-    featuredEdition && featuredEdition.status !== "draft"
-      ? featuredEdition.status
-      : (overviewEditions[0]?.status ?? null);
   const showCreateEvent = canManage && editions.length === 0;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
-      <CommunityHeader
-        name={community.name}
-        slug={community.slug}
-        liveEnabled={community.liveRankingsEnabled}
-        canManage={canManage}
-        editionStatus={navEditionStatus}
-        active="overview"
-        invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
-      />
-
+    <>
       {overviewEditions.length > 0 ? (
         <div className="mt-10">
           <CommunityEventsOverview
@@ -152,6 +126,6 @@ export default async function CommunityHomePage({
           />
         ) : null}
       </section>
-    </main>
+    </>
   );
 }

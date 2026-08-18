@@ -1,14 +1,13 @@
+import { Suspense } from "react";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
 import type {
-  EditionResultsPublicMode,
-  EditionResultsViewId,
-} from "@/lib/communities/edition-results-scoring";
+  EditionSchedule,
+  EditionStatus,
+} from "@/lib/communities/edition-status";
 import {
   editionDeckCopy,
   editionOverviewTitle,
   editionBallotCountCopy,
-  type EditionSchedule,
-  type EditionStatus,
 } from "@/lib/communities/edition-status";
 
 type Props = {
@@ -16,8 +15,6 @@ type Props = {
   slug: string;
   year: number;
   years: number[];
-  view?: EditionResultsViewId;
-  mode?: EditionResultsPublicMode;
   opensAt?: Date | null;
   closesAt?: Date | null;
   publishesAt?: Date | null;
@@ -33,8 +30,6 @@ export function EditionSectionHeader({
   slug,
   year,
   years,
-  view,
-  mode,
   opensAt,
   closesAt,
   publishesAt,
@@ -52,13 +47,9 @@ export function EditionSectionHeader({
           {title}
         </h2>
         {showYearSelect ? (
-          <EditionYearSelect
-            slug={slug}
-            year={year}
-            years={years}
-            view={view}
-            mode={mode}
-          />
+          <Suspense fallback={null}>
+            <EditionYearSelect slug={slug} year={year} years={years} />
+          </Suspense>
         ) : null}
       </div>
       {deck ? (

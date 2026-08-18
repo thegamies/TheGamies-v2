@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function CommunityPrivateView({ name }: { name: string }) {
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+    <section className="py-10">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">
         <Link href="/communities" className="hover:text-ink">
           Communities
@@ -14,6 +14,6 @@ export function CommunityPrivateView({ name }: { name: string }) {
       <p className="mt-6 max-w-xl text-muted">
         This community is private. You need an invite to join.
       </p>
-    </main>
+    </section>
   );
 }

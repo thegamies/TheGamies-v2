@@ -204,10 +204,12 @@ Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimme
 
 ## Route loading / error
 
-Community pages (`/communities/[slug]` and every tab under it) use App Router `loading.tsx`, `error.tsx`, and `not-found.tsx` with `RouteStatus`.
+Community pages keep masthead chips (and event inner tabs) in a **layout**. `loading.tsx` / `error.tsx` replace only the content below.
 
-- Loading: square `--accent` spinner in a reserved page rail (`min-height`) so the layout does not collapse
-- Error: product copy + **Try again** (`reset()`)
+- Top level: `src/app/communities/[slug]/layout.tsx` holds `CommunityHeader`. Tab switches (Overview, Events, Members, …) keep the header.
+- Events: `edition/[year]/layout.tsx` holds the awards title and Reveal / Results / … strip. Those tabs stay while the board below loads.
+- Loading: square `--accent` spinner (`RouteStatus` with `inset`)
+- Error: product copy + **Try again**
 - Not found: product copy + back to communities
 
 Do not put CLI, env var names, or stack traces in these states. In-page client blocks still use skeletons.
