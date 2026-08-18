@@ -21,6 +21,9 @@ vi.mock("next/link", () => ({
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/create/goty",
+}));
+
+vi.mock("@/lib/useRouter", () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
 

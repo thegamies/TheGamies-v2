@@ -166,6 +166,13 @@ Shared chrome and per-request auth must not create **server waterfalls** with pa
 - **Do not** import or render `SiteHeader` in individual `page.tsx` files or nested feature layouts (`create/`, etc.).
 - Layout and page Server Components fetch **in parallel**; putting the header only in the page (and `await`ing page data first) serializes auth behind the page query.
 
+### Route progress
+
+- Render **`NavigationProgress` once in `src/app/layout.tsx`**. Keep the root layout a Server Component — the loader is already a client component.
+- `<Link>` clicks start the accent hairline automatically.
+- For `router.push` / `replace`, import `useRouter` from `@/lib/useRouter` (wraps `nextjs-toploader/app`), not `next/navigation`. Otherwise the bar will not start.
+- Keep `usePathname` / `useSearchParams` on `next/navigation`. `router.refresh()` does not need the wrapped hook.
+
 ### Per-request memoization (`cache`)
 
 Use React `cache()` helpers in `src/lib/auth/session.ts`:
