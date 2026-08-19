@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  YEAR_SELECT_MENU_MIN_PX,
+  yearSelectMenuEdge,
+  type YearSelectMenuEdge,
+} from "@/components/ui/yearSelectMenu";
 
 export type YearSelectOption = {
   year: number;
@@ -31,8 +36,34 @@ export function YearSelect({
   label = "Year",
 }: Props) {
   const [open, setOpen] = useState(false);
+  const [menuEdge, setMenuEdge] = useState<YearSelectMenuEdge>("end");
   const rootRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
   const listId = useId();
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const root = rootRef.current;
+    if (!root) return;
+
+    function place() {
+      const trigger = root.getBoundingClientRect();
+      const menuWidth =
+        listRef.current?.getBoundingClientRect().width || YEAR_SELECT_MENU_MIN_PX;
+      setMenuEdge(
+        yearSelectMenuEdge({
+          triggerLeft: trigger.left,
+          triggerRight: trigger.right,
+          menuWidth,
+          viewportWidth: window.innerWidth,
+        }),
+      );
+    }
+
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,10 +119,14 @@ export function YearSelect({
 
       {open ? (
         <ul
+          ref={listRef}
           id={listId}
           role="listbox"
           aria-label={label}
-          className="absolute right-0 z-20 mt-2 min-w-[7.5rem] border border-line bg-paper py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+          data-menu-edge={menuEdge}
+          className={`absolute z-20 mt-2 min-w-[7.5rem] border border-line bg-paper py-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)] ${
+            menuEdge === "start" ? "left-0" : "right-0"
+          }`}
         >
           {options.map((opt) => {
             const active = opt.year === year;
