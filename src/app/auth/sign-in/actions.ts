@@ -3,11 +3,13 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { isUnverifiedEmailError } from "@/lib/auth/email-verification-copy";
+import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import {
   buildVerifyEmailHref,
   resolvePostAuthRedirect,
 } from "@/lib/auth/return-to";
+import { skipEmailVerification } from "@/lib/auth/skip-email-verification";
 
 export type SignInState = { error: string } | null;
 
@@ -31,6 +33,17 @@ export async function signInWithEmail(
 
   if (error) {
     if (isUnverifiedEmailError(error)) {
+      if (skipEmailVerification()) {
+        const marked = await markNeonAuthEmailVerified({ email }).catch(
+          () => false,
+        );
+        if (marked) {
+          const retry = await auth.signIn.email({ email, password });
+          if (!retry.error) {
+            redirect(next);
+          }
+        }
+      }
       redirect(
         buildVerifyEmailHref({
           email,

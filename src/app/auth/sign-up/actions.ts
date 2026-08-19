@@ -3,10 +3,12 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
+import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import {
   buildAbsoluteAppUrl,
   resolvePostAuthRedirect,
 } from "@/lib/auth/return-to";
+import { skipEmailVerification } from "@/lib/auth/skip-email-verification";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { validatePassword } from "@/lib/auth/password";
 
@@ -77,6 +79,15 @@ export async function signUpWithEmail(
   }
 
   if (data?.user?.emailVerified === false) {
+    if (skipEmailVerification()) {
+      const marked = await markNeonAuthEmailVerified({
+        authUserId: userId,
+        email,
+      }).catch(() => false);
+      if (marked) {
+        redirect(next);
+      }
+    }
     return { needsVerification: true, email };
   }
 

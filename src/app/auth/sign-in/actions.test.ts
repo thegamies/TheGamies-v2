@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInEmail = vi.fn();
+const skipEmailVerification = vi.fn(() => false);
+const markNeonAuthEmailVerified = vi.fn();
 const redirect = vi.fn((url: string) => {
   throw new Error(`REDIRECT:${url}`);
 });
@@ -17,6 +19,15 @@ vi.mock("@/lib/auth/server", () => ({
   },
 }));
 
+vi.mock("@/lib/auth/skip-email-verification", () => ({
+  skipEmailVerification: () => skipEmailVerification(),
+}));
+
+vi.mock("@/lib/auth/mark-email-verified", () => ({
+  markNeonAuthEmailVerified: (...args: unknown[]) =>
+    markNeonAuthEmailVerified(...args),
+}));
+
 import { signInWithEmail } from "./actions";
 
 function form(fields: Record<string, string>): FormData {
@@ -30,6 +41,9 @@ function form(fields: Record<string, string>): FormData {
 describe("signInWithEmail", () => {
   beforeEach(() => {
     signInEmail.mockReset();
+    skipEmailVerification.mockReset();
+    skipEmailVerification.mockReturnValue(false);
+    markNeonAuthEmailVerified.mockReset();
     redirect.mockClear();
   });
 
@@ -55,6 +69,34 @@ describe("signInWithEmail", () => {
     expect(redirect).toHaveBeenCalledWith(
       "/auth/verify-email?next=%2Fcreate%2Fgoty&email=ada%40example.com",
     );
+  });
+
+  it("marks the address verified and retries locally", async () => {
+    skipEmailVerification.mockReturnValue(true);
+    signInEmail
+      .mockResolvedValueOnce({
+        error: {
+          code: "EMAIL_NOT_VERIFIED",
+          message: "Email verification required",
+        },
+      })
+      .mockResolvedValueOnce({ error: null });
+    markNeonAuthEmailVerified.mockResolvedValueOnce(true);
+
+    await expect(
+      signInWithEmail(
+        null,
+        form({
+          email: "ada@example.com",
+          password: "secret",
+          next: "/account",
+        }),
+      ),
+    ).rejects.toThrow(/REDIRECT:\/account/);
+    expect(markNeonAuthEmailVerified).toHaveBeenCalledWith({
+      email: "ada@example.com",
+    });
+    expect(signInEmail).toHaveBeenCalledTimes(2);
   });
 
   it("returns other sign-in errors on the form", async () => {

@@ -1,23 +1,49 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useState, type FormEvent } from "react";
+import { ACCOUNT_DELETE_FAILED } from "@/lib/auth/account-delete-copy";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/Dialog";
-import { deleteOwnAccount } from "./actions";
 
 export function AccountDeleteForm() {
-  const [state, formAction, pending] = useActionState(deleteOwnAccount, null);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!state?.ok) return;
-    window.location.assign("/");
-  }, [state]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function closeDialog() {
     if (pending) return;
     setOpen(false);
+    setError(null);
+  }
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    const formData = new FormData(event.currentTarget);
+    try {
+      const response = await fetch("/api/account/delete", {
+        method: "POST",
+        body: formData,
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !payload?.ok) {
+        setError(payload?.error ?? ACCOUNT_DELETE_FAILED);
+        setPending(false);
+        return;
+      }
+      // Full document load. router.push would still refresh /account after Auth close.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- leave the deleted session with a document navigation
+      window.location.assign("/");
+    } catch {
+      setError(ACCOUNT_DELETE_FAILED);
+      setPending(false);
+    }
   }
 
   return (
@@ -51,7 +77,7 @@ export function AccountDeleteForm() {
           the only host of a community, add another host or delete that
           community first.
         </p>
-        <form action={formAction} className="mt-4 space-y-3">
+        <form onSubmit={onSubmit} className="mt-4 space-y-3">
           <label className="block text-sm text-muted">
             Password
             <input
@@ -75,9 +101,9 @@ export function AccountDeleteForm() {
               {pending ? "Deleting…" : "Delete account"}
             </Button>
           </div>
-          {state?.error ? (
+          {error ? (
             <p className="text-sm text-danger" role="alert">
-              {state.error}
+              {error}
             </p>
           ) : null}
         </form>
