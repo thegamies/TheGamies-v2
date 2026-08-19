@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { fitDisplayReservePx } from "@/components/ui/FitDisplayTitle";
 import {
   standingFillFiveColClass,
+  standingFillFiveFlowClass,
   standingFillFiveListClass,
   standingStripColClass,
 } from "./StandingGameCard";
@@ -16,10 +17,18 @@ describe("standingStripColClass", () => {
 });
 
 describe("standingFillFiveColClass", () => {
-  it("sizes five equal columns from the row and keeps overflow on one track", () => {
+  it("sizes three equal columns on mobile, five from sm, and keeps overflow on one track", () => {
     expect(standingFillFiveListClass).toContain("grid-flow-col");
-    expect(standingFillFiveListClass).toContain("100cqi");
+    expect(standingFillFiveListClass).toContain("(100cqi_-_1rem)/3");
+    expect(standingFillFiveListClass).toContain(
+      "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+    );
+    expect(standingFillFiveListClass).not.toContain("(100cqi_-_2rem)/5");
     expect(standingFillFiveListClass).toContain("overflow-y-hidden");
+    expect(standingFillFiveFlowClass).toContain("(100cqi_-_1rem)/3");
+    expect(standingFillFiveFlowClass).toContain(
+      "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+    );
     expect(standingFillFiveColClass()).toContain("min-w-0");
     expect(standingFillFiveColClass()).not.toContain("w-[132px]");
   });

@@ -282,12 +282,16 @@ export function standingStripColClass(featured: boolean): string {
   }`;
 }
 
-/** Five equal columns that fill the row; extra items stay on one row and scroll. */
+/**
+ * Fill-row standing cards. Mobile is 3-up (gap-x-2 → 2 gaps = 1rem) so covers
+ * stay readable; sm+ is 5-up (gap-x-4 → 4 gaps = 4rem). Extra items stay on
+ * one row and scroll.
+ */
 export const standingFillFiveListClass =
-  "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_2rem)/5)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
+  "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_1rem)/3)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
 
 export const standingFillFiveFlowClass =
-  "grid w-max min-w-full grid-flow-col items-start justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_2rem)/5)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
+  "grid w-max min-w-full grid-flow-col items-start justify-start gap-x-2 overflow-y-hidden sm:gap-x-4 [grid-auto-columns:calc((100cqi_-_1rem)/3)] sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]";
 
 export function standingFillFiveColClass(): string {
   return "group min-w-0 row-span-2 grid grid-rows-subgrid";

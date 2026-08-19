@@ -79,4 +79,46 @@ describe("YearTopFiveStrip", () => {
       screen.getByRole("link", { name: /Hades II/ }).getAttribute("href"),
     ).toBe("/games/hades-ii");
   });
+
+  it("sizes the top-five and category strips three-up on mobile", () => {
+    const { container } = render(
+      <YearTopFiveStrip
+        year={2026}
+        yearHref="/game-of-the-year/2026"
+        rows={[
+          {
+            place: 1,
+            gameId: "g1",
+            slug: "hades-ii",
+            title: "Hades II",
+            coverUrl: null,
+            score: 40,
+          },
+        ]}
+        categoryWinners={[
+          {
+            categoryId: "best-debut",
+            label: "Best Debut",
+            games: [
+              {
+                gameId: "g2",
+                slug: "clair-obscur",
+                title: "Clair Obscur",
+                coverUrl: null,
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    const lists = [...container.querySelectorAll("ul")];
+    expect(lists.length).toBe(2);
+    for (const list of lists) {
+      expect(list.className).toContain("(100cqi_-_1rem)/3");
+      expect(list.className).toContain(
+        "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+      );
+    }
+  });
 });
