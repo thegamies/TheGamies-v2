@@ -7,7 +7,11 @@ import {
   getGotyThroughRankForYears,
   TOP_STANDINGS_RANK,
 } from "@/lib/live-aggregate/service";
-import { getLandingStandingsYears } from "@/lib/site-settings/service";
+import {
+  getSiteSettings,
+  resolveLandingStandingsYears,
+} from "@/lib/site-settings/service";
+import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
 
 export default async function HomePage() {
   let sections: Array<{
@@ -32,10 +36,13 @@ export default async function HomePage() {
       }>;
     }>;
   }> = [];
+  let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
 
   try {
+    const settings = await getSiteSettings();
+    minVisible = settings.standingFillMinVisible;
     const years = await filterYearsWithPublicGoty(
-      await getLandingStandingsYears(),
+      resolveLandingStandingsYears(settings.landingStandingsYears),
     );
     const [boards, highlights] = await Promise.all([
       getGotyThroughRankForYears(years, {
@@ -86,7 +93,11 @@ export default async function HomePage() {
       <SectionRule className="mt-8 sm:mt-10" />
 
       <section className="pt-4 sm:pt-5">
-        <YearTopFiveSections sections={sections} allYearsHref="/standings" />
+        <YearTopFiveSections
+          sections={sections}
+          allYearsHref="/standings"
+          minVisible={minVisible}
+        />
       </section>
     </main>
   );

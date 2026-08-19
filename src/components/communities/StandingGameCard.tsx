@@ -283,9 +283,9 @@ export function standingStripColClass(featured: boolean): string {
 }
 
 /**
- * Fill-row standing cards. Column width is the editorial 5-up size
- * (`--standing-fill-card`) at every breakpoint so five fit at `--page-max`
- * without scrolling. Narrower viewports keep that width and scroll.
+ * Fill-row standing cards. Column width is min(editorial 5-up at `--page-max`,
+ * `--standing-fill-min-visible` across the row). Extra items stay on one row
+ * and scroll. A decimal visible count peeks the next cover.
  */
 export const standingFillFiveListClass =
   "grid w-max min-w-full grid-flow-col grid-rows-[auto_auto] justify-start gap-x-[var(--standing-fill-gap)] overflow-y-hidden [grid-auto-columns:var(--standing-fill-card)]";

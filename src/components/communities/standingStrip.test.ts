@@ -17,7 +17,7 @@ describe("standingStripColClass", () => {
 });
 
 describe("standingFillFiveColClass", () => {
-  it("uses the editorial 5-up card width at every breakpoint and keeps overflow on one track", () => {
+  it("uses the shared fill-row card width and keeps overflow on one track", () => {
     expect(standingFillFiveListClass).toContain("grid-flow-col");
     expect(standingFillFiveListClass).toContain(
       "[grid-auto-columns:var(--standing-fill-card)]",
@@ -25,7 +25,6 @@ describe("standingFillFiveColClass", () => {
     expect(standingFillFiveListClass).toContain(
       "gap-x-[var(--standing-fill-gap)]",
     );
-    expect(standingFillFiveListClass).not.toContain("100cqi");
     expect(standingFillFiveListClass).toContain("overflow-y-hidden");
     expect(standingFillFiveFlowClass).toContain(
       "[grid-auto-columns:var(--standing-fill-card)]",

@@ -12,6 +12,7 @@ import {
   setPublicBoardMinCategoryVotes,
   setPublicBoardMinLists,
   setSiteRankMode,
+  setStandingFillMinVisible,
 } from "@/lib/site-settings/service";
 import { parseSharedRankMode } from "@/lib/standings/shared-rank";
 
@@ -199,6 +200,38 @@ export async function savePublicBoardMinCategoryVotesAction(
         err instanceof Error
           ? err.message
           : "Could not save the category vote minimum.",
+    };
+  }
+}
+
+export async function saveStandingFillMinVisibleAction(
+  raw: string,
+): Promise<{
+  error?: string;
+  ok?: boolean;
+  standingFillMinVisible?: number;
+}> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return { error: "Enter how many covers should sit in view, such as 3.2." };
+  }
+  try {
+    const saved = await setStandingFillMinVisible(parsed);
+    revalidatePath("/");
+    revalidatePath("/standings");
+    revalidatePath("/admin/rankings");
+    return {
+      ok: true,
+      standingFillMinVisible: saved.standingFillMinVisible,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save the covers-in-view setting.",
     };
   }
 }

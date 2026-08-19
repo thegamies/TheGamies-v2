@@ -11,6 +11,8 @@ import {
   listYearsWithGotyScores,
   TOP_STANDINGS_RANK,
 } from "@/lib/live-aggregate/service";
+import { getStandingFillMinVisible } from "@/lib/site-settings/service";
+import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
 
 export const metadata: Metadata = {
   title: "Game of the Year",
@@ -32,6 +34,13 @@ export default async function StandingsLandingPage() {
     categoryWinners: CategoryHighlightWinner[];
   }> = [];
   let error: string | null = null;
+  let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
+
+  try {
+    minVisible = await getStandingFillMinVisible();
+  } catch {
+    minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
+  }
 
   try {
     const years = await listYearsWithGotyScores();
@@ -82,7 +91,10 @@ export default async function StandingsLandingPage() {
         </p>
       ) : (
         <div className="mt-6">
-          <YearTopFiveSections sections={sections} />
+          <YearTopFiveSections
+            sections={sections}
+            minVisible={minVisible}
+          />
         </div>
       )}
     </main>

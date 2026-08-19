@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import {
@@ -10,6 +11,10 @@ import {
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import type { CategoryHighlightWinner } from "@/lib/live-aggregate/category-highlights";
+import {
+  DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  standingFillMinVisibleVars,
+} from "@/lib/standings/standing-fill";
 
 export type YearTopFiveRow = {
   place: number;
@@ -28,8 +33,8 @@ const fillFiveColClass = standingFillFiveColClass();
 
 /**
  * One year of Top 5. Year + Full rankings share a ruled header bar.
- * Cards keep the editorial 5-up width at every breakpoint; extra ties stay on
- * one row and scroll.
+ * Card width is min(editorial 5-up, covers-in-view). Extra ties stay on one
+ * row and scroll. A decimal covers-in-view peeks the next cover.
  */
 export function YearTopFiveStrip({
   year,
@@ -37,17 +42,22 @@ export function YearTopFiveStrip({
   yearHref,
   categoryWinners = [],
   showRule = false,
+  minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE,
 }: {
   year: number;
   rows: YearTopFiveRow[];
   yearHref: string;
   categoryWinners?: CategoryHighlightWinner[];
   showRule?: boolean;
+  minVisible?: number;
 }) {
   const categoriesHref = `/game-of-the-year/${year}?view=categories`;
 
   return (
-    <article className={showRule ? "mt-5 sm:mt-6" : undefined}>
+    <article
+      className={showRule ? "mt-5 sm:mt-6" : undefined}
+      style={standingFillMinVisibleVars(minVisible) as CSSProperties}
+    >
       <div className="flex items-end justify-between gap-4 border-b border-line pb-2">
         <h3 className="font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl">
           {year}
@@ -133,6 +143,7 @@ export function YearTopFiveStrip({
 export function YearTopFiveSections({
   sections,
   allYearsHref,
+  minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE,
 }: {
   sections: Array<{
     year: number;
@@ -141,6 +152,7 @@ export function YearTopFiveSections({
     categoryWinners?: CategoryHighlightWinner[];
   }>;
   allYearsHref?: string | null;
+  minVisible?: number;
 }) {
   if (sections.length === 0) {
     return (
@@ -168,6 +180,7 @@ export function YearTopFiveSections({
           yearHref={section.yearHref}
           categoryWinners={section.categoryWinners}
           showRule={index > 0}
+          minVisible={minVisible}
         />
       ))}
     </div>

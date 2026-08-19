@@ -16,10 +16,21 @@
 
   --page-max: 72rem;
   --gutter: 1.5rem;
-  /* Five equal standing cards at editorial max width; same size at every breakpoint. */
+  /* Five equal standing cards at editorial max width. Narrower viewports
+     size to `--standing-fill-min-visible` (decimals peek the next cover). */
   --standing-fill-gap: 1rem;
-  --standing-fill-card: calc(
+  --standing-fill-min-visible: 3.2;
+  --standing-fill-card-max: calc(
     (var(--page-max) - 2 * var(--gutter) - 4 * var(--standing-fill-gap)) / 5
+  );
+  --standing-fill-card: min(
+    var(--standing-fill-card-max),
+    calc(
+      (
+          100cqi -
+            (var(--standing-fill-min-visible) - 1) * var(--standing-fill-gap)
+        ) / var(--standing-fill-min-visible)
+    )
   );
 
   --motion-fast: 120ms;

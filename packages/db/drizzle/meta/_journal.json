@@ -218,6 +218,13 @@
       "when": 1787788800000,
       "tag": "0030_public_board_min_category_votes",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787875200000,
+      "tag": "0031_standing_fill_min_visible",
+      "breakpoints": true
     }
   ]
 }

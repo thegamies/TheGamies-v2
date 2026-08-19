@@ -87,8 +87,8 @@ GOTY years stay off the homepage, `/standings`, year boards, and game-page ranks
 
 ## Homepage / all-years highlights
 
-- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full. Equal cards use the editorial 5-up width (`--standing-fill-card`) at every breakpoint so five fill `--page-max` without scrolling. Narrower viewports keep that width and scroll horizontally. No featured #1 width. Extra ties stay on that row.
-- **Top Categories:** up to five most-voted awards in the same 5-up-width row; category names clamp to one line. Every game tied at #1 rotates in the same tie stack as community boards. Category name → that category board; game name → game page. **All categories** opens `?view=categories`.
+- Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full. Equal cards use `--standing-fill-card`: min of editorial 5-up at `--page-max` (five fill a wide row with no scroll) and `--standing-fill-min-visible` across the current row. **Temporary** admin control on `/admin/rankings` (`standing_fill_min_visible`, default **3.2**). A decimal peeks the next cover so the row shows it can scroll. Extra ties stay on that row.
+- **Top Categories:** up to five most-voted awards in the same fill-row; category names clamp to one line. Every game tied at #1 rotates in the same tie stack as community boards. Category name → that category board; game name → game page. **All categories** opens `?view=categories`.
 - Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 
 ## Non-goals

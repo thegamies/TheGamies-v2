@@ -11,6 +11,10 @@ import {
   parsePublicBoardMinCategoryVotes,
   parsePublicBoardMinLists,
 } from "@/lib/live-aggregate/public-board";
+import {
+  DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  parseStandingFillMinVisible,
+} from "@/lib/standings/standing-fill";
 
 export {
   defaultLandingStandingsYears,
@@ -29,6 +33,7 @@ export type SiteSettingsRow = {
   rankMode: SharedRankMode;
   publicBoardMinLists: number;
   publicBoardMinCategoryVotes: number;
+  standingFillMinVisible: number;
 };
 
 export async function getSiteSettings(
@@ -40,6 +45,7 @@ export async function getSiteSettings(
       rankMode: siteSettings.rankMode,
       publicBoardMinLists: siteSettings.publicBoardMinLists,
       publicBoardMinCategoryVotes: siteSettings.publicBoardMinCategoryVotes,
+      standingFillMinVisible: siteSettings.standingFillMinVisible,
     })
     .from(siteSettings)
     .where(eq(siteSettings.id, SETTINGS_ID))
@@ -53,6 +59,9 @@ export async function getSiteSettings(
     ),
     publicBoardMinCategoryVotes: parsePublicBoardMinCategoryVotes(
       row?.publicBoardMinCategoryVotes ?? DEFAULT_PUBLIC_BOARD_MIN_CATEGORY_VOTES,
+    ),
+    standingFillMinVisible: parseStandingFillMinVisible(
+      row?.standingFillMinVisible ?? DEFAULT_STANDING_FILL_MIN_VISIBLE,
     ),
   };
 }
@@ -187,6 +196,38 @@ export async function setPublicBoardMinCategoryVotes(
       target: siteSettings.id,
       set: {
         publicBoardMinCategoryVotes,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getStandingFillMinVisible(
+  db: Db = getDb(),
+): Promise<number> {
+  const settings = await getSiteSettings(db);
+  return settings.standingFillMinVisible;
+}
+
+/** Persist the temporary homepage / all-years covers-in-view count. */
+export async function setStandingFillMinVisible(
+  minVisible: number,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const standingFillMinVisible = parseStandingFillMinVisible(minVisible);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      standingFillMinVisible,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        standingFillMinVisible,
         updatedAt: new Date(),
       },
     });

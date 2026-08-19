@@ -13,6 +13,7 @@ import {
   savePublicBoardMinCategoryVotesAction,
   savePublicBoardMinListsAction,
   saveRankModeAction,
+  saveStandingFillMinVisibleAction,
   setRevealAction,
 } from "./actions";
 
@@ -51,6 +52,7 @@ type Props = {
   initialRankMode: SharedRankMode;
   initialPublicBoardMinLists: number;
   initialPublicBoardMinCategoryVotes: number;
+  initialStandingFillMinVisible: number;
 };
 
 export function AdminRankingsClient({
@@ -61,6 +63,7 @@ export function AdminRankingsClient({
   initialRankMode,
   initialPublicBoardMinLists,
   initialPublicBoardMinCategoryVotes,
+  initialStandingFillMinVisible,
 }: Props) {
   const [authorized, setAuthorized] = useState(initiallyAuthorized);
   const [secret, setSecret] = useState("");
@@ -84,6 +87,12 @@ export function AdminRankingsClient({
   );
   const [minCategoryVotesSaved, setMinCategoryVotesSaved] = useState(
     initialPublicBoardMinCategoryVotes,
+  );
+  const [minVisibleInput, setMinVisibleInput] = useState(
+    String(initialStandingFillMinVisible),
+  );
+  const [minVisibleSaved, setMinVisibleSaved] = useState(
+    initialStandingFillMinVisible,
   );
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -300,6 +309,56 @@ export function AdminRankingsClient({
         </Button>
         <p className="text-xs text-muted">
           Current category vote minimum: {minCategoryVotesSaved}
+        </p>
+      </section>
+
+      <section className="space-y-4 border-b border-line pb-10">
+        <h2 className="font-display text-2xl tracking-wide text-ink">
+          Covers in view
+        </h2>
+        <p className="text-sm text-muted">
+          Temporary. How many homepage and all-years covers sit in view on a
+          narrow screen. A decimal peeks the next cover so the row shows it
+          can scroll — 3.2 is three full covers and a sliver. A wide screen
+          still fits five.
+        </p>
+        <label className="block text-sm text-muted">
+          Covers in view
+          <input
+            type="number"
+            min={1}
+            max={5}
+            step={0.1}
+            className={`${fieldInputClass} mt-1`}
+            value={minVisibleInput}
+            onChange={(e) => setMinVisibleInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result =
+                await saveStandingFillMinVisibleAction(minVisibleInput);
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.standingFillMinVisible != null) {
+                setMinVisibleSaved(result.standingFillMinVisible);
+                setMinVisibleInput(String(result.standingFillMinVisible));
+              }
+              setMessage("Covers in view saved.");
+            })
+          }
+        >
+          Save covers in view
+        </Button>
+        <p className="text-xs text-muted">
+          Current covers in view: {minVisibleSaved}
         </p>
       </section>
 

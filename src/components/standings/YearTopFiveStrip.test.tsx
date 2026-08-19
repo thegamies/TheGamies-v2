@@ -120,4 +120,29 @@ describe("YearTopFiveStrip", () => {
       );
     }
   });
+
+  it("applies a decimal covers-in-view count as a CSS variable", () => {
+    const { container } = render(
+      <YearTopFiveStrip
+        year={2026}
+        yearHref="/game-of-the-year/2026"
+        minVisible={3.2}
+        rows={[
+          {
+            place: 1,
+            gameId: "g1",
+            slug: "hades-ii",
+            title: "Hades II",
+            coverUrl: null,
+            score: 40,
+          },
+        ]}
+      />,
+    );
+
+    const article = container.querySelector("article");
+    expect(article?.style.getPropertyValue("--standing-fill-min-visible")).toBe(
+      "3.2",
+    );
+  });
 });

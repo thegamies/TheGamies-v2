@@ -190,7 +190,9 @@ Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 | `--page-max` | Content width | `72rem` |
 | `--gutter` | Page padding | `1.5rem` |
 | `--standing-fill-gap` | Gap between fill-row standing cards | `1rem` |
-| `--standing-fill-card` | Fill-row standing card width (5-up at `--page-max`) | derived |
+| `--standing-fill-min-visible` | Covers in view on a narrow fill-row (decimals peek) | `3.2` (admin, temporary) |
+| `--standing-fill-card-max` | Fill-row card width at `--page-max` (5-up) | derived |
+| `--standing-fill-card` | Fill-row card width | `min` of max and visible-count size |
 
 Rules:
 
@@ -212,7 +214,7 @@ Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimme
 - Desktop (~1440): editorial width, pinned table identifiers when scrolling horizontally
 - Tablet (~1024) / Mobile (~390): focused segmented views for Combined / Community / Hosts / Ballots; no two-axis navigation for core comprehension
 - Horizontal strips (GOTY / category Comparison, category Ranked): hide scrollbars; edge fade when more content; desktop drag-to-pan (click still works — drag starts after a short move). Arrow controls optional (`showArrowControls`, off by default). Touch/trackpad native scroll. Do not remap vertical wheel to horizontal. Comparison strips keep headers with each chapter’s table. GOTY Ranked must fit 360 without sideways scroll.
-- Homepage / all-years GOTY strips: cards keep `--standing-fill-card` (five across at `--page-max`) at every breakpoint; narrower viewports scroll.
+- Homepage / all-years GOTY strips: card width is `min(--standing-fill-card-max`, visible-count size). `--standing-fill-min-visible` (temporary admin setting, decimals allowed) keeps at least that many covers in view and peeks the next; a wide screen still fits five.
 
 ## Fixtures that mocks must cover
 

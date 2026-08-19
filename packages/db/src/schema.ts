@@ -6,6 +6,7 @@ import {
   jsonb,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
@@ -855,6 +856,7 @@ export const liveCategoryDirty = pgTable(
  * `rankMode` — competition (1–1–3) or dense (1–1–2) for site live boards.
  * `publicBoardMinLists` — GOTY years stay hidden until this many lists.
  * `publicBoardMinCategoryVotes` — a category board stays hidden until that award has this many votes.
+ * `standingFillMinVisible` — temporary: covers in view on homepage / all-years strips (decimals peek).
  */
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey().default("default"),
@@ -867,5 +869,8 @@ export const siteSettings = pgTable("site_settings", {
   publicBoardMinCategoryVotes: integer("public_board_min_category_votes")
     .notNull()
     .default(5),
+  standingFillMinVisible: real("standing_fill_min_visible")
+    .notNull()
+    .default(3.2),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
