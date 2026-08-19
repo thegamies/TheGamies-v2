@@ -9,10 +9,8 @@ export const VERIFY_EMAIL_SENT = "Open the confirmation link in your email.";
 export const VERIFY_EMAIL_RESENT =
   "We sent another confirmation link to that address.";
 
-export const VERIFY_EMAIL_INVALID =
-  "That confirmation link did not work. Send a new one.";
-
-export const VERIFY_EMAIL_CONFIRMING = "Confirming your email…";
+export const VERIFY_EMAIL_SEND_FAILED =
+  "Could not send another confirmation email. Try again.";
 
 export function isUnverifiedEmailError(error: {
   message?: string;

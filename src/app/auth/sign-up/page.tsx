@@ -45,7 +45,6 @@ function SignUpForm() {
           email={state.email}
           next={next || null}
           intent={intent}
-          sendCodeOnMount={!state.codeRequested}
         />
       </>
     );

@@ -1,16 +1,31 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requestEmailVerificationOtp } from "@/lib/auth/request-email-verification";
 import { auth } from "@/lib/auth/server";
-import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
+import {
+  buildAbsoluteAppUrl,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/return-to";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { validatePassword } from "@/lib/auth/password";
 
 export type SignUpState =
   | { error: string }
-  | { needsVerification: true; email: string; codeRequested: boolean }
+  | { needsVerification: true; email: string }
   | null;
+
+async function requestOrigin(): Promise<string> {
+  const headerStore = await headers();
+  const origin = headerStore.get("origin")?.trim();
+  if (origin) return origin.replace(/\/$/, "");
+  const proto = headerStore.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host =
+    headerStore.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    headerStore.get("host")?.trim();
+  if (proto && host) return `${proto}://${host}`;
+  return process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+}
 
 export async function signUpWithEmail(
   _prevState: SignUpState,
@@ -24,6 +39,7 @@ export async function signUpWithEmail(
     formData.get("next"),
     formData.get("intent"),
   );
+  const callbackURL = buildAbsoluteAppUrl(await requestOrigin(), next) ?? undefined;
 
   if (!email || !password || !name || !username) {
     return { error: "Fill in all fields." };
@@ -38,6 +54,7 @@ export async function signUpWithEmail(
     email,
     password,
     name,
+    callbackURL,
   });
 
   if (error) {
@@ -60,8 +77,7 @@ export async function signUpWithEmail(
   }
 
   if (data?.user?.emailVerified === false) {
-    const codeRequested = await requestEmailVerificationOtp(email);
-    return { needsVerification: true, email, codeRequested };
+    return { needsVerification: true, email };
   }
 
   redirect(next);

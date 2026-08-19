@@ -3,87 +3,60 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
-  VERIFY_EMAIL_CONFIRMING,
-  VERIFY_EMAIL_INVALID,
   VERIFY_EMAIL_RESENT,
+  VERIFY_EMAIL_SEND_FAILED,
   VERIFY_EMAIL_SENT,
 } from "@/lib/auth/email-verification-copy";
-import {
-  clearPostAuthNext,
-  readPostAuthNext,
-} from "@/lib/auth/post-auth-next";
+import { readPostAuthNext } from "@/lib/auth/post-auth-next";
 import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
-import {
-  resendEmailVerificationOtp,
-  verifyEmailOtp,
-} from "@/lib/auth/verify-email-client";
+import { sendVerificationLink } from "@/lib/auth/verify-email-client";
 
 const fieldClass =
   "mt-1 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent";
 
 type Props = {
   email: string;
-  otp?: string | null;
   next?: string | null;
   intent?: string | null;
   allowEmailEdit?: boolean;
-  /** Request a confirmation link on first paint when none was sent yet. */
-  sendCodeOnMount?: boolean;
+  /** Request a confirmation link on first paint (unverified sign-in). */
+  sendOnMount?: boolean;
 };
+
+function callbackURL(next: string | null | undefined, intent: string | null | undefined) {
+  const dest = resolvePostAuthRedirect(next ?? readPostAuthNext(), intent);
+  return `${window.location.origin}${dest}`;
+}
 
 export function VerifyEmailForm({
   email: initialEmail,
-  otp: initialOtp = "",
   next,
   intent,
   allowEmailEdit = false,
-  sendCodeOnMount = false,
+  sendOnMount = false,
 }: Props) {
   const [email, setEmail] = useState(initialEmail);
-  const [pending, setPending] = useState(
-    Boolean((initialOtp ?? "").replace(/\s/g, "") && initialEmail.trim()),
-  );
+  const [pending, setPending] = useState(false);
   const [resent, setResent] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const autoTried = useRef(false);
-  const codeRequested = useRef(false);
-  const linkCode = (initialOtp ?? "").replace(/\s/g, "");
+  const requested = useRef(false);
 
-  async function confirm(address: string, code: string) {
-    if (!address || !code) return;
-    setPending(true);
-    setError(null);
-    try {
-      const { error: verifyError } = await verifyEmailOtp({
-        email: address,
-        otp: code,
-      });
-      if (verifyError) {
-        setError(VERIFY_EMAIL_INVALID);
-        setPending(false);
-        return;
-      }
-      const dest = resolvePostAuthRedirect(next ?? readPostAuthNext(), intent);
-      clearPostAuthNext();
-      window.location.assign(dest);
-    } catch {
-      setError(VERIFY_EMAIL_INVALID);
-      setPending(false);
-    }
+  async function sendLink(address: string) {
+    if (!address) return false;
+    const { error: sendError } = await sendVerificationLink({
+      email: address,
+      callbackURL: callbackURL(next, intent),
+    });
+    return !sendError;
   }
 
   useEffect(() => {
     const address = initialEmail.trim();
-    if (address && linkCode && !autoTried.current) {
-      autoTried.current = true;
-      void confirm(address, linkCode);
-      return;
+    if (sendOnMount && address && !requested.current) {
+      requested.current = true;
+      void sendLink(address);
     }
-    if (sendCodeOnMount && address && !codeRequested.current) {
-      codeRequested.current = true;
-      void resendEmailVerificationOtp({ email: address });
-    }
-    // First paint: confirm from the email link, or request a link after sign-in.
+    // First paint: request a link after unverified sign-in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -93,19 +66,15 @@ export function VerifyEmailForm({
     setPending(true);
     setError(null);
     try {
-      await resendEmailVerificationOtp({ email: address });
-      setResent(true);
+      const sent = await sendLink(address);
+      if (sent) {
+        setResent(true);
+      } else {
+        setError(VERIFY_EMAIL_SEND_FAILED);
+      }
     } finally {
       setPending(false);
     }
-  }
-
-  if (linkCode && pending && !error) {
-    return (
-      <p className="mt-10 text-sm text-muted" role="status">
-        {VERIFY_EMAIL_CONFIRMING}
-      </p>
-    );
   }
 
   return (

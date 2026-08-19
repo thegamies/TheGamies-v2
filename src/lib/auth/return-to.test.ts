@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { safeNextPath } from "./safe-next";
 import {
+  buildAbsoluteAppUrl,
   buildSignInHref,
   buildSignUpHref,
-  buildVerifyEmailAbsoluteHref,
   buildVerifyEmailHref,
   resolvePostAuthRedirect,
   returnPathFromLocation,
@@ -52,20 +52,12 @@ describe("buildSignInHref / buildSignUpHref", () => {
     expect(href).toContain("next=");
   });
 
-  it("builds an absolute confirm URL with the code", () => {
+  it("builds an absolute callback URL", () => {
     expect(
-      buildVerifyEmailAbsoluteHref("https://thegamies-v2.example.workers.dev", {
-        email: "ada@example.com",
-        otp: "654321",
-      }),
-    ).toBe(
-      "https://thegamies-v2.example.workers.dev/auth/verify-email?email=ada%40example.com&otp=654321",
-    );
+      buildAbsoluteAppUrl("https://thegamies-v2.example.workers.dev", "/account"),
+    ).toBe("https://thegamies-v2.example.workers.dev/account");
     expect(
-      buildVerifyEmailAbsoluteHref("http://evil.example", {
-        email: "ada@example.com",
-        otp: "1",
-      }),
+      buildAbsoluteAppUrl("http://evil.example", "/account"),
     ).toBeNull();
   });
 });

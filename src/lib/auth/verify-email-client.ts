@@ -2,24 +2,13 @@
 
 import { authClient } from "./client";
 
-export async function verifyEmailOtp(input: {
+export async function sendVerificationLink(input: {
   email: string;
-  otp: string;
+  callbackURL: string;
 }): Promise<{ error?: { message?: string } | null }> {
-  const { error } = await authClient.emailOtp.verifyEmail({
+  const { error } = await authClient.sendVerificationEmail({
     email: input.email,
-    otp: input.otp,
+    callbackURL: input.callbackURL,
   });
   return { error: error ?? null };
 }
-
-export async function resendEmailVerificationOtp(input: {
-  email: string;
-}): Promise<{ error?: { message?: string } | null }> {
-  const { error } = await authClient.emailOtp.sendVerificationOtp({
-    email: input.email,
-    type: "email-verification",
-  });
-  return { error: error ?? null };
-}
-

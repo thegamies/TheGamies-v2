@@ -47,29 +47,36 @@ describe("auth emails", () => {
     expect(message?.text).toContain("123456");
   });
 
-  it("maps OTP codes for email verification", () => {
-    const message = buildAuthEmail(
-      {
+  it("maps verification magic links", () => {
+    const message = buildAuthEmail({
+      event_type: "send.magic_link",
+      user: { email: "ada@example.com" },
+      event_data: {
+        link_type: "email-verification",
+        link_url: "https://auth.example/verify?token=abc",
+        expires_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+      },
+    });
+    expect(message?.subject).toBe(AUTH_EMAIL_SUBJECTS.confirmation);
+    expect(message?.html).toContain("Confirm email");
+    expect(message?.html).toContain("https://auth.example/verify?token=abc");
+    expect(message?.html).not.toContain("letter-spacing:0.2em");
+    expect(message?.text).not.toContain("Your code:");
+    expect(message?.text).toContain("https://auth.example/verify?token=abc");
+    expect(message?.text).toContain("This link is valid for 15 minutes.");
+  });
+
+  it("skips leftover email-verification OTP events", () => {
+    expect(
+      buildAuthEmail({
         event_type: "send.otp",
         user: { email: "ada@example.com" },
         event_data: {
           otp_type: "email-verification",
           otp_code: "654321",
         },
-      },
-      { origin: "https://thegamies.gg" },
-    );
-    expect(message?.subject).toBe(AUTH_EMAIL_SUBJECTS.confirmation);
-    expect(message?.html).toContain("Confirm email");
-    expect(message?.html).toContain(
-      "https://thegamies.gg/auth/verify-email?email=ada%40example.com&amp;otp=654321",
-    );
-    expect(message?.html).not.toContain("letter-spacing:0.2em");
-    expect(message?.text).not.toContain("Your code:");
-    expect(message?.text).toContain(
-      "https://thegamies.gg/auth/verify-email?email=ada%40example.com&otp=654321",
-    );
-    expect(message?.text).toContain("This link is valid for 15 minutes.");
+      }),
+    ).toBeNull();
   });
 
   it("describes how long a token is valid", () => {

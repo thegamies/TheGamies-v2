@@ -14,7 +14,6 @@ import { VerifyEmailForm } from "./VerifyEmailForm";
 function VerifyEmailBody() {
   const searchParams = useSearchParams();
   const email = searchParams.get("email")?.trim() ?? "";
-  const otp = searchParams.get("otp");
   const next = searchParams.get("next");
   const intent = parseListAuthIntent(searchParams.get("intent"));
 
@@ -27,11 +26,10 @@ function VerifyEmailBody() {
       <p className="mt-3 text-muted">{VERIFY_EMAIL_INTRO}</p>
       <VerifyEmailForm
         email={email}
-        otp={otp}
         next={next}
         intent={intent}
         allowEmailEdit={!email}
-        sendCodeOnMount={Boolean(email && !otp)}
+        sendOnMount={Boolean(email)}
       />
       <p className="mt-6 text-sm text-muted">
         Already confirmed?{" "}

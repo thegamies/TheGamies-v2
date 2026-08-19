@@ -1,4 +1,3 @@
-import { buildVerifyEmailAbsoluteHref } from "@/lib/auth/return-to";
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
 import {
@@ -23,10 +22,18 @@ export function authEmailFromAddress(): string {
   return process.env.AUTH_EMAIL_FROM?.trim() || AUTH_EMAIL_FROM_DEFAULT;
 }
 
+/** OTP confirmation is unused: verification is a Neon magic link. */
+export function isIgnoredAuthEmail(payload: NeonAuthEmailPayload): boolean {
+  return (
+    payload.event_type === "send.otp" &&
+    payload.event_data?.otp_type === "email-verification"
+  );
+}
+
 export function buildAuthEmail(
   payload: NeonAuthEmailPayload,
-  options: { origin?: string } = {},
 ): AuthEmailMessage | null {
+  if (isIgnoredAuthEmail(payload)) return null;
   const to = payload.user?.email?.trim();
   if (!to) return null;
   const data = payload.event_data ?? {};
@@ -41,25 +48,6 @@ export function buildAuthEmail(
         subject: AUTH_EMAIL_SUBJECTS.recovery,
         html: renderRecoveryEmail({ code, expiresAt }),
         text: recoveryText({ code, expiresAt }),
-      };
-    }
-    if (data.otp_type === "email-verification") {
-      const href = options.origin
-        ? buildVerifyEmailAbsoluteHref(options.origin, { email: to, otp: code })
-        : null;
-      return {
-        to,
-        subject: AUTH_EMAIL_SUBJECTS.confirmation,
-        html: renderConfirmationEmail({
-          href: href ?? undefined,
-          code: href ? undefined : code,
-          expiresAt,
-        }),
-        text: confirmationText({
-          href: href ?? undefined,
-          code: href ? undefined : code,
-          expiresAt,
-        }),
       };
     }
     return {

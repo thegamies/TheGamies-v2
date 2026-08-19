@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { neonAuthJwksUrl, verifyNeonAuthWebhook } from "@/lib/email/neon-webhook";
-import { buildAuthEmail, sendAuthEmail } from "@/lib/email/send";
+import { buildAuthEmail, isIgnoredAuthEmail, sendAuthEmail } from "@/lib/email/send";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -22,10 +22,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid webhook." }, { status: 401 });
   }
 
-  const message = buildAuthEmail(payload, {
-    origin: new URL(request.url).origin,
-  });
+  const message = buildAuthEmail(payload);
   if (!message) {
+    if (isIgnoredAuthEmail(payload)) {
+      return NextResponse.json({ ok: true, skipped: true });
+    }
     const eventType = payload.event_type ?? "";
     if (eventType === "send.otp" || eventType === "send.magic_link") {
       console.error("auth-email-unmapped", eventType);

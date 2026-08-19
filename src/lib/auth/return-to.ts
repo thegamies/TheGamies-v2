@@ -23,33 +23,28 @@ export function buildSignUpHref(opts: {
   return buildAuthHref("/auth/sign-up", opts);
 }
 
-/** Build `/auth/verify-email` with optional email, code, return path, and list intent. */
+/** Build `/auth/verify-email` with optional email, return path, and list intent. */
 export function buildVerifyEmailHref(opts: {
   email?: string | null;
-  otp?: string | null;
   next?: string | null;
   intent?: ListAuthIntent | null;
 } = {}): string {
   const href = buildAuthHref("/auth/verify-email", opts);
   const params = new URLSearchParams(href.split("?")[1] ?? "");
   const email = opts.email?.trim();
-  const otp = opts.otp?.trim();
   if (email) params.set("email", email);
-  if (otp) params.set("otp", otp);
   const qs = params.toString();
   return qs ? `/auth/verify-email?${qs}` : "/auth/verify-email";
 }
 
-/** Absolute confirm URL for Auth mail (Worker origin + code). */
-export function buildVerifyEmailAbsoluteHref(
-  origin: string,
-  opts: { email: string; otp: string },
-): string | null {
+/** Absolute in-app URL for Auth callbacks (verification / post-sign-up). */
+export function buildAbsoluteAppUrl(origin: string, path: string): string | null {
   const base = origin.trim().replace(/\/$/, "");
   if (!base.startsWith("https://") && !base.startsWith("http://localhost")) {
     return null;
   }
-  return `${base}${buildVerifyEmailHref({ email: opts.email, otp: opts.otp })}`;
+  const safePath = path.startsWith("/") && !path.startsWith("//") ? path : "/account";
+  return `${base}${safePath}`;
 }
 
 function buildAuthHref(
