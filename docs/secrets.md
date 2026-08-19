@@ -75,6 +75,9 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | `R2_SECRET_ACCESS_KEY` | same | avatar uploads |
 | `R2_AVATAR_BUCKET` | same | avatar bucket (same name as the prior Gamies) |
 | `AVATAR_PUBLIC_BASE_URL` | same | public CDN base for `avatars/{id}/avatar.jpg` |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | GA4 measurement id (public; inlined at build). Unset = no analytics |
+| `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From address (default `The Gamies <noreply@thegamies.gg>`) |
+| `NEON_API_KEY`, `NEON_PROJECT_ID` | same | Optional on the app: close Auth directory users (Console → Auth → Users). Also used in CI for PR branches. |
 
 PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
 

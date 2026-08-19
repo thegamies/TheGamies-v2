@@ -19,6 +19,7 @@ import { YearSelect } from "@/components/ui/YearSelect";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
+import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { SectionRule } from "@/components/ui/SectionRule";
@@ -247,6 +248,13 @@ export default function DesignSystemPage() {
           <code className="text-ink">{`tone="danger"`}</code> for delete.
         </p>
         <DatePickerFixture />
+        <p className="mt-10 mb-4 max-w-2xl text-sm text-muted">
+          Cookie consent is a compact{" "}
+          <code className="text-ink">CookieConsentBanner</code> card, fixed
+          bottom-right on the site (not a full-width bar). Preview below is
+          in-flow.
+        </p>
+        <CookieConsentBanner preview />
       </Section>
 
       <Section title="Navigation">

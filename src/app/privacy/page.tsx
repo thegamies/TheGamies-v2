@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { PRIVACY_EMAIL, PRIVACY_MAILTO } from "@/lib/site";
 
-const EFFECTIVE_DATE = "July 13, 2026";
+const EFFECTIVE_DATE = "August 19, 2026";
 
 export const metadata: Metadata = {
   title: "Privacy Policy",
@@ -56,26 +56,33 @@ export default function PrivacyPage() {
         of a business transaction such as a merger or acquisition.
       </p>
       <p>We do not sell your personal information.</p>
-      <h2>Cookies and Analytics</h2>
+      <h2 id="cookies">Cookies and Analytics</h2>
       <p>
-        We use cookies to keep you signed in, remember your preferences, improve
-        security, and understand how The Gamies is used.
+        We use essential cookies to keep you signed in, remember your
+        preferences, and help secure The Gamies. Those stay on even if you
+        reject non-essential cookies.
       </p>
       <p>
-        We also use Google Analytics to collect aggregated usage information
-        that helps us improve the website and understand how visitors use our
-        services.
+        We use Google Analytics to collect aggregated usage information. That
+        usage data is collected in a cookieless form even if you have not
+        accepted analytics cookies. If you accept, additional analytics cookies
+        help us understand return visits more accurately. We do not use
+        advertising cookies.
       </p>
       <p>
-        You can control or disable cookies through your browser settings,
-        although some features of The Gamies may not function properly if
-        cookies are disabled.
+        You can Accept or Reject non-essential cookies in the prompt on The
+        Gamies. You can also control cookies through your browser settings,
+        although some features may not function properly if essential cookies
+        are disabled.
       </p>
       <h2>Account Deletion</h2>
       <p>
-        You can delete your account through your account settings. Some
-        information may be retained where required by law or as reasonably
-        necessary to protect the security and integrity of The Gamies.
+        You can delete your account through your account settings. That removes
+        your profile, lists, community memberships, and ballots that are still
+        open. Published community ceremonies may keep an anonymized voter line
+        with no name and no profile. Some information may also be retained where
+        required by law or as reasonably necessary to protect the security and
+        integrity of The Gamies.
       </p>
       <h2>Children&apos;s Privacy</h2>
       <p>

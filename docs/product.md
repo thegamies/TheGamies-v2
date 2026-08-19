@@ -72,6 +72,7 @@ Site
 
 ### Users
 - Auth profiles (username, display, bio, avatar upload, social links, basic visibility)
+- Change **username** (30-day cooldown), **display name**, and **password** on `/account`; **forgot password** on sign-in
 - User pages with lists, communities, avatar, and social profiles (X, YouTube, Twitch, Bluesky handles; website as a full URL)
 - Anonymous list authors remain public via list URL until/unless claimed by sign-in
 

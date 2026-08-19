@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/Button";
+import { PASSWORD_HELPER } from "@/lib/auth/password";
 import { buildSignInHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signUpWithEmail } from "./actions";
@@ -63,6 +64,7 @@ function SignUpForm() {
           className={fieldClass}
         />
       </label>
+      <p className="text-xs text-muted">{PASSWORD_HELPER}</p>
       {state?.error ? (
         <p className="text-sm text-accent">{state.error}</p>
       ) : null}

@@ -90,6 +90,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
           AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
           STAGING_VERCEL_APP_URL: ${{ secrets.STAGING_VERCEL_APP_URL }}
           VERCEL_STAGING_ALIAS: ${{ secrets.VERCEL_STAGING_ALIAS }}
         run: |
@@ -114,7 +115,7 @@ jobs:
           fi
 
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -184,7 +185,9 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
           AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.STAGING_CF_APP_URL }}
+          AUTH_EMAIL_FROM: ${{ secrets.AUTH_EMAIL_FROM }}
         run: |
           WORKER="thegamies-v2-develop"
           if [ -z "$NEON_AUTH_BASE_URL" ]; then
@@ -218,7 +221,9 @@ jobs:
             "R2_SECRET_ACCESS_KEY",
             "R2_AVATAR_BUCKET",
             "AVATAR_PUBLIC_BASE_URL",
+            "NEXT_PUBLIC_GA_MEASUREMENT_ID",
             "NEXT_PUBLIC_APP_URL",
+            "AUTH_EMAIL_FROM",
           ];
           const secrets = {};
           const lines = ["NEXTJS_ENV=production"];
@@ -261,8 +266,35 @@ jobs:
           echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
           echo "- Secrets: GitHub Actions ? wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
 
+  auth_email:
+    needs: cloudflare
+    runs-on: ubuntu-latest
+    if: needs.cloudflare.outputs.skipped != 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point develop Auth email webhooks at staging Worker
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          CF_URL: ${{ secrets.STAGING_CF_APP_URL || needs.cloudflare.outputs.url }}
+        run: |
+          if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
+            echo "Neon API secrets missing; skip Auth email webhook."
+            exit 0
+          fi
+          chmod +x scripts/ci/neon-branch-id.sh scripts/ci/register-neon-auth-email-webhook.sh
+          BRANCH_ID=$(scripts/ci/neon-branch-id.sh develop)
+          case "$CF_URL" in
+            https://*)
+              scripts/ci/register-neon-auth-email-webhook.sh "$BRANCH_ID" "$CF_URL"
+              ;;
+            *)
+              echo "No Cloudflare https URL; skipping Auth email webhook."
+              ;;
+          esac
+
   summary:
-    needs: [migrate, vercel, cloudflare]
+    needs: [migrate, vercel, cloudflare, auth_email]
     runs-on: ubuntu-latest
     if: always()
     steps:

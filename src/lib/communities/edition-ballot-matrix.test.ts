@@ -216,6 +216,56 @@ describe("assembleBallotMatrixRows", () => {
     expect(matrixHasAnyGames(rows)).toBe(true);
   });
 
+  it("keeps a Former member host column and their ballot ranks", () => {
+    const rows = assembleBallotMatrixRows({
+      top: 2,
+      community: [
+        {
+          place: 1,
+          points: 10,
+          gameId: "c1",
+          slug: "comm-one",
+          title: "Comm One",
+          coverUrl: null,
+        },
+      ],
+      voices: [
+        {
+          place: 1,
+          points: 10,
+          gameId: "h1",
+          slug: "host-one",
+          title: "Host One",
+          coverUrl: null,
+        },
+      ],
+      voiceColumns: [
+        {
+          profileId: "gone",
+          displayName: "Former member",
+          username: "former_abc",
+        },
+      ],
+      voterRanks: [
+        {
+          profileId: "gone",
+          rank: 1,
+          gameId: "h1",
+          slug: "host-one",
+          title: "Host One",
+          coverUrl: null,
+        },
+      ],
+      viewerProfileId: null,
+      includeYou: false,
+    });
+
+    expect(rows[0]?.voiceGames.gone).toMatchObject({
+      gameId: "h1",
+      title: "Host One",
+    });
+  });
+
   it("stacks Community ties in one competition slot", () => {
     const rows = assembleBallotMatrixRows({
       top: 3,

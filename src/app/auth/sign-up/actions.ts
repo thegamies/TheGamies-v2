@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
+import { validatePassword } from "@/lib/auth/password";
 
 export async function signUpWithEmail(
   _prevState: { error: string } | null,
@@ -20,6 +21,11 @@ export async function signUpWithEmail(
 
   if (!email || !password || !name || !username) {
     return { error: "Fill in all fields." };
+  }
+
+  const passwordCheck = validatePassword(password);
+  if (!passwordCheck.ok) {
+    return { error: passwordCheck.message };
   }
 
   const { data, error } = await auth.signUp.email({

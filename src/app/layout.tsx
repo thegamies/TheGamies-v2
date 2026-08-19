@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
+import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
 import { AppProviders } from "@/components/AppProviders";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteFooter } from "@/components/SiteFooter";
@@ -59,6 +61,8 @@ export default function RootLayout({
           <SiteHeader />
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
           <SiteFooter />
+          <GoogleAnalytics />
+          <CookieConsentBanner />
         </AppProviders>
       </body>
     </html>

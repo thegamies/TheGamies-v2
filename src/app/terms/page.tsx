@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { TERMS_EMAIL, TERMS_MAILTO } from "@/lib/site";
 
-const EFFECTIVE_DATE = "July 13, 2026";
+const EFFECTIVE_DATE = "August 19, 2026";
 
 export const metadata: Metadata = {
   title: "Terms of Service",
@@ -59,8 +59,8 @@ export default function TermsPage() {
       </p>
       <p>
         We may remove content, restrict features, suspend accounts, or
-        permanently ban users who violate these Terms or our Community
-        Guidelines.
+        permanently ban users who violate these Terms or our{" "}
+        <Link href="/guidelines">Community Guidelines</Link>.
       </p>
       <h2>Service Availability</h2>
       <p>
@@ -103,6 +103,7 @@ export default function TermsPage() {
       <p>
         Questions about these Terms may be sent to{" "}
         <a href={TERMS_MAILTO}>{TERMS_EMAIL}</a>. See also our{" "}
+        <Link href="/guidelines">Community Guidelines</Link> and{" "}
         <Link href="/privacy">Privacy Policy</Link>.
       </p>
     </SiteInfoLayout>

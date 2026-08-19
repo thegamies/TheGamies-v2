@@ -15,8 +15,22 @@ import {
   getProfileByAuthUserId,
   updateOwnedAvatarUrl,
   updateOwnedProfile,
+  usernameTaken,
 } from "@/lib/profile/service";
-import { visibilitySchema } from "@/lib/profile/username";
+import {
+  USERNAME_NOT_AVAILABLE,
+  parseOwnedUsername,
+  visibilitySchema,
+} from "@/lib/profile/username";
+import { lastHostAccountDeleteMessage } from "@/lib/profile/delete-account";
+import {
+  listLastHostCommunityNames,
+  purgeAndTombstoneProfile,
+} from "@/lib/profile/delete-account-service";
+import {
+  deleteAuthenticatedUser,
+  verifyAccountPassword,
+} from "@/lib/auth/delete-user";
 
 async function requireSessionUserId(next = "/account"): Promise<string> {
   const { data: session } = await auth.getSession();
@@ -27,11 +41,17 @@ async function requireSessionUserId(next = "/account"): Promise<string> {
   return userId;
 }
 
+export type AccountFormState = {
+  error?: string;
+  ok?: boolean;
+} | null;
+
 export async function saveAccountProfile(
-  _prevState: { error: string } | null,
+  _prevState: AccountFormState,
   formData: FormData,
-) {
+): Promise<AccountFormState> {
   const userId = await requireSessionUserId();
+  const existing = await getProfileByAuthUserId(userId);
 
   const username = String(formData.get("username") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
@@ -69,8 +89,27 @@ export async function saveAccountProfile(
   }
 
   revalidatePath("/account");
+  if (existing?.username && existing.username !== updated.profile.username) {
+    revalidatePath(`/u/${existing.username}`);
+  }
   revalidatePath(`/u/${updated.profile.username}`);
-  return null;
+  return { ok: true };
+}
+
+export async function checkUsernameAvailable(username: string): Promise<{
+  available: boolean;
+  error?: string;
+}> {
+  const userId = await requireSessionUserId();
+  const parsed = parseOwnedUsername(username);
+  if ("error" in parsed) {
+    return { available: false, error: parsed.error };
+  }
+  const taken = await usernameTaken(parsed.username, userId);
+  if (taken) {
+    return { available: false, error: USERNAME_NOT_AVAILABLE };
+  }
+  return { available: true };
 }
 
 export async function uploadAccountAvatar(
@@ -140,4 +179,66 @@ export async function removeAccountAvatar(): Promise<{
   revalidatePath("/account");
   revalidatePath(`/u/${updated.profile.username}`);
   return { ok: true };
+}
+
+export async function deleteOwnAccount(
+  _prevState: { error: string } | null,
+  formData: FormData,
+) {
+  const { data: session } = await auth.getSession();
+  const userId = session?.user?.id;
+  const email = session?.user?.email?.trim();
+  if (!userId) {
+    redirect("/auth/sign-in?next=/account");
+  }
+
+  const password = String(formData.get("password") ?? "");
+  if (!password) {
+    return { error: "Enter your password to delete your account." };
+  }
+  if (!email) {
+    return { error: "Could not verify this account." };
+  }
+
+  const profile = await getProfileByAuthUserId(userId);
+  if (profile) {
+    const lastHostNames = await listLastHostCommunityNames(profile.id);
+    const blocked = lastHostAccountDeleteMessage(lastHostNames);
+    if (blocked) return { error: blocked };
+  }
+
+  const verified = await verifyAccountPassword({ email, password });
+  if ("error" in verified) return verified;
+
+  const closed = await deleteAuthenticatedUser({
+    password,
+    authUserId: userId,
+    email,
+  });
+  if ("error" in closed) return closed;
+
+  if (profile) {
+    const config = readR2AvatarConfigFromEnv();
+    if (config) {
+      try {
+        await deleteUserAvatarObjects(config, profile.id);
+      } catch {
+        // Avatar storage may be unconfigured; continue with account deletion.
+      }
+    }
+
+    const purged = await purgeAndTombstoneProfile(profile.id);
+    if ("error" in purged) return purged;
+
+    revalidatePath(`/u/${profile.username}`);
+  }
+
+  try {
+    await auth.signOut();
+  } catch {
+    // Sign-in may already be closed.
+  }
+
+  revalidatePath("/account");
+  redirect("/");
 }
