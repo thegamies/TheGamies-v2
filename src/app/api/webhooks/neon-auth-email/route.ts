@@ -24,12 +24,22 @@ export async function POST(request: Request) {
 
   const message = buildAuthEmail(payload);
   if (!message) {
+    const eventType = payload.event_type ?? "";
+    if (eventType === "send.otp" || eventType === "send.magic_link") {
+      console.error("auth-email-unmapped", eventType);
+      return NextResponse.json(
+        { error: "Could not build email." },
+        { status: 422 },
+      );
+    }
     return NextResponse.json({ ok: true, skipped: true });
   }
 
   try {
     await sendAuthEmail(message);
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "unknown";
+    console.error("auth-email-send-failed", reason);
     return NextResponse.json(
       { error: "Could not send email." },
       { status: 503 },

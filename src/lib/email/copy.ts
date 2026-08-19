@@ -1,6 +1,13 @@
 export const AUTH_EMAIL_FROM_DEFAULT = "The Gamies <noreply@thegamies.gg>";
-export const AUTH_EMAIL_LOGO_URL = "https://thegamies.gg/thegamies-logo.png";
 export const AUTH_EMAIL_HOME_URL = "https://thegamies.gg";
+
+/** Neon Auth documented windows when the webhook omits `expires_at`. */
+export const AUTH_EMAIL_VALIDITY_MINUTES = {
+  recovery: 15,
+  confirmation: 15,
+  "email-change": 15,
+  "sign-in": 5,
+} as const;
 
 export const AUTH_EMAIL_SUBJECTS = {
   recovery: "Reset your The Gamies password",

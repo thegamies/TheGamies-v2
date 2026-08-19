@@ -23,8 +23,22 @@ export function buildSignUpHref(opts: {
   return buildAuthHref("/auth/sign-up", opts);
 }
 
+/** Build `/auth/verify-email` with optional email, return path, and list intent. */
+export function buildVerifyEmailHref(opts: {
+  email?: string | null;
+  next?: string | null;
+  intent?: ListAuthIntent | null;
+} = {}): string {
+  const href = buildAuthHref("/auth/verify-email", opts);
+  const email = opts.email?.trim();
+  if (!email) return href;
+  const params = new URLSearchParams(href.split("?")[1] ?? "");
+  params.set("email", email);
+  return `/auth/verify-email?${params.toString()}`;
+}
+
 function buildAuthHref(
-  base: "/auth/sign-in" | "/auth/sign-up",
+  base: "/auth/sign-in" | "/auth/sign-up" | "/auth/verify-email",
   opts: { next?: string | null; intent?: ListAuthIntent | null },
 ): string {
   const intent = opts.intent ?? null;

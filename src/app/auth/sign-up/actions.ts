@@ -6,10 +6,15 @@ import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { validatePassword } from "@/lib/auth/password";
 
+export type SignUpState =
+  | { error: string }
+  | { needsVerification: true; email: string }
+  | null;
+
 export async function signUpWithEmail(
-  _prevState: { error: string } | null,
+  _prevState: SignUpState,
   formData: FormData,
-) {
+): Promise<SignUpState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const name = String(formData.get("displayName") ?? "").trim();
@@ -51,6 +56,10 @@ export async function signUpWithEmail(
 
   if ("error" in ensured) {
     return { error: ensured.error };
+  }
+
+  if (data?.user?.emailVerified === false) {
+    return { needsVerification: true, email };
   }
 
   redirect(next);

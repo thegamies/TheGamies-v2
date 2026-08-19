@@ -5,7 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { PASSWORD_RESET_UPDATED } from "@/lib/auth/password";
-import { buildSignUpHref } from "@/lib/auth/return-to";
+import { VERIFY_EMAIL_SIGN_IN } from "@/lib/auth/email-verification-copy";
+import { buildSignUpHref, buildVerifyEmailHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signInWithEmail } from "./actions";
 
@@ -49,6 +50,21 @@ function SignInForm() {
       </p>
       {state?.error ? (
         <p className="text-sm text-accent">{state.error}</p>
+      ) : null}
+      {state?.unverifiedEmail ? (
+        <p className="text-sm text-muted">
+          {VERIFY_EMAIL_SIGN_IN}{" "}
+          <Link
+            href={buildVerifyEmailHref({
+              email: state.unverifiedEmail,
+              next,
+              intent,
+            })}
+            className="text-ink underline"
+          >
+            Enter confirmation code
+          </Link>
+        </p>
       ) : null}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}

@@ -3,6 +3,7 @@ import { safeNextPath } from "./safe-next";
 import {
   buildSignInHref,
   buildSignUpHref,
+  buildVerifyEmailHref,
   resolvePostAuthRedirect,
   returnPathFromLocation,
 } from "./return-to";
@@ -38,6 +39,16 @@ describe("buildSignInHref / buildSignUpHref", () => {
     expect(
       buildSignUpHref({ next: "/create/goty?year=2026", intent: "share" }),
     ).toContain("/auth/sign-up?");
+  });
+
+  it("builds verify-email with the address", () => {
+    const href = buildVerifyEmailHref({
+      email: "ada@example.com",
+      next: "/account",
+    });
+    expect(href.startsWith("/auth/verify-email?")).toBe(true);
+    expect(href).toContain("email=ada%40example.com");
+    expect(href).toContain("next=");
   });
 });
 

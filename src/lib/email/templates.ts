@@ -1,6 +1,7 @@
 import {
   AUTH_EMAIL_HOME_URL,
-  AUTH_EMAIL_LOGO_URL,
+  AUTH_EMAIL_VALIDITY_MINUTES,
+  type AuthEmailKind,
 } from "./copy";
 
 const PAPER = "#0d0d0e";
@@ -28,8 +29,8 @@ export function renderAuthEmailLayout(bodyHtml: string): string {
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:560px;">
           <tr>
             <td align="center" style="padding-bottom:24px;">
-              <a href="${AUTH_EMAIL_HOME_URL}" style="text-decoration:none;">
-                <img src="${AUTH_EMAIL_LOGO_URL}" alt="The Gamies" width="160" style="display:block;border:0;max-width:160px;height:auto;" />
+              <a href="${AUTH_EMAIL_HOME_URL}" style="display:inline-block;font-size:28px;font-weight:700;letter-spacing:0.04em;line-height:1.2;color:${INK};text-decoration:none;">
+                The Gamies
               </a>
             </td>
           </tr>
@@ -87,16 +88,28 @@ function codeBlock(code: string): string {
 export function expirySentence(
   expiresAt: string | undefined,
   kind: "link" | "code",
+  fallbackMinutes: number,
 ): string {
-  if (!expiresAt) {
-    return `This ${kind} expires soon.`;
+  let minutes = fallbackMinutes;
+  if (expiresAt) {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (Number.isFinite(ms) && ms > 0) {
+      minutes = Math.max(1, Math.round(ms / 60_000));
+    }
   }
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  if (!Number.isFinite(ms) || ms <= 0) {
-    return `This ${kind} expires soon.`;
-  }
-  const minutes = Math.max(1, Math.round(ms / 60_000));
-  return `This ${kind} expires in ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+  return `This ${kind} is valid for ${minutes} minute${minutes === 1 ? "" : "s"}.`;
+}
+
+function expiryForKind(
+  expiresAt: string | undefined,
+  emailKind: AuthEmailKind,
+  tokenKind: "link" | "code",
+): string {
+  return expirySentence(
+    expiresAt,
+    tokenKind,
+    AUTH_EMAIL_VALIDITY_MINUTES[emailKind],
+  );
 }
 
 export function escapeHtml(value: string): string {
@@ -112,7 +125,11 @@ export function renderRecoveryEmail(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "recovery",
+    input.code ? "code" : "link",
+  );
   const intro = input.code
     ? "We received a request to reset the password for your The Gamies account. Enter this code to choose a new password."
     : "We received a request to reset the password for your The Gamies account. Click the button below to choose a new password.";
@@ -135,7 +152,11 @@ export function renderConfirmationEmail(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "confirmation",
+    input.code ? "code" : "link",
+  );
   const action = input.code
     ? codeBlock(input.code)
     : input.href
@@ -156,7 +177,7 @@ export function renderEmailChangeEmail(input: {
   newEmail: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, "link");
+  const expiry = expiryForKind(input.expiresAt, "email-change", "link");
   const body = `
 ${heading("Confirm your email change")}
 <p style="margin:0 0 12px;font-size:15px;line-height:1.6;color:${MUTED};">
@@ -176,7 +197,11 @@ export function renderSignInEmail(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "sign-in",
+    input.code ? "code" : "link",
+  );
   const action = input.code
     ? codeBlock(input.code)
     : input.href
@@ -196,7 +221,11 @@ export function recoveryText(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "recovery",
+    input.code ? "code" : "link",
+  );
   if (input.code) {
     return `Reset your The Gamies password.\n\nYour code: ${input.code}\n\n${expiry}`;
   }
@@ -208,7 +237,11 @@ export function confirmationText(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "confirmation",
+    input.code ? "code" : "link",
+  );
   if (input.code) {
     return `Confirm your The Gamies email.\n\nYour code: ${input.code}\n\n${expiry}`;
   }
@@ -220,7 +253,11 @@ export function signInText(input: {
   code?: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, input.code ? "code" : "link");
+  const expiry = expiryForKind(
+    input.expiresAt,
+    "sign-in",
+    input.code ? "code" : "link",
+  );
   if (input.code) {
     return `Sign in to The Gamies.\n\nYour code: ${input.code}\n\n${expiry}`;
   }
@@ -233,6 +270,6 @@ export function emailChangeText(input: {
   newEmail: string;
   expiresAt?: string;
 }): string {
-  const expiry = expirySentence(input.expiresAt, "link");
+  const expiry = expiryForKind(input.expiresAt, "email-change", "link");
   return `Confirm your email change from ${input.currentEmail} to ${input.newEmail}.\n\n${input.href}\n\n${expiry}`;
 }

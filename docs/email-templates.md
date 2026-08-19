@@ -11,7 +11,7 @@ Branded transactional mail for Neon Auth, sent from the **Cloudflare Worker** (n
 | Email change | Confirm your email change for The Gamies | Verification payload includes current + new email |
 | Sign in | Sign in to The Gamies | Magic link / OTP sign-in |
 
-Copy and layout live in [`src/lib/email/templates.ts`](../src/lib/email/templates.ts). Palette matches the site (`--paper` / `--panel` / `--ink` / `--muted` / `--line` / `--accent`). Logo is `https://thegamies.gg/thegamies-logo.png`. No em dashes. Expiry text uses the webhook `expires_at` (Neon reset links are about 15 minutes).
+Copy and layout live in [`src/lib/email/templates.ts`](../src/lib/email/templates.ts). Palette matches the site (`--paper` / `--panel` / `--ink` / `--muted` / `--line` / `--accent`). Header is **The Gamies** as text (no logo image). No em dashes. Validity copy uses webhook `expires_at` when present, otherwise Neon defaults: password reset / confirm / email change **15 minutes**, sign-in magic link **5 minutes**.
 
 ## Send path
 
@@ -45,6 +45,8 @@ Auth email webhooks are **per database branch**. CI wires them:
 | Manual deploy | `preview/manual-<slug>` | `thegamies-v2-manual-<slug>` | Branch-deploy workflow |
 
 Local `dev_personal` Neon branch: run `scripts/ci/register-neon-auth-email-webhook.sh <branch_id> <https-origin>` after `pnpm preview:cf`, or set the webhook in Console. `next dev` on Node cannot send via the `EMAIL` binding.
+
+**No mail after sign-up:** Neon skips its default sender once `send.otp` is subscribed. The webhook URL must be that **same** Neon branch’s Cloudflare Worker (JWKS comes from that Worker’s `NEON_AUTH_BASE_URL`). A 401/503 in Worker logs means the code never left. Check spam for `noreply@thegamies.gg`.
 
 On each lasting Auth environment, also set Application name to **The Gamies**. Trusted domains must include the app origins so reset links land on `/auth/reset-password`.
 

@@ -11,8 +11,10 @@ describe("auth emails", () => {
     });
     expect(html).toContain("Reset your password");
     expect(html).toContain("Reset password");
-    expect(html).toContain("https://thegamies.gg/thegamies-logo.png");
+    expect(html).toContain("The Gamies");
+    expect(html).not.toContain("thegamies-logo.png");
     expect(html).toContain("#ff5a1f");
+    expect(html).toContain("This link is valid for 15 minutes.");
     expect(html).not.toContain("{{ .TokenHash }}");
   });
 
@@ -45,14 +47,27 @@ describe("auth emails", () => {
     expect(message?.text).toContain("123456");
   });
 
-  it("skips unknown events", () => {
-    expect(buildAuthEmail({ event_type: "user.created" })).toBeNull();
+  it("maps OTP codes for email verification", () => {
+    const message = buildAuthEmail({
+      event_type: "send.otp",
+      user: { email: "ada@example.com" },
+      event_data: {
+        otp_type: "email-verification",
+        otp_code: "654321",
+      },
+    });
+    expect(message?.subject).toBe(AUTH_EMAIL_SUBJECTS.confirmation);
+    expect(message?.html).toContain("654321");
+    expect(message?.text).toContain("This code is valid for 15 minutes.");
   });
 
-  it("describes expiry in minutes", () => {
+  it("describes how long a token is valid", () => {
     const inFifteen = new Date(Date.now() + 15 * 60_000).toISOString();
-    expect(expirySentence(inFifteen, "link")).toBe(
-      "This link expires in 15 minutes.",
+    expect(expirySentence(inFifteen, "link", 15)).toBe(
+      "This link is valid for 15 minutes.",
+    );
+    expect(expirySentence(undefined, "link", 5)).toBe(
+      "This link is valid for 5 minutes.",
     );
   });
 });
