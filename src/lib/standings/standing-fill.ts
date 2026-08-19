@@ -1,6 +1,8 @@
-export const DEFAULT_STANDING_FILL_MIN_VISIBLE = 3.2;
+export const DEFAULT_STANDING_FILL_MIN_VISIBLE = 2.2;
 export const STANDING_FILL_MIN_VISIBLE_MIN = 1;
 export const STANDING_FILL_MIN_VISIBLE_MAX = 5;
+/** Redeclares `--standing-fill-card` so a local covers-in-view count is used. */
+export const STANDING_FILL_SCOPE_CLASS = "standing-fill-scope";
 
 /**
  * How many fill-row covers sit in the viewport, including a fractional peek.

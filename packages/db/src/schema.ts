@@ -871,6 +871,6 @@ export const siteSettings = pgTable("site_settings", {
     .default(5),
   standingFillMinVisible: real("standing_fill_min_visible")
     .notNull()
-    .default(3.2),
+    .default(2.2),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

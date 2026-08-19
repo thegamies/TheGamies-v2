@@ -19,10 +19,26 @@
   /* Five equal standing cards at editorial max width. Narrower viewports
      size to `--standing-fill-min-visible` (decimals peek the next cover). */
   --standing-fill-gap: 1rem;
-  --standing-fill-min-visible: 3.2;
+  --standing-fill-min-visible: 2.2;
   --standing-fill-card-max: calc(
     (var(--page-max) - 2 * var(--gutter) - 4 * var(--standing-fill-gap)) / 5
   );
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --background: var(--paper);
+  --foreground: var(--ink);
+}
+
+/*
+ * Recompute card width wherever covers-in-view is overridden. A composed
+ * custom property on :root bakes in the :root default; descendants that only change
+ * --standing-fill-min-visible would otherwise keep the default size.
+ */
+:root,
+.standing-fill-scope {
   --standing-fill-card: min(
     var(--standing-fill-card-max),
     calc(
@@ -32,13 +48,6 @@
         ) / var(--standing-fill-min-visible)
     )
   );
-
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
-  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
-
-  --background: var(--paper);
-  --foreground: var(--ink);
 }
 
 @theme inline {

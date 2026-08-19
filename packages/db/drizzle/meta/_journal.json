@@ -225,6 +225,13 @@
       "when": 1787875200000,
       "tag": "0031_standing_fill_min_visible",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787961600000,
+      "tag": "0032_standing_fill_min_visible_2_2",
+      "breakpoints": true
     }
   ]
 }

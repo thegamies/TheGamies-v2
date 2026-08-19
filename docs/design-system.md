@@ -190,7 +190,7 @@ Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 | `--page-max` | Content width | `72rem` |
 | `--gutter` | Page padding | `1.5rem` |
 | `--standing-fill-gap` | Gap between fill-row standing cards | `1rem` |
-| `--standing-fill-min-visible` | Covers in view on a narrow fill-row (decimals peek) | `3.2` (admin, temporary) |
+| `--standing-fill-min-visible` | Covers in view on a narrow fill-row (decimals peek) | `2.2` (admin, temporary) |
 | `--standing-fill-card-max` | Fill-row card width at `--page-max` (5-up) | derived |
 | `--standing-fill-card` | Fill-row card width | `min` of max and visible-count size |
 

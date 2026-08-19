@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  STANDING_FILL_SCOPE_CLASS,
   parseStandingFillMinVisible,
   standingFillMinVisibleVars,
 } from "./standing-fill";
 
 describe("parseStandingFillMinVisible", () => {
   it("keeps one decimal and allows a fractional peek", () => {
-    expect(parseStandingFillMinVisible("3.2")).toBe(3.2);
+    expect(DEFAULT_STANDING_FILL_MIN_VISIBLE).toBe(2.2);
+    expect(parseStandingFillMinVisible("2.2")).toBe(2.2);
     expect(parseStandingFillMinVisible(3.25)).toBe(3.3);
     expect(parseStandingFillMinVisible(3)).toBe(3);
   });
@@ -25,8 +27,12 @@ describe("parseStandingFillMinVisible", () => {
 
 describe("standingFillMinVisibleVars", () => {
   it("writes the CSS custom property used by fill-row cards", () => {
-    expect(standingFillMinVisibleVars(3.2)).toEqual({
-      "--standing-fill-min-visible": "3.2",
+    expect(STANDING_FILL_SCOPE_CLASS).toBe("standing-fill-scope");
+    expect(standingFillMinVisibleVars(2.2)).toEqual({
+      "--standing-fill-min-visible": "2.2",
+    });
+    expect(standingFillMinVisibleVars(2.5)).toEqual({
+      "--standing-fill-min-visible": "2.5",
     });
   });
 });

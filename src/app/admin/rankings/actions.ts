@@ -215,7 +215,7 @@ export async function saveStandingFillMinVisibleAction(
   if (denied) return denied;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
-    return { error: "Enter how many covers should sit in view, such as 3.2." };
+    return { error: "Enter how many covers should sit in view, such as 2.2." };
   }
   try {
     const saved = await setStandingFillMinVisible(parsed);

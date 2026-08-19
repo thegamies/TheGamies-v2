@@ -319,7 +319,7 @@ export function AdminRankingsClient({
         <p className="text-sm text-muted">
           Temporary. How many homepage and all-years covers sit in view on a
           narrow screen. A decimal peeks the next cover so the row shows it
-          can scroll — 3.2 is three full covers and a sliver. A wide screen
+          can scroll — 2.2 is two full covers and a sliver. A wide screen
           still fits five.
         </p>
         <label className="block text-sm text-muted">

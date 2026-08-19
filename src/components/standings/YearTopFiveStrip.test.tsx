@@ -2,6 +2,7 @@
 
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { STANDING_FILL_SCOPE_CLASS } from "@/lib/standings/standing-fill";
 import { YearTopFiveStrip } from "./YearTopFiveStrip";
 
 class ResizeObserverStub {
@@ -126,7 +127,7 @@ describe("YearTopFiveStrip", () => {
       <YearTopFiveStrip
         year={2026}
         yearHref="/game-of-the-year/2026"
-        minVisible={3.2}
+        minVisible={2.5}
         rows={[
           {
             place: 1,
@@ -141,8 +142,9 @@ describe("YearTopFiveStrip", () => {
     );
 
     const article = container.querySelector("article");
+    expect(article?.classList.contains(STANDING_FILL_SCOPE_CLASS)).toBe(true);
     expect(article?.style.getPropertyValue("--standing-fill-min-visible")).toBe(
-      "3.2",
+      "2.5",
     );
   });
 });

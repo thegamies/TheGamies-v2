@@ -13,6 +13,7 @@ import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import type { CategoryHighlightWinner } from "@/lib/live-aggregate/category-highlights";
 import {
   DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  STANDING_FILL_SCOPE_CLASS,
   standingFillMinVisibleVars,
 } from "@/lib/standings/standing-fill";
 
@@ -55,7 +56,11 @@ export function YearTopFiveStrip({
 
   return (
     <article
-      className={showRule ? "mt-5 sm:mt-6" : undefined}
+      className={
+        showRule
+          ? `${STANDING_FILL_SCOPE_CLASS} mt-5 sm:mt-6`
+          : STANDING_FILL_SCOPE_CLASS
+      }
       style={standingFillMinVisibleVars(minVisible) as CSSProperties}
     >
       <div className="flex items-end justify-between gap-4 border-b border-line pb-2">
