@@ -80,7 +80,7 @@ describe("YearTopFiveStrip", () => {
     ).toBe("/games/hades-ii");
   });
 
-  it("sizes the top-five and category strips three-up on mobile", () => {
+  it("keeps the editorial 5-up card width on the top-five and category strips", () => {
     const { container } = render(
       <YearTopFiveStrip
         year={2026}
@@ -115,9 +115,8 @@ describe("YearTopFiveStrip", () => {
     const lists = [...container.querySelectorAll("ul")];
     expect(lists.length).toBe(2);
     for (const list of lists) {
-      expect(list.className).toContain("(100cqi_-_1rem)/3");
       expect(list.className).toContain(
-        "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+        "[grid-auto-columns:var(--standing-fill-card)]",
       );
     }
   });

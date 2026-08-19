@@ -17,17 +17,18 @@ describe("standingStripColClass", () => {
 });
 
 describe("standingFillFiveColClass", () => {
-  it("sizes three equal columns on mobile, five from sm, and keeps overflow on one track", () => {
+  it("uses the editorial 5-up card width at every breakpoint and keeps overflow on one track", () => {
     expect(standingFillFiveListClass).toContain("grid-flow-col");
-    expect(standingFillFiveListClass).toContain("(100cqi_-_1rem)/3");
     expect(standingFillFiveListClass).toContain(
-      "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+      "[grid-auto-columns:var(--standing-fill-card)]",
     );
-    expect(standingFillFiveListClass).not.toContain("(100cqi_-_2rem)/5");
+    expect(standingFillFiveListClass).toContain(
+      "gap-x-[var(--standing-fill-gap)]",
+    );
+    expect(standingFillFiveListClass).not.toContain("100cqi");
     expect(standingFillFiveListClass).toContain("overflow-y-hidden");
-    expect(standingFillFiveFlowClass).toContain("(100cqi_-_1rem)/3");
     expect(standingFillFiveFlowClass).toContain(
-      "sm:[grid-auto-columns:calc((100cqi_-_4rem)/5)]",
+      "[grid-auto-columns:var(--standing-fill-card)]",
     );
     expect(standingFillFiveColClass()).toContain("min-w-0");
     expect(standingFillFiveColClass()).not.toContain("w-[132px]");

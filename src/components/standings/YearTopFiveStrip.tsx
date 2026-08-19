@@ -28,7 +28,7 @@ const fillFiveColClass = standingFillFiveColClass();
 
 /**
  * One year of Top 5. Year + Full rankings share a ruled header bar.
- * Three equal cards fill the row on mobile, five from sm; extra ties stay on
+ * Cards keep the editorial 5-up width at every breakpoint; extra ties stay on
  * one row and scroll.
  */
 export function YearTopFiveStrip({

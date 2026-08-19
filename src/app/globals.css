@@ -16,6 +16,11 @@
 
   --page-max: 72rem;
   --gutter: 1.5rem;
+  /* Five equal standing cards at editorial max width; same size at every breakpoint. */
+  --standing-fill-gap: 1rem;
+  --standing-fill-card: calc(
+    (var(--page-max) - 2 * var(--gutter) - 4 * var(--standing-fill-gap)) / 5
+  );
 
   --motion-fast: 120ms;
   --motion-base: 200ms;
