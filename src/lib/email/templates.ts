@@ -160,12 +160,11 @@ export function renderConfirmationEmail(input: {
   const intro = input.href
     ? "Thanks for signing up for The Gamies. Click the button below to confirm your email and finish creating your account."
     : "Thanks for signing up for The Gamies. Confirm your email address to finish creating your account and start ranking games.";
-  const action = [
-    input.href ? ctaButton(input.href, "Confirm email") : "",
-    input.code ? codeBlock(input.code) : "",
-  ]
-    .filter(Boolean)
-    .join("");
+  const action = input.href
+    ? ctaButton(input.href, "Confirm email")
+    : input.code
+      ? codeBlock(input.code)
+      : "";
   const body = `
 ${heading("Confirm your email")}
 ${para(intro)}
@@ -247,8 +246,11 @@ export function confirmationText(input: {
     input.href ? "link" : "code",
   );
   const lines = ["Confirm your The Gamies email."];
-  if (input.href) lines.push("", input.href);
-  if (input.code) lines.push("", `Your code: ${input.code}`);
+  if (input.href) {
+    lines.push("", input.href);
+  } else if (input.code) {
+    lines.push("", `Your code: ${input.code}`);
+  }
   lines.push("", expiry);
   return lines.join("\n");
 }

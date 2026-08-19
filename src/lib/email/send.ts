@@ -52,12 +52,12 @@ export function buildAuthEmail(
         subject: AUTH_EMAIL_SUBJECTS.confirmation,
         html: renderConfirmationEmail({
           href: href ?? undefined,
-          code,
+          code: href ? undefined : code,
           expiresAt,
         }),
         text: confirmationText({
           href: href ?? undefined,
-          code,
+          code: href ? undefined : code,
           expiresAt,
         }),
       };

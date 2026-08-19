@@ -182,9 +182,9 @@ export async function removeAccountAvatar(): Promise<{
 }
 
 export async function deleteOwnAccount(
-  _prevState: { error: string } | null,
+  _prevState: AccountFormState,
   formData: FormData,
-) {
+): Promise<AccountFormState> {
   const { data: session } = await auth.getSession();
   const userId = session?.user?.id;
   const email = session?.user?.email?.trim();
@@ -217,6 +217,9 @@ export async function deleteOwnAccount(
   });
   if ("error" in closed) return closed;
 
+  // Auth user is gone. Finish tombstone best-effort, then return ok so the
+  // client can leave /account. signOut + redirect from this action crashes
+  // the Cloudflare Worker after the session is already invalid.
   if (profile) {
     const config = readR2AvatarConfigFromEnv();
     if (config) {
@@ -227,10 +230,12 @@ export async function deleteOwnAccount(
       }
     }
 
-    const purged = await purgeAndTombstoneProfile(profile.id);
-    if ("error" in purged) return purged;
-
-    revalidatePath(`/u/${profile.username}`);
+    try {
+      await purgeAndTombstoneProfile(profile.id);
+      revalidatePath(`/u/${profile.username}`);
+    } catch {
+      // Profile tombstone can retry later; the sign-in is already closed.
+    }
   }
 
   try {
@@ -239,6 +244,5 @@ export async function deleteOwnAccount(
     // Sign-in may already be closed.
   }
 
-  revalidatePath("/account");
-  redirect("/");
+  return { ok: true };
 }

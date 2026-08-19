@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import { Dialog } from "@/components/ui/Dialog";
@@ -9,6 +9,11 @@ import { deleteOwnAccount } from "./actions";
 export function AccountDeleteForm() {
   const [state, formAction, pending] = useActionState(deleteOwnAccount, null);
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!state?.ok) return;
+    window.location.assign("/");
+  }, [state]);
 
   function closeDialog() {
     if (pending) return;

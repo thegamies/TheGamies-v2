@@ -60,10 +60,14 @@ describe("auth emails", () => {
       { origin: "https://thegamies.gg" },
     );
     expect(message?.subject).toBe(AUTH_EMAIL_SUBJECTS.confirmation);
-    expect(message?.html).toContain("654321");
     expect(message?.html).toContain("Confirm email");
     expect(message?.html).toContain(
       "https://thegamies.gg/auth/verify-email?email=ada%40example.com&amp;otp=654321",
+    );
+    expect(message?.html).not.toContain("letter-spacing:0.2em");
+    expect(message?.text).not.toContain("Your code:");
+    expect(message?.text).toContain(
+      "https://thegamies.gg/auth/verify-email?email=ada%40example.com&otp=654321",
     );
     expect(message?.text).toContain("This link is valid for 15 minutes.");
   });

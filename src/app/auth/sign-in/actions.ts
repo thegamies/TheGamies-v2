@@ -2,12 +2,14 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 import { isUnverifiedEmailError } from "@/lib/auth/email-verification-copy";
+import { parseListAuthIntent } from "@/lib/lists/auth-intent";
+import {
+  buildVerifyEmailHref,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/return-to";
 
-export type SignInState =
-  | { error: string; unverifiedEmail?: string }
-  | null;
+export type SignInState = { error: string } | null;
 
 export async function signInWithEmail(
   _prevState: SignInState,
@@ -15,10 +17,8 @@ export async function signInWithEmail(
 ): Promise<SignInState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const next = resolvePostAuthRedirect(
-    formData.get("next"),
-    formData.get("intent"),
-  );
+  const intent = parseListAuthIntent(formData.get("intent"));
+  const next = resolvePostAuthRedirect(formData.get("next"), intent);
 
   if (!email || !password) {
     return { error: "Enter your email and password." };
@@ -30,11 +30,16 @@ export async function signInWithEmail(
   });
 
   if (error) {
-    const message = error.message || "Could not sign in.";
     if (isUnverifiedEmailError(error)) {
-      return { error: message, unverifiedEmail: email };
+      redirect(
+        buildVerifyEmailHref({
+          email,
+          next: String(formData.get("next") ?? "") || null,
+          intent,
+        }),
+      );
     }
-    return { error: message };
+    return { error: error.message || "Could not sign in." };
   }
 
   redirect(next);

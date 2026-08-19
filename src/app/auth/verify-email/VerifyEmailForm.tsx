@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
+  VERIFY_EMAIL_CONFIRMING,
   VERIFY_EMAIL_INVALID,
-  VERIFY_EMAIL_MISSING,
   VERIFY_EMAIL_RESENT,
   VERIFY_EMAIL_SENT,
 } from "@/lib/auth/email-verification-copy";
@@ -27,7 +27,7 @@ type Props = {
   next?: string | null;
   intent?: string | null;
   allowEmailEdit?: boolean;
-  /** Request a code on first paint when Neon skipped `send.otp` during sign-up. */
+  /** Request a confirmation link on first paint when none was sent yet. */
   sendCodeOnMount?: boolean;
 };
 
@@ -40,19 +40,17 @@ export function VerifyEmailForm({
   sendCodeOnMount = false,
 }: Props) {
   const [email, setEmail] = useState(initialEmail);
-  const [otp, setOtp] = useState(initialOtp ?? "");
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(
+    Boolean((initialOtp ?? "").replace(/\s/g, "") && initialEmail.trim()),
+  );
   const [resent, setResent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const autoTried = useRef(false);
   const codeRequested = useRef(false);
+  const linkCode = (initialOtp ?? "").replace(/\s/g, "");
 
   async function confirm(address: string, code: string) {
-    if (!address) return;
-    if (!code) {
-      setError(VERIFY_EMAIL_MISSING);
-      return;
-    }
+    if (!address || !code) return;
     setPending(true);
     setError(null);
     try {
@@ -62,39 +60,32 @@ export function VerifyEmailForm({
       });
       if (verifyError) {
         setError(VERIFY_EMAIL_INVALID);
+        setPending(false);
         return;
       }
       const dest = resolvePostAuthRedirect(next ?? readPostAuthNext(), intent);
       clearPostAuthNext();
       window.location.assign(dest);
-    } finally {
+    } catch {
+      setError(VERIFY_EMAIL_INVALID);
       setPending(false);
     }
   }
 
   useEffect(() => {
     const address = initialEmail.trim();
-    const code = (initialOtp ?? "").replace(/\s/g, "");
-    if (address && code && !autoTried.current) {
+    if (address && linkCode && !autoTried.current) {
       autoTried.current = true;
-      void confirm(address, code);
+      void confirm(address, linkCode);
       return;
     }
     if (sendCodeOnMount && address && !codeRequested.current) {
       codeRequested.current = true;
-      void resendEmailVerificationOtp({ email: address }).then(() => {
-        setResent(true);
-      });
+      void resendEmailVerificationOtp({ email: address });
     }
-    // First paint: confirm from the email link, or request a code after sign-up.
+    // First paint: confirm from the email link, or request a link after sign-in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function onVerify(formData: FormData) {
-    const address = String(formData.get("email") ?? email).trim();
-    const code = String(formData.get("otp") ?? "").replace(/\s/g, "");
-    await confirm(address, code);
-  }
 
   async function onResend() {
     const address = email.trim();
@@ -109,8 +100,16 @@ export function VerifyEmailForm({
     }
   }
 
+  if (linkCode && pending && !error) {
+    return (
+      <p className="mt-10 text-sm text-muted" role="status">
+        {VERIFY_EMAIL_CONFIRMING}
+      </p>
+    );
+  }
+
   return (
-    <form action={onVerify} className="mt-10 space-y-4">
+    <div className="mt-10 space-y-4">
       {allowEmailEdit || !initialEmail ? (
         <label className="block text-sm text-muted">
           Email
@@ -125,40 +124,20 @@ export function VerifyEmailForm({
           />
         </label>
       ) : (
-        <input type="hidden" name="email" value={email} />
-      )}
-      {!allowEmailEdit && initialEmail ? (
         <p className="text-sm text-ink">{email}</p>
-      ) : null}
-      <label className="block text-sm text-muted">
-        Confirmation code
-        <input
-          name="otp"
-          type="text"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          required
-          value={otp}
-          onChange={(event) => setOtp(event.target.value)}
-          className={fieldClass}
-        />
-      </label>
+      )}
       <p className="text-sm text-muted" role="status">
         {resent ? VERIFY_EMAIL_RESENT : VERIFY_EMAIL_SENT}
       </p>
       {error ? <p className="text-sm text-accent">{error}</p> : null}
-      <Button type="submit" disabled={pending} className="w-full">
-        {pending ? "Confirming…" : "Confirm email"}
-      </Button>
       <Button
         type="button"
-        variant="quiet"
-        disabled={pending}
+        disabled={pending || !email.trim()}
         className="w-full"
         onClick={onResend}
       >
-        Send another code
+        {pending ? "Sending…" : "Send another email"}
       </Button>
-    </form>
+    </div>
   );
 }
