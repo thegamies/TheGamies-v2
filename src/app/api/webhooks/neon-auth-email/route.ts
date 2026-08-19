@@ -22,7 +22,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid webhook." }, { status: 401 });
   }
 
-  const message = buildAuthEmail(payload);
+  const message = buildAuthEmail(payload, {
+    origin: new URL(request.url).origin,
+  });
   if (!message) {
     const eventType = payload.event_type ?? "";
     if (eventType === "send.otp" || eventType === "send.magic_link") {

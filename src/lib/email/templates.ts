@@ -155,16 +155,20 @@ export function renderConfirmationEmail(input: {
   const expiry = expiryForKind(
     input.expiresAt,
     "confirmation",
-    input.code ? "code" : "link",
+    input.href ? "link" : "code",
   );
-  const action = input.code
-    ? codeBlock(input.code)
-    : input.href
-      ? ctaButton(input.href, "Confirm email")
-      : "";
+  const intro = input.href
+    ? "Thanks for signing up for The Gamies. Click the button below to confirm your email and finish creating your account."
+    : "Thanks for signing up for The Gamies. Confirm your email address to finish creating your account and start ranking games.";
+  const action = [
+    input.href ? ctaButton(input.href, "Confirm email") : "",
+    input.code ? codeBlock(input.code) : "",
+  ]
+    .filter(Boolean)
+    .join("");
   const body = `
 ${heading("Confirm your email")}
-${para("Thanks for signing up for The Gamies. Confirm your email address to finish creating your account and start ranking games.")}
+${para(intro)}
 ${action}
 ${footnote(`${expiry} If you didn&rsquo;t create a The Gamies account, you can safely ignore this email.`)}
 `;
@@ -240,12 +244,13 @@ export function confirmationText(input: {
   const expiry = expiryForKind(
     input.expiresAt,
     "confirmation",
-    input.code ? "code" : "link",
+    input.href ? "link" : "code",
   );
-  if (input.code) {
-    return `Confirm your The Gamies email.\n\nYour code: ${input.code}\n\n${expiry}`;
-  }
-  return `Confirm your The Gamies email.\n\n${input.href ?? ""}\n\n${expiry}`;
+  const lines = ["Confirm your The Gamies email."];
+  if (input.href) lines.push("", input.href);
+  if (input.code) lines.push("", `Your code: ${input.code}`);
+  lines.push("", expiry);
+  return lines.join("\n");
 }
 
 export function signInText(input: {

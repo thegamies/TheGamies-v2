@@ -26,6 +26,7 @@ function VerifyEmailBody() {
       <p className="mt-3 text-muted">{VERIFY_EMAIL_INTRO}</p>
       <VerifyEmailForm
         email={email}
+        otp={searchParams.get("otp")}
         next={next}
         intent={intent}
         allowEmailEdit={!email}

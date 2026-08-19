@@ -48,17 +48,24 @@ describe("auth emails", () => {
   });
 
   it("maps OTP codes for email verification", () => {
-    const message = buildAuthEmail({
-      event_type: "send.otp",
-      user: { email: "ada@example.com" },
-      event_data: {
-        otp_type: "email-verification",
-        otp_code: "654321",
+    const message = buildAuthEmail(
+      {
+        event_type: "send.otp",
+        user: { email: "ada@example.com" },
+        event_data: {
+          otp_type: "email-verification",
+          otp_code: "654321",
+        },
       },
-    });
+      { origin: "https://thegamies.gg" },
+    );
     expect(message?.subject).toBe(AUTH_EMAIL_SUBJECTS.confirmation);
     expect(message?.html).toContain("654321");
-    expect(message?.text).toContain("This code is valid for 15 minutes.");
+    expect(message?.html).toContain("Confirm email");
+    expect(message?.html).toContain(
+      "https://thegamies.gg/auth/verify-email?email=ada%40example.com&amp;otp=654321",
+    );
+    expect(message?.text).toContain("This link is valid for 15 minutes.");
   });
 
   it("describes how long a token is valid", () => {

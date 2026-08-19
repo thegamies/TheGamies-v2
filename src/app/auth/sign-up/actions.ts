@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { requestEmailVerificationOtp } from "@/lib/auth/request-email-verification";
 import { auth } from "@/lib/auth/server";
 import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
@@ -8,7 +9,7 @@ import { validatePassword } from "@/lib/auth/password";
 
 export type SignUpState =
   | { error: string }
-  | { needsVerification: true; email: string }
+  | { needsVerification: true; email: string; codeRequested: boolean }
   | null;
 
 export async function signUpWithEmail(
@@ -59,7 +60,8 @@ export async function signUpWithEmail(
   }
 
   if (data?.user?.emailVerified === false) {
-    return { needsVerification: true, email };
+    const codeRequested = await requestEmailVerificationOtp(email);
+    return { needsVerification: true, email, codeRequested };
   }
 
   redirect(next);

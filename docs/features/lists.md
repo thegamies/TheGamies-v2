@@ -74,7 +74,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Create: `/create`, `/create/goty`, `/create/custom`
 - Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`). GOTY lists use secondary tabs **Game of the Year** (default) and **Categories** (`?view=categories`). Categories loads only that list’s picks (not the full award catalog). **Edit** on Categories opens `/create/goty?id=…&view=categories`. Switching tabs in the GOTY editor updates the same `?view=` query. Custom lists have no tabs.
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
-- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
+- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). After sign-up, confirm email (link in the message, or a code). The save/share `next` is kept so the user returns to the list. General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
 - Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs.
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`

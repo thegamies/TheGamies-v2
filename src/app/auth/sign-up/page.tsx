@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState } from "react";
+import { Suspense, useActionState, useEffect } from "react";
 import { VerifyEmailForm } from "@/app/auth/verify-email/VerifyEmailForm";
 import { Button } from "@/components/ui/Button";
 import {
   VERIFY_EMAIL_HEADING,
   VERIFY_EMAIL_INTRO,
 } from "@/lib/auth/email-verification-copy";
+import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
 import { PASSWORD_HELPER } from "@/lib/auth/password";
 import { buildSignInHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
@@ -26,6 +27,10 @@ function SignUpForm() {
     null as SignUpState,
   );
 
+  useEffect(() => {
+    rememberPostAuthNext(next || null);
+  }, [next]);
+
   if (state && "needsVerification" in state) {
     return (
       <>
@@ -40,6 +45,7 @@ function SignUpForm() {
           email={state.email}
           next={next || null}
           intent={intent}
+          sendCodeOnMount={!state.codeRequested}
         />
       </>
     );

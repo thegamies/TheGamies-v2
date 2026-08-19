@@ -2,10 +2,10 @@ import { AUTH_EMAIL_VALIDITY_MINUTES } from "@/lib/email/copy";
 
 export const VERIFY_EMAIL_HEADING = "Confirm your email";
 
-export const VERIFY_EMAIL_INTRO = `We sent a confirmation code to this address. It is valid for ${AUTH_EMAIL_VALIDITY_MINUTES.confirmation} minutes.`;
+export const VERIFY_EMAIL_INTRO = `We sent a confirmation link to this address. It is valid for ${AUTH_EMAIL_VALIDITY_MINUTES.confirmation} minutes. You can also enter the code from the email.`;
 
 export const VERIFY_EMAIL_SENT =
-  "Check your inbox for a confirmation code from The Gamies.";
+  "Open the confirmation link in your email, or enter the code here.";
 
 export const VERIFY_EMAIL_RESENT = "We sent another code to that address.";
 

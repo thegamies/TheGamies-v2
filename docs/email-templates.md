@@ -46,7 +46,7 @@ Auth email webhooks are **per database branch**. CI wires them:
 
 Local `dev_personal` Neon branch: run `scripts/ci/register-neon-auth-email-webhook.sh <branch_id> <https-origin>` after `pnpm preview:cf`, or set the webhook in Console. `next dev` on Node cannot send via the `EMAIL` binding.
 
-**No mail after sign-up:** Neon skips its default sender once `send.otp` is subscribed. The webhook URL must be that **same** Neon branch’s Cloudflare Worker (JWKS comes from that Worker’s `NEON_AUTH_BASE_URL`). A 401/503 in Worker logs means the code never left. Check spam for `noreply@thegamies.gg`.
+**No mail after sign-up:** Neon skips its default sender once `send.otp` is subscribed. The webhook URL must be that **same** Neon branch’s Cloudflare Worker (JWKS comes from that Worker’s `NEON_AUTH_BASE_URL`). A 401/503 in Worker logs means the code never left. Check spam for `noreply@thegamies.gg`. Confirmation mail includes a **Confirm email** button to `/auth/verify-email` on that Worker origin (code still in the message). Sign-up `next` is stored in a same-browser cookie so save/share return still works after the click.
 
 On each lasting Auth environment, also set Application name to **The Gamies**. Trusted domains must include the app origins so reset links land on `/auth/reset-password`.
 

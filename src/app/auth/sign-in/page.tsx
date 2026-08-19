@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState } from "react";
+import { Suspense, useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import { PASSWORD_RESET_UPDATED } from "@/lib/auth/password";
 import { VERIFY_EMAIL_SIGN_IN } from "@/lib/auth/email-verification-copy";
+import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
 import { buildSignUpHref, buildVerifyEmailHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signInWithEmail } from "./actions";
@@ -18,6 +19,10 @@ function SignInForm() {
   const next = searchParams.get("next") ?? "";
   const intent = parseListAuthIntent(searchParams.get("intent"));
   const [state, formAction, pending] = useActionState(signInWithEmail, null);
+
+  useEffect(() => {
+    rememberPostAuthNext(next || null);
+  }, [next]);
 
   return (
     <form action={formAction} className="mt-10 space-y-4">

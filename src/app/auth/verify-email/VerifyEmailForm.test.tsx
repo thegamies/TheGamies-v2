@@ -58,6 +58,26 @@ describe("VerifyEmailForm", () => {
     expect(await screen.findByText(VERIFY_EMAIL_INVALID)).toBeTruthy();
   });
 
+  it("confirms from an email return link", async () => {
+    verifyEmailOtp.mockResolvedValue({});
+    const assign = vi.fn();
+    vi.stubGlobal("location", { assign: assign });
+    render(
+      <VerifyEmailForm
+        email="ada@example.com"
+        otp="654321"
+        next="/create/goty"
+      />,
+    );
+    await vi.waitFor(() => {
+      expect(verifyEmailOtp).toHaveBeenCalledWith({
+        email: "ada@example.com",
+        otp: "654321",
+      });
+      expect(assign).toHaveBeenCalledWith("/create/goty");
+    });
+  });
+
   it("sends another code without leaving the page", async () => {
     resendEmailVerificationOtp.mockResolvedValue({});
     render(<VerifyEmailForm email="ada@example.com" />);
@@ -66,5 +86,18 @@ describe("VerifyEmailForm", () => {
     expect(resendEmailVerificationOtp).toHaveBeenCalledWith({
       email: "ada@example.com",
     });
+  });
+
+  it("requests a code after sign-up when Neon skipped send.otp", async () => {
+    resendEmailVerificationOtp.mockResolvedValue({});
+    render(
+      <VerifyEmailForm email="ada@example.com" sendCodeOnMount />,
+    );
+    await vi.waitFor(() => {
+      expect(resendEmailVerificationOtp).toHaveBeenCalledWith({
+        email: "ada@example.com",
+      });
+    });
+    expect(await screen.findByText(VERIFY_EMAIL_RESENT)).toBeTruthy();
   });
 });

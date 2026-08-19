@@ -1,3 +1,4 @@
+import { buildVerifyEmailAbsoluteHref } from "@/lib/auth/return-to";
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
 import {
@@ -24,6 +25,7 @@ export function authEmailFromAddress(): string {
 
 export function buildAuthEmail(
   payload: NeonAuthEmailPayload,
+  options: { origin?: string } = {},
 ): AuthEmailMessage | null {
   const to = payload.user?.email?.trim();
   if (!to) return null;
@@ -42,11 +44,22 @@ export function buildAuthEmail(
       };
     }
     if (data.otp_type === "email-verification") {
+      const href = options.origin
+        ? buildVerifyEmailAbsoluteHref(options.origin, { email: to, otp: code })
+        : null;
       return {
         to,
         subject: AUTH_EMAIL_SUBJECTS.confirmation,
-        html: renderConfirmationEmail({ code, expiresAt }),
-        text: confirmationText({ code, expiresAt }),
+        html: renderConfirmationEmail({
+          href: href ?? undefined,
+          code,
+          expiresAt,
+        }),
+        text: confirmationText({
+          href: href ?? undefined,
+          code,
+          expiresAt,
+        }),
       };
     }
     return {

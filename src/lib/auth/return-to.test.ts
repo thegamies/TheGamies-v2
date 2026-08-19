@@ -3,6 +3,7 @@ import { safeNextPath } from "./safe-next";
 import {
   buildSignInHref,
   buildSignUpHref,
+  buildVerifyEmailAbsoluteHref,
   buildVerifyEmailHref,
   resolvePostAuthRedirect,
   returnPathFromLocation,
@@ -49,6 +50,23 @@ describe("buildSignInHref / buildSignUpHref", () => {
     expect(href.startsWith("/auth/verify-email?")).toBe(true);
     expect(href).toContain("email=ada%40example.com");
     expect(href).toContain("next=");
+  });
+
+  it("builds an absolute confirm URL with the code", () => {
+    expect(
+      buildVerifyEmailAbsoluteHref("https://thegamies-v2.example.workers.dev", {
+        email: "ada@example.com",
+        otp: "654321",
+      }),
+    ).toBe(
+      "https://thegamies-v2.example.workers.dev/auth/verify-email?email=ada%40example.com&otp=654321",
+    );
+    expect(
+      buildVerifyEmailAbsoluteHref("http://evil.example", {
+        email: "ada@example.com",
+        otp: "1",
+      }),
+    ).toBeNull();
   });
 });
 
