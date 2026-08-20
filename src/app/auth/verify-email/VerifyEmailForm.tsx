@@ -8,7 +8,10 @@ import {
   VERIFY_EMAIL_SENT,
 } from "@/lib/auth/email-verification-copy";
 import { readPostAuthNext } from "@/lib/auth/post-auth-next";
-import { resolvePostAuthRedirect } from "@/lib/auth/return-to";
+import {
+  buildEmailConfirmedCallbackUrl,
+  resolvePostAuthRedirect,
+} from "@/lib/auth/return-to";
 import { sendVerificationLink } from "@/lib/auth/verify-email-client";
 
 const fieldClass =
@@ -25,7 +28,10 @@ type Props = {
 
 function callbackURL(next: string | null | undefined, intent: string | null | undefined) {
   const dest = resolvePostAuthRedirect(next ?? readPostAuthNext(), intent);
-  return `${window.location.origin}${dest}`;
+  return (
+    buildEmailConfirmedCallbackUrl(window.location.origin, dest) ??
+    `${window.location.origin}/auth/confirmed`
+  );
 }
 
 export function VerifyEmailForm({

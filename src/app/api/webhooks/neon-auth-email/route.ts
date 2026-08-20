@@ -22,7 +22,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid webhook." }, { status: 401 });
   }
 
-  const message = buildAuthEmail(payload);
+  const message = buildAuthEmail(payload, {
+    appOrigin:
+      process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ||
+      new URL(request.url).origin,
+    neonAuthBaseUrl: baseUrl,
+  });
   if (!message) {
     if (isIgnoredAuthEmail(payload)) {
       return NextResponse.json({ ok: true, skipped: true });

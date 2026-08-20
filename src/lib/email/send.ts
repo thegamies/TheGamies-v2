@@ -1,5 +1,6 @@
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
+import { rewriteNeonAuthEmailHref } from "./auth-link";
 import {
   confirmationText,
   emailChangeText,
@@ -32,12 +33,21 @@ export function isIgnoredAuthEmail(payload: NeonAuthEmailPayload): boolean {
 
 export function buildAuthEmail(
   payload: NeonAuthEmailPayload,
+  opts?: { appOrigin?: string; neonAuthBaseUrl?: string },
 ): AuthEmailMessage | null {
   if (isIgnoredAuthEmail(payload)) return null;
   const to = payload.user?.email?.trim();
   if (!to) return null;
   const data = payload.event_data ?? {};
   const expiresAt = data.expires_at;
+
+  function hrefForMagicLink(linkType: string | undefined, href: string): string {
+    if (linkType === "forget-password") return href;
+    const appOrigin = opts?.appOrigin?.trim();
+    const neonAuthBaseUrl = opts?.neonAuthBaseUrl?.trim();
+    if (!appOrigin || !neonAuthBaseUrl) return href;
+    return rewriteNeonAuthEmailHref(href, { appOrigin, neonAuthBaseUrl });
+  }
 
   if (payload.event_type === "send.otp") {
     const code = data.otp_code?.trim();
@@ -59,8 +69,9 @@ export function buildAuthEmail(
   }
 
   if (payload.event_type === "send.magic_link") {
-    const href = data.link_url?.trim();
-    if (!href) return null;
+    const rawHref = data.link_url?.trim();
+    if (!rawHref) return null;
+    const href = hrefForMagicLink(data.link_type, rawHref);
     if (data.link_type === "forget-password") {
       return {
         to,

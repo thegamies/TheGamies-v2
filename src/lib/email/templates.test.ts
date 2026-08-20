@@ -66,6 +66,28 @@ describe("auth emails", () => {
     expect(message?.text).toContain("This link is valid for 15 minutes.");
   });
 
+  it("proxies verification magic links through the app auth handler", () => {
+    const message = buildAuthEmail(
+      {
+        event_type: "send.magic_link",
+        user: { email: "ada@example.com" },
+        event_data: {
+          link_type: "email-verification",
+          link_url:
+            "https://ep-test.neon.tech/neondb/auth/verify-email?token=abc&callbackURL=https%3A%2F%2Fthegamies.gg%2Faccount",
+        },
+      },
+      {
+        appOrigin: "https://thegamies-v2-pr-12.example.workers.dev",
+        neonAuthBaseUrl: "https://ep-test.neon.tech/neondb/auth/",
+      },
+    );
+    expect(message?.html).toContain(
+      "https://thegamies-v2-pr-12.example.workers.dev/api/auth/verify-email?token=abc",
+    );
+    expect(message?.html).not.toContain("ep-test.neon.tech");
+  });
+
   it("skips leftover email-verification OTP events", () => {
     expect(
       buildAuthEmail({

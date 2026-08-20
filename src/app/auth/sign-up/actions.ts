@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
 import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import {
-  buildAbsoluteAppUrl,
+  buildEmailConfirmedCallbackUrl,
   resolvePostAuthRedirect,
 } from "@/lib/auth/return-to";
 import { skipEmailVerification } from "@/lib/auth/skip-email-verification";
@@ -41,7 +41,8 @@ export async function signUpWithEmail(
     formData.get("next"),
     formData.get("intent"),
   );
-  const callbackURL = buildAbsoluteAppUrl(await requestOrigin(), next) ?? undefined;
+  const callbackURL =
+    buildEmailConfirmedCallbackUrl(await requestOrigin(), next) ?? undefined;
 
   if (!email || !password || !name || !username) {
     return { error: "Fill in all fields." };

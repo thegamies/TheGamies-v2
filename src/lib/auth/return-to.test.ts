@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { safeNextPath } from "./safe-next";
 import {
   buildAbsoluteAppUrl,
+  buildEmailConfirmedCallbackUrl,
   buildSignInHref,
   buildSignUpHref,
   buildVerifyEmailHref,
@@ -59,6 +60,17 @@ describe("buildSignInHref / buildSignUpHref", () => {
     expect(
       buildAbsoluteAppUrl("http://evil.example", "/account"),
     ).toBeNull();
+  });
+
+  it("builds an email-confirmed callback URL", () => {
+    expect(
+      buildEmailConfirmedCallbackUrl(
+        "https://thegamies-v2.example.workers.dev",
+        "/create/goty",
+      ),
+    ).toBe(
+      "https://thegamies-v2.example.workers.dev/auth/confirmed?next=%2Fcreate%2Fgoty",
+    );
   });
 });
 

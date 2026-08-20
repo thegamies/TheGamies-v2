@@ -47,6 +47,18 @@ export function buildAbsoluteAppUrl(origin: string, path: string): string | null
   return `${base}${safePath}`;
 }
 
+/** Where Neon should send the browser after the confirm-email click. */
+export function buildEmailConfirmedCallbackUrl(
+  origin: string,
+  next: string,
+): string | null {
+  const dest = safeNextPath(next) ?? "/account";
+  return buildAbsoluteAppUrl(
+    origin,
+    `/auth/confirmed?next=${encodeURIComponent(dest)}`,
+  );
+}
+
 function buildAuthHref(
   base: "/auth/sign-in" | "/auth/sign-up" | "/auth/verify-email",
   opts: { next?: string | null; intent?: ListAuthIntent | null },
