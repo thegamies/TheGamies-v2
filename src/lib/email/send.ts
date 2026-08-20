@@ -1,6 +1,6 @@
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
-import { rewriteNeonAuthEmailHref } from "./auth-link";
+import { rewriteNeonAuthEmailHref, confirmationPageHref } from "./auth-link";
 import {
   confirmationText,
   emailChangeText,
@@ -46,6 +46,9 @@ export function buildAuthEmail(
     const appOrigin = opts?.appOrigin?.trim();
     const neonAuthBaseUrl = opts?.neonAuthBaseUrl?.trim();
     if (!appOrigin || !neonAuthBaseUrl) return href;
+    if (linkType === "email-verification") {
+      return confirmationPageHref(href, { appOrigin, neonAuthBaseUrl });
+    }
     return rewriteNeonAuthEmailHref(href, { appOrigin, neonAuthBaseUrl });
   }
 

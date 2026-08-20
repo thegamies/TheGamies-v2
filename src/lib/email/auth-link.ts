@@ -1,3 +1,5 @@
+import { safeNextPath } from "@/lib/auth/safe-next";
+
 /**
  * Neon Auth email links hit the hosted Auth origin. Clicking those cannot set
  * the app session cookie (cross-site). Proxy the same path through `/api/auth`.
@@ -36,6 +38,46 @@ export function rewriteNeonAuthEmailHref(
   return rewritten.toString();
 }
 
+/**
+ * Confirm-email clicks land on the app with the token still unused, so the
+ * client can verify through `/api/auth` and store the session cookie.
+ */
+export function confirmationPageHref(
+  href: string,
+  input: { appOrigin: string; neonAuthBaseUrl: string },
+): string {
+  const rewritten = rewriteNeonAuthEmailHref(href, input);
+  let link: URL;
+  try {
+    link = new URL(rewritten);
+  } catch {
+    return rewritten;
+  }
+  const token = link.searchParams.get("token");
+  if (!token) return rewritten;
+  const next = nextFromCallback(link.searchParams.get("callbackURL"), input.appOrigin);
+  const appOrigin = input.appOrigin.replace(/\/$/, "");
+  return `${appOrigin}/auth/confirmed?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
+}
+
+function nextFromCallback(
+  callback: string | null,
+  appOrigin: string,
+): string {
+  if (!callback) return "/account";
+  try {
+    const url = callback.startsWith("/")
+      ? new URL(callback, appOrigin)
+      : new URL(callback);
+    const fromQuery = safeNextPath(url.searchParams.get("next"));
+    if (fromQuery) return fromQuery;
+    if (url.pathname.startsWith("/auth/")) return "/account";
+    return safeNextPath(`${url.pathname}${url.search}`) ?? "/account";
+  } catch {
+    return "/account";
+  }
+}
+
 function rewriteCallbackToAppOrigin(
   callback: string,
   appOrigin: string,
@@ -50,3 +92,4 @@ function rewriteCallbackToAppOrigin(
     return null;
   }
 }
+

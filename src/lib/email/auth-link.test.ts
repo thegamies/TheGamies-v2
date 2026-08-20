@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewriteNeonAuthEmailHref } from "./auth-link";
+import { confirmationPageHref, rewriteNeonAuthEmailHref } from "./auth-link";
 
 const neon = "https://ep-test.neon.tech/neondb/auth/";
 const app = "https://thegamies-v2-pr-12.example.workers.dev";
@@ -27,5 +27,22 @@ describe("rewriteNeonAuthEmailHref", () => {
         neonAuthBaseUrl: neon,
       }),
     ).toBe(original);
+  });
+});
+
+describe("confirmationPageHref", () => {
+  it("sends confirm-email clicks to the app with the token still unused", () => {
+    const callback = encodeURIComponent(
+      "https://thegamies.gg/auth/confirmed?next=/create/goty",
+    );
+    const href = confirmationPageHref(
+      `https://ep-test.neon.tech/neondb/auth/verify-email?token=abc&callbackURL=${callback}`,
+      { appOrigin: app, neonAuthBaseUrl: neon },
+    );
+    const url = new URL(href);
+    expect(url.origin).toBe(app);
+    expect(url.pathname).toBe("/auth/confirmed");
+    expect(url.searchParams.get("token")).toBe("abc");
+    expect(url.searchParams.get("next")).toBe("/create/goty");
   });
 });

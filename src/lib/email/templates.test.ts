@@ -66,7 +66,7 @@ describe("auth emails", () => {
     expect(message?.text).toContain("This link is valid for 15 minutes.");
   });
 
-  it("proxies verification magic links through the app auth handler", () => {
+  it("puts the confirmation token on the app so a session can be stored", () => {
     const message = buildAuthEmail(
       {
         event_type: "send.magic_link",
@@ -83,8 +83,9 @@ describe("auth emails", () => {
       },
     );
     expect(message?.html).toContain(
-      "https://thegamies-v2-pr-12.example.workers.dev/api/auth/verify-email?token=abc",
+      "https://thegamies-v2-pr-12.example.workers.dev/auth/confirmed?token=abc",
     );
+    expect(message?.html).toContain("next=%2Faccount");
     expect(message?.html).not.toContain("ep-test.neon.tech");
   });
 
