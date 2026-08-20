@@ -213,7 +213,7 @@ type BallotVoterGameRow = {
   coverUrl: string | null;
 };
 
-/** GOTY ranks from ballot tables (not freeze copies). */
+/** GOTY ranks from ballot tables (not freeze copies). Closed/published ballots stay after account tombstone so Comparison host columns remain. */
 async function loadBallotVoterRanks(
   editionId: string,
   profileIds: string[],

@@ -24,6 +24,9 @@ Work top to bottom.
 - [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local). Neon branch name should be **`develop`** — PR/manual previews parent from it.
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
+- [ ] Keep **Sign-up with email** enabled in Neon Auth so password-reset mail can send. Reset links go to `/auth/reset-password`. Local `pnpm dev` on localhost skips confirm-email (no Auth mail on Node). Pull-request previews and develop/staging still require confirmation.
+- [ ] Auth branded mail: enable Cloudflare Email Sending for `thegamies.gg`. CI points each Neon Auth **branch** webhook at that environment’s Cloudflare Worker (`/api/webhooks/neon-auth-email`). Production: set the webhook once on the production Auth branch. Details: [email-templates.md](./email-templates.md).
+- [ ] Account deletion closes the Neon Auth user so the email can be reused. Neon’s SDK `deleteUser()` is often a no-op; the app also deletes `neon_auth.user` / `users_sync` on this branch, and if `NEON_API_KEY` + `NEON_PROJECT_ID` are set it calls [Delete auth user](https://neon.com/docs/reference/api/auth/delete-branch-neon-auth-user) (same action as Console → Auth → Users). Manual leftover users: Console → Auth → Users.
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
 - [ ] Add trusted domains in Neon Auth for **staging and production** hosts (Console → Auth → Configuration → Domains). `localhost` ports are pre-approved; **LAN IPs are not** — for phone/device testing add the URL you open on the phone (e.g. `http://192.168.1.123:3000`). `next.config.ts` allowlists this machine’s current LAN IPs for `/_next` assets; restart `next dev` after a network change. Extra hostnames go in Doppler `ALLOWED_DEV_ORIGINS`.
 - [ ] PR / manual previews: CI creates a Neon branch with its own Auth URL and registers that deploy’s Vercel + Cloudflare origins as trusted domains on the branch — no manual domain entry per preview. Details: [deployment.md](./deployment.md#neon-auth-urls-and-domains).
@@ -57,7 +60,7 @@ Work top to bottom.
 ## 4. GitHub (app secrets for deploys)
 
 - [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
-- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, plus avatar R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_AVATAR_BUCKET`, `AVATAR_PUBLIC_BASE_URL`)
+- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, plus avatar R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_AVATAR_BUCKET`, `AVATAR_PUBLIC_BASE_URL`), plus `NEXT_PUBLIC_GA_MEASUREMENT_ID` when Analytics should run, plus optional `AUTH_EMAIL_FROM` for branded Auth mail
 - [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
 - [ ] Re-run **Staging dual deploy** on `develop` after importing or changing secrets
 - [ ] Confirm Cloudflare Worker `thegamies-v2-develop` → Settings → Variables and Secrets

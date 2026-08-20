@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { safeNextPath } from "./safe-next";
 import {
+  buildAbsoluteAppUrl,
+  buildEmailConfirmedCallbackUrl,
   buildSignInHref,
   buildSignUpHref,
+  buildVerifyEmailHref,
   resolvePostAuthRedirect,
   returnPathFromLocation,
 } from "./return-to";
@@ -38,6 +41,36 @@ describe("buildSignInHref / buildSignUpHref", () => {
     expect(
       buildSignUpHref({ next: "/create/goty?year=2026", intent: "share" }),
     ).toContain("/auth/sign-up?");
+  });
+
+  it("builds verify-email with the address", () => {
+    const href = buildVerifyEmailHref({
+      email: "ada@example.com",
+      next: "/account",
+    });
+    expect(href.startsWith("/auth/verify-email?")).toBe(true);
+    expect(href).toContain("email=ada%40example.com");
+    expect(href).toContain("next=");
+  });
+
+  it("builds an absolute callback URL", () => {
+    expect(
+      buildAbsoluteAppUrl("https://thegamies-v2.example.workers.dev", "/account"),
+    ).toBe("https://thegamies-v2.example.workers.dev/account");
+    expect(
+      buildAbsoluteAppUrl("http://evil.example", "/account"),
+    ).toBeNull();
+  });
+
+  it("builds an email-confirmed callback URL", () => {
+    expect(
+      buildEmailConfirmedCallbackUrl(
+        "https://thegamies-v2.example.workers.dev",
+        "/create/goty",
+      ),
+    ).toBe(
+      "https://thegamies-v2.example.workers.dev/auth/confirmed?next=%2Fcreate%2Fgoty",
+    );
   });
 });
 

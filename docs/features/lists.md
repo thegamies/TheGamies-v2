@@ -51,7 +51,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Optional per-game notes (blurbs) — **signed-in only**, max **500** characters
 - GOTY builder heading is `{year} Game of the Year` in body ink (no Title field). Custom lists keep an editable Title.
 - Hold briefly to reorder (scroll is blocked while holding so the page does not steal the gesture). List format: six-dot handle on the right of each row. Poster/Grid: tap a game to open an external **Remove** popover (ink-contrast border, design-system danger button) that points at the card; tap elsewhere to dismiss. List keeps a text **Remove** control beside the title.
-- Signed-in owners can **Delete list** from the editor (danger confirm). GOTY lists also leave the live board. Redirects to the profile Lists tab.
+- Signed-in owners can **Delete list** from the editor (danger confirm). GOTY lists also leave the live board. Redirects to the profile Lists tab. Deleting the **account** removes every owned list the same way.
 - Image export via **Share → Share as image** on GOTY ranking view (JPEG poster). Rank style (banner / chip / off + suffix) and **default view** (Grid / List / Poster; new lists default to Grid) are saved on the list. The public list page uses that default and lets anyone switch formats.
 - **Settings** (rank style) only on Poster, not on List/Grid or the Categories tab.
 - List **size** is a layout control only — changing empty slots is not an unsaved edit. Switching format is preview-only until **Default view** is checked.
@@ -74,7 +74,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Create: `/create`, `/create/goty`, `/create/custom`
 - Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`). GOTY lists use secondary tabs **Game of the Year** (default) and **Categories** (`?view=categories`). Categories loads only that list’s picks (not the full award catalog). **Edit** on Categories opens `/create/goty?id=…&view=categories`. Switching tabs in the GOTY editor updates the same `?view=` query. Custom lists have no tabs.
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
-- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
+- Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). After sign-up, confirm email (link in the message, or a code). The save/share `next` is kept so the user returns to the list. General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
 - Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs.
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`

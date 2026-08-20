@@ -15,8 +15,13 @@ import {
   getProfileByAuthUserId,
   updateOwnedAvatarUrl,
   updateOwnedProfile,
+  usernameTaken,
 } from "@/lib/profile/service";
-import { visibilitySchema } from "@/lib/profile/username";
+import {
+  USERNAME_NOT_AVAILABLE,
+  parseOwnedUsername,
+  visibilitySchema,
+} from "@/lib/profile/username";
 
 async function requireSessionUserId(next = "/account"): Promise<string> {
   const { data: session } = await auth.getSession();
@@ -27,11 +32,17 @@ async function requireSessionUserId(next = "/account"): Promise<string> {
   return userId;
 }
 
+export type AccountFormState = {
+  error?: string;
+  ok?: boolean;
+} | null;
+
 export async function saveAccountProfile(
-  _prevState: { error: string } | null,
+  _prevState: AccountFormState,
   formData: FormData,
-) {
+): Promise<AccountFormState> {
   const userId = await requireSessionUserId();
+  const existing = await getProfileByAuthUserId(userId);
 
   const username = String(formData.get("username") ?? "");
   const displayName = String(formData.get("displayName") ?? "");
@@ -69,8 +80,27 @@ export async function saveAccountProfile(
   }
 
   revalidatePath("/account");
+  if (existing?.username && existing.username !== updated.profile.username) {
+    revalidatePath(`/u/${existing.username}`);
+  }
   revalidatePath(`/u/${updated.profile.username}`);
-  return null;
+  return { ok: true };
+}
+
+export async function checkUsernameAvailable(username: string): Promise<{
+  available: boolean;
+  error?: string;
+}> {
+  const userId = await requireSessionUserId();
+  const parsed = parseOwnedUsername(username);
+  if ("error" in parsed) {
+    return { available: false, error: parsed.error };
+  }
+  const taken = await usernameTaken(parsed.username, userId);
+  if (taken) {
+    return { available: false, error: USERNAME_NOT_AVAILABLE };
+  }
+  return { available: true };
 }
 
 export async function uploadAccountAvatar(

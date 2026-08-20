@@ -187,6 +187,9 @@ export const profiles = pgTable("profiles", {
   avatarUrl: text("avatar_url"),
   socialLinks: jsonb("social_links").$type<Record<string, string>>(),
   visibility: text("visibility").notNull().default("public"),
+  deletedAt: timestamp("deleted_at", { mode: "date" }),
+  /** Set when the public handle changes; NULL means the next rename is allowed immediately. */
+  usernameChangedAt: timestamp("username_changed_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -368,7 +371,7 @@ export const communityEditionBallots = pgTable(
       .references(() => communityEditions.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id")
       .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+      .references(() => profiles.id, { onDelete: "restrict" }),
     submittedAt: timestamp("submitted_at", { mode: "date" })
       .defaultNow()
       .notNull(),
@@ -534,7 +537,7 @@ export const communityEditionVoices = pgTable(
       .references(() => communityEditions.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id")
       .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+      .references(() => profiles.id, { onDelete: "restrict" }),
     designatedAt: timestamp("designated_at", { mode: "date" })
       .defaultNow()
       .notNull(),
@@ -638,7 +641,7 @@ export const communityEditionResultVoters = pgTable(
       .references(() => communityEditions.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id")
       .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+      .references(() => profiles.id, { onDelete: "restrict" }),
     isVoice: boolean("is_voice").notNull().default(false),
     displayName: text("display_name").notNull(),
     username: text("username").notNull(),
@@ -660,7 +663,7 @@ export const communityEditionResultVoterRanks = pgTable(
       .references(() => communityEditions.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id")
       .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+      .references(() => profiles.id, { onDelete: "restrict" }),
     rank: integer("rank").notNull(),
     gameId: uuid("game_id")
       .notNull()
@@ -686,7 +689,7 @@ export const communityEditionResultVoterCategoryPicks = pgTable(
       .references(() => communityEditions.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id")
       .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+      .references(() => profiles.id, { onDelete: "restrict" }),
     categoryId: text("category_id")
       .notNull()
       .references(() => awardCategories.id, { onDelete: "cascade" }),

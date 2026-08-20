@@ -23,7 +23,7 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 | Styles | Tailwind + design tokens |
 | Hosts | **Vercel and Cloudflare Workers (OpenNext)** — both first-class |
 | DB | Neon Postgres (server `DATABASE_URL` owner role; **no RLS policies yet**) |
-| Auth | Neon Auth (Managed Better Auth); profiles in app `profiles` table |
+| Auth | Neon Auth (Managed Better Auth); profiles in app `profiles` table. Account deletion closes the auth user via SDK `deleteUser`, the Neon Auth Users API, and `neon_auth` SQL (SDK delete is often a no-op). The UI posts JSON to `/api/account/delete` (not a Server Action): after Auth close, OpenNext crashes if Next re-renders `/account` or `redirect()`s. |
 | Access control | **App-layer** session + ownership until Auth JWT → DB role for RLS is defined |
 | Catalog | IGDB via separate worker |
 | Validation | Zod |

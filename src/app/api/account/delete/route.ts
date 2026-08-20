@@ -1,0 +1,60 @@
+import { NextResponse } from "next/server";
+import { ACCOUNT_DELETE_FAILED } from "@/lib/auth/account-delete-copy";
+import { auth } from "@/lib/auth/server";
+import {
+  authSessionCookieNamesFromHeader,
+  originMatchesRequestHost,
+} from "@/lib/auth/session-cookies";
+import { closeOwnAccount } from "@/lib/profile/close-own-account";
+
+function expireAuthCookies(request: Request, response: NextResponse): void {
+  for (const name of authSessionCookieNamesFromHeader(
+    request.headers.get("cookie"),
+  )) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+      secure: name.startsWith("__Secure-") || name.startsWith("__Host-"),
+    });
+  }
+}
+
+/**
+ * JSON POST so the client can leave `/account` with a full navigation.
+ * A Server Action would re-render `/account` after Auth close and OpenNext
+ * serves the load-error page instead of the action result.
+ */
+export async function POST(request: Request) {
+  if (!originMatchesRequestHost(request)) {
+    return NextResponse.json(
+      { error: ACCOUNT_DELETE_FAILED },
+      { status: 403 },
+    );
+  }
+
+  const { data: session } = await auth.getSession();
+  const userId = session?.user?.id;
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Sign in to delete your account." },
+      { status: 401 },
+    );
+  }
+
+  const formData = await request.formData();
+  const result = await closeOwnAccount({
+    authUserId: userId,
+    email: session.user.email,
+    password: String(formData.get("password") ?? ""),
+  });
+
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: 400 });
+  }
+
+  const response = NextResponse.json({ ok: true });
+  expireAuthCookies(request, response);
+  return response;
+}

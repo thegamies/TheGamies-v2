@@ -12,6 +12,8 @@ import { EditionFullStandings } from "@/components/communities/EditionFullStandi
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
+import { VoterProfileHandle } from "@/components/communities/VoterProfileHandle";
+import { isAnonymizedVoter } from "@/lib/profile/delete-account";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import type {
@@ -329,14 +331,14 @@ export function EditionResultsView({
             {publicBallot.voter.displayName}
             {publicBallot.voter.isVoice ? " · Host" : ""}
           </h3>
-          <p className="mt-1 text-sm text-muted">
-            <Link
-              href={`/u/${publicBallot.voter.username}`}
-              className="hover:text-accent hover:underline"
-            >
-              @{publicBallot.voter.username}
-            </Link>
-          </p>
+          {isAnonymizedVoter(publicBallot.voter) ? null : (
+            <p className="mt-1 text-sm text-muted">
+              <VoterProfileHandle
+                username={publicBallot.voter.username}
+                displayName={publicBallot.voter.displayName}
+              />
+            </p>
+          )}
           <EditionBallotReadonly
             items={publicBallot.items}
             categoryVotes={publicBallot.categoryVotes}

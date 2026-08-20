@@ -1,9 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { createDb, profiles, type Db } from "@thegamies/db";
 import {
+  USERNAME_COOLDOWN_MESSAGE,
+  USERNAME_NOT_AVAILABLE,
+  canChangeUsername,
   displayNameSchema,
   normalizeUsername,
-  usernameSchema,
+  parseOwnedUsername,
 } from "@/lib/profile/username";
 import {
   mergeSocialLinks,
@@ -27,7 +30,9 @@ export async function getProfileByAuthUserId(
   const rows = await db
     .select()
     .from(profiles)
-    .where(eq(profiles.authUserId, authUserId))
+    .where(
+      and(eq(profiles.authUserId, authUserId), isNull(profiles.deletedAt)),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -35,12 +40,17 @@ export async function getProfileByAuthUserId(
 export async function getProfileByUsername(
   username: string,
   db: Db = getDb(),
+  opts: { includeDeleted?: boolean } = {},
 ): Promise<Profile | null> {
   const normalized = normalizeUsername(username);
   const rows = await db
     .select()
     .from(profiles)
-    .where(eq(profiles.username, normalized))
+    .where(
+      opts.includeDeleted
+        ? eq(profiles.username, normalized)
+        : and(eq(profiles.username, normalized), isNull(profiles.deletedAt)),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -50,7 +60,9 @@ export async function usernameTaken(
   exceptAuthUserId?: string,
   db: Db = getDb(),
 ): Promise<boolean> {
-  const existing = await getProfileByUsername(username, db);
+  const existing = await getProfileByUsername(username, db, {
+    includeDeleted: true,
+  });
   if (!existing) return false;
   if (exceptAuthUserId && existing.authUserId === exceptAuthUserId) {
     return false;
@@ -67,9 +79,9 @@ export async function ensureProfileForAuthUser(input: {
   username: string;
   displayName: string;
 }): Promise<{ profile: Profile; created: boolean } | { error: string }> {
-  const usernameParsed = usernameSchema.safeParse(input.username);
-  if (!usernameParsed.success) {
-    return { error: "Choose a username with 3–24 letters, numbers, or underscores." };
+  const usernameParsed = parseOwnedUsername(input.username);
+  if ("error" in usernameParsed) {
+    return { error: usernameParsed.error };
   }
   const displayParsed = displayNameSchema.safeParse(input.displayName);
   if (!displayParsed.success) {
@@ -82,15 +94,15 @@ export async function ensureProfileForAuthUser(input: {
     return { profile: existing, created: false };
   }
 
-  if (await usernameTaken(usernameParsed.data, undefined, db)) {
-    return { error: "That username is taken." };
+  if (await usernameTaken(usernameParsed.username, undefined, db)) {
+    return { error: USERNAME_NOT_AVAILABLE };
   }
 
   const inserted = await db
     .insert(profiles)
     .values({
       authUserId: input.authUserId,
-      username: usernameParsed.data,
+      username: usernameParsed.username,
       displayName: displayParsed.data,
       visibility: "public",
     })
@@ -111,9 +123,9 @@ export async function updateOwnedProfile(input: {
   visibility: "public" | "private";
   socialLinks?: SocialLinks;
 }): Promise<{ profile: Profile } | { error: string }> {
-  const usernameParsed = usernameSchema.safeParse(input.username);
-  if (!usernameParsed.success) {
-    return { error: "Choose a username with 3–24 letters, numbers, or underscores." };
+  const usernameParsed = parseOwnedUsername(input.username);
+  if ("error" in usernameParsed) {
+    return { error: usernameParsed.error };
   }
   const displayParsed = displayNameSchema.safeParse(input.displayName);
   if (!displayParsed.success) {
@@ -126,8 +138,13 @@ export async function updateOwnedProfile(input: {
     return { error: "Profile not found." };
   }
 
-  if (await usernameTaken(usernameParsed.data, input.authUserId, db)) {
-    return { error: "That username is taken." };
+  const usernameChanged = existing.username !== usernameParsed.username;
+  if (usernameChanged && !canChangeUsername(existing.usernameChangedAt)) {
+    return { error: USERNAME_COOLDOWN_MESSAGE };
+  }
+
+  if (await usernameTaken(usernameParsed.username, input.authUserId, db)) {
+    return { error: USERNAME_NOT_AVAILABLE };
   }
 
   let socialLinks: Record<string, string> | null | undefined;
@@ -145,15 +162,17 @@ export async function updateOwnedProfile(input: {
     }
   }
 
+  const now = new Date();
   const updated = await db
     .update(profiles)
     .set({
-      username: usernameParsed.data,
+      username: usernameParsed.username,
       displayName: displayParsed.data,
       bio: input.bio?.trim() ? input.bio.trim() : null,
       visibility: input.visibility,
       ...(socialLinks !== undefined ? { socialLinks } : {}),
-      updatedAt: new Date(),
+      ...(usernameChanged ? { usernameChangedAt: now } : {}),
+      updatedAt: now,
     })
     .where(eq(profiles.authUserId, input.authUserId))
     .returning();

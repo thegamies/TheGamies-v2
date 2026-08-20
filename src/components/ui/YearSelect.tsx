@@ -43,10 +43,10 @@ export function YearSelect({
 
   useLayoutEffect(() => {
     if (!open) return;
-    const root = rootRef.current;
-    if (!root) return;
 
     function place() {
+      const root = rootRef.current;
+      if (!root) return;
       const trigger = root.getBoundingClientRect();
       const menuWidth =
         listRef.current?.getBoundingClientRect().width || YEAR_SELECT_MENU_MIN_PX;

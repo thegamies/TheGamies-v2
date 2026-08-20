@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState } from "react";
+import { Suspense, useActionState, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
+import { PASSWORD_RESET_UPDATED } from "@/lib/auth/password";
+import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
 import { buildSignUpHref } from "@/lib/auth/return-to";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { signInWithEmail } from "./actions";
@@ -16,6 +18,10 @@ function SignInForm() {
   const next = searchParams.get("next") ?? "";
   const intent = parseListAuthIntent(searchParams.get("intent"));
   const [state, formAction, pending] = useActionState(signInWithEmail, null);
+
+  useEffect(() => {
+    rememberPostAuthNext(next || null);
+  }, [next]);
 
   return (
     <form action={formAction} className="mt-10 space-y-4">
@@ -41,6 +47,11 @@ function SignInForm() {
           className={fieldClass}
         />
       </label>
+      <p className="text-sm">
+        <Link href="/auth/forgot-password" className="text-ink underline">
+          Forgot password?
+        </Link>
+      </p>
       {state?.error ? (
         <p className="text-sm text-accent">{state.error}</p>
       ) : null}
@@ -48,6 +59,16 @@ function SignInForm() {
         {pending ? "Signing in…" : "Sign in"}
       </Button>
     </form>
+  );
+}
+
+function ResetNotice() {
+  const searchParams = useSearchParams();
+  if (searchParams.get("reset") !== "1") return null;
+  return (
+    <p className="mt-4 text-sm text-muted" role="status">
+      {PASSWORD_RESET_UPDATED}
+    </p>
   );
 }
 
@@ -73,6 +94,10 @@ export default function SignInPage() {
         Sign in
       </h1>
       <p className="mt-3 text-muted">Welcome back to The Gamies.</p>
+
+      <Suspense fallback={null}>
+        <ResetNotice />
+      </Suspense>
 
       <Suspense fallback={null}>
         <SignInForm />

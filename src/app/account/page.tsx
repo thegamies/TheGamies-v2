@@ -6,6 +6,8 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
+import { AccountDeleteForm } from "./AccountDeleteForm";
+import { AccountPasswordForm } from "./AccountPasswordForm";
 import { AccountProfileForm } from "./AccountProfileForm";
 
 export const dynamic = "force-dynamic";
@@ -71,6 +73,8 @@ export default async function AccountPage() {
             </Link>
           </p>
           <AccountProfileForm profile={profile} />
+          <AccountPasswordForm />
+          <AccountDeleteForm />
         </>
       )}
     </main>

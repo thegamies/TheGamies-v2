@@ -113,6 +113,8 @@ Rules:
 
 `Dialog` — dimmed overlay (`bg-black/50`) + `--panel` surface with a display title and ✕ close. Escape, the close control, and clicking the dimmed edge close it. Default (`placement="modal"`): `--line` border, ink title. `tone="danger"`: `--danger` border and title. `placement="contained"`: centered like a modal, capped to the viewport (`max-h`), sticky title, scrolling body — use for tall pickers (Add categories). Confirm with filled `danger`; cancel stays bordered. Event delete also requires typing the year. Do not invent a second modal chrome.
 
+`CookieConsentBanner` — compact `--panel` card with a hard `--line` border, **fixed bottom-right** (`z-40`, under `Dialog` at `z-[60]`). Safe-area padding. Accept (accent) / Reject (bordered). Not a full-width bottom bar. `preview` renders in-flow for the gallery.
+
 ## Section rule
 
 `SectionRule` — accent tick + muted hairline spanning the full content width (tick shrink-0, hairline `flex-1`). Used for edition and live category chapter breaks. Prefer this over a plain `border-t` when the break should feel ceremonial. Place the rule at article/section width — not inside a narrow flex column — so the hairline reads full-bleed within the page rail.
@@ -149,7 +151,7 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, `CookieConsentBanner`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
 
 Planned: `EventNavigation`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 

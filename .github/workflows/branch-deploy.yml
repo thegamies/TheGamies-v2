@@ -187,6 +187,7 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
           AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
         run: |
           if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
             echo "DATABASE_URL is empty for Neon preview branch; refusing to deploy." >&2
@@ -196,7 +197,7 @@ jobs:
           printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
           pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -264,6 +265,8 @@ jobs:
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
           AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
+          AUTH_EMAIL_FROM: ${{ secrets.AUTH_EMAIL_FROM }}
           WORKER: ${{ needs.prepare.outputs.worker }}
         run: |
           if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
@@ -291,6 +294,8 @@ jobs:
             "R2_SECRET_ACCESS_KEY",
             "R2_AVATAR_BUCKET",
             "AVATAR_PUBLIC_BASE_URL",
+            "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+            "AUTH_EMAIL_FROM",
           ];
           const secrets = {};
           const lines = ["NEXTJS_ENV=production"];
@@ -345,6 +350,23 @@ jobs:
           else
             echo "No deploy URLs to register."
           fi
+      - name: Register Neon Auth email webhook on Cloudflare
+        if: needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
+          CF_URL: ${{ needs.cloudflare.outputs.url }}
+        run: |
+          chmod +x scripts/ci/register-neon-auth-email-webhook.sh
+          case "$CF_URL" in
+            https://*)
+              scripts/ci/register-neon-auth-email-webhook.sh "$BRANCH_ID" "$CF_URL"
+              ;;
+            *)
+              echo "No Cloudflare https URL; skipping Auth email webhook."
+              ;;
+          esac
 
   summary:
     if: inputs.action == 'deploy'

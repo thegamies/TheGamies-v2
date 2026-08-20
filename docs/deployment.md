@@ -91,6 +91,7 @@ Configure on the repo:
 | `R2_SECRET_ACCESS_KEY` | R2 secret key |
 | `R2_AVATAR_BUCKET` | Avatar bucket (same as the prior Gamies) |
 | `AVATAR_PUBLIC_BASE_URL` | Public base URL for avatar objects |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public; both hosts). Unset = no gtag |
 | `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname; also used as public URL if `STAGING_VERCEL_APP_URL` unset |
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.
@@ -167,6 +168,9 @@ What CI does for previews and manual deploys:
 - Downstream jobs resolve `DATABASE_URL` with `scripts/ci/neon-database-url.sh` (job outputs cannot carry the masked `db_url`)
 - Deploys both hosts with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
 - POSTs each deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
+- PUTs Auth **email webhooks** on that branch to the **Cloudflare** origin `/api/webhooks/neon-auth-email` (`scripts/ci/register-neon-auth-email-webhook.sh`). Staging does the same for Neon branch `develop` → worker `thegamies-v2-develop`.
+
+Each Neon Auth branch has its own webhook URL. A preview Worker never receives production reset mail, and production never sends through a PR worker. Local personal branches: run the same script (or set the webhook in Console) against your Worker/`wrangler` preview URL.
 
 The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_URL` should point at). Rename in Neon or change `parent_branch` in the workflows if yours differs.
 

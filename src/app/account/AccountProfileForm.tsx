@@ -4,6 +4,7 @@ import { useActionState, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { UserAvatar } from "@/components/profile/UserAvatar";
 import {
+  checkUsernameAvailable,
   removeAccountAvatar,
   saveAccountProfile,
   uploadAccountAvatar,
@@ -17,6 +18,10 @@ import {
   socialLinkUrlToHandle,
 } from "@/lib/profile/social-links";
 import type { Profile } from "@/lib/profile/service";
+import {
+  formatUsernameChangeAllowedOn,
+  nextUsernameChangeAllowedAt,
+} from "@/lib/profile/username";
 
 const fieldClass =
   "mt-1 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent";
@@ -25,9 +30,12 @@ export function AccountProfileForm({ profile }: { profile: Profile }) {
   const [state, formAction, pending] = useActionState(saveAccountProfile, null);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [usernameHint, setUsernameHint] = useState<string | null>(null);
   const [avatarPending, startAvatar] = useTransition();
+  const [, startUsernameCheck] = useTransition();
   const fileRef = useRef<HTMLInputElement>(null);
   const socials = normalizeSocialLinks(profile.socialLinks);
+  const nextRename = nextUsernameChangeAllowedAt(profile.usernameChangedAt);
 
   function onPickFile(file: File | undefined) {
     if (!file) return;
@@ -134,9 +142,38 @@ export function AccountProfileForm({ profile }: { profile: Profile }) {
           required
           defaultValue={profile.username}
           pattern="[A-Za-z0-9_]{3,24}"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           className={fieldClass}
+          onBlur={(e) => {
+            const value = e.target.value;
+            if (!value || value.toLowerCase() === profile.username) {
+              setUsernameHint(null);
+              return;
+            }
+            startUsernameCheck(async () => {
+              const result = await checkUsernameAvailable(value);
+              setUsernameHint(result.error ?? null);
+            });
+          }}
         />
       </label>
+      {usernameHint ? (
+        <p className="text-sm text-accent" role="status">
+          {usernameHint}
+        </p>
+      ) : null}
+      {nextRename ? (
+        <p className="text-xs text-muted">
+          You can change your username again on{" "}
+          {formatUsernameChangeAllowedOn(nextRename)}.
+        </p>
+      ) : (
+        <p className="text-xs text-muted">
+          3–24 letters, numbers, or underscores.
+        </p>
+      )}
       <label className="block text-sm text-muted">
         Bio
         <textarea
@@ -178,7 +215,13 @@ export function AccountProfileForm({ profile }: { profile: Profile }) {
         </select>
       </label>
       {state?.error ? (
-        <p className="text-sm text-accent">{state.error}</p>
+        <p className="text-sm text-accent" role="alert">
+          {state.error}
+        </p>
+      ) : state?.ok ? (
+        <p className="text-sm text-muted" role="status">
+          Profile saved.
+        </p>
       ) : null}
       <Button type="submit" disabled={pending || avatarPending}>
         {pending ? "Saving…" : "Save profile"}

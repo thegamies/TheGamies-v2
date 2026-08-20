@@ -10,6 +10,7 @@ export const IGDB_URL = "https://www.igdb.com/";
 export const SITE_INFO_LINKS = [
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
+  { href: "/guidelines", label: "Guidelines" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ] as const;

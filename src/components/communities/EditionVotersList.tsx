@@ -6,10 +6,12 @@ import {
 } from "@/lib/communities/edition-results-href";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
+import { VoterProfileHandle } from "@/components/communities/VoterProfileHandle";
 import {
   editionBoardLabel,
   type EditionResultsPublicMode,
 } from "@/lib/communities/edition-results-scoring";
+import { isAnonymizedVoter } from "@/lib/profile/delete-account";
 
 export function EditionVotersList({
   slug,
@@ -118,15 +120,19 @@ export function EditionVotersList({
                   {yourProfileId === v.profileId ? " (you)" : ""}
                 </p>
               )}
-              <p className="text-sm text-muted">
-                <Link
-                  href={`/u/${v.username}`}
-                  className="hover:text-accent hover:underline"
-                >
-                  @{v.username}
-                </Link>
-                {v.isVoice ? " · Host" : ""}
-              </p>
+              {isAnonymizedVoter(v) && !v.isVoice ? null : (
+                <p className="text-sm text-muted">
+                  <VoterProfileHandle
+                    username={v.username}
+                    displayName={v.displayName}
+                  />
+                  {v.isVoice
+                    ? isAnonymizedVoter(v)
+                      ? "Host"
+                      : " · Host"
+                    : null}
+                </p>
+              )}
             </li>
           ))}
         </ul>

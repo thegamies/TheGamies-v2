@@ -23,8 +23,44 @@ export function buildSignUpHref(opts: {
   return buildAuthHref("/auth/sign-up", opts);
 }
 
+/** Build `/auth/verify-email` with optional email, return path, and list intent. */
+export function buildVerifyEmailHref(opts: {
+  email?: string | null;
+  next?: string | null;
+  intent?: ListAuthIntent | null;
+} = {}): string {
+  const href = buildAuthHref("/auth/verify-email", opts);
+  const params = new URLSearchParams(href.split("?")[1] ?? "");
+  const email = opts.email?.trim();
+  if (email) params.set("email", email);
+  const qs = params.toString();
+  return qs ? `/auth/verify-email?${qs}` : "/auth/verify-email";
+}
+
+/** Absolute in-app URL for Auth callbacks (verification / post-sign-up). */
+export function buildAbsoluteAppUrl(origin: string, path: string): string | null {
+  const base = origin.trim().replace(/\/$/, "");
+  if (!base.startsWith("https://") && !base.startsWith("http://localhost")) {
+    return null;
+  }
+  const safePath = path.startsWith("/") && !path.startsWith("//") ? path : "/account";
+  return `${base}${safePath}`;
+}
+
+/** Where Neon should send the browser after the confirm-email click. */
+export function buildEmailConfirmedCallbackUrl(
+  origin: string,
+  next: string,
+): string | null {
+  const dest = safeNextPath(next) ?? "/account";
+  return buildAbsoluteAppUrl(
+    origin,
+    `/auth/confirmed?next=${encodeURIComponent(dest)}`,
+  );
+}
+
 function buildAuthHref(
-  base: "/auth/sign-in" | "/auth/sign-up",
+  base: "/auth/sign-in" | "/auth/sign-up" | "/auth/verify-email",
   opts: { next?: string | null; intent?: ListAuthIntent | null },
 ): string {
   const intent = opts.intent ?? null;
