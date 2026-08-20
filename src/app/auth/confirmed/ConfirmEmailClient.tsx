@@ -10,24 +10,20 @@ export function ConfirmEmailClient() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
   const next = resolvePostAuthRedirect(searchParams.get("next"));
-  const [error, setError] = useState<string | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const started = useRef(false);
+  const error = token ? verifyError : "missing";
 
   useEffect(() => {
-    if (started.current) return;
+    if (!token || started.current) return;
     started.current = true;
-    if (!token) {
-      setError("missing");
-      return;
-    }
     void confirmEmailWithToken(token).then((result) => {
       if ("ok" in result) {
         // Full document load so SiteHeader picks up the new session cookie.
-        // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- session cookie must apply on a new document
         window.location.assign(next);
         return;
       }
-      setError(result.error);
+      setVerifyError(result.error);
     });
   }, [token, next]);
 
