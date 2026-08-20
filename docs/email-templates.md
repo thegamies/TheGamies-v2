@@ -44,7 +44,7 @@ Auth email webhooks are **per database branch**. CI wires them:
 | PR preview | `preview/pr-<n>` | `thegamies-v2-pr-<n>` | Preview workflow |
 | Manual deploy | `preview/manual-<slug>` | `thegamies-v2-manual-<slug>` | Branch-deploy workflow |
 
-Local `dev_personal` Neon branch: run `scripts/ci/register-neon-auth-email-webhook.sh <branch_id> <https-origin>` after `pnpm preview:cf`, or set the webhook in Console. `next dev` on Node cannot send via the `EMAIL` binding, so local sign-up **skips confirm-email** (marks the Neon Auth user verified in `neon_auth`). Preview, staging, and production still require the confirmation link.
+Local `dev_personal` Neon branch: run `scripts/ci/register-neon-auth-email-webhook.sh <branch_id> <https-origin>` after `pnpm preview:cf`, or set the webhook in Console. `next dev` on Node cannot send via the `EMAIL` binding, so **local laptop sign-up only** skips confirm-email (marks the Neon Auth user verified in `neon_auth`). Pull-request previews, develop/staging, and production still require the confirmation link.
 
 **No mail after sign-up:** Neon skips its default sender once `send.otp` / `send.magic_link` is subscribed. The webhook URL must be that **same** Neon branch’s Cloudflare Worker (JWKS comes from that Worker’s `NEON_AUTH_BASE_URL`). A 401/503 in Worker logs means the code never left. Check spam for `noreply@thegamies.gg`. Confirmation uses Neon **Verification link**: branded mail’s **Confirm email** button is Neon’s `link_url`. After the click, Auth redirects to the app `callbackURL` (save/share `next`, or `/account`). Unverified sign-in goes to `/auth/verify-email` and can send another link. Do not wrap OTP codes in a site URL.
 

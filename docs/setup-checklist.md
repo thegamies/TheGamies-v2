@@ -24,7 +24,7 @@ Work top to bottom.
 - [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local). Neon branch name should be **`develop`** — PR/manual previews parent from it.
 - [ ] (Recommended) lasting Neon branch `local/<you>` on Doppler `dev_personal`
 - [ ] Enable **Neon Auth** on the project branch; copy Auth URL → Doppler `NEON_AUTH_BASE_URL` + GitHub `STAGING_NEON_AUTH_BASE_URL`
-- [ ] Keep **Sign-up with email** enabled in Neon Auth so password-reset mail can send. Reset links go to `/auth/reset-password`. Local `pnpm dev` skips confirm-email (no Auth mail on Node); hosted environments still require it.
+- [ ] Keep **Sign-up with email** enabled in Neon Auth so password-reset mail can send. Reset links go to `/auth/reset-password`. Local `pnpm dev` on localhost skips confirm-email (no Auth mail on Node). Pull-request previews and develop/staging still require confirmation.
 - [ ] Auth branded mail: enable Cloudflare Email Sending for `thegamies.gg`. CI points each Neon Auth **branch** webhook at that environment’s Cloudflare Worker (`/api/webhooks/neon-auth-email`). Production: set the webhook once on the production Auth branch. Details: [email-templates.md](./email-templates.md).
 - [ ] Account deletion closes the Neon Auth user so the email can be reused. Neon’s SDK `deleteUser()` is often a no-op; the app also deletes `neon_auth.user` / `users_sync` on this branch, and if `NEON_API_KEY` + `NEON_PROJECT_ID` are set it calls [Delete auth user](https://neon.com/docs/reference/api/auth/delete-branch-neon-auth-user) (same action as Console → Auth → Users). Manual leftover users: Console → Auth → Users.
 - [ ] Generate cookie secret (`openssl rand -base64 32`) → Doppler + GitHub `NEON_AUTH_COOKIE_SECRET`
