@@ -375,6 +375,7 @@ export function EditionResultsView({
         />
       ) : view === "reveal" ? (
         <EditionRevealView
+          slug={slug}
           year={year}
           communityName={communityName}
           topTen={topTen}

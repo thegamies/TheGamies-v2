@@ -21,6 +21,7 @@ export function editionBoardLabel(
 
 /** Ceremony / results / ballot / host settings shell. */
 export type EditionResultsViewId =
+  | "entrance"
   | "reveal"
   | "overview"
   | "standings"
@@ -75,6 +76,9 @@ export function parseEditionResultsView(
   if (raw === "preview") return "preview";
   if (raw === "show") return "show";
   if (raw === "reveal") return "reveal";
+  if (raw === "entrance") return "entrance";
+  // Missing / unknown: callers that need the spoiler entrance resolve bare
+  // published URLs themselves; elsewhere default to Reveal.
   return "reveal";
 }
 

@@ -27,8 +27,11 @@ export function editionResultsHref(
   const mode = opts.mode ?? "community";
   const view = opts.view ?? "reveal";
   if (mode !== "community") params.set("mode", mode);
+  // Bare URL is the spoiler-safe entrance (or Results after the window).
+  // Reveal must be explicit so it does not collide with entrance.
   if (view === "overview") params.set("view", "results");
-  else if (view !== "reveal") params.set("view", view);
+  else if (view === "reveal") params.set("view", "reveal");
+  else if (view !== "entrance") params.set("view", view);
   if (view === "settings" && opts.panel && opts.panel !== "edition") {
     params.set("panel", opts.panel);
   }

@@ -110,8 +110,8 @@ export function CommunityInviteSettings({
           Open invites
         </h3>
         <p className="text-sm text-ink">
-          Open invites are {openInvites ? "on" : "off"}. When on, members can
-          copy the invite from the community header.
+          Open invites are {openInvites ? "on" : "off"}. Admins can always copy
+          the invite from the header. When open invites are on, members can too.
         </p>
         <Button type="submit" variant="bordered" disabled={openPending}>
           {openPending

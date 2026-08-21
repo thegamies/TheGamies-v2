@@ -107,11 +107,11 @@ describe("canManageCommunity", () => {
 });
 
 describe("canSeeCommunityInvite", () => {
-  it("is only for members when open invites is on", () => {
-    expect(canSeeCommunityInvite("member", true)).toBe(true);
+  it("admins always; members only when open invites is on", () => {
+    expect(canSeeCommunityInvite("admin", false)).toBe(true);
     expect(canSeeCommunityInvite("admin", true)).toBe(true);
+    expect(canSeeCommunityInvite("member", true)).toBe(true);
     expect(canSeeCommunityInvite("member", false)).toBe(false);
-    expect(canSeeCommunityInvite("admin", false)).toBe(false);
     expect(canSeeCommunityInvite(null, true)).toBe(false);
   });
 });

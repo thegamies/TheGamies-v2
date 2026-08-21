@@ -9,6 +9,7 @@ import { EditionBallotPreview } from "@/components/communities/EditionBallotPrev
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
+import { EditionResultsEntrance } from "@/components/communities/EditionResultsEntrance";
 import {
   EditionResultsView,
   EditionResultsViewNav,
@@ -74,6 +75,8 @@ import {
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
+import { isEditionResultsEntranceOpen } from "@/lib/communities/edition-results-entrance";
+import type { EditionResultsViewId } from "@/lib/communities/edition-results-scoring";
 import { editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
@@ -148,6 +151,9 @@ export default async function CommunityEditionYearPage({
       ? Math.floor(previewPageRaw)
       : 1;
   const showSource = parseEditionShowSource(first(sp.source));
+  const viewParam = first(sp.view);
+  const hasExplicitView =
+    typeof viewParam === "string" && viewParam.length > 0;
 
   const user = await getRequestSessionUser();
   const profile = user?.id
@@ -229,14 +235,25 @@ export default async function CommunityEditionYearPage({
       ? await listEditionAwardCategories(edition.id).catch(() => [])
       : [];
 
-  const requestedViewEarly = parseEditionResultsView(first(sp.view));
+  const requestedViewEarly = parseEditionResultsView(viewParam);
   const resolvedHost = resolveEditionHostSettings(
     requestedViewEarly,
     first(sp.panel),
   );
-  let view = resolvedHost.view;
+  let view: EditionResultsViewId = resolvedHost.view;
   let settingsPanel = resolvedHost.panel;
+
+  if (edition.status === "published" && !hasExplicitView) {
+    view = isEditionResultsEntranceOpen(edition.publishesAt)
+      ? "entrance"
+      : "overview";
+    settingsPanel = "edition";
+  }
+
   if (view === "settings" && !canManage) {
+    view = "reveal";
+  }
+  if (view === "entrance" && edition.status !== "published") {
     view = "reveal";
   }
   if (
@@ -569,7 +586,18 @@ export default async function CommunityEditionYearPage({
     } | null;
   } | null = null;
 
-  if (edition.status === "published" && !showHostSettings) {
+  let entranceFreezeReady = false;
+  if (edition.status === "published" && view === "entrance" && !showHostSettings) {
+    try {
+      await ensurePublishedEditionResults(community.id, edition.year);
+      const meta = await getEditionResultsMeta(edition.id);
+      entranceFreezeReady = meta != null || edition.freezeStatus === "ready";
+    } catch {
+      entranceFreezeReady = false;
+    }
+  }
+
+  if (edition.status === "published" && !showHostSettings && view !== "entrance") {
     try {
       await ensurePublishedEditionResults(community.id, edition.year);
       const meta = await getEditionResultsMeta(edition.id);
@@ -754,7 +782,32 @@ export default async function CommunityEditionYearPage({
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
       />
 
-      {edition.status === "published" && resultsBundle ? (
+      {edition.status === "published" && view === "entrance" ? (
+        <section className="mt-8">
+          <EditionSectionHeader
+            status={edition.status}
+            slug={community.slug}
+            year={edition.year}
+            years={yearOptions}
+            view={view}
+            mode={mode}
+            opensAt={edition.opensAt}
+            closesAt={edition.closesAt}
+            publishesAt={edition.publishesAt}
+            ballotCount={ballotCount}
+          />
+          {entranceFreezeReady ? (
+            <EditionResultsEntrance
+              slug={community.slug}
+              year={edition.year}
+              communityName={community.name}
+              mode={mode}
+            />
+          ) : (
+            <EditionResultsCalculatingBanner status={edition.freezeStatus} />
+          )}
+        </section>
+      ) : edition.status === "published" && resultsBundle ? (
         <section className="mt-8">
           <EditionSectionHeader
             status={edition.status}

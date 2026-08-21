@@ -44,10 +44,14 @@ export function canManageCommunity(role: CommunityRole | null): boolean {
   return role === "admin";
 }
 
-/** Members (including admins) see the header invite only when open invites is on. */
+/**
+ * Admins always see Copy invite in the community header.
+ * Other members see it only when open invites is on.
+ */
 export function canSeeCommunityInvite(
   role: CommunityRole | null,
   openInvites: boolean,
 ): boolean {
+  if (role === "admin") return true;
   return role != null && openInvites;
 }

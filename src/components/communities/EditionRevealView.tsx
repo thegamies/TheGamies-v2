@@ -16,6 +16,7 @@ import type {
   EditionCategoryStandingBlock,
   EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
+import { markEditionResultsEntranceSeen } from "@/lib/communities/edition-results-entrance";
 import {
   applyCategoryRevealGridColumns,
   CATEGORY_REVEAL_EXIT_AT,
@@ -1205,6 +1206,7 @@ function CategoriesCountdown({
 }
 
 function CeremonySummary({
+  slug,
   year,
   communityName,
   topTen,
@@ -1212,6 +1214,7 @@ function CeremonySummary({
   resultsHref,
   continueLabel,
 }: {
+  slug: string;
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
@@ -1346,6 +1349,9 @@ function CeremonySummary({
           <Link
             href={resultsHref}
             className="font-semibold text-accent hover:underline"
+            onClick={() => {
+              markEditionResultsEntranceSeen(slug, year);
+            }}
           >
             {continueLabel}
           </Link>
@@ -1411,6 +1417,7 @@ function RevealOpener({
 }
 
 export function EditionRevealView({
+  slug,
   year,
   communityName,
   topTen,
@@ -1418,6 +1425,7 @@ export function EditionRevealView({
   resultsHref,
   continueLabel = "Continue to full results",
 }: {
+  slug: string;
   year: number;
   communityName: string;
   topTen: EditionGotyStandingRow[];
@@ -1479,6 +1487,7 @@ export function EditionRevealView({
         ) : null}
 
         <CeremonySummary
+          slug={slug}
           year={year}
           communityName={communityName}
           topTen={topTen}

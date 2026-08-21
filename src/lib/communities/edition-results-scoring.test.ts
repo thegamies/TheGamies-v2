@@ -69,6 +69,15 @@ describe("editionResultsHref", () => {
     );
   });
 
+  it("serializes Reveal explicitly so bare URL stays the entrance", () => {
+    expect(editionResultsHref("demo", 2026, { view: "reveal" })).toBe(
+      "/communities/demo/edition/2026?view=reveal",
+    );
+    expect(editionResultsHref("demo", 2026, { view: "entrance" })).toBe(
+      "/communities/demo/edition/2026",
+    );
+  });
+
   it("keeps view and Voices mode when switching years", () => {
     expect(
       editionResultsHref("demo", 2025, {
@@ -80,8 +89,9 @@ describe("editionResultsHref", () => {
 });
 
 describe("parseEditionResultsView", () => {
-  it("defaults to reveal and accepts results views plus settings and show", () => {
+  it("defaults to reveal for unknown values and accepts entrance", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
+    expect(parseEditionResultsView("entrance")).toBe("entrance");
     expect(parseEditionResultsView("settings")).toBe("settings");
     expect(parseEditionResultsView("show")).toBe("show");
     expect(parseEditionResultsView("hosts")).toBe("hosts");

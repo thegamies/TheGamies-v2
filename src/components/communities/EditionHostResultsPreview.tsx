@@ -152,6 +152,7 @@ export function EditionHostResultsPreview({
       ) : previewView === "show" ? (
         <div className="mt-8" key={`show-${source}`}>
           <EditionRevealView
+            slug={slug}
             year={year}
             communityName={communityName}
             topTen={topTen}

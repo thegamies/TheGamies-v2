@@ -11,7 +11,7 @@ One results toolbar under the Results heading:
 
 Multi-year switching is a pop-open year control beside the Results heading (2+ public years). Switching years keeps the current view (Reveal · Results · …) and Community · Hosts board. Community Overview · Live Rankings · Events · Members · Settings stay **primary** bordered chips. See `docs/design-system.md` → Navigation hierarchy.
 
-**Reveal** (`?view=` default / `reveal`)
+**Reveal** (`?view=reveal`)
 
 Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per chapter** (title + stage together — nested sticky breaks iOS Safari) so place/award handoffs are horizontal (left in / right out at the same time). Long scrub distance keeps the pace deliberate. Respects `prefers-reduced-motion`.
 
@@ -21,6 +21,8 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 4. **Categories** — single stage cycles awards. Each award is one **CategoryRevealBoard** of `#1 · #2 · #3` columns. Columns stay full-size in layout; each **slides in from off-screen left** via `translate3d` and packs stage-left (**#3 → #2 → #1**, earlier ranks push right). Every derived-rank ≤ 3 game is shown; ties use multi-row mosaics with titles. Competition numbering can skip a slot (1–1–3: no #2); dense fills 1 then 2 — follows the event setting  
 5. **Summary** — sticky chapter header (`{year} Summary`) with Top 10 + category #1 boards; tied category winners use the rotating stack  
 6. **Continue to full results** + **Return to top**
+
+**Entrance (spoiler-safe)** — bare `/communities/[slug]/edition/[year]` with no `view`, only while `publishesAt` is within the last **30 days** and the browser has not yet chosen Results. Copy: results are here; **Start the Reveal** / **View Full Results**. Preference is stored in `localStorage` per community + year when the user skips to Results or finishes Reveal via **Continue to full results**. After the preference or after 30 days, bare URL opens **Results**. Explicit `?view=reveal` / `?view=results` always honor. No GOTY art on the entrance.
 
 **Host results preview** (while voting is **closed**, before publish): secondary tab **Results preview** before Ballot (`?view=show`), community hosts only. Inner nav: Reveal · Results · Full standings · Categories (same URLs as public results views, host-gated while closed). Default **demo** uses placeholder covers and Game 1… titles for GOTY + each event award. Results keeps **Ranked · Comparison** (SSR matrices; no published-only API). **Show real results** navigates to `&source=live` (separate request) and SSR-loads freeze boards. Public standings/comparison APIs stay published-only; host Full standings uses SSR rows (first page when live).
 
