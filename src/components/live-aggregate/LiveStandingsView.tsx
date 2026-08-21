@@ -23,7 +23,7 @@ export function LiveStandingsView({
     : "This year's category boards are still coming together.";
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-[var(--page-pad-y)]">
       <LiveStandingsBoard
         page={page}
         yearOptions={yearOptions}

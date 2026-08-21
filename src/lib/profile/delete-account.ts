@@ -51,6 +51,7 @@ export function tombstoneProfileFields(profileId: string, now: Date) {
     username: tombstoneUsername(profileId),
     bio: null as string | null,
     avatarUrl: null as string | null,
+    bannerUrl: null as string | null,
     socialLinks: null as Record<string, string> | null,
     visibility: "private" as const,
     authUserId: deletedAuthUserIdSentinel(profileId),

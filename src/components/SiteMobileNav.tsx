@@ -97,7 +97,7 @@ export function SiteMobileNav({
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                  className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                   onClick={close}
                 >
                   {link.label}
@@ -116,7 +116,7 @@ export function SiteMobileNav({
                       <Link
                         key={`${group.id}-${item.href}-${item.label}`}
                         href={item.href}
-                        className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                        className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                         onClick={close}
                       >
                         {item.label}
@@ -139,7 +139,7 @@ export function SiteMobileNav({
                     fallback={
                       <Link
                         href="/auth/sign-in"
-                        className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                        className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                         onClick={close}
                       >
                         Sign in
@@ -147,7 +147,7 @@ export function SiteMobileNav({
                     }
                   >
                     <SignInLink
-                      className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                      className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                       onClick={close}
                     />
                   </Suspense>
@@ -155,7 +155,7 @@ export function SiteMobileNav({
                     <Link
                       key={link.href}
                       href={link.href}
-                      className="border-b border-line py-4 text-base tracking-wide text-muted transition-colors hover:text-ink"
+                      className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                       onClick={close}
                     >
                       {link.label}

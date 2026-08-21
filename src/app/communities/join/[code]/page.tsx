@@ -40,7 +40,7 @@ export default async function CommunityJoinPage({
   const next = `/communities/join/${encodeURIComponent(codeRaw)}`;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
       <p className="text-xs uppercase tracking-[0.2em] text-muted">
         <Link href="/communities" className="hover:text-ink">
           Communities

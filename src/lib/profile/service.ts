@@ -209,3 +209,29 @@ export async function updateOwnedAvatarUrl(input: {
   }
   return { profile };
 }
+
+export async function updateOwnedBannerUrl(input: {
+  authUserId: string;
+  bannerUrl: string | null;
+}): Promise<{ profile: Profile } | { error: string }> {
+  const db = getDb();
+  const existing = await getProfileByAuthUserId(input.authUserId, db);
+  if (!existing) {
+    return { error: "Profile not found." };
+  }
+
+  const updated = await db
+    .update(profiles)
+    .set({
+      bannerUrl: input.bannerUrl,
+      updatedAt: new Date(),
+    })
+    .where(eq(profiles.authUserId, input.authUserId))
+    .returning();
+
+  const profile = updated[0];
+  if (!profile) {
+    return { error: "Could not update banner." };
+  }
+  return { profile };
+}

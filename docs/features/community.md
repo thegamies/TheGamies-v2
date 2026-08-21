@@ -11,7 +11,7 @@ Communities may turn **Live Rankings** on or off. Events are the end-of-year awa
 
 ## Identity + membership (shipped)
 
-Signed-in users with a **profile** can **create** a community (name + optional description; URL slug is derived from the name). The creator is the first internal `admin` member. Communities are **private**: `/communities` lists only memberships, interiors are members-only, and people join with an **invite code**. Admins always see **Copy invite** in the community header. They manage the current code, generate a new one, and optionally turn on **open invites** (members can copy the invite from the header) under Settings → Invite. Admins can add other admins under Settings → Community. The last admin cannot leave — that note lives on Settings, not Overview. The last host also cannot delete their account until they add another host or delete the community. Account deletion tombs the profile: lists and memberships go; published ceremonies keep an anonymized **Former member** voter line (scores stay frozen, including Results Comparison host columns).
+Signed-in users with a **profile** can **create** a community (name + optional description; URL slug is derived from the name). The creator is the first internal `admin` member. Communities are **private**: `/communities` lists only memberships, interiors are members-only, and people join with an **invite code**. Admins always see **Copy invite** in the community header. They manage the current code, generate a new one, and optionally turn on **open invites** (members can copy the invite from the header) under Settings → Invite. Admins set **banner** and **avatar** under Settings → Community (same R2 bucket as profile photos). Admins can add other admins under Settings → Community. The last admin cannot leave — that note lives on Settings, not Overview. The last host also cannot delete their account until they add another host or delete the community. Account deletion tombs the profile: lists and memberships go; published ceremonies keep an anonymized **Former member** voter line (scores stay frozen, including Results Comparison host columns).
 
 Public member lists never say admin / judge / expert — people are listed by display name. Settings → Community uses **Admin**. Event boards still say **Host**. Internal role is `admin` | `member`.
 
@@ -46,7 +46,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY event (vote + results by schedule)
 - `/communities/[slug]/ballot` → redirects to edition
 - `/communities/[slug]/results` → redirects to edition
-- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), **Community** (`?tab=community`), and **Invite** (`?tab=invite`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: add/remove admins (last admin cannot be removed) and leave. Invite: copy the current join link, generate a new code (retires the old one), and toggle **open invites** so members (not only admins) can copy the invite from the header.
+- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), **Community** (`?tab=community`), and **Invite** (`?tab=invite`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: banner + avatar upload, add/remove admins (last admin cannot be removed), and leave. Invite: copy the current join link, generate a new code (retires the old one), and toggle **open invites** so members (not only admins) can copy the invite from the header.
 - `/communities/[slug]/create/event` — hosts only. Create event: year, schedule, categories, tie numbering. Redirects to that year’s Edition settings.
 - Profile `/u/[username]` **Communities** tab (`?tab=communities`) lists communities the person belongs to (paged; 24 per page)
 
@@ -54,7 +54,6 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 
 - Weighted Combined (Host %)
 - Approval join, bans, extra roles
-- Cover/avatar upload
 - Site-admin-only create gate
 - Per-community custom defs / multi / ranked edition category modes
 - Full all-member ballot matrix virtualization

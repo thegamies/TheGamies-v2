@@ -111,7 +111,7 @@ export function SharedListView({
   const tabOpts = { saved, error };
 
   return (
-    <main className="relative mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+    <main className="relative mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
       <RefreshOnBfcache />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(255,90,31,0.12),_transparent_55%)]" />
       <div className="relative">

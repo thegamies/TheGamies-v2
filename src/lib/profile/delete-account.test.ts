@@ -90,6 +90,7 @@ describe("tombstoneProfileFields", () => {
     expect(fields.username).toBe(tombstoneUsername(id));
     expect(fields.bio).toBeNull();
     expect(fields.avatarUrl).toBeNull();
+    expect(fields.bannerUrl).toBeNull();
     expect(fields.socialLinks).toBeNull();
     expect(fields.visibility).toBe("private");
     expect(fields.authUserId).toBe(deletedAuthUserIdSentinel(id));

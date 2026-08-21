@@ -191,6 +191,7 @@ Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 | `--cover-ratio` | Game art | `3 / 4` |
 | `--page-max` | Content width | `72rem` |
 | `--gutter` | Page padding | `1.5rem` |
+| `--page-pad-y` | Vertical pad under site header | `1.5rem` |
 | `--standing-fill-gap` | Gap between fill-row standing cards | `1rem` |
 | `--standing-fill-min-visible` | Covers in view on a narrow fill-row (decimals peek) | `2.2` (admin, temporary) |
 | `--standing-fill-card-max` | Fill-row card width at `--page-max` (5-up) | derived |
@@ -217,6 +218,7 @@ Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimme
 - Tablet (~1024) / Mobile (~390): focused segmented views for Combined / Community / Hosts / Ballots; no two-axis navigation for core comprehension
 - Horizontal strips (GOTY / category Comparison, category Ranked): hide scrollbars; edge fade when more content; desktop drag-to-pan (click still works — drag starts after a short move). Arrow controls optional (`showArrowControls`, off by default). Touch/trackpad native scroll. Do not remap vertical wheel to horizontal. Comparison strips keep headers with each chapter’s table. GOTY Ranked must fit 360 without sideways scroll.
 - Homepage / all-years GOTY strips: card width is `min(--standing-fill-card-max`, visible-count size). `--standing-fill-min-visible` (temporary admin setting, decimals allowed) keeps at least that many covers in view and peeks the next; a wide screen still fits five.
+- Homepage **Big Picture** hero: cover marquees sit under a transparent site nav; tagline + Browse games / Communities overlay the bottom of the wall. Covers from IGDB catalog **popularity** for the current and previous year (same sort as `/games`). Soft side/bottom fade into paper (no hard rule); pauses under `prefers-reduced-motion`.
 
 ## Fixtures that mocks must cover
 

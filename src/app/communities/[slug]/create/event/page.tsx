@@ -92,6 +92,8 @@ export default async function CreateCommunityEventPage({
         editionStatus={featuredStatus}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
+        avatarUrl={community.avatarUrl}
+        bannerUrl={community.bannerUrl}
       />
 
       <section className="mt-10">

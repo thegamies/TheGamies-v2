@@ -45,7 +45,7 @@ export default async function GamesPage({
 
   return (
     <>
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
         <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
           Games
         </h1>

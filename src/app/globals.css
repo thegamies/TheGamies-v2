@@ -16,6 +16,8 @@
 
   --page-max: 72rem;
   --gutter: 1.5rem;
+  /* Vertical pad below site header for standard page shells */
+  --page-pad-y: 1.5rem;
   /* Five equal standing cards at editorial max width. Narrower viewports
      size to `--standing-fill-min-visible` (decimals peek the next cover). */
   --standing-fill-gap: 1rem;
@@ -109,6 +111,64 @@ body {
 
 .skeleton-pulse {
   animation: skeleton-pulse 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes home-bp-marquee-left {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes home-bp-marquee-right {
+  from {
+    transform: translateX(-50%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-bp-track {
+    animation: none !important;
+  }
+}
+
+/*
+ * Cover wall dissolves to transparent so page `--paper` shows through —
+ * avoids muddy overlay tints that miss the background.
+ */
+.home-bp-wall {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    #000 0%,
+    #000 42%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 100%);
+}
+
+.home-bp-fade-x {
+  background: linear-gradient(
+    to right,
+    var(--paper) 0%,
+    transparent 16%,
+    transparent 84%,
+    var(--paper) 100%
+  );
+}
+
+.home-bp-fade-y {
+  /* Stronger top wash for nav readability — bottom dissolve is the wall mask */
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--paper) 88%, transparent) 0%,
+    color-mix(in srgb, var(--paper) 45%, transparent) 22%,
+    transparent 48%
+  );
 }
 
 .category-reveal-grid {

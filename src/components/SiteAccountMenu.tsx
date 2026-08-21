@@ -51,7 +51,7 @@ export function SiteAccountMenu({
       <button
         ref={buttonRef}
         type="button"
-        className="inline-flex items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-muted transition-colors hover:text-ink"
         aria-expanded={open}
         aria-haspopup="menu"
         aria-controls={menuId}

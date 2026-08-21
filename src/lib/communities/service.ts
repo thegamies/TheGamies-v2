@@ -43,6 +43,7 @@ export type MembershipCommunity = {
   slug: string;
   name: string;
   description: string;
+  avatarUrl: string | null;
   memberCount: number;
 };
 
@@ -85,6 +86,7 @@ export { COMMUNITY_MEMBERS_PAGE_SIZE, paginateCommunityMembers } from "./members
 export type ProfileCommunity = {
   slug: string;
   name: string;
+  avatarUrl: string | null;
 };
 
 export type ProfileCommunitiesPage = {
@@ -145,6 +147,7 @@ export async function listMembershipCommunitiesPage(
       slug: communities.slug,
       name: communities.name,
       description: communities.description,
+      avatarUrl: communities.avatarUrl,
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
@@ -189,6 +192,7 @@ export async function listCommunitiesForProfile(
     .select({
       slug: communities.slug,
       name: communities.name,
+      avatarUrl: communities.avatarUrl,
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
@@ -218,6 +222,7 @@ export async function listCommunitiesForProfilePage(
     .select({
       slug: communities.slug,
       name: communities.name,
+      avatarUrl: communities.avatarUrl,
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
@@ -536,6 +541,48 @@ export async function leaveCommunity(
       ),
     );
   return { ok: true };
+}
+
+export async function setCommunityImageUrl(
+  slug: string,
+  profileId: string,
+  input: {
+    kind: "avatar" | "banner";
+    imageUrl: string | null;
+  },
+  db: Db = getDb(),
+): Promise<
+  | { ok: true; avatarUrl: string | null; bannerUrl: string | null }
+  | { error: string }
+> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only admins can update community images." };
+  }
+
+  const patch =
+    input.kind === "avatar"
+      ? { avatarUrl: input.imageUrl }
+      : { bannerUrl: input.imageUrl };
+
+  const [updated] = await db
+    .update(communities)
+    .set({
+      ...patch,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id))
+    .returning({
+      avatarUrl: communities.avatarUrl,
+      bannerUrl: communities.bannerUrl,
+    });
+
+  return {
+    ok: true,
+    avatarUrl: updated?.avatarUrl ?? detail.avatarUrl,
+    bannerUrl: updated?.bannerUrl ?? detail.bannerUrl,
+  };
 }
 
 export async function rotateCommunityInviteCode(

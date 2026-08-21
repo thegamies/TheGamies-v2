@@ -124,6 +124,8 @@ export default async function CommunityMembersPage({
         editionStatus={publicEdition?.status ?? null}
         active="members"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
+        avatarUrl={community.avatarUrl}
+        bannerUrl={community.bannerUrl}
       />
 
       <section className="mt-10">

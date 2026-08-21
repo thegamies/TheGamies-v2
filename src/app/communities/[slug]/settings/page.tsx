@@ -22,6 +22,7 @@ import {
   listCommunityMemberOptions,
 } from "@/lib/communities/service";
 import { CommunityHostsForm } from "./CommunityHostsForm";
+import { CommunityIdentitySettings } from "./CommunityIdentitySettings";
 import { CommunityLeaveForm } from "./CommunityLeaveForm";
 import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
@@ -102,6 +103,8 @@ export default async function CommunitySettingsPage({
         editionStatus={featuredStatus}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
+        avatarUrl={community.avatarUrl}
+        bannerUrl={community.bannerUrl}
       />
 
       <section className="mt-10">
@@ -146,6 +149,15 @@ export default async function CommunitySettingsPage({
         ) : (
           <>
             <p className="mt-6 max-w-xl text-sm text-muted">
+              Community look, admins, and leave.
+            </p>
+            <CommunityIdentitySettings
+              slug={community.slug}
+              name={community.name}
+              avatarUrl={community.avatarUrl}
+              bannerUrl={community.bannerUrl}
+            />
+            <p className="mt-10 max-w-xl text-sm text-muted">
               Add other admins, or leave if you are not the last admin.
             </p>
             <CommunityHostsForm

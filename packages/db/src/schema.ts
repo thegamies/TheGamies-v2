@@ -212,6 +212,7 @@ export const profiles = pgTable("profiles", {
   displayName: text("display_name").notNull(),
   bio: text("bio"),
   avatarUrl: text("avatar_url"),
+  bannerUrl: text("banner_url"),
   socialLinks: jsonb("social_links").$type<Record<string, string>>(),
   visibility: text("visibility").notNull().default("public"),
   deletedAt: timestamp("deleted_at", { mode: "date" }),
@@ -227,6 +228,8 @@ export const communities = pgTable("communities", {
   slug: text("slug").notNull().unique(),
   name: text("name").notNull(),
   description: text("description").notNull().default(""),
+  avatarUrl: text("avatar_url"),
+  bannerUrl: text("banner_url"),
   createdByProfileId: uuid("created_by_profile_id").references(
     () => profiles.id,
     { onDelete: "set null" },

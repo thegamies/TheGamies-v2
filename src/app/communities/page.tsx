@@ -41,7 +41,7 @@ export default async function CommunitiesPage({
     : null;
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
           Communities
@@ -95,16 +95,33 @@ export default async function CommunitiesPage({
               <li key={community.id} className="py-5">
                 <Link
                   href={`/communities/${community.slug}`}
-                  className="font-display text-2xl tracking-wide text-ink hover:text-accent"
+                  className="flex items-center gap-4 font-display text-2xl tracking-wide text-ink hover:text-accent"
                 >
+                  {community.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={community.avatarUrl}
+                      alt=""
+                      width={48}
+                      height={48}
+                      className="h-12 w-12 rounded-full border border-line object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="flex h-12 w-12 items-center justify-center rounded-full border border-line bg-panel text-lg"
+                      aria-hidden
+                    >
+                      {community.name.slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
                   {community.name}
                 </Link>
-                <p className="mt-1 text-sm text-muted">
+                <p className="mt-1 pl-16 text-sm text-muted">
                   {community.memberCount}{" "}
                   {community.memberCount === 1 ? "member" : "members"}
                 </p>
                 {community.description ? (
-                  <p className="mt-2 max-w-2xl text-sm text-muted">
+                  <p className="mt-2 max-w-2xl pl-16 text-sm text-muted">
                     {community.description}
                   </p>
                 ) : null}

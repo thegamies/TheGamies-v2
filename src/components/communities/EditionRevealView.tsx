@@ -1258,7 +1258,7 @@ function CeremonySummary({
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10 sm:py-12">
+      <div className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)] sm:py-12">
         {gotyAsc.length > 0 ? (
           <div>
             <h3 className="font-display text-xl tracking-wide text-ink sm:text-2xl">

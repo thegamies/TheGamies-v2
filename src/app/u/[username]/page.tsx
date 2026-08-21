@@ -6,6 +6,7 @@ import { ProfilePager } from "@/components/profile/ProfilePager";
 import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { UserAvatar } from "@/components/profile/UserAvatar";
+import { MastheadBanner } from "@/components/ui/MastheadBanner";
 import { getRequestSessionUser } from "@/lib/auth/session";
 import { listCommunitiesForProfilePage } from "@/lib/communities/service";
 import { listOwnedForProfilePage } from "@/lib/lists/service";
@@ -70,50 +71,61 @@ export default async function PublicProfilePage({
 
   return (
     <>
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
-        <div className="flex items-start gap-5">
-          <UserAvatar
-            displayName={profile.displayName}
-            username={profile.username}
-            avatarUrl={profile.avatarUrl}
-            size={96}
-          />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs uppercase tracking-[0.2em] text-muted">
-              @{profile.username}
-            </p>
-            <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-              {profile.displayName}
-            </h1>
-            {profile.visibility === "private" && isOwner ? (
-              <p className="mt-2 text-sm text-muted">
-                This profile is private — only you can see it here.
-              </p>
-            ) : null}
-            <ProfileSocialLinks value={profile.socialLinks} />
+      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pb-10 pt-0">
+        {profile.bannerUrl ? (
+          <div className="-mx-[var(--gutter)]">
+            <MastheadBanner src={profile.bannerUrl} fadeTo="paper" />
           </div>
+        ) : null}
+        <div
+          className={`relative z-[1] ${
+            profile.bannerUrl ? "-mt-14 pt-2 sm:-mt-16" : "pt-[var(--page-pad-y)]"
+          }`}
+        >
+          <div className="flex items-start gap-5">
+            <UserAvatar
+              displayName={profile.displayName}
+              username={profile.username}
+              avatarUrl={profile.avatarUrl}
+              size={96}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-[0.2em] text-muted">
+                @{profile.username}
+              </p>
+              <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
+                {profile.displayName}
+              </h1>
+              {profile.visibility === "private" && isOwner ? (
+                <p className="mt-2 text-sm text-muted">
+                  This profile is private — only you can see it here.
+                </p>
+              ) : null}
+              <ProfileSocialLinks value={profile.socialLinks} />
+            </div>
+          </div>
+          {profile.bio ? (
+            <p className="mt-6 max-w-2xl text-lg text-muted">{profile.bio}</p>
+          ) : (
+            <p className="mt-6 text-muted">No bio yet.</p>
+          )}
+
+          <ProfileTabs username={profile.username} tab={tab} />
+
+          {tab === "communities" ? (
+            <ProfileCommunities
+              profileId={profile.id}
+              username={profile.username}
+              pageRaw={pageRaw}
+            />
+          ) : (
+            <ProfileLists
+              profileId={profile.id}
+              username={profile.username}
+              pageRaw={pageRaw}
+            />
+          )}
         </div>
-        {profile.bio ? (
-          <p className="mt-6 max-w-2xl text-lg text-muted">{profile.bio}</p>
-        ) : (
-          <p className="mt-6 text-muted">No bio yet.</p>
-        )}
-
-        <ProfileTabs username={profile.username} tab={tab} />
-
-        {tab === "communities" ? (
-          <ProfileCommunities
-            profileId={profile.id}
-            username={profile.username}
-            pageRaw={pageRaw}
-          />
-        ) : (
-          <ProfileLists
-            profileId={profile.id}
-            username={profile.username}
-            pageRaw={pageRaw}
-          />
-        )}
       </main>
     </>
   );
@@ -220,8 +232,25 @@ async function ProfileCommunities({
           <li key={community.slug} className="py-4">
             <Link
               href={`/communities/${community.slug}`}
-              className="text-lg text-ink hover:text-accent"
+              className="flex items-center gap-3 text-lg text-ink hover:text-accent"
             >
+              {community.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={community.avatarUrl}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="h-10 w-10 rounded-full border border-line object-cover"
+                />
+              ) : (
+                <span
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panel font-display text-sm tracking-wide text-ink"
+                  aria-hidden
+                >
+                  {community.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
               {community.name}
             </Link>
           </li>

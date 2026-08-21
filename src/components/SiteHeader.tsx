@@ -8,6 +8,7 @@ import { SignInLink } from "@/components/auth/SignInLink";
 import { SiteAccountMenu } from "@/components/SiteAccountMenu";
 import { SiteBrand } from "@/components/SiteBrand";
 import { SiteCreateLink } from "@/components/SiteCreateLink";
+import { SiteHeaderChrome } from "@/components/SiteHeaderChrome";
 import { SiteMobileNav } from "@/components/SiteMobileNav";
 import {
   buildAccountMenuGroups,
@@ -41,11 +42,11 @@ export async function SiteHeader() {
     : { status: "anonymous" };
 
   return (
-    <header className="border-b border-line">
-      <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-5">
+    <SiteHeaderChrome>
+      <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-2">
         <SiteBrand />
         <nav
-          className="hidden items-center gap-5 text-sm text-muted lg:flex"
+          className="hidden items-center gap-5 text-sm font-semibold text-muted lg:flex"
           aria-label="Site"
         >
           {primaryLinks.map((link) => (
@@ -59,12 +60,15 @@ export async function SiteHeader() {
           ) : (
             <Suspense
               fallback={
-                <Link href="/auth/sign-in" className="hover:text-ink">
+                <Link
+                  href="/auth/sign-in"
+                  className="font-semibold hover:text-ink"
+                >
                   Sign in
                 </Link>
               }
             >
-              <SignInLink className="hover:text-ink" />
+              <SignInLink className="font-semibold hover:text-ink" />
             </Suspense>
           )}
         </nav>
@@ -77,6 +81,6 @@ export async function SiteHeader() {
           />
         </div>
       </div>
-    </header>
+    </SiteHeaderChrome>
   );
 }

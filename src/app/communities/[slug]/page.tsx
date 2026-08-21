@@ -95,6 +95,8 @@ export default async function CommunityHomePage({
         editionStatus={navEditionStatus}
         active="overview"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
+        avatarUrl={community.avatarUrl}
+        bannerUrl={community.bannerUrl}
       />
 
       {overviewEditions.length > 0 ? (

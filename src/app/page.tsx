@@ -1,6 +1,9 @@
-import Link from "next/link";
+import {
+  HomeBigPictureBanner,
+  type HomeBigPictureGame,
+} from "@/components/home/HomeBigPictureBanner";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
-import { SectionRule } from "@/components/ui/SectionRule";
+import { listHomeBigPictureGames } from "@/lib/home/big-picture-games";
 import { getCategoryHighlightsForYears } from "@/lib/live-aggregate/category-highlights";
 import {
   filterYearsWithPublicGoty,
@@ -37,6 +40,7 @@ export default async function HomePage() {
     }>;
   }> = [];
   let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
+  let bigPictureGames: HomeBigPictureGame[] = [];
 
   try {
     const settings = await getSiteSettings();
@@ -44,12 +48,14 @@ export default async function HomePage() {
     const years = await filterYearsWithPublicGoty(
       resolveLandingStandingsYears(settings.landingStandingsYears),
     );
-    const [boards, highlights] = await Promise.all([
+    const [boards, highlights, popular] = await Promise.all([
       getGotyThroughRankForYears(years, {
         maxRank: TOP_STANDINGS_RANK,
       }),
       getCategoryHighlightsForYears(years),
+      listHomeBigPictureGames(),
     ]);
+    bigPictureGames = popular;
     const winnersByYear = new Map(
       highlights.map((block) => [block.year, block.winners]),
     );
@@ -68,31 +74,18 @@ export default async function HomePage() {
     }));
   } catch {
     sections = [];
+    try {
+      bigPictureGames = await listHomeBigPictureGames();
+    } catch {
+      bigPictureGames = [];
+    }
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-6 sm:py-8">
-      <p className="max-w-lg font-serif text-xl leading-snug text-muted sm:text-2xl">
-        Personal Game of the Year lists and community awards.
-      </p>
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Link
-          href="/games"
-          className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
-        >
-          Browse games
-        </Link>
-        <Link
-          href="/communities"
-          className="rounded-[var(--radius-control)] border border-line px-5 py-3 text-sm tracking-wide text-ink transition-colors hover:border-accent"
-        >
-          Communities
-        </Link>
-      </div>
+    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] pb-6 pt-0 sm:pb-8">
+      <HomeBigPictureBanner games={bigPictureGames} />
 
-      <SectionRule className="mt-8 sm:mt-10" />
-
-      <section className="pt-4 sm:pt-5">
+      <section className="pt-6 sm:pt-8">
         <YearTopFiveSections
           sections={sections}
           allYearsHref="/standings"

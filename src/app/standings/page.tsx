@@ -71,7 +71,7 @@ export default async function StandingsLandingPage() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-8 sm:py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)] sm:py-8">
       <div className="flex items-start gap-3">
         <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
           Game of the Year

@@ -12,7 +12,7 @@ export function SiteInfoLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-10">
+    <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-[var(--page-pad-y)]">
       <nav
         className="flex flex-wrap gap-x-3 gap-y-1 text-xs uppercase tracking-[0.2em] text-muted"
         aria-label="Information"

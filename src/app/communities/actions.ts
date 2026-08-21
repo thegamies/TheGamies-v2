@@ -12,6 +12,7 @@ import {
   joinCommunityWithInvite,
   leaveCommunity,
   rotateCommunityInviteCode,
+  setCommunityImageUrl,
   setCommunityLiveScoresVisibleFrom,
   setCommunityMemberRole,
   setCommunityOpenInvites,
@@ -19,6 +20,14 @@ import {
   setLiveRankingsLocked,
 } from "@/lib/communities/service";
 import { COMMUNITY_ROLES } from "@/lib/communities/schema";
+import {
+  AVATAR_MAX_BYTES,
+  BANNER_MAX_BYTES,
+  deleteCommunityImageObjects,
+  readR2AvatarConfigFromEnv,
+  uploadCommunityImageObject,
+  type CommunityImageKind,
+} from "@/lib/profile/avatar-upload";
 import {
   addEditionCategory,
   editionCategoriesWriteBlockedReason,
@@ -193,6 +202,112 @@ export async function setCommunityOpenInvitesAction(
 
   revalidateCommunity(slug);
   return null;
+}
+
+export async function uploadCommunityImageAction(
+  formData: FormData,
+): Promise<{
+  error?: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+}> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const kindRaw = String(formData.get("kind") ?? "").trim();
+  const kind: CommunityImageKind | null =
+    kindRaw === "avatar" || kindRaw === "banner" ? kindRaw : null;
+  if (!slug) return { error: "Community not found." };
+  if (!kind) return { error: "Choose a photo or banner." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const community = await getCommunityBySlug(slug, gate.profile.id);
+  if (!community) return { error: "Community not found." };
+  if (!canManageCommunity(community.viewerRole)) {
+    return { error: "Only admins can update community images." };
+  }
+
+  const file = formData.get("image");
+  if (!(file instanceof File) || file.size === 0) {
+    return { error: kind === "avatar" ? "Choose a photo to upload." : "Choose a banner to upload." };
+  }
+  const maxBytes = kind === "avatar" ? AVATAR_MAX_BYTES : BANNER_MAX_BYTES;
+  if (file.size > maxBytes) {
+    return {
+      error:
+        kind === "avatar"
+          ? "Photo must be 2MB or smaller."
+          : "Banner must be 3MB or smaller.",
+    };
+  }
+
+  const config = readR2AvatarConfigFromEnv();
+  if (!config) {
+    return { error: "Image upload is not available right now." };
+  }
+
+  try {
+    const body = await file.arrayBuffer();
+    const { imageUrl } = await uploadCommunityImageObject(config, {
+      communityId: community.id,
+      kind,
+      body,
+    });
+    const result = await setCommunityImageUrl(slug, gate.profile.id, {
+      kind,
+      imageUrl,
+    });
+    if ("error" in result) return { error: result.error };
+    revalidateCommunity(slug);
+    return {
+      avatarUrl: result.avatarUrl,
+      bannerUrl: result.bannerUrl,
+    };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Image could not be saved.",
+    };
+  }
+}
+
+export async function removeCommunityImageAction(
+  formData: FormData,
+): Promise<{
+  error?: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
+}> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const kindRaw = String(formData.get("kind") ?? "").trim();
+  const kind: CommunityImageKind | null =
+    kindRaw === "avatar" || kindRaw === "banner" ? kindRaw : null;
+  if (!slug) return { error: "Community not found." };
+  if (!kind) return { error: "Choose a photo or banner." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const community = await getCommunityBySlug(slug, gate.profile.id);
+  if (!community) return { error: "Community not found." };
+  if (!canManageCommunity(community.viewerRole)) {
+    return { error: "Only admins can update community images." };
+  }
+
+  const config = readR2AvatarConfigFromEnv();
+  if (config) {
+    await deleteCommunityImageObjects(config, community.id, kind);
+  }
+
+  const result = await setCommunityImageUrl(slug, gate.profile.id, {
+    kind,
+    imageUrl: null,
+  });
+  if ("error" in result) return { error: result.error };
+  revalidateCommunity(slug);
+  return {
+    avatarUrl: result.avatarUrl,
+    bannerUrl: result.bannerUrl,
+  };
 }
 
 export async function leaveCommunityAction(

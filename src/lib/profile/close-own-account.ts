@@ -4,6 +4,7 @@ import {
 } from "@/lib/auth/delete-user";
 import {
   deleteUserAvatarObjects,
+  deleteUserBannerObjects,
   readR2AvatarConfigFromEnv,
 } from "@/lib/profile/avatar-upload";
 import { lastHostAccountDeleteMessage } from "@/lib/profile/delete-account";
@@ -56,6 +57,7 @@ export async function closeOwnAccount(input: {
     if (config) {
       try {
         await deleteUserAvatarObjects(config, profile.id);
+        await deleteUserBannerObjects(config, profile.id);
       } catch {
         // Avatar storage may be unconfigured; continue with account deletion.
       }

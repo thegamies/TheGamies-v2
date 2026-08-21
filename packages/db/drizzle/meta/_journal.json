@@ -260,6 +260,13 @@
       "when": 1788307200000,
       "tag": "0036_igdb_webhook_events",
       "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788393600000,
+      "tag": "0037_profile_community_banners",
+      "breakpoints": true
     }
   ]
 }

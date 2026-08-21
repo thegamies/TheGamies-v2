@@ -33,6 +33,7 @@ vi.mock("@/lib/auth/delete-user", () => ({
 vi.mock("@/lib/profile/avatar-upload", () => ({
   readR2AvatarConfigFromEnv,
   deleteUserAvatarObjects: vi.fn(),
+  deleteUserBannerObjects: vi.fn(),
 }));
 
 import { closeOwnAccount } from "./close-own-account";
