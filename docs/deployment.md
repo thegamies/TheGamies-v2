@@ -27,6 +27,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 |---|---|
 | `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys; cron for edition freeze |
 | `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets |
+| `workers/igdb-webhooks/wrangler.jsonc` | Dedicated IGDB webhook Worker (Queue producer, KV cadence, cron drain) |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
 | `.github/workflows/ci.yml` | Lint, typecheck, build on PR/push |
@@ -39,6 +40,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
 - **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). On Cloudflare, schedule an HTTP cron (or Worker Cron that `fetch`es the Worker URL) with `Authorization: Bearer $CRON_SECRET` — OpenNext does not auto-route CF Cron Triggers to App Router routes.
+- **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) with HTTP pull, plus a KV namespace per env. Deploy with `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Set Worker secrets/vars per `--env`. Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 
 ## Account setup (one-time)

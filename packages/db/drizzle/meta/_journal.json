@@ -253,6 +253,13 @@
       "when": 1788220800000,
       "tag": "0035_profile_username_changed_at",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788307200000,
+      "tag": "0036_igdb_webhook_events",
+      "breakpoints": true
     }
   ]
 }

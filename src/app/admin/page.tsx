@@ -13,6 +13,11 @@ const ADMIN_LINKS = [
     description: "Import and enrich the game catalog.",
   },
   {
+    href: "/admin/webhooks",
+    title: "Catalog webhooks",
+    description: "Queue IGDB updates and control drain cadence.",
+  },
+  {
     href: "/admin/rankings",
     title: "Live rankings",
     description: "Reveal scores, refresh dirty keys, or rebuild a year.",

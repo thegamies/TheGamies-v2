@@ -31,6 +31,8 @@ export const games = pgTable("games", {
   follows: integer("follows"),
   hypes: integer("hypes"),
   popularity: integer("popularity").notNull().default(0),
+  /** Set when IGDB removes the title; cleared on create/update webhooks. */
+  igdbRemovedAt: timestamp("igdb_removed_at", { mode: "date" }),
   syncedAt: timestamp("synced_at", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -176,6 +178,31 @@ export const syncRuns = pgTable("sync_runs", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   finishedAt: timestamp("finished_at", { mode: "date" }),
 });
+
+/** IGDB webhook deliveries — written during queue drain, not on ingress. */
+export const igdbWebhookEvents = pgTable(
+  "igdb_webhook_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    receivedAt: timestamp("received_at", { mode: "date" }).notNull(),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+    entity: text("entity"),
+    method: text("method"),
+    igdbId: integer("igdb_id"),
+    status: text("status").notNull().default("pending"),
+    error: text("error"),
+    payload: jsonb("payload").$type<unknown>(),
+    queueMessageId: text("queue_message_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("igdb_webhook_events_status_received_idx").on(
+      t.status,
+      t.receivedAt,
+    ),
+    index("igdb_webhook_events_received_idx").on(t.receivedAt),
+  ],
+);
 
 /** App profile linked to Neon Auth user id. Access is app-layer (session + ownership), not RLS. */
 export const profiles = pgTable("profiles", {

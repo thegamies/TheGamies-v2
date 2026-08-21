@@ -70,6 +70,10 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | `CRON_SECRET` | same | Vercel Cron + scheduled HTTP to `/api/cron/edition-freeze` (Bearer or `?secret=`) |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
+| `IGDB_WEBHOOK_SECRET` | same | Base secret for IGDB webhook slots (`{base}:{entity}:{method}`) — Worker + local register |
+| `IGDB_WEBHOOKS_WORKER_URL` | same | Public origin of that env’s webhook Worker (`…-develop` staging, `thegamies-igdb-webhooks` production) |
+| `IGDB_WEBHOOK_QUEUE_ID` | Worker var (per env) | Queue UUID for HTTP pull (`igdb-webhooks-develop` vs `igdb-webhooks`) |
+| `CLOUDFLARE_API_TOKEN` | Worker secret | Queues Edit token used by the webhook Worker to pull/ack (may reuse deploy token if scoped) |
 | `R2_ACCOUNT_ID` | same | avatar uploads (Cloudflare R2) |
 | `R2_ACCESS_KEY_ID` | same | avatar uploads |
 | `R2_SECRET_ACCESS_KEY` | same | avatar uploads |

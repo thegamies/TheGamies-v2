@@ -60,6 +60,7 @@ export async function upsertGamesWithLinks(
             follows: sql`excluded.follows`,
             hypes: sql`excluded.hypes`,
             popularity: sql`excluded.popularity`,
+            igdbRemovedAt: sql`null`,
             syncedAt: sql`now()`,
             updatedAt: sql`now()`,
           },

@@ -27,7 +27,22 @@ Entity stubbing (fake `[stub]` names) is not used.
 | Companies | `/v4/companies` | `companies` |
 | Time to beat | `/v4/game_time_to_beats` | `game_time_to_beats` |
 
-Webhooks are out of scope for now.
+## Webhooks (Cloudflare Queue)
+
+IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel and not the OpenNext app Worker. Staging and production each have their own Worker, queue, and KV (see [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md)).
+
+**Flow:**
+
+1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
+2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon.
+3. A **cron every minute** checks KV cadence (`intervalMinutes`, `maxMessagesPerDrain`, `paused`). When due, it **pulls** a batch, writes `igdb_webhook_events`, applies catalog upserts/deletes, then acks/retries.
+4. Ops configure cadence and registrations on `/admin/webhooks` (proxied to the Worker with the admin code).
+
+**Cadence / mode:** default **Queued** — every 15 minutes, pull batches until empty. Switch to **Live** in `/admin/webhooks` to apply each delivery immediately (wakes Neon per event). Pause in Live routes new deliveries to the queue instead; **Drain now** still clears any backlog.
+
+**Game deletes** set `games.igdb_removed_at` (soft delist) so list and standings rows are not cascaded away. Create/update clears that timestamp.
+
+**Secrets / URLs:** see [secrets.md](./secrets.md) and [deployment.md](./deployment.md). Point IGDB registrations only at the Cloudflare webhook Worker URL. Do not auto-register PR preview workers against production IGDB slots.
 
 ## CLI
 

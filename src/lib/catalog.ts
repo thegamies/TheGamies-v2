@@ -58,6 +58,7 @@ export async function browseGames(input: BrowseGamesInput = {}) {
   today.setUTCHours(0, 0, 0, 0);
 
   const conditions = [];
+  conditions.push(isNull(games.igdbRemovedAt));
   if (!includeAdult) {
     conditions.push(eq(games.isAdult, false));
   }
