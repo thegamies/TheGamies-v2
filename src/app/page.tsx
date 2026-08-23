@@ -10,6 +10,8 @@ import {
   getGotyThroughRankForYears,
   TOP_STANDINGS_RANK,
 } from "@/lib/live-aggregate/service";
+import { gotyCreatorCta, type GotyCreatorCta } from "@/lib/lists/existing-goty";
+import { loadGotyCreatorCtas } from "@/lib/lists/load-goty-creator-cta";
 import {
   getSiteSettings,
   resolveLandingStandingsYears,
@@ -38,6 +40,7 @@ export default async function HomePage() {
         coverUrl: string | null;
       }>;
     }>;
+    creatorCta?: GotyCreatorCta;
   }> = [];
   let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   let bigPictureGames: HomeBigPictureGame[] = [];
@@ -48,12 +51,13 @@ export default async function HomePage() {
     const years = await filterYearsWithPublicGoty(
       resolveLandingStandingsYears(settings.landingStandingsYears),
     );
-    const [boards, highlights, popular] = await Promise.all([
+    const [boards, highlights, popular, creatorCtas] = await Promise.all([
       getGotyThroughRankForYears(years, {
         maxRank: TOP_STANDINGS_RANK,
       }),
       getCategoryHighlightsForYears(years),
       listHomeBigPictureGames(),
+      loadGotyCreatorCtas(years).catch(() => new Map<number, GotyCreatorCta>()),
     ]);
     bigPictureGames = popular;
     const winnersByYear = new Map(
@@ -71,6 +75,8 @@ export default async function HomePage() {
         score: row.score,
       })),
       categoryWinners: winnersByYear.get(board.year) ?? [],
+      creatorCta:
+        creatorCtas.get(board.year) ?? gotyCreatorCta(board.year, null),
     }));
   } catch {
     sections = [];

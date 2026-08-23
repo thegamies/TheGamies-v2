@@ -194,6 +194,39 @@ export async function getOwnedGotyForYear(
   return row ?? null;
 }
 
+/** publicId by GOTY year for one profile — standings CTA lookup, not a list dump. */
+export async function mapOwnedGotyPublicIdsByYear(
+  profileId: string,
+  years: number[],
+  db: Db = getDb(),
+): Promise<Map<number, string>> {
+  const unique = [
+    ...new Set(
+      years.filter((year) => Number.isFinite(year)).map((year) => Math.floor(year)),
+    ),
+  ];
+  const out = new Map<number, string>();
+  if (unique.length === 0) return out;
+  const rows = await db
+    .select({
+      year: lists.year,
+      publicId: lists.publicId,
+    })
+    .from(lists)
+    .where(
+      and(
+        eq(lists.profileId, profileId),
+        eq(lists.listType, "goty"),
+        inArray(lists.year, unique),
+      ),
+    );
+  for (const row of rows) {
+    if (row.year == null) continue;
+    out.set(row.year, row.publicId);
+  }
+  return out;
+}
+
 /** Ranked games from the signed-in profile's GOTY list for `year`, or null if none. */
 export async function getOwnedGotyItemsForYear(
   profileId: string,

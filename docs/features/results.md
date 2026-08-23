@@ -7,7 +7,7 @@ The final results page is the primary design-system foundation.
 One results toolbar under the Results heading:
 
 - **Secondary** underline tabs: Reveal · Results · Full standings · Categories · Voters · Your ballot (members only) · Settings (hosts)  
-- **Tertiary** text toggle: Community · Hosts (hidden on Your ballot)  
+- Below the divider, one row of segmented controls: on Results, Ranked / Comparison first, then Community / Hosts (hidden on Your ballot and while Comparison is showing). Local `next dev` only: a **Debug** popover on that row.
 
 Multi-year switching is a pop-open year control beside the Results heading (2+ public years). Switching years keeps the current view (Reveal · Results · …) and Community · Hosts board. Community Overview · Live Rankings · Events · Members · Settings stay **primary** bordered chips. See `docs/design-system.md` → Navigation hierarchy.
 
@@ -28,7 +28,7 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 
 **Results** (`?view=results`, also accepts `overview`)
 
-Tertiary **Ranked · Comparison** at the top of the page (default Ranked) applies to both GOTY and Categories. SSR loads Ranked data only (GOTY through 10 + category podiums); Comparison matrices fetch on first Comparison click (`/api/.../comparison`).
+**Ranked / Comparison** segmented control on the board row (default Ranked) applies to both GOTY and Categories. SSR loads Ranked data only (GOTY through 10 + category podiums); Comparison matrices fetch on first Comparison click (`/api/.../comparison`).
 
 1. **Game of the Year** — Ranked: one continuous wrapping Top 10 grid (no horizontal scroll); large place in front of the title. Comparison: per-rank chapters, each with You · Community · Hosts · each Host; **rank rows share one horizontal scroll** so columns stay aligned → link to **Full standings** when more than 10. Comparison numbering follows the event’s competition or dense setting (no Skip / Dense / Board picker).  
 2. Category awards — Ranked: every freeze row with **displayed rank ≤ 3** per award (full ties at the cutoff), **one line**, `HorizontalScroll` if needed; place in front of the title; #1 slightly wider. Comparison: same per-award chapters, each with You · Community (#1, stacked if tied) · Hosts (#1) · each Host. Each award links to **Full standings** for that category (`?view=category&category=`).  
@@ -45,14 +45,14 @@ Sections use the accent-tick `SectionRule` between later blocks.
 
 **Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Hosts toggle is hidden here.
 
-**Debug (local `next dev` only):** on Results, beside Community · Hosts, use **Repeat** (Off · ×2 · …) and **Cap** (− / Off / +) to stress category Reveal mosaics — cap truncates each derived-rank group first, then repeat clones each rank. No URL params; hidden in production.
+**Debug (local `next dev` only):** on the board row, open **Debug** for **Repeat** (Off · ×2 · …) and **Cap** (− / Off / +) to stress category Reveal mosaics — cap truncates each derived-rank group first, then repeat clones each rank. No URL params; hidden in production.
 
 ## Standings modes and views
 
 ```text
 Reveal    Results    Full standings    Categories    Voters    Your ballot
-Community     Hosts
-Ranked        Comparison
+————————————————————————————————————————————————————————————————————————
+[ Ranked | Comparison ]  [ Community | Hosts ]              [ Debug ]
 ```
 
 Community = all submitted ballots. Hosts = designated Host ballots only.
@@ -76,4 +76,4 @@ Tie stacks fit one card footprint (overlapping covers, auto-rotate + click to cy
 
 ## Category results
 
-Results: tertiary **Ranked · Comparison** (shared for GOTY and Categories). Ranked GOTY is a wrapping Top 10; Ranked Categories is displayed rank ≤ 3 on one line with horizontal scroll (full ties). Comparison keeps per-award / per-rank chapters; each shows You · Community (#1, stacked if tied) · Hosts (#1) · each Host pick. Categories tab mirrors top 3 strips; full tallies live on `?view=category&category=` (SQL-paginated cover cards, 10 per page).
+Results: **Ranked / Comparison** on the board row (shared for GOTY and Categories). Ranked GOTY is a wrapping Top 10; Ranked Categories is displayed rank ≤ 3 on one line with horizontal scroll (full ties). Comparison keeps per-award / per-rank chapters; each shows You · Community (#1, stacked if tied) · Hosts (#1) · each Host pick. Categories tab mirrors top 3 strips; full tallies live on `?view=category&category=` (SQL-paginated cover cards, 10 per page).

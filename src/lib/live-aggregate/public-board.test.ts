@@ -5,6 +5,7 @@ import {
   isPublicBoardReady,
   parsePublicBoardMinCategoryVotes,
   parsePublicBoardMinLists,
+  yearsForStandingsSwitcher,
 } from "./public-board";
 
 describe("public board minimum", () => {
@@ -25,5 +26,18 @@ describe("public board minimum", () => {
     expect(parsePublicBoardMinCategoryVotes("0")).toBe(
       DEFAULT_PUBLIC_BOARD_MIN_CATEGORY_VOTES,
     );
+  });
+});
+
+describe("yearsForStandingsSwitcher", () => {
+  it("unions public years newest first without duplicates", () => {
+    expect(yearsForStandingsSwitcher([2024, 2026, 2026, 2025])).toEqual([
+      2026, 2025, 2024,
+    ]);
+  });
+
+  it("keeps the year on screen even when it is not public yet", () => {
+    expect(yearsForStandingsSwitcher([2026], 2023)).toEqual([2026, 2023]);
+    expect(yearsForStandingsSwitcher([2026], 2026)).toEqual([2026]);
   });
 });

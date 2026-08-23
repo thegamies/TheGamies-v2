@@ -3,10 +3,15 @@
 import {
   createContext,
   useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { navItemClass } from "@/components/ui/navLevels";
 import type { EditionCategoryStandingBlock } from "@/lib/communities/edition-results";
 import {
@@ -81,68 +86,151 @@ export function useEditionCategoryPodiums(
 }
 
 /**
- * Dev-only tertiary controls beside Community · Hosts.
- * No URL params — local stress-test for category Reveal mosaics.
+ * Dev-only Repeat / Cap controls for category Reveal mosaics.
+ * No URL params. Hidden in production.
  */
-export function EditionCategoryDebugBar() {
+export function EditionCategoryDebugPopover() {
   const ctx = useContext(EditionCategoryDebugCtx);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+
+  useLayoutEffect(() => {
+    if (!open) {
+      setPanelPos(null);
+      return;
+    }
+    function place() {
+      const trigger = rootRef.current;
+      const panel = panelRef.current;
+      if (!trigger) return;
+      const rect = trigger.getBoundingClientRect();
+      const width = panel?.offsetWidth ?? 256;
+      const left = Math.min(
+        Math.max(8, rect.right - width),
+        window.innerWidth - width - 8,
+      );
+      setPanelPos({ top: rect.bottom + 4, left });
+    }
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
+    }
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      event.stopPropagation();
+      setOpen(false);
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   if (!ctx?.enabled) return null;
 
   const cap = ctx.maxPerRank;
+  const active = ctx.repeat > 1 || cap > 0;
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-x-2 gap-y-1"
-      aria-label="Category reveal stress test"
-    >
-      <span className="text-muted" aria-hidden>
-        ·
-      </span>
-      <span className={navItemClass("tertiary", false)}>Repeat</span>
-      {REVEAL_TIE_REPEAT_OPTIONS.map((n) => (
-        <button
-          key={`repeat-${n}`}
-          type="button"
-          className={navItemClass("tertiary", ctx.repeat === n)}
-          onClick={() => ctx.setRepeat(n)}
-        >
-          {n === 1 ? "Off" : `×${n}`}
-        </button>
-      ))}
-      <span className="text-muted" aria-hidden>
-        ·
-      </span>
-      <span className={navItemClass("tertiary", false)}>Cap</span>
-      <span className="inline-flex items-center gap-1">
-        <button
-          type="button"
-          className={navItemClass("tertiary", false)}
-          aria-label="Decrease per-rank cap"
-          disabled={cap <= 0}
-          onClick={() => ctx.setMaxPerRank(cap - 1)}
-        >
-          −
-        </button>
-        <span
-          className={`min-w-[1.75rem] text-center ${navItemClass("tertiary", cap > 0)}`}
-          title={
-            cap === 0
-              ? "No per-rank game limit"
-              : `Keep at most ${cap} games per rank before repeat`
-          }
-        >
-          {cap === 0 ? "Off" : cap}
-        </span>
-        <button
-          type="button"
-          className={navItemClass("tertiary", false)}
-          aria-label="Increase per-rank cap"
-          disabled={cap >= REVEAL_TIE_CAP_MAX}
-          onClick={() => ctx.setMaxPerRank(cap + 1)}
-        >
-          +
-        </button>
-      </span>
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        aria-controls={panelId}
+        onClick={() => setOpen((current) => !current)}
+        className={`inline-flex h-9 shrink-0 items-center rounded-[var(--radius-control)] border px-3 text-xs font-semibold tracking-wide transition-colors duration-[var(--motion-fast)] ${
+          active || open
+            ? "border-accent text-accent"
+            : "border-line text-muted hover:border-accent hover:text-ink"
+        }`}
+      >
+        Debug
+      </button>
+      {open && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={panelRef}
+              id={panelId}
+              role="dialog"
+              aria-label="Category reveal stress test"
+              style={
+                panelPos
+                  ? { top: panelPos.top, left: panelPos.left }
+                  : { visibility: "hidden", top: 0, left: 0 }
+              }
+              className="fixed z-30 min-w-[16rem] rounded-[var(--radius-control)] border border-line bg-panel px-3 py-3"
+            >
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={navItemClass("tertiary", false)}>Repeat</span>
+            {REVEAL_TIE_REPEAT_OPTIONS.map((n) => (
+              <button
+                key={`repeat-${n}`}
+                type="button"
+                className={navItemClass("tertiary", ctx.repeat === n)}
+                onClick={() => ctx.setRepeat(n)}
+              >
+                {n === 1 ? "Off" : `×${n}`}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={navItemClass("tertiary", false)}>Cap</span>
+            <span className="inline-flex items-center gap-1">
+              <button
+                type="button"
+                className={navItemClass("tertiary", false)}
+                aria-label="Decrease per-rank cap"
+                disabled={cap <= 0}
+                onClick={() => ctx.setMaxPerRank(cap - 1)}
+              >
+                −
+              </button>
+              <span
+                className={`min-w-[1.75rem] text-center ${navItemClass("tertiary", cap > 0)}`}
+                title={
+                  cap === 0
+                    ? "No per-rank game limit"
+                    : `Keep at most ${cap} games per rank before repeat`
+                }
+              >
+                {cap === 0 ? "Off" : cap}
+              </span>
+              <button
+                type="button"
+                className={navItemClass("tertiary", false)}
+                aria-label="Increase per-rank cap"
+                disabled={cap >= REVEAL_TIE_CAP_MAX}
+                onClick={() => ctx.setMaxPerRank(cap + 1)}
+              >
+                +
+              </button>
+            </span>
+          </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

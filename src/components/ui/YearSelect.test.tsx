@@ -65,4 +65,23 @@ describe("YearSelect", () => {
     expect(list.getAttribute("data-menu-edge")).toBe("end");
     expect(list.className).toContain("right-0");
   });
+
+  it("uses an unbordered All trigger that stays shrink-wrapped", () => {
+    render(
+      <YearSelect
+        options={OPTIONS}
+        label="All"
+        triggerLabel="All"
+      />,
+    );
+    const trigger = screen.getByRole("button", { name: "All" });
+    expect(trigger.textContent).toContain("All");
+    expect(trigger.className).not.toContain("border");
+    expect(trigger.className).toContain("text-2xl");
+    expect(trigger.className).toContain("font-display");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("link", { name: "2026" }).getAttribute("href")).toBe(
+      "/game-of-the-year/2026",
+    );
+  });
 });

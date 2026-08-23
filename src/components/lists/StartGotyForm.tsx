@@ -6,6 +6,10 @@ import { startGotyDraftAction } from "@/app/create/actions";
 import { existingGotyPreviewHref } from "@/lib/lists/existing-goty";
 import { Button } from "@/components/ui/Button";
 import { YearPicker } from "@/components/ui/YearPicker";
+import {
+  type ListShareView,
+  withListShareView,
+} from "@/lib/lists/urls";
 
 const currentYear = new Date().getUTCFullYear();
 
@@ -14,6 +18,7 @@ export function StartGotyForm({
   syncYearInUrl = false,
   hasExistingForYear = false,
   error = null,
+  editorView = "goty",
 }: {
   defaultYear?: number;
   /** Keep `?year=` in sync so an owned year can show its preview on this page. */
@@ -21,6 +26,8 @@ export function StartGotyForm({
   /** True when the selected year already has a list (preview shown below). */
   hasExistingForYear?: boolean;
   error?: string | null;
+  /** Preserve Categories when starting or switching years. */
+  editorView?: ListShareView;
 }) {
   const router = useRouter();
   const [year, setYear] = useState(defaultYear);
@@ -31,6 +38,9 @@ export function StartGotyForm({
         <p className="text-sm text-accent" role="alert">
           {error}
         </p>
+      ) : null}
+      {editorView === "categories" ? (
+        <input type="hidden" name="view" value="categories" />
       ) : null}
       <div>
         <label
@@ -49,7 +59,9 @@ export function StartGotyForm({
           onChange={(next) => {
             setYear(next);
             if (syncYearInUrl) {
-              router.replace(existingGotyPreviewHref(next));
+              router.replace(
+                withListShareView(existingGotyPreviewHref(next), editorView),
+              );
             }
           }}
         />

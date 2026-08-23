@@ -10,7 +10,15 @@ import {
 import {
   clearListDraftCookie,
 } from "@/lib/lists/draft-cookie";
-import { existingGotyPreviewHref } from "@/lib/lists/existing-goty";
+import {
+  existingGotyEditHref,
+  existingGotyPreviewHref,
+} from "@/lib/lists/existing-goty";
+import { clientDraftGotyYear } from "@/lib/lists/create-goty-entry";
+import {
+  parseListShareView,
+  withListShareView,
+} from "@/lib/lists/urls";
 import {
   claimList,
   createDraft,
@@ -58,13 +66,14 @@ export async function startGotyDraftAction(formData: FormData) {
     redirect(`/create/goty?error=${encodeURIComponent("Pick a valid year.")}`);
   }
   const y = Math.floor(year);
+  const view = parseListShareView(formData.get("view"));
   const profileId = await currentProfileId();
 
   if (profileId) {
     await clearListDraftCookie();
     const existing = await getOwnedGotyForYear(profileId, y);
     if (existing) {
-      redirect(existingGotyPreviewHref(y));
+      redirect(withListShareView(existingGotyPreviewHref(y), view));
     }
     const result = await createDraft(
       { listType: "goty", year: y },
@@ -73,10 +82,12 @@ export async function startGotyDraftAction(formData: FormData) {
     if ("error" in result) {
       redirect(`/create/goty?error=${encodeURIComponent(result.error)}`);
     }
-    redirect(`/create/goty?id=${result.list.publicId}`);
+    redirect(
+      withListShareView(`/create/goty?id=${result.list.publicId}`, view),
+    );
   }
 
-  redirect(`/create/goty?year=${y}`);
+  redirect(withListShareView(`/create/goty?year=${y}`, view));
 }
 
 export async function startCustomDraftAction(formData: FormData) {
@@ -114,6 +125,11 @@ export async function startCustomDraftAction(formData: FormData) {
   const params = new URLSearchParams({ title });
   if (year && Number.isFinite(year)) params.set("year", String(Math.floor(year)));
   redirect(`/create/custom?${params.toString()}`);
+}
+
+/** Server cookie clear only — client still must wipe localStorage. */
+export async function clearListDraftCookieAction() {
+  await clearListDraftCookie();
 }
 
 export async function discardAnonDraftAction(formData?: FormData) {
@@ -348,9 +364,24 @@ export async function hydrateDraftGamesAction(igdbIds: number[]) {
   return hydrateGamesByIgdbIds(igdbIds);
 }
 
+/** Drop a local GOTY draft when the account already owns that year. */
+async function ownedGotyHrefIfLocalDraftConflicts(
+  profileId: string,
+  draft: unknown,
+): Promise<string | null> {
+  const year = clientDraftGotyYear(draft);
+  if (year == null) return null;
+  const existing = await getOwnedGotyForYear(profileId, year);
+  if (!existing) return null;
+  await clearListDraftCookie();
+  await clearListEditCookie();
+  return existingGotyEditHref(existing.publicId);
+}
+
 /**
  * After sign-in with intent=save|share: promote the client draft to an owned
  * list. Save stays in the editor; share redirects to the public URL.
+ * If that year is already owned, discard the local draft instead of overwriting.
  */
 export async function completeListAuthIntentAction(
   formData: FormData,
@@ -373,6 +404,16 @@ export async function completeListAuthIntentAction(
   const draft = parseClientDraftPayload(formData);
   if (!draft) return { error: "Could not restore the ranking." };
 
+  // Must run before saveOwnedListFromClientDraft — that helper reuses an
+  // owned GOTY row and would overwrite it with the unsigned ranking.
+  const ownedConflictHref = await ownedGotyHrefIfLocalDraftConflicts(
+    profileId,
+    draft,
+  );
+  if (ownedConflictHref) {
+    redirect(ownedConflictHref);
+  }
+
   const publicId =
     typeof (draft as { publicId?: string }).publicId === "string"
       ? (draft as { publicId: string }).publicId
@@ -385,7 +426,16 @@ export async function completeListAuthIntentAction(
     profileId,
     editSecret,
   });
-  if ("error" in result) return { error: result.error };
+  if ("error" in result) {
+    const fallbackHref = await ownedGotyHrefIfLocalDraftConflicts(
+      profileId,
+      draft,
+    );
+    if (fallbackHref) {
+      redirect(fallbackHref);
+    }
+    return { error: result.error };
+  }
 
   const votesRaw = String(formData.get("categoryVotesJson") ?? "").trim();
   if (votesRaw && result.list.listType === "goty") {

@@ -76,7 +76,7 @@ Stacking identical treatments is forbidden — each level must read quieter than
 |---|---|---|---|
 | **Primary** | Community section switcher | Bordered chips inside `CommunityHeader` (`--panel` band) | Overview · Live Rankings · Events · Members · Settings |
 | **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Community. Site GOTY + community Live: Game of the Year · Categories |
-| **Tertiary** | Board / filter | Plain text + middots, muted / active accent | Community · Hosts. Results boards: Ranked · Comparison |
+| **Tertiary** | Board / filter | Segmented controls on one row below the Results view divider | Community / Hosts. Results: Ranked / Comparison. Dev **Debug** popover (local only) |
 
 Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.
 
@@ -90,7 +90,7 @@ Rules:
 - Results in-page views stay secondary underlines under the awards title (`{year} Video Game Awards`)
 - Community Settings in-page views stay secondary underlines under **Settings**: Live Rankings · Events · Community
 - Never stack identical primary chip rows
-- Tertiary never uses boxes or underlines — text weight alone
+- Results board filters use the shared `segmentBtnClass` control group (same language as list Format), not middot text. They sit on one line below the view-tab divider. Dev-only Reveal stress tools live in a **Debug** popover on that row.
 - Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
 - Multi-year edition switching uses `EditionYearSelect` (pop-open) to the right of `{year} Video Game Awards` — not a second underline strip. Only when 2+ public years. Year links keep the current Results view and Community · Hosts board.
 - Community Settings → Events lists every year with status and host links (Edition settings / Manage hosts / Host preview). Year switching on the public event page stays `EditionYearSelect`.

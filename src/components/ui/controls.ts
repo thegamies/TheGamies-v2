@@ -19,6 +19,15 @@ export function segmentBtnClass(active: boolean): string {
   }`;
 }
 
+/** Toolbar segments — size to the label, never shrink or wrap. */
+export function segmentFitBtnClass(active: boolean): string {
+  return `inline-flex h-full shrink-0 items-center justify-center px-4 text-xs font-semibold tracking-wide whitespace-nowrap transition-colors duration-[var(--motion-fast)] ${
+    active
+      ? "bg-accent text-white"
+      : "bg-transparent text-muted hover:bg-panel hover:text-ink"
+  }`;
+}
+
 export function iconControlClass(active = false): string {
   return `inline-flex h-9 w-9 shrink-0 items-center justify-center border rounded-[var(--radius-control)] text-sm transition-colors duration-[var(--motion-fast)] ${
     active

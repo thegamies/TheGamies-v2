@@ -175,6 +175,8 @@ export type LiveStandingsBoardProps = {
   footer?: ReactNode;
   /** Site GOTY explain control. Omit on community Live. */
   showRankingsInfo?: boolean;
+  /** Site GOTY: Create list / My list, or Make picks / My picks. */
+  creatorCta?: { label: string; href: string } | null;
 };
 
 /**
@@ -193,6 +195,7 @@ export function LiveStandingsBoard({
   headingLevel = "h1",
   footer,
   showRankingsInfo = false,
+  creatorCta = null,
 }: LiveStandingsBoardProps) {
   const revealed = page.detailedStatsRevealed;
   const yearBase = (y: number) => {
@@ -214,22 +217,42 @@ export function LiveStandingsBoard({
   return (
     <>
       <header>
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-          <div className="flex min-w-0 items-baseline gap-3">
-            <Heading className="font-display text-4xl tracking-wide text-ink sm:text-5xl">
+        <div className="flex items-start justify-between gap-x-4">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
+            <Heading className="min-w-0 text-pretty font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
               {title}
             </Heading>
-            {showRankingsInfo ? <RankingsInfoControl /> : null}
+            {showRankingsInfo ? (
+              <div className="flex h-[1em] shrink-0 items-center text-4xl sm:text-5xl">
+                <RankingsInfoControl />
+              </div>
+            ) : null}
           </div>
-          <YearSelect
-            year={page.year}
-            options={yearOptionsLinks}
-            alwaysShow
-            label="Standings year"
-          />
+          <div className="flex h-[1em] shrink-0 items-center text-4xl sm:text-5xl">
+            <div className="text-base leading-none">
+              <YearSelect
+                year={page.year}
+                options={yearOptionsLinks}
+                alwaysShow
+                label="Standings year"
+              />
+            </div>
+          </div>
         </div>
-        {listCountLabel ? (
-          <p className="mt-2 text-sm text-muted">{listCountLabel}</p>
+        {listCountLabel || creatorCta ? (
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {listCountLabel ? (
+              <p className="text-sm text-muted">{listCountLabel}</p>
+            ) : null}
+            {creatorCta ? (
+              <Link
+                href={creatorCta.href}
+                className="text-sm font-semibold tracking-wide text-accent hover:opacity-90"
+              >
+                {creatorCta.label}
+              </Link>
+            ) : null}
+          </div>
         ) : null}
         {statusNotes.map((note) => (
           <p key={note} className="mt-2 max-w-2xl text-sm text-muted" role="status">

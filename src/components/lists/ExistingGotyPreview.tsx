@@ -4,9 +4,12 @@ import {
   standingStripColClass,
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
-import { Button } from "@/components/ui/Button";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { existingGotyEditHref } from "@/lib/lists/existing-goty";
+import {
+  type ListShareView,
+  withListShareView,
+} from "@/lib/lists/urls";
 
 export type ExistingGotyPreviewItem = {
   gameId: string;
@@ -21,11 +24,13 @@ export function ExistingGotyPreview({
   publicId,
   title,
   items,
+  editorView = "goty",
 }: {
   year: number;
   publicId: string;
   title: string;
   items: ExistingGotyPreviewItem[];
+  editorView?: ListShareView;
 }) {
   const topFive = items.slice(0, 5);
 
@@ -35,9 +40,15 @@ export function ExistingGotyPreview({
         <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
           {year}
         </p>
-        <p className="mt-2 font-display text-3xl tracking-wide text-ink">
-          {title}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="font-display text-3xl tracking-wide text-ink">{title}</p>
+          <Link
+            href={withListShareView(existingGotyEditHref(publicId), editorView)}
+            className="text-sm font-semibold tracking-wide text-accent hover:opacity-90"
+          >
+            Edit
+          </Link>
+        </div>
       </div>
 
       {topFive.length === 0 ? (
@@ -64,10 +75,6 @@ export function ExistingGotyPreview({
           </ol>
         </HorizontalScroll>
       )}
-
-      <Link href={existingGotyEditHref(publicId)}>
-        <Button type="button">Edit list</Button>
-      </Link>
     </div>
   );
 }

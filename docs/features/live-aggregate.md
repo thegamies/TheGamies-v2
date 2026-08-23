@@ -68,14 +68,14 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## URLs
 
-- `/` — homepage Top 5 strips for featured years that already meet the public list floor (default: current + previous; admin override on `/admin/rankings`)
-- `/standings` — all public years: Game of the Year top 5 plus the five most-voted category **#1s**; year CTA is **Full rankings**
+- `/` — homepage Top 5 strips for featured years that already meet the public list floor (default: current + previous; admin override on `/admin/rankings`); year and **Top Categories** are display links into the year board (hover accent). Bordered **Full Standings** / **Create list** / **My list** sit on the year row; **See All** / **Make picks** / **My picks** sit on Top Categories. Years with no category highlights still show Top Categories (underlined) and a taller centered empty: “Not enough votes yet” plus a bordered **Add categories to your list**.
+- `/standings` — all public years (enough GOTY lists **or** at least one public category): Game of the Year top 5 plus the five most-voted category **#1s**. Header **All** stays on the right (including small screens), aligned with the info control, and opens a year popover into `/game-of-the-year/[year]`. Year and **Top Categories** are display links into the year board, with bordered **Full Standings** / **Create list** and **See All** / **Make picks** on the right. Empty category years keep the Top Categories rule and a centered empty.
 - `/admin/seed` — Top 5 for every year with live scores
 - `/game-of-the-year` → current year
-- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes. Years below the public list floor show an editorial empty state (not a 404).
+- `/game-of-the-year/[year]` — GOTY cover-card grid paginated **50 per page** (`?page=2`); secondary **Game of the Year** · **Categories** (`?view=categories`); **Create list** / **My list** (GOTY view) or **Make picks** / **My picks** (Categories view) sit next to the list total, as a text link into the GOTY creator; category chapters filtered by award group via a single dropdown (`?group=genre`) and searchable by name; categories ordered by most votes. Years below the public list floor show an editorial empty state (not a 404).
 - `/games/[slug]` — 240px cover on the left; title, description, site GOTY **rank** per public year (Broadcast compact), **site category #1s**, and credits to the right. Description clamps to four lines with Show more / Show less. Rank is always public. Votes, points, and the list-position chart follow the reveal gate. Query is this game’s score rows plus a higher-score count for place — not the full year board. Editions with no scores inherit the parent title’s standings. Suppressed years are omitted.
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
-- Year switching uses the shared top-right `YearSelect` (not a button row)
+- Year switching uses the shared `YearSelect` popover. Site GOTY (`/standings` **All** and `/game-of-the-year/[year]`) lists years with a public GOTY board **or** at least one public category — not a rolling calendar window. Community Live still uses recent calendar years.
 - Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights
 
 - `/admin` — ops index (sync, rankings, seed)
@@ -88,7 +88,8 @@ GOTY years stay off the homepage, `/standings`, year boards, and game-page ranks
 ## Homepage / all-years highlights
 
 - Depth is **Top 5** (site tie numbering); ties at the cutoff are included in full. Equal cards use `--standing-fill-card`: min of editorial 5-up at `--page-max` (five fill a wide row with no scroll) and `--standing-fill-min-visible` across the current row. **Temporary** admin control on `/admin/rankings` (`standing_fill_min_visible`, default **2.2**). A decimal peeks the next cover so the row shows it can scroll. Extra ties stay on that row.
-- **Top Categories:** up to five most-voted awards in the same fill-row; category names clamp to one line. Every game tied at #1 rotates in the same tie stack as community boards. Category name → that category board; game name → game page. **All categories** opens `?view=categories`.
+- **Top Categories:** up to five most-voted awards in the same fill-row; category names clamp to one line. Every game tied at #1 rotates in the same tie stack as community boards. Category name → that category board; game name → game page. **Top Categories** and bordered **See All** open `?view=categories`. Bordered **Make picks** / **My picks** opens the GOTY creator on Categories. If no award has enough votes yet, the section still renders taller and centered: “Not enough votes yet” plus a bordered **Add categories to your list**.
+- Creator CTAs: unsigned visitors get **Create list** / **Make picks** with no extra query. Signed-in: one `public_id` lookup for the years on screen — not a full list dump.
 - Admin may set `site_settings.landing_standings_years`; blank clears to calendar default.
 
 ## Non-goals

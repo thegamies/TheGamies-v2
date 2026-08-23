@@ -22,6 +22,8 @@ type ScrollableNavProps = {
   /** Use div (e.g. role=tablist) instead of nav. */
   as?: "nav" | "div";
   role?: "navigation" | "tablist";
+  /** Cross-axis alignment. Default end (underline tabs). */
+  align?: "end" | "center";
 };
 
 const fadeClass: Record<FadeFrom, string> = {
@@ -42,6 +44,7 @@ export function ScrollableNav({
   fadeFrom = "paper",
   as = "nav",
   role,
+  align = "end",
 }: ScrollableNavProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canLeft, setCanLeft] = useState(false);
@@ -101,7 +104,9 @@ export function ScrollableNav({
         ) : null}
         <div
           ref={scrollRef}
-          className={`scrollbar-none flex w-full min-w-0 flex-nowrap items-end overflow-x-auto ${rowClassName} [&_a]:shrink-0 [&_a]:whitespace-nowrap [&_button]:shrink-0 [&_button]:whitespace-nowrap [&_span[aria-hidden]]:shrink-0`}
+          className={`scrollbar-none flex w-full min-w-0 flex-nowrap overflow-x-auto ${
+            align === "center" ? "items-center" : "items-end"
+          } ${rowClassName} [&_a]:shrink-0 [&_a]:whitespace-nowrap [&_button]:shrink-0 [&_button]:whitespace-nowrap [&_span[aria-hidden]]:shrink-0`}
         >
           {children}
         </div>

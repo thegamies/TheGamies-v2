@@ -42,6 +42,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Deployment (dual host) | `docs/deployment.md` |
 | Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
+| Go-live remaining work | `docs/go-live.md` |
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | IGDB catalog sync | `docs/igdb-sync.md` |

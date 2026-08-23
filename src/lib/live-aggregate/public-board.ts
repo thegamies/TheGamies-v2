@@ -22,3 +22,20 @@ export function parsePublicBoardMinCategoryVotes(raw: unknown): number {
   }
   return Math.min(n, PUBLIC_BOARD_MIN_LISTS_MAX);
 }
+
+/** Newest first. Optionally keep the year currently on screen even if unpublished. */
+export function yearsForStandingsSwitcher(
+  publicYears: readonly number[],
+  currentYear?: number,
+): number[] {
+  const years = new Set<number>();
+  for (const raw of publicYears) {
+    const year = Math.floor(Number(raw));
+    if (Number.isFinite(year)) years.add(year);
+  }
+  if (currentYear != null) {
+    const year = Math.floor(Number(currentYear));
+    if (Number.isFinite(year)) years.add(year);
+  }
+  return [...years].sort((a, b) => b - a);
+}

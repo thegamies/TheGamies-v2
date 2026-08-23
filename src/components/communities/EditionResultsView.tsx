@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
-import {
-  EditionCategoryDebugBar,
-  EditionCategoryDebugProvider,
-} from "@/components/communities/EditionCategoryDebug";
+import { EditionCategoryDebugProvider } from "@/components/communities/EditionCategoryDebug";
+import { EditionResultsBoardToolbar } from "@/components/communities/EditionResultsBoardToolbar";
+import { EditionResultsLayoutProvider } from "@/components/communities/EditionResultsLayout";
 import {
   EditionCategoryDetail,
   EditionCategoryResults,
@@ -32,7 +31,6 @@ import {
   editionVoterBallotHref,
 } from "@/lib/communities/edition-results-href";
 import {
-  editionBoardLabel,
   type EditionResultsPublicMode,
   type EditionResultsViewId,
   type SharedRankMode,
@@ -93,74 +91,54 @@ export function EditionResultsViewNav({
   }
   const viewingYourBallot = view === "ballot" && !viewingPublicBallot && hasYourBallot;
   const showBoardModes = view !== "ballot" && view !== "settings";
-  const modes: EditionResultsPublicMode[] = ["community", "voices"];
 
   return (
-    <div className="mt-6 border-b border-line pb-0">
-      <ScrollableNav aria-label="Results view" border={false}>
-        {views.map((v) => {
-          const active =
-            v.id === "settings"
-              ? view === "settings"
-              : v.id === "ballot"
-                ? viewingYourBallot
-                : v.id === "voters"
-                  ? view === "voters" || viewingPublicBallot
-                  : v.id === "categories"
-                    ? view === "categories" || view === "category"
-                    : v.id === view && !viewingPublicBallot;
-          return (
-            <Link
-              key={v.id}
-              href={
-                v.id === "settings"
-                  ? editionHostSettingsHref(slug, year)
-                  : editionResultsHref(slug, year, {
-                      mode,
-                      view: v.id,
-                      votersPage,
-                      q: votersQ,
-                    })
-              }
-              className={navItemClass("secondary", active)}
-            >
-              {v.label}
-            </Link>
-          );
-        })}
-      </ScrollableNav>
+    <div className="mt-6">
+      <div className="border-b border-line pb-0">
+        <ScrollableNav aria-label="Results view" border={false}>
+          {views.map((v) => {
+            const active =
+              v.id === "settings"
+                ? view === "settings"
+                : v.id === "ballot"
+                  ? viewingYourBallot
+                  : v.id === "voters"
+                    ? view === "voters" || viewingPublicBallot
+                    : v.id === "categories"
+                      ? view === "categories" || view === "category"
+                      : v.id === view && !viewingPublicBallot;
+            return (
+              <Link
+                key={v.id}
+                href={
+                  v.id === "settings"
+                    ? editionHostSettingsHref(slug, year)
+                    : editionResultsHref(slug, year, {
+                        mode,
+                        view: v.id,
+                        votersPage,
+                        q: votersQ,
+                      })
+                }
+                className={navItemClass("secondary", active)}
+              >
+                {v.label}
+              </Link>
+            );
+          })}
+        </ScrollableNav>
+      </div>
 
       {showBoardModes ? (
-        <ScrollableNav
-          aria-label="Results board"
-          border={false}
-          className="mt-3"
-          rowClassName="items-center gap-x-2"
-        >
-          {modes.map((m, i) => (
-            <span key={m} className="contents">
-              {i > 0 ? (
-                <span className="text-muted" aria-hidden>
-                  ·
-                </span>
-              ) : null}
-              <Link
-                href={editionResultsHref(slug, year, {
-                  mode: m,
-                  view,
-                  votersPage: 1,
-                  q: votersQ,
-                  category:
-                    view === "category" ? categoryId ?? undefined : undefined,
-                })}
-                className={navItemClass("tertiary", m === mode)}
-              >
-                {editionBoardLabel(m)}
-              </Link>
-            </span>
-          ))}
-          <EditionCategoryDebugBar />
-        </ScrollableNav>
+        <EditionResultsBoardToolbar
+          slug={slug}
+          year={year}
+          mode={mode}
+          view={view}
+          categoryId={categoryId}
+          votersQ={votersQ}
+          showLayout={view === "overview"}
+        />
       ) : null}
     </div>
   );
@@ -266,6 +244,7 @@ export function EditionResultsView({
       : null;
   return (
     <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
+    <EditionResultsLayoutProvider>
     <div className="mt-6 space-y-10">
       <EditionResultsViewNav
         slug={slug}
@@ -397,6 +376,7 @@ export function EditionResultsView({
         />
       )}
     </div>
+    </EditionResultsLayoutProvider>
     </EditionCategoryDebugProvider>
   );
 }

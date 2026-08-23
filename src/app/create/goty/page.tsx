@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
+import { ClearLocalGotyDraft } from "@/components/lists/ClearLocalGotyDraft";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ExistingGotyPreview } from "@/components/lists/ExistingGotyPreview";
 import { ListEditor } from "@/components/lists/ListEditor";
@@ -13,6 +15,7 @@ import {
 } from "@/lib/lists/anon-editor-seed";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
+import { existingGotyEditHref } from "@/lib/lists/existing-goty";
 import {
   getOwnedGotyForYear,
   getOwnedGotyItemsForYear,
@@ -21,8 +24,11 @@ import {
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { parseStoredListFormat, parseStoredRankStyle } from "@/lib/lists/schema";
-import { createGotyEntryMode } from "@/lib/lists/create-goty-entry";
-import { parseListShareView } from "@/lib/lists/urls";
+import {
+  createGotyEntryMode,
+  shouldDiscardLocalGotyDraft,
+} from "@/lib/lists/create-goty-entry";
+import { parseListShareView, withListShareView } from "@/lib/lists/urls";
 import {
   getCategoryVotesForList,
   listActiveAwardCategories,
@@ -69,6 +75,54 @@ export default async function CreateGotyPage({
   const profileId = await sessionProfileId();
   const signedIn = Boolean(profileId);
   const awardCategories = await listActiveAwardCategories().catch(() => []);
+  const localDraft = await readListDraftCookie();
+  const draftIsGoty = localDraft?.listType === "goty";
+  const draftYear = draftIsGoty ? localDraft.year : null;
+  const urlYear =
+    yearParam && Number.isFinite(Number(yearParam))
+      ? Math.floor(Number(yearParam))
+      : null;
+  let ownedForDraftYear: Awaited<
+    ReturnType<typeof getOwnedGotyForYear>
+  > = null;
+  if (profileId && draftIsGoty && draftYear != null) {
+    ownedForDraftYear = await getOwnedGotyForYear(profileId, draftYear).catch(
+      () => null,
+    );
+  }
+  let ownedForUrlYear: Awaited<ReturnType<typeof getOwnedGotyForYear>> = null;
+  if (profileId && urlYear != null) {
+    ownedForUrlYear =
+      draftYear === urlYear
+        ? ownedForDraftYear
+        : await getOwnedGotyForYear(profileId, urlYear).catch(() => null);
+  }
+  const discardCookieDraft = shouldDiscardLocalGotyDraft({
+    signedIn,
+    draftIsGoty: Boolean(draftIsGoty),
+    draftYear,
+    accountHasGotyForYear: Boolean(ownedForDraftYear),
+  });
+  // Cookie may be empty while localStorage still has a GOTY draft for ?year=.
+  const discardShownYearDraft = shouldDiscardLocalGotyDraft({
+    signedIn,
+    draftIsGoty: true,
+    draftYear: urlYear,
+    accountHasGotyForYear: Boolean(ownedForUrlYear),
+  });
+  const discardLocalGotyDraft =
+    discardCookieDraft || (Boolean(authIntent) && discardShownYearDraft);
+  const ownedToOpen = ownedForDraftYear ?? ownedForUrlYear;
+  // Cookie writes are not allowed from this page — ClearLocalGotyDraft
+  // clears cookie + localStorage after the owned list is shown.
+  if (discardLocalGotyDraft && !publicId && ownedToOpen) {
+    redirect(
+      withListShareView(
+        existingGotyEditHref(ownedToOpen.publicId),
+        editorView,
+      ),
+    );
+  }
 
   let editor: {
     publicId: string | null;
@@ -115,6 +169,7 @@ export default async function CreateGotyPage({
     resume,
     authIntent: Boolean(authIntent),
     yearParam,
+    discardLocalGotyDraft,
   });
 
   if (entryMode === "load-by-id" && publicId) {
@@ -131,7 +186,7 @@ export default async function CreateGotyPage({
         publicId: result.list.publicId,
         title: result.list.title,
         year: result.list.year,
-        slotCount: Math.max(10, result.items.length),
+        slotCount: 10,
         rankStyle: parseStoredRankStyle(result.list.rankStyle),
         showSuffix: result.list.showSuffix,
         listFormat: parseStoredListFormat(result.list.listFormat),
@@ -249,7 +304,10 @@ export default async function CreateGotyPage({
       loadError = "Pick a valid year.";
     } else {
       const y = Math.floor(year);
-      const list = await getOwnedGotyForYear(profileId, y).catch(() => null);
+      const list =
+        urlYear === y
+          ? ownedForUrlYear
+          : await getOwnedGotyForYear(profileId, y).catch(() => null);
       if (list) {
         const items =
           (await getOwnedGotyItemsForYear(profileId, y, { limit: 5 }).catch(
@@ -321,8 +379,17 @@ export default async function CreateGotyPage({
   }
 
   if (editor) {
+    const clearOwnedDraftYear =
+      signedIn &&
+      editor.year != null &&
+      (discardLocalGotyDraft || Boolean(editor.publicId))
+        ? editor.year
+        : null;
     return (
       <div>
+        {clearOwnedDraftYear != null ? (
+          <ClearLocalGotyDraft year={clearOwnedDraftYear} />
+        ) : null}
         <ListEditor
           publicId={editor.publicId}
           listType="goty"
@@ -335,7 +402,7 @@ export default async function CreateGotyPage({
           initialShowSuffix={editor.showSuffix}
           signedIn={signedIn}
           error={error}
-          authIntent={authIntent}
+          authIntent={discardLocalGotyDraft ? null : authIntent}
           returnPath={
             editor.year != null
               ? `/create/goty?year=${editor.year}`
@@ -354,9 +421,15 @@ export default async function CreateGotyPage({
     (yearParam && Number.isFinite(Number(yearParam))
       ? Math.floor(Number(yearParam))
       : currentYear);
+  const pickerClearYear =
+    existingList?.year ??
+    (discardLocalGotyDraft ? (draftYear ?? urlYear) : null);
 
   return (
     <div>
+      {pickerClearYear != null ? (
+        <ClearLocalGotyDraft year={pickerClearYear} />
+      ) : null}
       <CreatePageHeader />
       <p className="mb-6 text-[11px] font-extrabold uppercase tracking-[0.16em] text-muted">
         Game of the Year
@@ -374,6 +447,7 @@ export default async function CreateGotyPage({
         syncYearInUrl={signedIn}
         hasExistingForYear={Boolean(existingList)}
         error={error}
+        editorView={editorView}
       />
 
       {existingList ? (
@@ -383,6 +457,7 @@ export default async function CreateGotyPage({
             publicId={existingList.publicId}
             title={existingList.title}
             items={existingList.items}
+            editorView={editorView}
           />
         </div>
       ) : null}

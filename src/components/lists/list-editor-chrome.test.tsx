@@ -225,4 +225,78 @@ describe("ListEditor chrome", () => {
     ).toHaveAttribute("aria-selected", "true");
     expect(window.location.search).toBe("?id=abc");
   });
+
+  it("hides GOTY size on Grid and List, and keeps games when shrinking Poster", () => {
+    const items = [
+      {
+        gameId: "g1",
+        igdbId: 1,
+        slug: "one",
+        title: "Game One",
+        year: 2026,
+        coverUrl: null,
+        rank: 1,
+        blurb: "",
+      },
+      {
+        gameId: "g2",
+        igdbId: 2,
+        slug: "two",
+        title: "Game Two",
+        year: 2026,
+        coverUrl: null,
+        rank: 2,
+        blurb: "",
+      },
+      {
+        gameId: "g3",
+        igdbId: 3,
+        slug: "three",
+        title: "Game Three",
+        year: 2026,
+        coverUrl: null,
+        rank: 3,
+        blurb: "",
+      },
+    ];
+    render(
+      <ListEditor
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={items}
+        initialSlotCount={3}
+        initialListFormat="grid"
+      />,
+    );
+    expect(screen.queryByLabelText("List size: 3. Tap to pick.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.queryByLabelText("List size: 3. Tap to pick.")).toBeNull();
+    expect(screen.getAllByText("Game Three").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Poster" }));
+    expect(screen.getByLabelText("List size: 3. Tap to pick.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Fewer slots" }));
+    expect(screen.queryByText("Shrink list?")).toBeNull();
+    expect(screen.getByText("1 game hidden")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getAllByText("Game Three").length).toBeGreaterThan(0);
+  });
+
+  it("keeps Size on custom List and Grid", () => {
+    render(
+      <ListEditor
+        listType="custom"
+        initialTitle="Favorites"
+        initialYear={null}
+        initialItems={[]}
+        initialListFormat="grid"
+      />,
+    );
+    expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
+  });
 });

@@ -152,7 +152,7 @@ Use Playwright screenshots compared to approved references under `design-referen
 
 CI treats ESLint **errors** as failures (warnings alone do not). Watch for `react-hooks/set-state-in-effect`: do not sync props into state with `useEffect(() => setX(prop))`. Prefer deriving from props, adjusting state during render when the prop identity changes, clearing related state in event handlers, or remounting with a `key`.
 
-Category Reveal stress-test (dev only): on edition Results, beside Community · Hosts, use **Repeat** and **Cap** controls (local `next dev` only). Cap limits games per derived rank; Repeat clones each derived rank. No URL params; no-op in production.
+Category Reveal stress-test (dev only): on edition Results, open **Debug** on the board row for **Repeat** and **Cap** (local `next dev` only). Cap limits games per derived rank; Repeat clones each derived rank. No URL params; no-op in production.
 
 Catalog / IGDB sync unit coverage lives under `packages/igdb/src/*.test.ts` and `src/lib/admin-sync-schema.test.ts`. Integration tests against Neon remain a follow-up.
 

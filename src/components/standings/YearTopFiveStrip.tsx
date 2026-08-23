@@ -11,6 +11,7 @@ import {
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import type { CategoryHighlightWinner } from "@/lib/live-aggregate/category-highlights";
+import { gotyCreatorCta, type GotyCreatorCta } from "@/lib/lists/existing-goty";
 import {
   DEFAULT_STANDING_FILL_MIN_VISIBLE,
   STANDING_FILL_SCOPE_CLASS,
@@ -30,10 +31,18 @@ export type YearTopFiveRow = {
 const outlinedLinkClass =
   "inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold tracking-wide text-ink transition-colors hover:border-accent";
 
+const headingRowClass =
+  "flex flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-line pb-1";
+
+const headingActionsClass = "flex flex-wrap items-end justify-end gap-2";
+
 const fillFiveColClass = standingFillFiveColClass();
 
 /**
- * One year of Top 5. Year + Full rankings share a ruled header bar.
+ * One year of Top 5. Year and Top Categories are display links. Bordered
+ * Full Standings / Create list and See All / Make picks sit on the right.
+ * Years without category highlights still show Top Categories and a
+ * compact centered empty note with a bordered add-categories control.
  * Card width is min(editorial 5-up, covers-in-view). Extra ties stay on one
  * row and scroll. A decimal covers-in-view peeks the next cover.
  */
@@ -44,6 +53,7 @@ export function YearTopFiveStrip({
   categoryWinners = [],
   showRule = false,
   minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  creatorCta,
 }: {
   year: number;
   rows: YearTopFiveRow[];
@@ -51,7 +61,9 @@ export function YearTopFiveStrip({
   categoryWinners?: CategoryHighlightWinner[];
   showRule?: boolean;
   minVisible?: number;
+  creatorCta?: GotyCreatorCta;
 }) {
+  const cta = creatorCta ?? gotyCreatorCta(year, null);
   const categoriesHref = `/game-of-the-year/${year}?view=categories`;
 
   return (
@@ -63,13 +75,24 @@ export function YearTopFiveStrip({
       }
       style={standingFillMinVisibleVars(minVisible) as CSSProperties}
     >
-      <div className="flex items-end justify-between gap-4 border-b border-line pb-2">
-        <h3 className="font-display text-2xl leading-none tracking-wide text-ink sm:text-3xl">
-          {year}
+      <div className={headingRowClass}>
+        <h3 className="m-0 font-display text-2xl leading-none tracking-wide sm:text-3xl">
+          <Link
+            href={yearHref}
+            className="text-ink transition-colors hover:text-accent"
+            aria-label={`${year} Game of the Year`}
+          >
+            {year}
+          </Link>
         </h3>
-        <Link href={yearHref} className={outlinedLinkClass}>
-          Full rankings
-        </Link>
+        <div className={headingActionsClass}>
+          <Link href={yearHref} className={outlinedLinkClass}>
+            Full Standings
+          </Link>
+          <Link href={cta.listHref} className={outlinedLinkClass}>
+            {cta.listLabel}
+          </Link>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -95,16 +118,26 @@ export function YearTopFiveStrip({
         </HorizontalScroll>
       )}
 
-      {categoryWinners.length > 0 ? (
-        <div className="mt-5">
-          <div className="flex items-end justify-between gap-4">
-            <p className="font-display text-xl leading-none tracking-wide text-ink sm:text-2xl">
+      <div className="mt-5">
+        <div className={headingRowClass}>
+          <p className="m-0 font-display text-2xl leading-none tracking-wide sm:text-3xl">
+            <Link
+              href={categoriesHref}
+              className="text-ink transition-colors hover:text-accent"
+            >
               Top Categories
-            </p>
+            </Link>
+          </p>
+          <div className={headingActionsClass}>
             <Link href={categoriesHref} className={outlinedLinkClass}>
-              All categories
+              See All
+            </Link>
+            <Link href={cta.categoriesHref} className={outlinedLinkClass}>
+              {cta.categoriesLabel}
             </Link>
           </div>
+        </div>
+        {categoryWinners.length > 0 ? (
           <HorizontalScroll
             className="@container mt-3"
             label={`${year} top categories`}
@@ -139,8 +172,15 @@ export function YearTopFiveStrip({
               })}
             </ul>
           </HorizontalScroll>
-        </div>
-      ) : null}
+        ) : (
+          <div className="mt-3 flex min-h-28 flex-col items-center justify-center gap-3 py-6 text-center">
+            <p className="text-sm text-muted">Not enough votes yet.</p>
+            <Link href={cta.categoriesHref} className={outlinedLinkClass}>
+              Add categories to your list
+            </Link>
+          </div>
+        )}
+      </div>
     </article>
   );
 }
@@ -155,6 +195,7 @@ export function YearTopFiveSections({
     rows: YearTopFiveRow[];
     yearHref: string;
     categoryWinners?: CategoryHighlightWinner[];
+    creatorCta?: GotyCreatorCta;
   }>;
   allYearsHref?: string | null;
   minVisible?: number;
@@ -169,7 +210,7 @@ export function YearTopFiveSections({
     <div>
       {allYearsHref ? (
         <div className="mb-3 flex items-end justify-between gap-4 border-b border-line pb-2 sm:mb-4">
-          <h2 className="font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
+          <h2 className="text-pretty font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
             Game of the Year
           </h2>
           <Link href={allYearsHref} className={outlinedLinkClass}>
@@ -184,6 +225,7 @@ export function YearTopFiveSections({
           rows={section.rows}
           yearHref={section.yearHref}
           categoryWinners={section.categoryWinners}
+          creatorCta={section.creatorCta}
           showRule={index > 0}
           minVisible={minVisible}
         />

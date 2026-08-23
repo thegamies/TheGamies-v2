@@ -801,6 +801,42 @@ export async function listYearsWithGotyScores(
   return rows.map((r) => r.year);
 }
 
+/**
+ * Years with a public GOTY board or at least one public category board.
+ * One integer list — not a dump of scores or awards.
+ */
+export async function listPublicStandingsYears(
+  db: Db = getLiveAggregateDb(),
+): Promise<number[]> {
+  const settings = await getSiteSettings(db);
+  const minLists = settings.publicBoardMinLists;
+  const minCategoryVotes = settings.publicBoardMinCategoryVotes;
+  const result = await db.execute(sql`
+    select year
+    from (
+      select distinct s.year
+      from live_goty_scores s
+      inner join live_goty_year_stats st on st.year = s.year
+      where st.list_count >= ${minLists}
+      union
+      select totals.year
+      from (
+        select year
+        from live_category_scores
+        group by year, category_id
+        having sum(vote_count) >= ${minCategoryVotes}
+      ) totals
+    ) years
+    order by year desc
+  `);
+  return result.rows
+    .map((row) => {
+      const year = Number(row.year);
+      return Number.isFinite(year) ? Math.floor(year) : null;
+    })
+    .filter((year): year is number => year != null);
+}
+
 export async function getGotyThroughRankForYears(
   years: readonly number[],
   opts: {

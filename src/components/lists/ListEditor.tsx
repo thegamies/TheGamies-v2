@@ -84,7 +84,7 @@ import {
   buildListSignInHref,
   type ListAuthIntent,
 } from "@/lib/lists/auth-intent";
-import { LIST_BLURB_MAX, LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import { LIST_BLURB_MAX, LIST_MAX_ITEMS, clampListSlotCount } from "@/lib/lists/schema";
 import {
   withListShareView,
   type ListShareView,
@@ -130,11 +130,6 @@ type ListEditorProps = {
 
 function withRanks(items: EditorItem[]): EditorItem[] {
   return items.map((item, i) => ({ ...item, rank: i + 1 }));
-}
-
-function formatTitleList(names: string[]): string {
-  if (names.length <= 3) return names.join(", ");
-  return `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`;
 }
 
 function persistSnapshot(input: {
@@ -239,7 +234,7 @@ export function ListEditor({
     ),
   );
   const [slotCount, setSlotCount] = useState(() =>
-    Math.max(initialSlotCount ?? 10, initialItems.length),
+    clampListSlotCount(initialSlotCount ?? 10),
   );
   const [listFormat, setListFormat] = useState<ListFormat>(initialListFormat);
   const [defaultFormat, setDefaultFormat] = useState<ListFormat>(initialListFormat);
@@ -271,7 +266,6 @@ export function ListEditor({
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [saveSignInOpen, setSaveSignInOpen] = useState(false);
   const [shareLinkSignInOpen, setShareLinkSignInOpen] = useState(false);
-  const [pendingTrim, setPendingTrim] = useState<number | null>(null);
   const [leavePrompt, setLeavePrompt] = useState<"done" | "share" | null>(
     null,
   );
@@ -280,10 +274,18 @@ export function ListEditor({
   const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
   const showYearBadge = listType === "goty";
   const showTopCount = listType === "custom";
-  const isFull = items.length >= slotCount;
+  const isFull = items.length >= LIST_MAX_ITEMS;
   const selectedIds = new Set(items.map((i) => i.gameId));
   const visibleHits = hits.filter((hit) => !selectedIds.has(hit.id));
-  const emptySlots = Math.max(0, slotCount - items.length);
+  const hiddenOnPoster = Math.max(0, items.length - slotCount);
+  const emptySlots =
+    listType === "goty" ? 0 : Math.max(0, slotCount - items.length);
+  const gridSlotCount =
+    listType === "goty"
+      ? items.length >= LIST_MAX_ITEMS
+        ? items.length
+        : items.length + 1
+      : slotCount;
   const signInHref = buildListSignInHref(returnPath, "save");
   const currentSnapshot = () =>
     persistSnapshot({
@@ -301,6 +303,8 @@ export function ListEditor({
     message: "Leave without saving? Your latest edits won’t be kept on this list.",
   });
   const onGotyChrome = editorView === "goty";
+  const showSizePicker =
+    onGotyChrome && (listType !== "goty" || listFormat === "poster");
   const authIntentEmptyError =
     signedIn && authIntent && draftReady && items.length === 0
       ? "Add at least one game before saving or sharing."
@@ -377,7 +381,7 @@ export function ListEditor({
         .filter((item): item is EditorItem => Boolean(item));
       if (nextItems.length > 0) {
         setItems(withRanks(nextItems));
-        setSlotCount(Math.max(draft.slotCount, nextItems.length));
+        setSlotCount(clampListSlotCount(draft.slotCount));
         setTitle(draft.title);
         if (draft.year != null) setYear(String(draft.year));
         if (draft.listFormat) {
@@ -419,7 +423,7 @@ export function ListEditor({
         return;
       }
       setItems(withRanks(nextItems));
-      setSlotCount(Math.max(draft.slotCount, nextItems.length));
+      setSlotCount(clampListSlotCount(draft.slotCount));
       setTitle(draft.title);
       if (draft.year != null) setYear(String(draft.year));
       if (draft.listFormat) {
@@ -631,23 +635,9 @@ export function ListEditor({
     });
   }
 
-  function applySlotCount(next: number) {
-    const clamped = Math.min(LIST_MAX_ITEMS, Math.max(1, next));
-    if (clamped < items.length) {
-      setItems((prev) => withRanks(prev.slice(0, clamped)));
-    }
-    setSlotCount(clamped);
-    setPendingTrim(null);
-    setSlotPickerOpen(false);
-  }
-
   function changeSlotCount(next: number) {
-    const clamped = Math.min(LIST_MAX_ITEMS, Math.max(1, next));
-    if (clamped < items.length) {
-      setPendingTrim(clamped);
-      return;
-    }
-    applySlotCount(clamped);
+    setSlotCount(clampListSlotCount(next));
+    setSlotPickerOpen(false);
   }
 
   function openSettings() {
@@ -661,14 +651,9 @@ export function ListEditor({
   function addGame(hit: GameSearchHit) {
     if (items.some((i) => i.gameId === hit.id)) return;
     if (listType === "goty" && hit.year !== yearNum) return;
-    if (items.length >= slotCount) {
-      if (slotCount >= LIST_MAX_ITEMS) {
-        setSaveError(`Lists can hold at most ${LIST_MAX_ITEMS} games.`);
-        return;
-      }
-      setSlotCount((n) =>
-        Math.min(LIST_MAX_ITEMS, Math.max(n, items.length + 1)),
-      );
+    if (items.length >= LIST_MAX_ITEMS) {
+      setSaveError(`Lists can hold at most ${LIST_MAX_ITEMS} games.`);
+      return;
     }
     setItems((prev) => {
       if (prev.length >= LIST_MAX_ITEMS) return prev;
@@ -705,11 +690,12 @@ export function ListEditor({
   function reorder(ids: string[]) {
     setItems((prev) => {
       const byId = new Map(prev.map((item) => [item.gameId, item]));
-      return withRanks(
-        ids
-          .map((id) => byId.get(id))
-          .filter((item): item is EditorItem => Boolean(item)),
-      );
+      const nextVisible = ids
+        .map((id) => byId.get(id))
+        .filter((item): item is EditorItem => Boolean(item));
+      const moved = new Set(nextVisible.map((item) => item.gameId));
+      const rest = prev.filter((item) => !moved.has(item.gameId));
+      return withRanks([...nextVisible, ...rest]);
     });
   }
 
@@ -832,18 +818,6 @@ export function ListEditor({
     }
     openShareMenu();
   }
-
-  const trimMessage = (() => {
-    if (pendingTrim == null) return "";
-    const removed = items.slice(pendingTrim);
-    const noted = removed.filter((item) => item.blurb.trim().length > 0);
-    const count = removed.length;
-    const base = `Shrinking to ${pendingTrim} removes ${count} ${
-      count === 1 ? "game" : "games"
-    } from the bottom of your ranking.`;
-    if (noted.length === 0) return base;
-    return `${base} Notes on ${formatTitleList(noted.map((n) => n.title))} will be lost.`;
-  })();
 
   const saveShareControls = (
     <div className="flex flex-wrap items-center gap-2">
@@ -1000,6 +974,7 @@ export function ListEditor({
       >
         {onGotyChrome ? (
           <>
+            {showSizePicker ? (
             <div className={controlLabelClass}>
               Size
               <div className={controlGroupClass}>
@@ -1033,6 +1008,7 @@ export function ListEditor({
                 </button>
               </div>
             </div>
+            ) : null}
 
             <ListFormatControl
               labeled
@@ -1157,7 +1133,7 @@ export function ListEditor({
             query={query}
             onQueryChange={setQuery}
             isFull={isFull}
-            fullMessage={`All ${slotCount} slots filled. Increase size or remove a game to add more.`}
+            fullMessage={`Lists can hold at most ${LIST_MAX_ITEMS} games.`}
             searching={searchPending}
             visibleResults={visibleHits}
             resultsEmpty={hits.length === 0}
@@ -1191,6 +1167,13 @@ export function ListEditor({
                   ? "Tap an empty slot or search to add games."
                   : "Hold to reorder. Tap a game to remove."}
               </p>
+              {hiddenOnPoster > 0 ? (
+                <p className="mt-1 text-center text-xs text-muted">
+                  {hiddenOnPoster === 1
+                    ? "1 game hidden"
+                    : `${hiddenOnPoster} games hidden`}
+                </p>
+              ) : null}
             </>
           ) : listFormat === "grid" ? (
               <GridListBuilder
@@ -1199,7 +1182,7 @@ export function ListEditor({
                 title: item.title,
                 coverUrl: item.coverUrl,
               }))}
-              slotCount={slotCount}
+              slotCount={gridSlotCount}
               onReorder={reorder}
               onRemove={removeGame}
               onPickEmpty={focusSearch}
@@ -1276,11 +1259,17 @@ export function ListEditor({
               ) : null}
 
               <p className="mt-4 text-xs text-muted">
-                {items.length} of {slotCount} slots
-                {slotCount < LIST_MAX_ITEMS
-                  ? ` · capacity up to ${LIST_MAX_ITEMS}`
-                  : null}
-                {" · Hold the handle to reorder."}
+                {listType === "goty"
+                  ? `${items.length} ${items.length === 1 ? "game" : "games"}${
+                      items.length < LIST_MAX_ITEMS
+                        ? ` · up to ${LIST_MAX_ITEMS}`
+                        : ""
+                    } · Hold the handle to reorder.`
+                  : `${items.length} of ${slotCount} slots${
+                      slotCount < LIST_MAX_ITEMS
+                        ? ` · capacity up to ${LIST_MAX_ITEMS}`
+                        : ""
+                    } · Hold the handle to reorder.`}
               </p>
             </>
           )}
@@ -1309,7 +1298,7 @@ export function ListEditor({
               query={query}
               onQueryChange={setQuery}
               isFull={isFull}
-              fullMessage={`All ${slotCount} slots filled. Increase size or remove a game to add more.`}
+              fullMessage={`Lists can hold at most ${LIST_MAX_ITEMS} games.`}
               searching={searchPending}
               visibleResults={visibleHits}
               resultsEmpty={hits.length === 0}
@@ -1371,17 +1360,6 @@ export function ListEditor({
         onPick={changeSlotCount}
         onClose={() => setSlotPickerOpen(false)}
       />
-
-      {pendingTrim != null ? (
-        <ConfirmDialog
-          open
-          title="Shrink list?"
-          message={trimMessage}
-          confirmLabel="Shrink anyway"
-          onCancel={() => setPendingTrim(null)}
-          onConfirm={() => applySlotCount(pendingTrim)}
-        />
-      ) : null}
 
       {leavePrompt ? (
         <ConfirmDialog

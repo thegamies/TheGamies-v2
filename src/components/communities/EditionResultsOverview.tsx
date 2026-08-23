@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { EditionCategoriesHighlights } from "@/components/communities/EditionCategoriesHighlights";
 import { EditionGotyHighlights } from "@/components/communities/EditionGotyHighlights";
-import { navItemClass } from "@/components/ui/navLevels";
-import { ScrollableNav } from "@/components/ui/ScrollableNav";
+import {
+  useEditionResultsLayout,
+  type ResultsBoardLayout,
+} from "@/components/communities/EditionResultsLayout";
+import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/controls";
 import type {
   EditionBallotMatrix,
   EditionCategoryComparisonMatrix,
@@ -13,7 +16,7 @@ import type {
 } from "@/lib/communities/edition-results";
 import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
 
-export type ResultsBoardLayout = "ranked" | "comparison";
+export type { ResultsBoardLayout };
 
 const LAYOUTS: Array<{ id: ResultsBoardLayout; label: string }> = [
   { id: "ranked", label: "Ranked" },
@@ -60,7 +63,10 @@ export function EditionResultsOverview({
   const hasSsrComparison =
     initialMatrix.hasGames || initialCategoryComparison.hasGames;
 
-  const [layout, setLayout] = useState<ResultsBoardLayout>("ranked");
+  const board = useEditionResultsLayout();
+  const [localLayout, setLocalLayout] = useState<ResultsBoardLayout>("ranked");
+  const layout = board?.layout ?? localLayout;
+  const setLayout = board?.setLayout ?? setLocalLayout;
   const [fetchedMatrix, setFetchedMatrix] = useState(EMPTY_MATRIX);
   const [fetchedCategoryComparison, setFetchedCategoryComparison] = useState(
     EMPTY_CATEGORY_COMPARISON,
@@ -109,11 +115,14 @@ export function EditionResultsOverview({
     }
   }, [comparisonStatus, hasSsrComparison, slug, year]);
 
-  const selectLayout = (next: ResultsBoardLayout) => {
-    setLayout(next);
-    if (next === "comparison") {
+  useEffect(() => {
+    if (layout === "comparison") {
       void loadComparison();
     }
+  }, [layout, loadComparison]);
+
+  const selectLayout = (next: ResultsBoardLayout) => {
+    setLayout(next);
   };
 
   const showCategories =
@@ -132,30 +141,25 @@ export function EditionResultsOverview({
 
   return (
     <div>
-      <ScrollableNav
-        aria-label="Results layout"
-        border={false}
-        className="mb-6"
-        rowClassName="items-center gap-x-2"
-      >
-        {LAYOUTS.map((opt, i) => (
-          <span key={opt.id} className="contents">
-            {i > 0 ? (
-              <span className="text-muted" aria-hidden>
-                ·
-              </span>
-            ) : null}
+      {board ? null : (
+        <div
+          role="group"
+          aria-label="Results layout"
+          className={`${controlGroupBarClass} mb-6 w-fit`}
+        >
+          {LAYOUTS.map((opt) => (
             <button
+              key={opt.id}
               type="button"
-              className={navItemClass("tertiary", layout === opt.id)}
+              className={segmentFitBtnClass(layout === opt.id)}
               aria-pressed={layout === opt.id}
               onClick={() => selectLayout(opt.id)}
             >
               {opt.label}
             </button>
-          </span>
-        ))}
-      </ScrollableNav>
+          ))}
+        </div>
+      )}
 
       {comparisonPending ? (
         <p className="text-muted">Loading comparison…</p>

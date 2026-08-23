@@ -1,4 +1,8 @@
-import { LIST_MAX_ITEMS, LIST_TYPES } from "@/lib/lists/schema";
+import {
+  clampListSlotCount,
+  LIST_MAX_ITEMS,
+  LIST_TYPES,
+} from "@/lib/lists/schema";
 
 export const LIST_DRAFT_COOKIE = "tg_list_draft";
 export const LIST_DRAFT_STORAGE_KEY = "tg_list_draft_v1";
@@ -126,12 +130,9 @@ export function parseListDraftCookie(
 
   const slotCountRaw =
     typeof obj.slotCount === "number" && Number.isFinite(obj.slotCount)
-      ? Math.floor(obj.slotCount)
-      : Math.max(10, igdbIds.length);
-  const slotCount = Math.min(
-    LIST_MAX_ITEMS,
-    Math.max(1, Math.max(slotCountRaw, igdbIds.length)),
-  );
+      ? obj.slotCount
+      : 10;
+  const slotCount = clampListSlotCount(slotCountRaw);
 
   const publicId =
     typeof obj.publicId === "string" && obj.publicId.trim()
@@ -198,10 +199,7 @@ export function buildListDraftPayload(input: {
       input.title.trim().slice(0, 120) ||
       defaultTitle(input.listType, year),
     igdbIds,
-    slotCount: Math.min(
-      LIST_MAX_ITEMS,
-      Math.max(1, Math.max(input.slotCount, igdbIds.length)),
-    ),
+    slotCount: clampListSlotCount(input.slotCount),
     ...(input.listFormat ? { listFormat: input.listFormat } : {}),
     ...(input.rankStyle ? { rankStyle: input.rankStyle } : {}),
     ...(typeof input.showSuffix === "boolean"

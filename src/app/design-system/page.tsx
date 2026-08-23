@@ -17,6 +17,7 @@ import { CategoryPickCard } from "@/components/ui/CategoryPickCard";
 import { GameCover } from "@/components/ui/GameCover";
 import { YearSelect } from "@/components/ui/YearSelect";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
+import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/controls";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
@@ -90,39 +91,41 @@ function MastheadResultsFixture() {
         year={2026}
         years={[2026, 2025]}
       />
-      <div className="mt-8 border-b border-line pb-0">
-        <ScrollableNav aria-label="Results view" border={false}>
-          {RESULTS_VIEWS.map((label, i) => (
-            <span key={label} className={navItemClass("secondary", i === 0)}>
-              {label}
-            </span>
-          ))}
-        </ScrollableNav>
+      <div className="mt-8">
+        <div className="border-b border-line pb-0">
+          <ScrollableNav aria-label="Results view" border={false}>
+            {RESULTS_VIEWS.map((label, i) => (
+              <span key={label} className={navItemClass("secondary", i === 0)}>
+                {label}
+              </span>
+            ))}
+          </ScrollableNav>
+        </div>
         <ScrollableNav
-          aria-label="Results board"
+          aria-label="Results board filters"
           border={false}
+          align="center"
           className="mt-3"
-          rowClassName="items-center gap-x-2"
+          rowClassName="gap-2 [&>[role=group]]:shrink-0"
         >
-          <span className={navItemClass("tertiary", true)}>Community</span>
-          <span className="text-muted" aria-hidden>
-            ·
-          </span>
-          <span className={navItemClass("tertiary", false)}>Hosts</span>
+          <div
+            role="group"
+            aria-label="Results layout"
+            className={`${controlGroupBarClass} w-max shrink-0`}
+          >
+            <span className={segmentFitBtnClass(true)}>Ranked</span>
+            <span className={segmentFitBtnClass(false)}>Comparison</span>
+          </div>
+          <div
+            role="group"
+            aria-label="Results board"
+            className={`${controlGroupBarClass} w-max shrink-0`}
+          >
+            <span className={segmentFitBtnClass(true)}>Community</span>
+            <span className={segmentFitBtnClass(false)}>Hosts</span>
+          </div>
         </ScrollableNav>
       </div>
-      <ScrollableNav
-        aria-label="Results layout"
-        border={false}
-        className="mt-6"
-        rowClassName="items-center gap-x-2"
-      >
-        <span className={navItemClass("tertiary", true)}>Ranked</span>
-        <span className="text-muted" aria-hidden>
-          ·
-        </span>
-        <span className={navItemClass("tertiary", false)}>Comparison</span>
-      </ScrollableNav>
       <p className="mt-6 text-sm text-muted">Standings content starts here…</p>
     </div>
   );

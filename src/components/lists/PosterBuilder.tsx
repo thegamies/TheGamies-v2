@@ -133,7 +133,7 @@ export function PosterBuilder({
     [rankStyle, rankFormat],
   );
   const hideRanks = chrome.mode === "none";
-  const filledIds = items.map((i) => i.id);
+  const filledIds = items.slice(0, slotCount).map((i) => i.id);
 
   const { rows, cardByRow, rankScaleWidth } = useMemo(() => {
     const placeholders: ExportGame[] = Array.from(

@@ -1,6 +1,13 @@
 import { z } from "zod";
 
 export const LIST_MAX_ITEMS = 100;
+
+/** Poster layout size. Independent of how many games are ranked. */
+export function clampListSlotCount(n: number): number {
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(LIST_MAX_ITEMS, Math.max(1, Math.floor(n)));
+}
+
 /** Max length for per-game notes (UX + Zod). */
 export const LIST_BLURB_MAX = 500;
 export const LIST_TYPES = ["goty", "custom"] as const;

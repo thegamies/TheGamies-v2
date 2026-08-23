@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { LiveStandingsView } from "@/components/live-aggregate/LiveStandingsView";
+import { yearsForStandingsSwitcher } from "@/lib/live-aggregate/public-board";
 import {
   STANDINGS_PAGE_SIZE,
   getStandingsPage,
+  listPublicStandingsYears,
 } from "@/lib/live-aggregate/service";
 import {
   DEFAULT_LIVE_STANDINGS_VIEW,
@@ -11,6 +13,8 @@ import {
   parseLiveStandingsView,
   parseStandingsCategoryGroup,
 } from "@/lib/live-aggregate/award-category-defs";
+import { gotyCreatorCta } from "@/lib/lists/existing-goty";
+import { loadGotyCreatorCtas } from "@/lib/lists/load-goty-creator-cta";
 
 type Params = Promise<{ year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -54,20 +58,14 @@ export default async function GameOfTheYearYearPage({
   const view = parseLiveStandingsView(first(sp.view));
   const categoryId = first(sp.category) ?? null;
 
-  const current = new Date().getUTCFullYear();
-  const yearOptions = Array.from({ length: 6 }, (_, i) => current - i);
-
-  let page;
-  try {
-    page = await getStandingsPage(y, {
+  const [page, publicYears, creatorCtas] = await Promise.all([
+    getStandingsPage(y, {
       page: requestedPage,
       pageSize: STANDINGS_PAGE_SIZE,
       categoryGroup,
       view,
       categoryId,
-    });
-  } catch {
-    page = {
+    }).catch(() => ({
       year: y,
       listCount: 0,
       detailedStatsRevealed: false,
@@ -85,8 +83,19 @@ export default async function GameOfTheYearYearPage({
       categoryGameTotal: 0,
       gotyPublic: false,
       categoriesPublic: false,
-    };
-  }
+    })),
+    listPublicStandingsYears().catch(() => [] as number[]),
+    loadGotyCreatorCtas([y]).catch(() => new Map()),
+  ]);
 
-  return <LiveStandingsView page={page} yearOptions={yearOptions} />;
+  const creatorCta = creatorCtas.get(y) ?? gotyCreatorCta(y, null);
+  const yearOptions = yearsForStandingsSwitcher(publicYears, y);
+
+  return (
+    <LiveStandingsView
+      page={page}
+      yearOptions={yearOptions}
+      creatorCta={creatorCta}
+    />
+  );
 }

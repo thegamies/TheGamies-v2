@@ -8,6 +8,7 @@ import {
   parseListDraftCookie,
 } from "./draft-cookie";
 import {
+  clampListSlotCount,
   clientDraftUpsertSchema,
   createDraftSchema,
   parseStoredListFormat,
@@ -221,7 +222,7 @@ describe("list draft cookie", () => {
     expect(parseListDraftCookie(encodeURIComponent('{"v":2}'))).toBeNull();
   });
 
-  it("dedupes igdb ids and caps slot count", () => {
+  it("dedupes igdb ids and keeps poster size independent of ranking length", () => {
     const payload = buildListDraftPayload({
       listType: "custom",
       year: null,
@@ -230,7 +231,30 @@ describe("list draft cookie", () => {
       slotCount: 0,
     });
     expect(payload.igdbIds).toEqual([1, 2]);
-    expect(payload.slotCount).toBeGreaterThanOrEqual(2);
+    expect(payload.slotCount).toBe(1);
+  });
+
+  it("allows a poster size smaller than the ranking", () => {
+    const payload = buildListDraftPayload({
+      listType: "goty",
+      year: 2026,
+      title: "2026 Game of the Year",
+      igdbIds: [1, 2, 3, 4, 5],
+      slotCount: 3,
+    });
+    expect(payload.slotCount).toBe(3);
+    expect(parseListDraftCookie(encodeListDraftCookie(payload))?.slotCount).toBe(
+      3,
+    );
+  });
+});
+
+describe("clampListSlotCount", () => {
+  it("keeps poster size independent of ranking length", () => {
+    expect(clampListSlotCount(3)).toBe(3);
+    expect(clampListSlotCount(0)).toBe(1);
+    expect(clampListSlotCount(200)).toBe(100);
+    expect(clampListSlotCount(Number.NaN)).toBe(10);
   });
 });
 

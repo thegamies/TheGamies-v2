@@ -14,14 +14,19 @@ export type YearSelectOption = {
 };
 
 type Props = {
-  year: number;
+  year?: number;
   /** Precomputed year links — serializable for Server → Client boundaries. */
   options: YearSelectOption[];
   /** Show the year even when there is only one (no menu). */
   alwaysShow?: boolean;
   /** Accessible name for the control / listbox. */
   label?: string;
+  /** Text trigger copy (e.g. All) instead of the current year. */
+  triggerLabel?: string;
 };
+
+const yearTriggerClass =
+  "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap font-display text-2xl leading-none tracking-wide text-ink hover:text-accent";
 
 /**
  * Compact pop-open year switcher — sits to the right of a section heading.
@@ -34,6 +39,7 @@ export function YearSelect({
   options,
   alwaysShow = false,
   label = "Year",
+  triggerLabel,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [menuEdge, setMenuEdge] = useState<YearSelectMenuEdge>("end");
@@ -87,30 +93,33 @@ export function YearSelect({
   }, [open]);
 
   if (options.length === 0) return null;
-  if (options.length === 1 && !alwaysShow) return null;
+  if (options.length === 1 && !alwaysShow && !triggerLabel) return null;
 
-  if (options.length === 1) {
+  if (options.length === 1 && !triggerLabel) {
     return (
-      <p className="font-display text-2xl tracking-wide text-ink" aria-label={label}>
+      <p
+        className="font-display text-2xl leading-none tracking-wide text-ink"
+        aria-label={label}
+      >
         {year}
       </p>
     );
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className="relative shrink-0 leading-none">
       <button
         type="button"
-        className="inline-flex items-baseline gap-1.5 font-display text-2xl tracking-wide text-ink hover:text-accent"
+        className={yearTriggerClass}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={listId}
         aria-label={label}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{year}</span>
+        <span>{triggerLabel ?? year}</span>
         <span
-          className={`text-sm text-muted transition-transform ${open ? "rotate-180" : ""}`}
+          className={`text-sm leading-none text-muted transition-transform ${open ? "rotate-180" : ""}`}
           aria-hidden
         >
           ▾

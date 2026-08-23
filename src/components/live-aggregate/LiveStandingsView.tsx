@@ -1,13 +1,19 @@
-import Link from "next/link";
 import { LiveStandingsBoard } from "@/components/live-aggregate/LiveStandingsBoard";
 import type { StandingsPage } from "@/lib/live-aggregate/service";
+import {
+  gotyCreatorCta,
+  gotyCreatorCtaForView,
+  type GotyCreatorCta,
+} from "@/lib/lists/existing-goty";
 
 export function LiveStandingsView({
   page,
   yearOptions,
+  creatorCta,
 }: {
   page: StandingsPage;
   yearOptions: number[];
+  creatorCta?: GotyCreatorCta;
 }) {
   const basePath = `/game-of-the-year/${page.year}`;
   const statusNotes: string[] = [];
@@ -21,6 +27,11 @@ export function LiveStandingsView({
   const emptyCategories = page.categoriesPublic
     ? "No category votes for this group yet."
     : "This year's category boards are still coming together.";
+
+  const headerCta = gotyCreatorCtaForView(
+    creatorCta ?? gotyCreatorCta(page.year, null),
+    page.view,
+  );
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] py-[var(--page-pad-y)]">
@@ -38,15 +49,7 @@ export function LiveStandingsView({
         emptyGoty={emptyGoty}
         emptyCategories={emptyCategories}
         showRankingsInfo
-        footer={
-          <p className="mt-14 text-sm text-muted">
-            Building your own list?{" "}
-            <Link href="/create/goty" className="text-accent hover:underline">
-              Create a Game of the Year ranking
-            </Link>
-            .
-          </p>
-        }
+        creatorCta={headerCta}
       />
     </main>
   );
