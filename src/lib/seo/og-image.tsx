@@ -1,5 +1,4 @@
 import { ImageResponse } from "next/og";
-import { GameOgCard } from "./game-og-card";
 import { OgCard, OG_SIZE, type OgCardCover } from "./og-card";
 import { loadOgFonts } from "./og-fonts";
 
@@ -37,10 +36,11 @@ export async function renderGameOgImage(input: {
 }) {
   return new ImageResponse(
     (
-      <GameOgCard
+      <OgCard
+        kicker="Game"
         title={input.title}
-        year={input.year}
-        coverUrl={input.coverUrl}
+        subtitle={input.year != null ? `Released ${input.year}` : undefined}
+        heroCover={input.coverUrl ?? null}
       />
     ),
     await imageOptions(),

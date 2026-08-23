@@ -8,25 +8,32 @@ import { igdbImage } from "@thegamies/igdb";
 import type { OgCardCover } from "@/lib/seo/og-card";
 import { renderGameOgImage, renderOgImage } from "@/lib/seo/og-image";
 import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
-import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+import { SITE_DESCRIPTION } from "@/lib/seo/site";
 
 async function defaultCard() {
   return renderOgImage({
-    title: SITE_NAME,
+    title: "Community Game of the Year",
     subtitle: SITE_DESCRIPTION,
+  });
+}
+
+async function pngResponse(image: Awaited<ReturnType<typeof renderOgImage>>) {
+  const body = await image.arrayBuffer();
+  return new Response(body, {
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": "public, max-age=3600",
+    },
   });
 }
 
 export async function GET(request: NextRequest) {
   const kind = request.nextUrl.searchParams.get("kind") ?? "default";
-  let response: Awaited<ReturnType<typeof renderOgImage>>;
   try {
-    response = await renderForKind(kind, request.nextUrl.searchParams);
+    return await pngResponse(await renderForKind(kind, request.nextUrl.searchParams));
   } catch {
-    response = await defaultCard();
+    return pngResponse(await defaultCard());
   }
-  response.headers.set("Cache-Control", "public, max-age=3600");
-  return response;
 }
 
 async function renderForKind(kind: string, params: URLSearchParams) {
@@ -37,7 +44,7 @@ async function renderForKind(kind: string, params: URLSearchParams) {
     return renderGameOgImage({
       title: game.title,
       year: game.year,
-      coverUrl: igdbImage(game.coverUrl, "1080p") ?? game.coverUrl,
+      coverUrl: igdbImage(game.coverUrl, "cover_big_2x") ?? game.coverUrl,
     });
   }
 
@@ -63,7 +70,10 @@ async function renderForKind(kind: string, params: URLSearchParams) {
     const items = await getShareListItems(data.list.id, { limit: 4 });
     const covers: OgCardCover[] = items
       .filter((item) => item.coverUrl)
-      .map((item) => ({ url: item.coverUrl as string, rank: item.rank }));
+      .map((item) => ({
+        url: igdbImage(item.coverUrl, "cover_big_2x") ?? (item.coverUrl as string),
+        rank: item.rank,
+      }));
     return renderOgImage({
       kicker: data.list.year ? `${data.list.year} list` : "List",
       title: data.list.title,
