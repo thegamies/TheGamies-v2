@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { IGDB_URL, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/site";
 
-export const metadata: Metadata = {
+import { publicPageMetadata } from "@/lib/seo/site";
+
+export const metadata: Metadata = publicPageMetadata({
   title: "Contact",
-};
+  description: "How to reach The Gamies.",
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (

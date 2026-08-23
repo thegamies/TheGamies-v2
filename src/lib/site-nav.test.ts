@@ -56,7 +56,7 @@ describe("buildPrimarySiteNavLinks", () => {
   it("is Games, GOTY, and Communities only", () => {
     expect(buildPrimarySiteNavLinks()).toEqual([
       { href: "/games", label: "Games" },
-      { href: "/standings", label: "GOTY" },
+      { href: "/game-of-the-year", label: "GOTY" },
       { href: "/communities", label: "Communities" },
     ]);
   });

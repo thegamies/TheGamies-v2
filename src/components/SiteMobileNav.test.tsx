@@ -32,7 +32,7 @@ vi.mock("@/app/auth/sign-out/actions", () => ({
 
 const primaryLinks = [
   { href: "/games", label: "Games" },
-  { href: "/standings", label: "GOTY" },
+  { href: "/game-of-the-year", label: "GOTY" },
   { href: "/communities", label: "Communities" },
 ];
 
@@ -68,7 +68,7 @@ describe("SiteMobileNav", () => {
     );
     expect(within(drawer).getByRole("link", { name: "GOTY" })).toHaveAttribute(
       "href",
-      "/standings",
+      "/game-of-the-year",
     );
     expect(
       within(drawer).getByRole("link", { name: "Communities" }),

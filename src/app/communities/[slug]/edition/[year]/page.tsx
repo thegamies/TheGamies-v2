@@ -88,6 +88,7 @@ import {
 } from "@/lib/communities/edition-categories";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { getOwnedGotyItemsForYear } from "@/lib/lists/service";
+import { noIndexRobots } from "@/lib/seo/site";
 
 type Params = Promise<{ slug: string; year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -105,16 +106,17 @@ export async function generateMetadata({
   const year = Number(yearRaw);
   try {
     const community = await getCommunityBySlug(slug);
-    if (!community) return { title: "Event" };
+    if (!community) return { title: "Event", robots: noIndexRobots };
     if (!Number.isFinite(year)) {
-      return { title: `${community.name} event` };
+      return { title: `${community.name} event`, robots: noIndexRobots };
     }
     return {
       title: `${community.name} ${Math.floor(year)} event`,
       description: `${community.name} Game of the Year event.`,
+      robots: noIndexRobots,
     };
   } catch {
-    return { title: "Event" };
+    return { title: "Event", robots: noIndexRobots };
   }
 }
 

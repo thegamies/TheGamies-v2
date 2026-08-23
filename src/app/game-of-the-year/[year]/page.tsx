@@ -15,6 +15,8 @@ import {
 } from "@/lib/live-aggregate/award-category-defs";
 import { gotyCreatorCta } from "@/lib/lists/existing-goty";
 import { loadGotyCreatorCtas } from "@/lib/lists/load-goty-creator-cta";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { publicPageMetadata } from "@/lib/seo/site";
 
 type Params = Promise<{ year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -31,10 +33,13 @@ export async function generateMetadata({
   const { year: yearRaw } = await params;
   const year = Number(yearRaw);
   if (!Number.isFinite(year)) return { title: "Game of the Year" };
-  return {
-    title: `${Math.floor(year)} Game of the Year`,
-    description: `Live Game of the Year standings for ${Math.floor(year)}.`,
-  };
+  const y = Math.floor(year);
+  return publicPageMetadata({
+    title: `${y} Game of the Year`,
+    description: `Live Game of the Year standings for ${y}.`,
+    path: `/game-of-the-year/${y}`,
+    image: ogImagePath({ kind: "goty", year: y }),
+  });
 }
 
 export default async function GameOfTheYearYearPage({

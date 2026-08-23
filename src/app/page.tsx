@@ -17,6 +17,16 @@ import {
   resolveLandingStandingsYears,
 } from "@/lib/site-settings/service";
 import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
+import { publicPageMetadata, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+
+export const metadata = {
+  ...publicPageMetadata({
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    path: "/",
+  }),
+  title: { absolute: SITE_NAME },
+};
 
 export default async function HomePage() {
   let sections: Array<{
@@ -94,7 +104,7 @@ export default async function HomePage() {
       <section className="pt-6 sm:pt-8">
         <YearTopFiveSections
           sections={sections}
-          allYearsHref="/standings"
+          allYearsHref="/game-of-the-year"
           minVisible={minVisible}
         />
       </section>

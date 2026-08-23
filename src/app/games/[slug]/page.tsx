@@ -6,6 +6,8 @@ import { GameGotyRankings } from "@/components/games/GameGotyRankings";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameCover } from "@/components/ui/GameCover";
 import { getGameBySlug } from "@/lib/catalog";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { publicPageMetadata } from "@/lib/seo/site";
 import {
   getGameDetailCategoryWins,
   getGameDetailGotyRankings,
@@ -27,10 +29,12 @@ export async function generateMetadata({
   try {
     const game = await getGameBySlug(slug);
     if (!game) return { title: "Game" };
-    return {
+    return publicPageMetadata({
       title: game.title,
       description: game.summary?.slice(0, 160) ?? undefined,
-    };
+      path: `/games/${slug}`,
+      image: game.coverUrl ?? ogImagePath({ kind: "game", slug }),
+    });
   } catch {
     return { title: "Game" };
   }

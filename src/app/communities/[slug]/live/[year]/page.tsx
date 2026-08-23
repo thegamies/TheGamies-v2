@@ -13,6 +13,7 @@ import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { noIndexRobots } from "@/lib/seo/site";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
   DEFAULT_LIVE_STANDINGS_VIEW,
@@ -37,16 +38,20 @@ export async function generateMetadata({
   const year = Number(yearRaw);
   try {
     const community = await getCommunityBySlug(slug);
-    if (!community) return { title: "Live Rankings" };
+    if (!community) return { title: "Live Rankings", robots: noIndexRobots };
     if (!Number.isFinite(year)) {
-      return { title: `${community.name} Live Rankings` };
+      return {
+        title: `${community.name} Live Rankings`,
+        robots: noIndexRobots,
+      };
     }
     return {
       title: `${community.name} ${Math.floor(year)} Live Rankings`,
       description: `Live Game of the Year standings for ${community.name}.`,
+      robots: noIndexRobots,
     };
   } catch {
-    return { title: "Live Rankings" };
+    return { title: "Live Rankings", robots: noIndexRobots };
   }
 }
 

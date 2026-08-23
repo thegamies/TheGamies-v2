@@ -5,9 +5,13 @@ import { TERMS_EMAIL, TERMS_MAILTO } from "@/lib/site";
 
 const EFFECTIVE_DATE = "August 19, 2026";
 
-export const metadata: Metadata = {
+import { publicPageMetadata } from "@/lib/seo/site";
+
+export const metadata: Metadata = publicPageMetadata({
   title: "Terms of Service",
-};
+  description: "Terms of Service for The Gamies.",
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (

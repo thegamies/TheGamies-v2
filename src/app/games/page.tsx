@@ -3,10 +3,13 @@ import type { Metadata } from "next";
 import { GamesBrowseFilters } from "@/components/games/GamesBrowseFilters";
 import { GameCover } from "@/components/ui/GameCover";
 import { browseGames } from "@/lib/catalog";
+import { publicPageMetadata } from "@/lib/seo/site";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicPageMetadata({
   title: "Games",
-};
+  description: "Browse the game catalog on The Gamies.",
+  path: "/games",
+});
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 

@@ -26,6 +26,8 @@ import {
   isCommunityPublic,
 } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { publicPageMetadata } from "@/lib/seo/site";
 import { MembershipActions } from "./MembershipActions";
 
 type Params = Promise<{ slug: string }>;
@@ -40,14 +42,16 @@ export async function generateMetadata({
     const community = await getCommunityBySlug(slug);
     if (!community) return { title: "Community" };
     const publicCommunity = isCommunityPublic(community.visibility);
-    return {
+    return publicPageMetadata({
       title: community.name,
       description:
         community.description || `${community.name} on The Gamies`,
-      robots: publicCommunity
-        ? { index: true, follow: true }
-        : { index: false, follow: false },
-    };
+      path: `/communities/${community.slug}`,
+      index: publicCommunity,
+      image: publicCommunity
+        ? ogImagePath({ kind: "community", slug: community.slug })
+        : undefined,
+    });
   } catch {
     return { title: "Community" };
   }

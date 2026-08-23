@@ -22,6 +22,9 @@ import {
   getProfileByUsername,
   ownsProfile,
 } from "@/lib/profile/service";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
 
 type Params = Promise<{ username: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -37,13 +40,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { username } = await params;
   const profile = await getProfileByUsername(username).catch(() => null);
-  if (!profile || profile.visibility === "private") {
-    return { title: "Profile" };
+  if (!profile || !shouldIndexProfile(profile)) {
+    return { title: "Profile", robots: noIndexRobots };
   }
-  return {
+  return publicPageMetadata({
     title: profile.displayName,
     description: profile.bio ?? `${profile.displayName} on The Gamies`,
-  };
+    path: `/u/${profile.username}`,
+    image: ogImagePath({ kind: "profile", username: profile.username }),
+  });
 }
 
 export default async function PublicProfilePage({

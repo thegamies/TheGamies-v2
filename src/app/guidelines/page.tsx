@@ -3,9 +3,13 @@ import Link from "next/link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/site";
 
-export const metadata: Metadata = {
+import { publicPageMetadata } from "@/lib/seo/site";
+
+export const metadata: Metadata = publicPageMetadata({
   title: "Community Guidelines",
-};
+  description: "How people are expected to use The Gamies.",
+  path: "/guidelines",
+});
 
 export default function GuidelinesPage() {
   return (

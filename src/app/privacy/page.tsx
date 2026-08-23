@@ -5,9 +5,13 @@ import { PRIVACY_EMAIL, PRIVACY_MAILTO } from "@/lib/site";
 
 const EFFECTIVE_DATE = "August 19, 2026";
 
-export const metadata: Metadata = {
+import { publicPageMetadata } from "@/lib/seo/site";
+
+export const metadata: Metadata = publicPageMetadata({
   title: "Privacy Policy",
-};
+  description: "Privacy Policy for The Gamies.",
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

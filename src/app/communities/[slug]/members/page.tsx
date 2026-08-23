@@ -16,6 +16,7 @@ import {
   getCommunityBySlug,
   listCommunityMembersPage,
 } from "@/lib/communities/service";
+import { noIndexRobots } from "@/lib/seo/site";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -41,13 +42,14 @@ export async function generateMetadata({
   const { slug } = await params;
   try {
     const community = await getCommunityBySlug(slug);
-    if (!community) return { title: "Members" };
+    if (!community) return { title: "Members", robots: noIndexRobots };
     return {
       title: `${community.name} members`,
       description: `People in ${community.name}.`,
+      robots: noIndexRobots,
     };
   } catch {
-    return { title: "Members" };
+    return { title: "Members", robots: noIndexRobots };
   }
 }
 

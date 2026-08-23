@@ -40,7 +40,7 @@ export function showDesignSystemNav(env: {
 export function buildPrimarySiteNavLinks(): SiteNavLink[] {
   return [
     { href: "/games", label: "Games" },
-    { href: "/standings", label: "GOTY" },
+    { href: "/game-of-the-year", label: "GOTY" },
     { href: "/communities", label: "Communities" },
   ];
 }

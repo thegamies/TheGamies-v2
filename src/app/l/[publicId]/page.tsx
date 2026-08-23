@@ -6,7 +6,9 @@ import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
 import { getShareListByPublicId, getShareListCategoryPicks, getShareListItems } from "@/lib/lists/service";
 import { listSharePath, listShareViewHref, parseListShareView } from "@/lib/lists/urls";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { getProfileByAuthUserId, getProfileByUsername } from "@/lib/profile/service";
+import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
 
 type Params = Promise<{ publicId: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -24,13 +26,24 @@ export async function generateMetadata({
   const data = await getShareListByPublicId(publicId, {
     includeItems: false,
   }).catch(() => null);
-  if (!data) return { title: "List" };
-  return {
+  if (!data) return { title: "List", robots: noIndexRobots };
+  const path = listSharePath({
+    publicId: data.list.publicId,
+    slug: data.list.slug,
+    username: data.owner?.username,
+  });
+  const ownerProfile = data.owner?.username
+    ? await getProfileByUsername(data.owner.username).catch(() => null)
+    : null;
+  const index = Boolean(ownerProfile && shouldIndexProfile(ownerProfile));
+  return publicPageMetadata({
     title: data.list.title,
     description: data.list.year
       ? `${data.list.year} list on The Gamies`
       : `${data.list.title} on The Gamies`,
-  };
+    path,
+    index,
+  });
 }
 
 export default async function SharedListByPublicIdPage({

@@ -10,7 +10,10 @@ import {
   getShareListItems,
 } from "@/lib/lists/service";
 import { listSharePath, parseListShareView } from "@/lib/lists/urls";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { getProfileByAuthUserId, getProfileByUsername } from "@/lib/profile/service";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
 
 type Params = Promise<{ username: string; listSlug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -25,16 +28,35 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { username, listSlug } = await params;
-  const data = await getShareListByUsernameSlug(username, listSlug, {
-    includeItems: false,
-  }).catch(() => null);
-  if (!data) return { title: "List" };
-  return {
+  const [profile, data] = await Promise.all([
+    getProfileByUsername(username).catch(() => null),
+    getShareListByUsernameSlug(username, listSlug, {
+      includeItems: false,
+    }).catch(() => null),
+  ]);
+  if (!data) return { title: "List", robots: noIndexRobots };
+  const path = listSharePath({
+    publicId: data.list.publicId,
+    slug: data.list.slug,
+    username: data.owner?.username,
+  });
+  const index = Boolean(profile && shouldIndexProfile(profile));
+  return publicPageMetadata({
     title: data.list.title,
     description: data.list.year
       ? `${data.list.year} list on The Gamies`
       : `${data.list.title} on The Gamies`,
-  };
+    path,
+    index,
+    image:
+      data.owner?.username && data.list.slug
+        ? ogImagePath({
+            kind: "list",
+            username: data.owner.username,
+            slug: data.list.slug,
+          })
+        : undefined,
+  });
 }
 
 export default async function OwnedListBySlugPage({

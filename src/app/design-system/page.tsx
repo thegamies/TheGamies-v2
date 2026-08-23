@@ -35,6 +35,7 @@ import type { EditionStatus } from "@/lib/communities/edition-status";
 
 export const metadata = {
   title: "Design system",
+  robots: { index: false, follow: false },
 };
 
 const FIXTURE_COVER =

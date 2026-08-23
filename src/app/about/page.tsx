@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { IGDB_URL } from "@/lib/site";
 
-export const metadata: Metadata = {
+import { publicPageMetadata } from "@/lib/seo/site";
+
+export const metadata: Metadata = publicPageMetadata({
   title: "About",
-};
+  description: "What The Gamies is and how Game of the Year lists work.",
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

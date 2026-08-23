@@ -94,14 +94,15 @@ Today:
 
 ### 7. Share + crawl basics
 
-Architecture calls for crawlable public pages and social cards. Missing:
+Shipped on Cloudflare:
 
-- `robots.txt` / `sitemap.xml` (game, list, profile, GOTY boards)
-- Open Graph / Twitter images (`generateMetadata` has titles; no `ImageResponse` / default share image)
-- `not-found` / `error` pages (unhandled failures are the Next default)
-- `metadataBase` so relative OG URLs resolve on the canonical host
+- `robots.txt` / paged `sitemap.xml` (games, public profiles, owned lists, GOTY boards, public community homes)
+- `metadataBase` from `NEXT_PUBLIC_APP_URL`
+- Open Graph / Twitter metadata, a static default card (`/og.png`), and generated cards at `/api/og` (game, list, profile, GOTY year, public community)
+- Editorial `not-found` / `error` pages
+- `noindex` on create, auth, design-system, dev, private profiles, and members-only community interiors
 
-Lists and results are the share surface. Blank or wrong cards will be the first impression.
+Confirm `NEXT_PUBLIC_APP_URL` is the public Cloudflare origin so canonical and `og:image` URLs resolve.
 
 ### 8. Staging secrets that production will also need
 
@@ -184,9 +185,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 ## Cleanup (small, do on the way to `main`)
 
 - Admin unlock copy: “Enter the admin code,” never the env var name
-- `robots: noindex` on `/design-system`, `/create`, auth pages, `/dev/nav-guard`
-- Custom `not-found.tsx` / `error.tsx` in editorial voice (no CLI / env names)
-- Default share image + favicon / apple-touch if the current `.ico` is a placeholder
+- Default favicon / apple-touch if the current `.ico` is a placeholder
 - README “Current status” still reads like a scaffold; retitle when production exists
 - `docs/setup-checklist.md` is still an unchecked wiring list — treat it as the **ops** companion to this doc
 - Dual-host preview check of Auth, list save, community ballot, freeze, and email on **staging** before promote

@@ -308,9 +308,9 @@ async function loadListItems(
 
 export async function getShareListItems(
   listId: string,
-  db: Db = getDb(),
+  opts: { db?: Db; limit?: number } = {},
 ) {
-  return loadListItems(listId, db);
+  return loadListItems(listId, opts.db ?? getDb(), { limit: opts.limit });
 }
 
 export type HydratedDraftGame = {

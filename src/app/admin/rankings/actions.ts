@@ -33,7 +33,7 @@ export async function setRevealAction(
   await setYearRevealed(Math.floor(year), revealed);
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
   revalidatePath("/");
-  revalidatePath("/standings");
+  revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");
   return { ok: true };
 }
@@ -53,7 +53,7 @@ export async function rebuildYearAction(
   }
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
   revalidatePath("/");
-  revalidatePath("/standings");
+  revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");
   return { ok: true };
 }
@@ -67,7 +67,7 @@ export async function refreshYearAction(
   const result = await tryRefreshYear(Math.floor(year));
   revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
   revalidatePath("/");
-  revalidatePath("/standings");
+  revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");
   return { ok: true, reason: result.reason };
 }
@@ -114,7 +114,7 @@ export async function saveLandingYearsAction(
     const years = parseLandingYearsInput(raw);
     const saved = await setLandingStandingsYears(years);
     revalidatePath("/");
-    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
     revalidatePath("/admin/rankings");
     return { ok: true, landingStandingsYears: saved.landingStandingsYears };
   } catch (err) {
@@ -136,7 +136,7 @@ export async function saveRankModeAction(
   try {
     const saved = await setSiteRankMode(rankMode);
     revalidatePath("/");
-    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
     revalidatePath("/game-of-the-year", "layout");
     revalidatePath("/admin/rankings");
     return { ok: true, rankMode: saved.rankMode };
@@ -159,7 +159,7 @@ export async function savePublicBoardMinListsAction(
   try {
     const saved = await setPublicBoardMinLists(parsed);
     revalidatePath("/");
-    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
     revalidatePath("/game-of-the-year", "layout");
     revalidatePath("/admin/rankings");
     return { ok: true, publicBoardMinLists: saved.publicBoardMinLists };
@@ -187,7 +187,7 @@ export async function savePublicBoardMinCategoryVotesAction(
   try {
     const saved = await setPublicBoardMinCategoryVotes(parsed);
     revalidatePath("/");
-    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
     revalidatePath("/game-of-the-year", "layout");
     revalidatePath("/admin/rankings");
     return {
@@ -220,7 +220,7 @@ export async function saveStandingFillMinVisibleAction(
   try {
     const saved = await setStandingFillMinVisible(parsed);
     revalidatePath("/");
-    revalidatePath("/standings");
+    revalidatePath("/game-of-the-year");
     revalidatePath("/admin/rankings");
     return {
       ok: true,

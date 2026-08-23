@@ -6,6 +6,8 @@ import { AppProviders } from "@/components/AppProviders";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { appOrigin, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 import "./globals.css";
 
 const archivo = Archivo({
@@ -27,13 +29,29 @@ const sourceSerif = Source_Serif_4({
   display: "swap",
 });
 
+const origin = appOrigin();
+
 export const metadata: Metadata = {
+  metadataBase: origin ? new URL(origin) : undefined,
   title: {
-    default: "The Gamies",
-    template: "%s · The Gamies",
+    default: SITE_NAME,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "Community Game of the Year awards, Hosts, and personal ranked lists.",
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    locale: "en_US",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [{ url: ogImagePath({ kind: "default" }), width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [ogImagePath({ kind: "default" })],
+  },
 };
 
 /** Keep iOS Safari on a real phone width (no ~980px desktop layout). */
