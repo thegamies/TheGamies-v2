@@ -4,6 +4,7 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import { CommunityListCard } from "@/components/communities/CommunityListCard";
 import { Button } from "@/components/ui/Button";
 import { ProfilePager } from "@/components/profile/ProfilePager";
 import { parseProfilePage } from "@/lib/profile/profile-page";
@@ -90,42 +91,17 @@ export default async function CommunitiesPage({
         </p>
       ) : (
         <>
-          <ul className="mt-6 divide-y divide-line border-y border-line">
+          <ul className="mt-6 grid gap-x-6 gap-y-5 border-y border-line py-4 sm:grid-cols-2">
             {memberships.communities.map((community) => (
-              <li key={community.id} className="py-5">
-                <Link
-                  href={`/communities/${community.slug}`}
-                  className="flex items-center gap-4 font-display text-2xl tracking-wide text-ink hover:text-accent"
-                >
-                  {community.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={community.avatarUrl}
-                      alt=""
-                      width={48}
-                      height={48}
-                      className="h-12 w-12 rounded-full border border-line object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="flex h-12 w-12 items-center justify-center rounded-full border border-line bg-panel text-lg"
-                      aria-hidden
-                    >
-                      {community.name.slice(0, 1).toUpperCase()}
-                    </span>
-                  )}
-                  {community.name}
-                </Link>
-                <p className="mt-1 pl-16 text-sm text-muted">
-                  {community.memberCount}{" "}
-                  {community.memberCount === 1 ? "member" : "members"}
-                </p>
-                {community.description ? (
-                  <p className="mt-2 max-w-2xl pl-16 text-sm text-muted">
-                    {community.description}
-                  </p>
-                ) : null}
-              </li>
+              <CommunityListCard
+                key={community.id}
+                slug={community.slug}
+                name={community.name}
+                description={community.description}
+                avatarUrl={community.avatarUrl}
+                bannerUrl={community.bannerUrl}
+                memberCount={community.memberCount}
+              />
             ))}
           </ul>
           <ProfilePager

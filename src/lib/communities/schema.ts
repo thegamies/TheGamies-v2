@@ -12,6 +12,28 @@ export const RESERVED_COMMUNITY_SLUGS = new Set(["new", "join"]);
 export const COMMUNITY_ROLES = ["admin", "member"] as const;
 export type CommunityRole = (typeof COMMUNITY_ROLES)[number];
 
+export const COMMUNITY_VISIBILITIES = ["private", "public"] as const;
+export type CommunityVisibility = (typeof COMMUNITY_VISIBILITIES)[number];
+
+export const communityVisibilitySchema = z.enum(COMMUNITY_VISIBILITIES);
+
+export function asCommunityVisibility(raw: unknown): CommunityVisibility {
+  return raw === "public" ? "public" : "private";
+}
+
+export function isCommunityPublic(visibility: string): boolean {
+  return visibility === "public";
+}
+
+/** Members always; non-members only when the community is public. */
+export function canBrowseCommunityHome(
+  visibility: string,
+  viewerRole: CommunityRole | null,
+): boolean {
+  if (viewerRole) return true;
+  return isCommunityPublic(visibility);
+}
+
 export function normalizeCommunitySlug(raw: string): string {
   return raw.trim().toLowerCase();
 }
@@ -66,6 +88,7 @@ export const communityDescriptionSchema = z
 export const createCommunitySchema = z.object({
   name: communityNameSchema,
   description: communityDescriptionSchema.optional().or(z.literal("")),
+  visibility: communityVisibilitySchema.default("private"),
 });
 
 export type CreateCommunityInput = z.infer<typeof createCommunitySchema> & {
@@ -82,6 +105,7 @@ export function parseCreateCommunityInput(
   }
   return {
     ...parsed.data,
+    visibility: parsed.data.visibility ?? "private",
     slug: slugifyCommunityName(parsed.data.name),
   };
 }

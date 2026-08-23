@@ -267,6 +267,27 @@
       "when": 1788393600000,
       "tag": "0037_profile_community_banners",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788480000000,
+      "tag": "0038_community_social_bans",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788566400000,
+      "tag": "0039_community_deletion_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788652800000,
+      "tag": "0040_community_visibility",
+      "breakpoints": true
     }
   ]
 }

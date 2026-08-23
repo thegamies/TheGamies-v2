@@ -19,11 +19,14 @@ import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules"
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   getCommunityBySlug,
-  listCommunityMemberOptions,
+  listCommunityAdminRoster,
 } from "@/lib/communities/service";
+import { listCommunityBansPage, getPendingCommunityDeletionRequest } from "@/lib/communities/moderation";
 import { CommunityHostsForm } from "./CommunityHostsForm";
 import { CommunityIdentitySettings } from "./CommunityIdentitySettings";
+import { CommunityBansSettings } from "./CommunityBansSettings";
 import { CommunityLeaveForm } from "./CommunityLeaveForm";
+import { RequestCommunityDeletionForm } from "./RequestCommunityDeletionForm";
 import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
@@ -82,12 +85,38 @@ export default async function CommunitySettingsPage({
   const featuredStatus =
     featured && featured.status !== "draft" ? featured.status : null;
 
-  let hostMembers: Awaited<ReturnType<typeof listCommunityMemberOptions>> = [];
+  let hostMembers: Awaited<ReturnType<typeof listCommunityAdminRoster>> = [];
+  let bansPage: Awaited<ReturnType<typeof listCommunityBansPage>> = {
+    bans: [],
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    totalPages: 1,
+  };
+  let pendingDeletion: Awaited<
+    ReturnType<typeof getPendingCommunityDeletionRequest>
+  > = null;
   if (tab === "community") {
     try {
-      hostMembers = await listCommunityMemberOptions(community.id);
+      hostMembers = await listCommunityAdminRoster(community.id);
     } catch {
       hostMembers = [];
+    }
+    try {
+      bansPage = await listCommunityBansPage(community.id, 1);
+    } catch {
+      bansPage = {
+        bans: [],
+        page: 1,
+        pageSize: 50,
+        total: 0,
+        totalPages: 1,
+      };
+    }
+    try {
+      pendingDeletion = await getPendingCommunityDeletionRequest(community.id);
+    } catch {
+      pendingDeletion = null;
     }
   }
   const canLeave =
@@ -105,6 +134,7 @@ export default async function CommunitySettingsPage({
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
         bannerUrl={community.bannerUrl}
+        socialLinks={community.socialLinks}
       />
 
       <section className="mt-10">
@@ -149,11 +179,16 @@ export default async function CommunitySettingsPage({
         ) : (
           <>
             <p className="mt-6 max-w-xl text-sm text-muted">
-              Community look, admins, and leave.
+              Community look, social links, admins, bans, and leave.
             </p>
             <CommunityIdentitySettings
               slug={community.slug}
               name={community.name}
+              description={community.description}
+              visibility={
+                community.visibility === "public" ? "public" : "private"
+              }
+              socialLinks={community.socialLinks}
               avatarUrl={community.avatarUrl}
               bannerUrl={community.bannerUrl}
             />
@@ -166,9 +201,23 @@ export default async function CommunitySettingsPage({
               viewerProfileId={profile.id}
               hostCount={community.hostCount}
             />
+            <CommunityBansSettings
+              slug={community.slug}
+              bans={bansPage.bans}
+            />
             <CommunityLeaveForm
               slug={community.slug}
               canLeave={canLeave}
+              isPublic={community.visibility === "public"}
+            />
+            <RequestCommunityDeletionForm
+              slug={community.slug}
+              name={community.name}
+              pendingRequest={
+                pendingDeletion
+                  ? { requestedAt: pendingDeletion.requestedAt }
+                  : null
+              }
             />
           </>
         )}

@@ -149,6 +149,7 @@ export default async function CommunityLiveYearPage({
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
         bannerUrl={community.bannerUrl}
+        socialLinks={community.socialLinks}
       />
 
       <CommunityLiveView

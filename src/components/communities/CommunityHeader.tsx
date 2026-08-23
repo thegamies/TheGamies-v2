@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CopyInviteButton } from "@/components/communities/CopyInviteButton";
+import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
 import { MastheadBanner } from "@/components/ui/MastheadBanner";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
@@ -93,6 +94,9 @@ type HeaderProps = NavProps & {
   invitePath?: string | null;
   avatarUrl?: string | null;
   bannerUrl?: string | null;
+  socialLinks?: unknown;
+  /** When false, masthead only (public non-member home). Default true. */
+  showNav?: boolean;
 };
 
 /**
@@ -108,6 +112,8 @@ export function CommunityHeader({
   invitePath = null,
   avatarUrl = null,
   bannerUrl = null,
+  socialLinks = null,
+  showNav = true,
 }: HeaderProps) {
   const initial = name.trim().slice(0, 1).toUpperCase() || "?";
 
@@ -143,21 +149,26 @@ export function CommunityHeader({
                 {initial}
               </div>
             )}
-            <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
-              {name}
-            </h1>
+            <div className="min-w-0">
+              <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
+                {name}
+              </h1>
+              <ProfileSocialLinks value={socialLinks} className="mt-3" />
+            </div>
           </div>
           {invitePath ? <CopyInviteButton path={invitePath} /> : null}
         </div>
-        <div className="mt-6">
-          <CommunityNav
-            slug={slug}
-            liveEnabled={liveEnabled}
-            canManage={canManage}
-            editionStatus={editionStatus}
-            active={active}
-          />
-        </div>
+        {showNav ? (
+          <div className="mt-6">
+            <CommunityNav
+              slug={slug}
+              liveEnabled={liveEnabled}
+              canManage={canManage}
+              editionStatus={editionStatus}
+              active={active}
+            />
+          </div>
+        ) : null}
       </div>
     </header>
   );

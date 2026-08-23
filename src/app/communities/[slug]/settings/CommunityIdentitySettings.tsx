@@ -1,24 +1,45 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useActionState, useRef, useState, useTransition } from "react";
 import {
   removeCommunityImageAction,
+  updateCommunityIdentityAction,
   uploadCommunityImageAction,
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { fieldInputClass } from "@/components/ui/controls";
+import { RadioOption } from "@/components/ui/Radio";
+import {
+  COMMUNITY_DESCRIPTION_MAX,
+  COMMUNITY_NAME_MAX,
+  type CommunityVisibility,
+} from "@/lib/communities/schema";
 import {
   resizeAvatarImage,
   resizeBannerImage,
 } from "@/lib/profile/resize-avatar";
+import {
+  SOCIAL_LINK_KEYS,
+  SOCIAL_LINK_LABELS,
+  SOCIAL_LINK_PLACEHOLDERS,
+  normalizeSocialLinks,
+  socialLinkUrlToHandle,
+} from "@/lib/profile/social-links";
 
 export function CommunityIdentitySettings({
   slug,
   name,
+  description,
+  visibility,
+  socialLinks,
   avatarUrl: initialAvatarUrl,
   bannerUrl: initialBannerUrl,
 }: {
   slug: string;
   name: string;
+  description: string;
+  visibility: CommunityVisibility;
+  socialLinks: unknown;
   avatarUrl: string | null;
   bannerUrl: string | null;
 }) {
@@ -30,6 +51,11 @@ export function CommunityIdentitySettings({
   const [bannerPending, startBanner] = useTransition();
   const avatarFileRef = useRef<HTMLInputElement>(null);
   const bannerFileRef = useRef<HTMLInputElement>(null);
+  const [identityState, identityAction, identityPending] = useActionState(
+    updateCommunityIdentityAction,
+    null,
+  );
+  const socials = normalizeSocialLinks(socialLinks);
   const initial = name.trim().slice(0, 1).toUpperCase() || "?";
 
   function onPickAvatar(file: File | undefined) {
@@ -115,7 +141,87 @@ export function CommunityIdentitySettings({
   }
 
   return (
-    <div className="mt-6 max-w-xl space-y-8">
+    <div className="mt-6 max-w-xl space-y-10">
+      <form action={identityAction} className="space-y-4">
+        <input type="hidden" name="slug" value={slug} />
+        <h3 className="font-display text-2xl tracking-wide text-ink">
+          Name and links
+        </h3>
+        <p className="text-sm text-muted">
+          The URL slug stays the same when you rename the community.
+        </p>
+        <label className="block text-sm text-muted">
+          Name
+          <input
+            name="name"
+            required
+            maxLength={COMMUNITY_NAME_MAX}
+            defaultValue={name}
+            className={fieldInputClass}
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Description
+          <textarea
+            name="description"
+            maxLength={COMMUNITY_DESCRIPTION_MAX}
+            rows={4}
+            defaultValue={description}
+            className={fieldInputClass}
+          />
+        </label>
+        <fieldset className="space-y-2">
+          <legend className="text-sm text-muted">Visibility</legend>
+          <RadioOption
+            name="visibility"
+            value="private"
+            defaultChecked={visibility === "private"}
+            hint="Invite only. Not listed on member profiles."
+          >
+            Private
+          </RadioOption>
+          <RadioOption
+            name="visibility"
+            value="public"
+            defaultChecked={visibility === "public"}
+            hint="Anyone can join, and the community appears on member profiles."
+          >
+            Public
+          </RadioOption>
+        </fieldset>
+        <fieldset className="space-y-3">
+          <legend className="text-sm text-muted">Social profiles</legend>
+          {SOCIAL_LINK_KEYS.map((key) => (
+            <label key={key} className="block text-sm text-muted">
+              {SOCIAL_LINK_LABELS[key]}
+              <input
+                name={`social_${key}`}
+                type="text"
+                inputMode={key === "website" ? "url" : "text"}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                defaultValue={socialLinkUrlToHandle(key, socials[key])}
+                placeholder={SOCIAL_LINK_PLACEHOLDERS[key]}
+                className={fieldInputClass}
+              />
+            </label>
+          ))}
+        </fieldset>
+        {identityState && "error" in identityState && identityState.error ? (
+          <p className="text-sm text-accent" role="alert">
+            {identityState.error}
+          </p>
+        ) : identityState && "ok" in identityState ? (
+          <p className="text-sm text-muted" role="status">
+            Saved.
+          </p>
+        ) : null}
+        <Button type="submit" disabled={identityPending}>
+          {identityPending ? "Saving…" : "Save"}
+        </Button>
+      </form>
+
       <div>
         <h3 className="font-display text-2xl tracking-wide text-ink">
           Banner

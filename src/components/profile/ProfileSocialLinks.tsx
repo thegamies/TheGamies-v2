@@ -7,15 +7,20 @@ import {
 
 export function ProfileSocialLinks({
   value,
+  className = "mt-4",
 }: {
   value: unknown;
+  className?: string;
 }) {
   const links = normalizeSocialLinks(value);
   const visible = SOCIAL_LINK_KEYS.filter((key) => Boolean(links[key]));
   if (visible.length === 0) return null;
 
   return (
-    <nav className="mt-4 flex flex-wrap items-center gap-2" aria-label="Social profiles">
+    <nav
+      className={`flex flex-wrap items-center gap-2 ${className}`.trim()}
+      aria-label="Social profiles"
+    >
       {visible.map((key) => {
         const href = links[key];
         if (!href) return null;

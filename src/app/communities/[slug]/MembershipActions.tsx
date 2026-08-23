@@ -10,12 +10,15 @@ type Props = {
   canLeave: boolean;
   /** Hosts leave from Settings, not Overview. */
   isHost?: boolean;
+  /** Public communities can be rejoined from the community page. */
+  isPublic?: boolean;
 };
 
 export function MembershipActions({
   slug,
   canLeave,
   isHost = false,
+  isPublic = false,
 }: Props) {
   const [leaveState, leaveFormAction, leavePending] = useActionState(
     leaveCommunityAction,
@@ -49,8 +52,9 @@ export function MembershipActions({
             className="w-full max-w-md"
           >
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              You will leave this community. You can join again later with an
-              invite.
+              {isPublic
+                ? "You will leave this community. You can join again from this page anytime."
+                : "You will leave this community. You can join again later with an invite."}
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <form action={leaveFormAction}>

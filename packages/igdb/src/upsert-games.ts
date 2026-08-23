@@ -1,6 +1,4 @@
-import { sql } from "drizzle-orm";
-import { inArray } from "drizzle-orm";
-import type { Db } from "@thegamies/db";
+import { inArray, sql } from "drizzle-orm";
 import {
   gameCompanies,
   gameGenres,
@@ -8,9 +6,46 @@ import {
   gamePlatforms,
   games,
   gameThemes,
-} from "@thegamies/db/schema";
+  type Db,
+} from "@thegamies/db";
 import { insertChunked } from "./chunk";
 import type { MappedGame } from "./client";
+
+export function gameJunctionDeleteSql(gameIds: string[]) {
+  const idList = sql.join(
+    gameIds.map((id) => sql`${id}`),
+    sql`, `,
+  );
+  return sql`
+    WITH
+      p AS (
+        DELETE FROM ${gamePlatforms}
+        WHERE ${gamePlatforms.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      g AS (
+        DELETE FROM ${gameGenres}
+        WHERE ${gameGenres.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      t AS (
+        DELETE FROM ${gameThemes}
+        WHERE ${gameThemes.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      k AS (
+        DELETE FROM ${gameKeywords}
+        WHERE ${gameKeywords.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      c AS (
+        DELETE FROM ${gameCompanies}
+        WHERE ${gameCompanies.gameId} IN (${idList})
+        RETURNING 1
+      )
+    SELECT 1
+  `;
+}
 
 export async function upsertGamesWithLinks(
   db: Db,
@@ -18,6 +53,7 @@ export async function upsertGamesWithLinks(
 ): Promise<number> {
   if (rows.length === 0) return 0;
 
+  const idRows: { id: string; igdbId: number }[] = [];
   await insertChunked(
     rows.map((row) => ({
       igdbId: row.igdbId,
@@ -38,8 +74,8 @@ export async function upsertGamesWithLinks(
       popularity: row.popularity,
       syncedAt: new Date(),
     })),
-    (chunk) =>
-      db
+    async (chunk) => {
+      const returned = await db
         .insert(games)
         .values(chunk)
         .onConflictDoUpdate({
@@ -64,17 +100,23 @@ export async function upsertGamesWithLinks(
             syncedAt: sql`now()`,
             updatedAt: sql`now()`,
           },
-        }),
+        })
+        .returning({ id: games.id, igdbId: games.igdbId });
+      idRows.push(...returned);
+    },
   );
 
-  const igdbIds = rows.map((r) => r.igdbId);
-  const idRows = await db
-    .select({ id: games.id, igdbId: games.igdbId })
-    .from(games)
-    .where(inArray(games.igdbId, igdbIds));
+  if (idRows.length === 0) {
+    const igdbIds = rows.map((r) => r.igdbId);
+    const fallback = await db
+      .select({ id: games.id, igdbId: games.igdbId })
+      .from(games)
+      .where(inArray(games.igdbId, igdbIds));
+    idRows.push(...fallback);
+  }
 
   const idByIgdb = new Map(idRows.map((r) => [r.igdbId, r.id]));
-  const gameIds = [...idByIgdb.values()];
+  const gameIds = [...new Set(idByIgdb.values())];
 
   const platformLinks: { gameId: string; platformIgdbId: number }[] = [];
   const genreLinks: { gameId: string; genreIgdbId: number }[] = [];
@@ -103,15 +145,7 @@ export async function upsertGamesWithLinks(
   }
 
   if (gameIds.length > 0) {
-    await db
-      .delete(gamePlatforms)
-      .where(inArray(gamePlatforms.gameId, gameIds));
-    await db.delete(gameGenres).where(inArray(gameGenres.gameId, gameIds));
-    await db.delete(gameThemes).where(inArray(gameThemes.gameId, gameIds));
-    await db.delete(gameKeywords).where(inArray(gameKeywords.gameId, gameIds));
-    await db
-      .delete(gameCompanies)
-      .where(inArray(gameCompanies.gameId, gameIds));
+    await db.execute(gameJunctionDeleteSql(gameIds));
   }
 
   await insertChunked(platformLinks, (chunk) =>

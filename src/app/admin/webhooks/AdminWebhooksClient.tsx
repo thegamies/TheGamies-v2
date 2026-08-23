@@ -7,10 +7,13 @@ import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 
 type AdminWebhooksTab = "processing" | "registrations" | "events";
+type EventSort = "receivedAt" | "processedAt";
 
 type DrainSettings = {
   processingMode: "queued" | "live";
+  deliveryMode: "auto" | "open" | "closed";
   intervalMinutes: number;
+  windowMinutes: number;
   maxMessagesPerDrain: number;
   paused: boolean;
   lastDrainAt: string | null;
@@ -72,8 +75,10 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     "queued",
   );
   const [intervalMinutes, setIntervalMinutes] = useState("15");
-  const [maxMessages, setMaxMessages] = useState("25");
-  const [paused, setPaused] = useState(false);
+  const [windowMinutes, setWindowMinutes] = useState("5");
+  const [deliveryMode, setDeliveryMode] = useState<"auto" | "open" | "closed">(
+    "auto",
+  );
 
   const [overview, setOverview] = useState<RegistrationOverview | null>(null);
   const [events, setEvents] = useState<WebhookEvent[]>([]);
@@ -81,6 +86,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
   const [eventStatus, setEventStatus] = useState<"all" | "failed" | "processed" | "pending">(
     "all",
   );
+  const [eventSort, setEventSort] = useState<EventSort>("receivedAt");
   const [testEntityId, setTestEntityId] = useState("135243");
   const [busySlot, setBusySlot] = useState<string | null>(null);
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
@@ -89,14 +95,14 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     const res = await fetch("/api/admin/webhooks/settings", { cache: "no-store" });
     if (!res.ok) {
       const json = (await res.json().catch(() => null)) as { error?: string } | null;
-      throw new Error(json?.error ?? "Could not load drain settings.");
+      throw new Error(json?.error ?? "Could not load processing settings.");
     }
     const json = (await res.json()) as { settings: DrainSettings };
     setSettings(json.settings);
     setProcessingMode(json.settings.processingMode ?? "queued");
     setIntervalMinutes(String(json.settings.intervalMinutes));
-    setMaxMessages(String(json.settings.maxMessagesPerDrain));
-    setPaused(json.settings.paused);
+    setWindowMinutes(String(json.settings.windowMinutes ?? 5));
+    setDeliveryMode(json.settings.deliveryMode ?? (json.settings.paused ? "closed" : "auto"));
   }, []);
 
   const loadRegistrations = useCallback(async () => {
@@ -108,11 +114,15 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     setOverview((await res.json()) as RegistrationOverview);
   }, []);
 
-  const loadEvents = useCallback(async (status: typeof eventStatus) => {
+  const loadEvents = useCallback(async (
+    status: typeof eventStatus,
+    sort: EventSort,
+  ) => {
     const qs = new URLSearchParams({
       limit: "50",
       offset: "0",
       status,
+      sort,
     });
     const res = await fetch(`/api/admin/webhooks/events?${qs}`, {
       cache: "no-store",
@@ -134,9 +144,9 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     await Promise.all([
       loadSettings(),
       loadRegistrations(),
-      loadEvents(eventStatus),
+      loadEvents(eventStatus, eventSort),
     ]);
-  }, [loadSettings, loadRegistrations, loadEvents, eventStatus]);
+  }, [loadSettings, loadRegistrations, loadEvents, eventStatus, eventSort]);
 
   useEffect(() => {
     if (!authorized) return;
@@ -144,7 +154,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
       void Promise.all([
         loadSettings(),
         loadRegistrations(),
-        loadEvents("all"),
+        loadEvents("all", "receivedAt"),
       ]).catch((err) => {
         setError(err instanceof Error ? err.message : "Failed to load.");
       });
@@ -186,8 +196,8 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
         body: JSON.stringify({
           processingMode,
           intervalMinutes: Number(intervalMinutes),
-          maxMessagesPerDrain: Number(maxMessages),
-          paused,
+          windowMinutes: Number(windowMinutes),
+          deliveryMode,
         }),
       });
       const json = (await res.json().catch(() => null)) as {
@@ -205,9 +215,12 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
       setSettings(json.settings);
       setProcessingMode(json.settings.processingMode ?? "queued");
       setIntervalMinutes(String(json.settings.intervalMinutes));
-      setMaxMessages(String(json.settings.maxMessagesPerDrain));
-      setPaused(json.settings.paused);
-      setMessage("Drain settings saved.");
+      setWindowMinutes(String(json.settings.windowMinutes ?? 5));
+      setDeliveryMode(
+        json.settings.deliveryMode ??
+          (json.settings.paused ? "closed" : "auto"),
+      );
+      setMessage("Processing settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save settings.");
     } finally {
@@ -222,31 +235,21 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     try {
       const res = await fetch("/api/admin/webhooks/drain", { method: "POST" });
       if (!res.ok) {
-        const json = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(json?.error ?? "Drain failed.");
+        const json = (await res.json().catch(() => null)) as {
+          error?: string;
+          reason?: string;
+        } | null;
+        if (json?.reason === "closed") {
+          throw new Error("Delivery is closed. Switch to Auto or Open first.");
+        }
+        throw new Error(json?.error ?? "Could not open delivery.");
       }
-      const json = (await res.json()) as {
-        skipped?: boolean;
-        reason?: string;
-        pulled: number;
-        processed: number;
-        failed: number;
-        emptied?: boolean;
-      };
-      if (json.skipped) {
-        setMessage(`Drain skipped (${json.reason ?? "not ready"}).`);
-      } else {
-        const emptied =
-          "emptied" in json && json.emptied === false
-            ? " Queue still has messages; next minute continues."
-            : "";
-        setMessage(
-          `Drain finished: ${json.pulled} pulled, ${json.processed} processed, ${json.failed} failed.${emptied}`,
-        );
-      }
+      setMessage(
+        "Delivery is open. Catalog updates apply until the next scheduled close, or until you close it.",
+      );
       await refreshAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Drain failed.");
+      setError(err instanceof Error ? err.message : "Could not open delivery.");
     } finally {
       setBusy(false);
     }
@@ -366,7 +369,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
         throw new Error(json?.error ?? "Reprocess failed.");
       }
       setMessage("Event reprocessed.");
-      await loadEvents(eventStatus);
+      await loadEvents(eventStatus, eventSort);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reprocess failed.");
     } finally {
@@ -430,7 +433,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
           className={navItemClass("secondary", tab === "events")}
           onClick={() => {
             setTab("events");
-            void loadEvents(eventStatus).catch((err) => {
+            void loadEvents(eventStatus, eventSort).catch((err) => {
               setError(
                 err instanceof Error ? err.message : "Failed to load events.",
               );
@@ -447,8 +450,9 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
           Processing
         </h2>
         <p className="text-sm text-muted">
-          Queued keeps Neon asleep between drains. Live applies each catalog
-          update as soon as it arrives.
+          Queued holds catalog updates, then Cloudflare delivers them in
+          batches while delivery is open. Live applies each update as it
+          arrives.
         </p>
         <form onSubmit={saveSettings} className="space-y-4">
           <fieldset className="space-y-2">
@@ -464,7 +468,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
               <span>
                 <span className="font-semibold">Queued</span>
                 <span className="mt-0.5 block text-muted">
-                  Buffer deliveries, then drain on a schedule.
+                  Buffer deliveries, then apply while delivery is open.
                 </span>
               </span>
             </label>
@@ -493,49 +497,86 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
             }
           >
             <label className="block">
-              <span className="text-sm text-muted">Minutes between drains</span>
+              <span className="text-sm text-muted">
+                Minutes between open windows
+              </span>
               <input
                 type="number"
                 min={1}
                 max={1440}
                 value={intervalMinutes}
                 onChange={(e) => setIntervalMinutes(e.target.value)}
-                disabled={processingMode === "live"}
+                disabled={processingMode === "live" || deliveryMode !== "auto"}
                 className={`mt-1 w-full ${fieldInputClass}`}
               />
             </label>
             <label className="block">
               <span className="text-sm text-muted">
-                Messages per pull (batch size)
+                Minutes to stay open
               </span>
               <input
                 type="number"
                 min={1}
-                max={100}
-                value={maxMessages}
-                onChange={(e) => setMaxMessages(e.target.value)}
-                disabled={processingMode === "live"}
+                max={1440}
+                value={windowMinutes}
+                onChange={(e) => setWindowMinutes(e.target.value)}
+                disabled={processingMode === "live" || deliveryMode !== "auto"}
                 className={`mt-1 w-full ${fieldInputClass}`}
               />
-              <span className="mt-1 block text-xs text-muted">
-                Each drain keeps pulling batches of this size until the queue is
-                empty.
-              </span>
             </label>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={paused}
-              onChange={(e) => setPaused(e.target.checked)}
-            />
-            {processingMode === "live"
-              ? "Pause live applies (new deliveries go to the queue instead)"
-              : "Pause automatic drains"}
-          </label>
+          <fieldset className="space-y-2">
+            <legend className="text-sm text-muted">Delivery</legend>
+            <label className="flex items-start gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="deliveryMode"
+                checked={deliveryMode === "auto"}
+                onChange={() => setDeliveryMode("auto")}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-semibold">Auto</span>
+                <span className="mt-0.5 block text-muted">
+                  Open for a short window on a repeating schedule (UTC).
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="deliveryMode"
+                checked={deliveryMode === "open"}
+                onChange={() => setDeliveryMode("open")}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-semibold">Open</span>
+                <span className="mt-0.5 block text-muted">
+                  Keep applying. The schedule will not close delivery.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm text-ink">
+              <input
+                type="radio"
+                name="deliveryMode"
+                checked={deliveryMode === "closed"}
+                onChange={() => setDeliveryMode("closed")}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-semibold">Closed</span>
+                <span className="mt-0.5 block text-muted">
+                  Hold updates in the queue. The schedule will not open
+                  delivery.
+                </span>
+              </span>
+            </label>
+          </fieldset>
           <p className="text-xs text-muted">
-            Last drain: {formatTime(settings?.lastDrainAt)}
+            Last opened: {formatTime(settings?.lastDrainAt)}
           </p>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={busy}>
@@ -544,10 +585,10 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
             <Button
               type="button"
               variant="bordered"
-              disabled={busy}
+              disabled={busy || deliveryMode === "closed"}
               onClick={() => void drainNow()}
             >
-              Drain now
+              Open delivery now
             </Button>
           </div>
         </form>
@@ -710,8 +751,8 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
               Recent events
             </h2>
             <p className="mt-1 text-sm text-muted">
-              Logged when a delivery is applied — on drain in Queued mode, or
-              immediately in Live mode.
+              Rows appear when a delivery is applied. Queued is when it
+              arrived; processed is when it was written to the catalog.
             </p>
           </div>
           <label className="text-sm text-muted">
@@ -725,7 +766,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
                   | "processed"
                   | "pending";
                 setEventStatus(next);
-                void loadEvents(next).catch((err) => {
+                void loadEvents(next, eventSort).catch((err) => {
                   setError(
                     err instanceof Error
                       ? err.message
@@ -747,7 +788,50 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
           <table className="w-full min-w-[44rem] text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-[0.15em] text-muted">
-                <th className="py-3 pr-4 font-medium">When</th>
+                <th className="py-3 pr-4 font-medium" aria-sort={eventSort === "receivedAt" ? "descending" : "none"}>
+                  <button
+                    type="button"
+                    className={
+                      eventSort === "receivedAt"
+                        ? "uppercase tracking-[0.15em] text-ink"
+                        : "uppercase tracking-[0.15em] text-muted hover:text-ink"
+                    }
+                    onClick={() => {
+                      setEventSort("receivedAt");
+                      void loadEvents(eventStatus, "receivedAt").catch((err) => {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to load events.",
+                        );
+                      });
+                    }}
+                  >
+                    Queued
+                  </button>
+                </th>
+                <th className="py-3 pr-4 font-medium" aria-sort={eventSort === "processedAt" ? "descending" : "none"}>
+                  <button
+                    type="button"
+                    className={
+                      eventSort === "processedAt"
+                        ? "uppercase tracking-[0.15em] text-ink"
+                        : "uppercase tracking-[0.15em] text-muted hover:text-ink"
+                    }
+                    onClick={() => {
+                      setEventSort("processedAt");
+                      void loadEvents(eventStatus, "processedAt").catch((err) => {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Failed to load events.",
+                        );
+                      });
+                    }}
+                  >
+                    Processed
+                  </button>
+                </th>
                 <th className="py-3 pr-4 font-medium">Entity</th>
                 <th className="py-3 pr-4 font-medium">Status</th>
                 <th className="py-3 pr-4 font-medium">Error</th>
@@ -757,7 +841,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
             <tbody>
               {events.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-muted">
+                    <td colSpan={6} className="py-6 text-muted">
                     No webhook events yet.
                   </td>
                 </tr>
@@ -766,6 +850,9 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
                   <tr key={event.id} className="border-b border-line/70 align-top">
                     <td className="py-3 pr-4 text-muted">
                       {formatTime(event.receivedAt)}
+                    </td>
+                    <td className="py-3 pr-4 text-muted">
+                      {formatTime(event.processedAt)}
                     </td>
                     <td className="py-3 pr-4 text-ink">
                       {event.entity ?? "—"} / {event.method ?? "—"}
@@ -776,7 +863,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
                       {event.error ?? "—"}
                     </td>
                     <td className="py-3">
-                      {event.status === "failed" ? (
+                      {event.status === "failed" || event.status === "pending" ? (
                         <Button
                           type="button"
                           size="sm"

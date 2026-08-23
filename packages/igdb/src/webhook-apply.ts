@@ -1,5 +1,4 @@
 import { eq, sql } from "drizzle-orm";
-import type { Db } from "@thegamies/db";
 import {
   companies,
   covers,
@@ -11,7 +10,8 @@ import {
   keywords,
   platforms,
   themes,
-} from "@thegamies/db/schema";
+  type Db,
+} from "@thegamies/db";
 import {
   mapIgdbGame,
   resolveAdultFilters,
@@ -53,13 +53,6 @@ async function softDelistGame(db: Db, igdbId: number): Promise<void> {
     .where(eq(games.igdbId, igdbId));
 }
 
-async function clearGameRemovedAt(db: Db, igdbId: number): Promise<void> {
-  await db
-    .update(games)
-    .set({ igdbRemovedAt: null, updatedAt: new Date() })
-    .where(eq(games.igdbId, igdbId));
-}
-
 async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {
   const game = assertIgdbGame(payload);
   const filters = await resolveAdultFilters();
@@ -68,7 +61,6 @@ async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {
     throw new Error("Webhook game payload missing name");
   }
   await upsertGamesWithLinks(db, [mapped]);
-  await clearGameRemovedAt(db, mapped.igdbId);
 }
 
 async function applyCover(db: Db, payload: unknown): Promise<void> {

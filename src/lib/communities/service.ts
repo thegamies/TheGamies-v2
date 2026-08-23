@@ -1,6 +1,7 @@
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   communities,
+  communityBans,
   communityMembers,
   createDb,
   profiles,
@@ -13,13 +14,21 @@ import {
 import {
   canManageCommunity,
   canSeeCommunityInvite,
+  COMMUNITY_ADMIN_ROSTER_LIMIT,
+  COMMUNITY_ADMIN_SEARCH_LIMIT,
   leaveBlockedReason,
   setCommunityRoleBlockedReason,
 } from "./rules";
 import {
+  communityDescriptionSchema,
+  communityNameSchema,
   communitySlugWithSuffix,
+  communityVisibilitySchema,
   parseCreateCommunityInput,
+  asCommunityVisibility,
+  isCommunityPublic,
   type CommunityRole,
+  type CommunityVisibility,
 } from "./schema";
 import { parseScoresVisibleDateInput } from "./live-reveal";
 import {
@@ -34,6 +43,11 @@ import {
   generateInviteCode,
   parseInviteCode,
 } from "./invite-code";
+import {
+  mergeSocialLinks,
+  socialLinksForStorage,
+  validateAndNormalizeSocialLinksPatch,
+} from "@/lib/profile/social-links";
 
 export type Community = typeof communities.$inferSelect;
 export type CommunityMemberRow = typeof communityMembers.$inferSelect;
@@ -44,6 +58,7 @@ export type MembershipCommunity = {
   name: string;
   description: string;
   avatarUrl: string | null;
+  bannerUrl: string | null;
   memberCount: number;
 };
 
@@ -84,9 +99,13 @@ export type CommunityMembersPage = {
 export { COMMUNITY_MEMBERS_PAGE_SIZE, paginateCommunityMembers } from "./members-page";
 
 export type ProfileCommunity = {
+  id: string;
   slug: string;
   name: string;
+  description: string;
   avatarUrl: string | null;
+  bannerUrl: string | null;
+  memberCount: number;
 };
 
 export type ProfileCommunitiesPage = {
@@ -148,6 +167,7 @@ export async function listMembershipCommunitiesPage(
       name: communities.name,
       description: communities.description,
       avatarUrl: communities.avatarUrl,
+      bannerUrl: communities.bannerUrl,
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
@@ -188,17 +208,8 @@ export async function listCommunitiesForProfile(
   profileId: string,
   db: Db = getDb(),
 ): Promise<ProfileCommunity[]> {
-  return db
-    .select({
-      slug: communities.slug,
-      name: communities.name,
-      avatarUrl: communities.avatarUrl,
-    })
-    .from(communityMembers)
-    .innerJoin(communities, eq(communities.id, communityMembers.communityId))
-    .where(eq(communityMembers.profileId, profileId))
-    .orderBy(asc(communities.name))
-    .limit(PROFILE_COMMUNITIES_PAGE_SIZE);
+  const page = await listCommunitiesForProfilePage(profileId, 1, db);
+  return page.communities;
 }
 
 export async function listCommunitiesForProfilePage(
@@ -207,10 +218,15 @@ export async function listCommunitiesForProfilePage(
   db: Db = getDb(),
 ): Promise<ProfileCommunitiesPage> {
   const pageSize = PROFILE_COMMUNITIES_PAGE_SIZE;
+  const publicMembership = and(
+    eq(communityMembers.profileId, profileId),
+    eq(communities.visibility, "public"),
+  );
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(communityMembers)
-    .where(eq(communityMembers.profileId, profileId));
+    .innerJoin(communities, eq(communities.id, communityMembers.communityId))
+    .where(publicMembership);
   const total = Number(countRow?.n ?? 0);
   const { page, offset, totalPages } = paginateProfileItems(
     pageRaw,
@@ -220,19 +236,41 @@ export async function listCommunitiesForProfilePage(
 
   const rows = await db
     .select({
+      id: communities.id,
       slug: communities.slug,
       name: communities.name,
+      description: communities.description,
       avatarUrl: communities.avatarUrl,
+      bannerUrl: communities.bannerUrl,
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
-    .where(eq(communityMembers.profileId, profileId))
+    .where(publicMembership)
     .orderBy(asc(communities.name))
     .limit(pageSize)
     .offset(offset);
 
+  const ids = rows.map((row) => row.id);
+  const countRows =
+    ids.length === 0
+      ? []
+      : await db
+          .select({
+            communityId: communityMembers.communityId,
+            n: sql<number>`count(*)::int`,
+          })
+          .from(communityMembers)
+          .where(inArray(communityMembers.communityId, ids))
+          .groupBy(communityMembers.communityId);
+  const countById = new Map(
+    countRows.map((row) => [row.communityId, Number(row.n)]),
+  );
+
   return {
-    communities: rows,
+    communities: rows.map((row) => ({
+      ...row,
+      memberCount: countById.get(row.id) ?? 0,
+    })),
     page,
     pageSize,
     total,
@@ -403,6 +441,7 @@ export async function createCommunity(
           slug,
           name: parsed.name,
           description: parsed.description ?? "",
+          visibility: parsed.visibility,
           createdByProfileId: profileId,
           inviteCode: generateInviteCode(),
         })
@@ -496,28 +535,72 @@ export async function joinCommunityWithInvite(
     .limit(1);
   if (!community) return { error: "That invite is not valid." };
 
+  return joinCommunityAsMember(community.id, community.slug, profileId, db);
+}
+
+/** Open join for public communities (no invite code). */
+export async function joinCommunityPublic(
+  slug: string,
+  profileId: string,
+  db: Db = getDb(),
+): Promise<{ ok: true; slug: string } | { error: string }> {
+  const [community] = await db
+    .select({
+      id: communities.id,
+      slug: communities.slug,
+      visibility: communities.visibility,
+    })
+    .from(communities)
+    .where(eq(communities.slug, slug.trim().toLowerCase()))
+    .limit(1);
+  if (!community) return { error: "Community not found." };
+  if (!isCommunityPublic(community.visibility)) {
+    return { error: "This community is private. You need an invite to join." };
+  }
+
+  return joinCommunityAsMember(community.id, community.slug, profileId, db);
+}
+
+async function joinCommunityAsMember(
+  communityId: string,
+  slug: string,
+  profileId: string,
+  db: Db,
+): Promise<{ ok: true; slug: string } | { error: string }> {
   const [existing] = await db
     .select({ profileId: communityMembers.profileId })
     .from(communityMembers)
     .where(
       and(
-        eq(communityMembers.communityId, community.id),
+        eq(communityMembers.communityId, communityId),
         eq(communityMembers.profileId, profileId),
       ),
     )
     .limit(1);
-  if (existing) return { ok: true, slug: community.slug };
+  if (existing) return { ok: true, slug };
+
+  const [banned] = await db
+    .select({ profileId: communityBans.profileId })
+    .from(communityBans)
+    .where(
+      and(
+        eq(communityBans.communityId, communityId),
+        eq(communityBans.profileId, profileId),
+      ),
+    )
+    .limit(1);
+  if (banned) return { error: "You can’t join this community." };
 
   try {
     await db.insert(communityMembers).values({
-      communityId: community.id,
+      communityId,
       profileId,
       role: "member",
     });
   } catch {
     return { error: "Could not join that community." };
   }
-  return { ok: true, slug: community.slug };
+  return { ok: true, slug };
 }
 
 export async function leaveCommunity(
@@ -805,4 +888,151 @@ export async function setCommunityLiveScoresVisibleFrom(
     ok: true,
     liveScoresVisibleFrom: updated?.liveScoresVisibleFrom ?? liveScoresVisibleFrom,
   };
+}
+
+export async function updateCommunityIdentity(
+  slug: string,
+  profileId: string,
+  input: {
+    name: string;
+    description: string;
+    visibility?: unknown;
+    socialLinks?: unknown;
+  },
+  db: Db = getDb(),
+): Promise<{ ok: true } | { error: string }> {
+  const detail = await getCommunityBySlug(slug, profileId, db);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only admins can edit this community." };
+  }
+
+  const nameParsed = communityNameSchema.safeParse(input.name);
+  if (!nameParsed.success) {
+    return { error: nameParsed.error.issues[0]?.message ?? "Enter a name." };
+  }
+  const descParsed = communityDescriptionSchema.safeParse(input.description);
+  if (!descParsed.success) {
+    return {
+      error: descParsed.error.issues[0]?.message ?? "Description is too long.",
+    };
+  }
+
+  let visibility: CommunityVisibility = asCommunityVisibility(detail.visibility);
+  if (input.visibility !== undefined) {
+    const visParsed = communityVisibilitySchema.safeParse(input.visibility);
+    if (!visParsed.success) {
+      return { error: "Choose public or private." };
+    }
+    visibility = visParsed.data;
+  }
+
+  let socialLinks: Record<string, string> | null = detail.socialLinks;
+  if (input.socialLinks !== undefined) {
+    try {
+      const patch = validateAndNormalizeSocialLinksPatch(input.socialLinks);
+      const merged = mergeSocialLinks(detail.socialLinks, patch);
+      const stored = socialLinksForStorage(merged);
+      socialLinks = Object.keys(stored).length > 0 ? stored : null;
+    } catch (err) {
+      return {
+        error: err instanceof Error ? err.message : "Social links could not be saved.",
+      };
+    }
+  }
+
+  await db
+    .update(communities)
+    .set({
+      name: nameParsed.data,
+      description: descParsed.data,
+      visibility,
+      socialLinks,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, detail.id));
+
+  return { ok: true };
+}
+
+export type CommunityAdminMemberRow = {
+  profileId: string;
+  username: string;
+  displayName: string;
+  role: CommunityRole;
+};
+
+export async function listCommunityAdminRoster(
+  communityId: string,
+  db: Db = getDb(),
+): Promise<CommunityAdminMemberRow[]> {
+  const rows = await db
+    .select({
+      profileId: communityMembers.profileId,
+      username: profiles.username,
+      displayName: profiles.displayName,
+      role: communityMembers.role,
+    })
+    .from(communityMembers)
+    .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.role, "admin"),
+      ),
+    )
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(COMMUNITY_ADMIN_ROSTER_LIMIT);
+
+  return rows.map((row) => ({
+    profileId: row.profileId,
+    username: row.username,
+    displayName: row.displayName,
+    role: asRole(row.role),
+  }));
+}
+
+/**
+ * SQL member search for Community Admins. Blank query returns no hits
+ * (default roster is a separate query — never dump the full membership).
+ */
+export async function searchCommunityMembersForAdmin(
+  communityId: string,
+  opts: { q: string; limit?: number },
+  db?: Db,
+): Promise<CommunityAdminMemberRow[]> {
+  const q = opts.q.trim();
+  if (q.length < 1) return [];
+
+  const database = db ?? getDb();
+  const limit = Math.min(
+    COMMUNITY_ADMIN_SEARCH_LIMIT,
+    Math.max(1, opts.limit ?? COMMUNITY_ADMIN_SEARCH_LIMIT),
+  );
+  const term = `%${q}%`;
+
+  const rows = await database
+    .select({
+      profileId: communityMembers.profileId,
+      username: profiles.username,
+      displayName: profiles.displayName,
+      role: communityMembers.role,
+    })
+    .from(communityMembers)
+    .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        or(ilike(profiles.displayName, term), ilike(profiles.username, term)),
+      ),
+    )
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(limit);
+
+  return rows.map((row) => ({
+    profileId: row.profileId,
+    username: row.username,
+    displayName: row.displayName,
+    role: asRole(row.role),
+  }));
 }

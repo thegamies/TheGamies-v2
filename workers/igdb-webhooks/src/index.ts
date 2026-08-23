@@ -1,7 +1,10 @@
 import {
   deleteIgdbWebhook,
   fetchWebhookRegistrationOverview,
+  clampWebhookEventSort,
   listWebhookEvents,
+  desiredQueueOpen,
+  nextScheduledCloseAt,
   processWebhookEnvelope,
   registerIgdbWebhookSlot,
   registerMissingIgdbWebhooks,
@@ -18,9 +21,22 @@ import {
   type WebhookMethod,
 } from "@thegamies/igdb";
 import { createDb } from "@thegamies/db";
-import { runDrain } from "./drain";
 import { bindProcessEnv, json, requireAdmin } from "./http";
+import { setQueueDeliveryPaused } from "./queue-delivery";
 import { readDrainSettings, writeDrainSettings } from "./settings";
+
+function isEnvelope(value: unknown): value is IgdbWebhookEnvelope {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.receivedAt === "string" && "body" in row;
+}
+
+async function syncQueueDelivery(env: Env, now = new Date()): Promise<boolean> {
+  const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
+  const open = desiredQueueOpen(settings, now);
+  await setQueueDeliveryPaused(env, !open);
+  return open;
+}
 
 function callbackUrl(env: Env, request: Request): string {
   const configured = env.IGDB_WEBHOOK_PUBLIC_URL?.replace(/\/$/, "");
@@ -97,7 +113,7 @@ async function handleIgdbIngress(
 
   const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
   const useLive =
-    settings.processingMode === "live" && !settings.paused;
+    settings.processingMode === "live" && settings.deliveryMode !== "closed";
 
   if (useLive) {
     if (!env.DATABASE_URL) {
@@ -138,12 +154,31 @@ async function handleAdminSettings(
         typeof body.intervalMinutes === "number"
           ? body.intervalMinutes
           : undefined,
+      windowMinutes:
+        typeof body.windowMinutes === "number"
+          ? body.windowMinutes
+          : undefined,
       maxMessagesPerDrain:
         typeof body.maxMessagesPerDrain === "number"
           ? body.maxMessagesPerDrain
           : undefined,
+      deliveryMode:
+        body.deliveryMode === "auto" ||
+        body.deliveryMode === "open" ||
+        body.deliveryMode === "closed"
+          ? body.deliveryMode
+          : undefined,
       paused: typeof body.paused === "boolean" ? body.paused : undefined,
+      forceOpenUntil: body.deliveryMode === "closed" ? null : undefined,
     });
+    try {
+      await setQueueDeliveryPaused(env, !desiredQueueOpen(settings));
+    } catch (error) {
+      console.error(
+        "igdb-webhooks-delivery-sync",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     return json({ settings });
   }
 
@@ -184,8 +219,9 @@ async function handleAdminEvents(
       statusParam === "all"
         ? (statusParam as WebhookEventStatus | "all")
         : "all";
+    const sort = clampWebhookEventSort(url.searchParams.get("sort"));
     const db = createDb(env.DATABASE_URL);
-    const result = await listWebhookEvents(db, { limit, offset, status });
+    const result = await listWebhookEvents(db, { limit, offset, status, sort });
     return json(result);
   }
 
@@ -288,7 +324,11 @@ async function handleAdminRegister(
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: Env,
+    _ctx: ExecutionContext,
+  ): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/$/, "") || "/";
 
@@ -300,9 +340,28 @@ export default {
       if (path === "/internal/drain" && request.method === "POST") {
         const denied = requireAdmin(request, env.ADMIN_SYNC_SECRET);
         if (denied) return denied;
-        bindProcessEnv(env);
-        const result = await runDrain(env, { force: true });
-        return json(result);
+        const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
+        if (settings.deliveryMode === "closed") {
+          return json(
+            { skipped: true, reason: "closed" },
+            409,
+          );
+        }
+        const forceOpenUntil =
+          settings.deliveryMode === "auto"
+            ? nextScheduledCloseAt(settings).toISOString()
+            : null;
+        await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
+          forceOpenUntil,
+          lastDrainAt: new Date().toISOString(),
+        });
+        await setQueueDeliveryPaused(env, false);
+        return json({
+          accepted: true,
+          open: true,
+          deliveryMode: settings.deliveryMode,
+          forceOpenUntil,
+        });
       }
 
       if (path === "/admin/settings") {
@@ -332,20 +391,62 @@ export default {
   async scheduled(
     _controller: ScheduledController,
     env: Env,
-    ctx: ExecutionContext,
+    _ctx: ExecutionContext,
   ): Promise<void> {
-    ctx.waitUntil(
-      (async () => {
-        try {
-          bindProcessEnv(env);
-          await runDrain(env);
-        } catch (error) {
-          console.error(
-            "igdb-webhooks-cron-error",
-            error instanceof Error ? error.message : String(error),
-          );
+    try {
+      const open = await syncQueueDelivery(env);
+      console.log(
+        JSON.stringify({ msg: "igdb-webhooks", event: "delivery-sync", open }),
+      );
+    } catch (error) {
+      console.error(
+        "igdb-webhooks-cron-error",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  },
+
+  async queue(
+    batch: MessageBatch<unknown>,
+    env: Env,
+  ): Promise<void> {
+    const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
+    if (settings.deliveryMode === "closed") {
+      for (const message of batch.messages) {
+        message.retry();
+      }
+      return;
+    }
+    if (!env.DATABASE_URL) {
+      for (const message of batch.messages) {
+        message.retry();
+      }
+      return;
+    }
+    bindProcessEnv(env);
+    const db = createDb(env.DATABASE_URL);
+    for (const message of batch.messages) {
+      try {
+        const envelope: IgdbWebhookEnvelope = isEnvelope(message.body)
+          ? message.body
+          : {
+              receivedAt: new Date().toISOString(),
+              entity: null,
+              method: null,
+              igdbId: null,
+              headers: {},
+              body: message.body,
+              ingressError: "Queue message was not a webhook envelope",
+            };
+        const result = await processWebhookEnvelope(db, envelope, message.id);
+        if (result.status === "failed" && !envelope.ingressError) {
+          message.retry();
+        } else {
+          message.ack();
         }
-      })(),
-    );
+      } catch {
+        message.retry();
+      }
+    }
   },
 };

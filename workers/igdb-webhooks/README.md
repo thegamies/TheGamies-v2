@@ -1,6 +1,6 @@
 # IGDB webhooks Worker
 
-Dedicated Cloudflare Worker for catalog webhook ingress + queued drain.
+Dedicated Cloudflare Worker for catalog webhook ingress and queued apply.
 
 **Two lasting environments from day one** (mirrors site staging/prod):
 
@@ -13,16 +13,20 @@ PR previews do **not** get their own queue — use staging for admin/register.
 
 ## One-time Cloudflare setup
 
-Create **both** queues (enable HTTP pull on each):
+Create **both** queues (Worker consumer is attached on deploy — do **not** add HTTP pull; a queue can have only one consumer type):
 
 ```bash
 cd workers/igdb-webhooks
 
 npx wrangler queues create igdb-webhooks-develop
-npx wrangler queues consumer http add igdb-webhooks-develop
-
 npx wrangler queues create igdb-webhooks
-npx wrangler queues consumer http add igdb-webhooks
+```
+
+If a queue still has an HTTP pull consumer, remove it before deploy:
+
+```bash
+npx wrangler queues consumer http remove igdb-webhooks-develop
+npx wrangler queues consumer http remove igdb-webhooks
 ```
 
 Create **both** KV namespaces and paste ids into `wrangler.jsonc` (`env.develop` / `env.production`):
@@ -71,3 +75,30 @@ Point each app deploy’s `IGDB_WEBHOOKS_WORKER_URL` at the matching Worker orig
 - Production app → `https://thegamies-igdb-webhooks.<account>.workers.dev`
 
 Register IGDB slots only from that env’s `/admin/webhooks` so callbacks stay on the correct Worker/queue.
+
+## Logs (develop)
+
+Workers Logs is on for `thegamies-igdb-webhooks-develop` only (not production). Cron writes a JSON line with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"`.
+
+Dashboard: Workers & Pages → `thegamies-igdb-webhooks-develop` → Logs.
+
+Or:
+
+```bash
+pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler tail --env develop
+```
+
+Redeploy the develop Worker after changing this (`pnpm deploy:igdb-webhooks:develop`).
+
+## Delivery
+
+The Worker `queue()` handler applies each batch (`max_concurrency: 1`). Cron every minute only pause/resumes Cloudflare queue delivery from KV:
+
+- **Auto** — open for `windowMinutes` at the start of each `intervalMinutes` cycle (UTC)
+- **Open** — always deliver; cron will not pause
+- **Closed** — always paused; cron will not resume; ingress still enqueues
+
+Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed). In Auto, that stays open until the next scheduled close.
+
+`Failed query: <sql>` on a failed event is usually a dropped Neon HTTP call. The event log stores the underlying cause when present. Reprocess works for pending and failed.
+

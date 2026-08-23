@@ -10,6 +10,7 @@ import { CommunityPrivateView } from "@/components/communities/CommunityPrivateV
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
+import { MemberAdminActions } from "@/app/communities/[slug]/settings/MemberAdminActions";
 import {
   COMMUNITY_MEMBERS_PAGE_SIZE,
   getCommunityBySlug,
@@ -126,6 +127,7 @@ export default async function CommunityMembersPage({
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
         bannerUrl={community.bannerUrl}
+        socialLinks={community.socialLinks}
       />
 
       <section className="mt-10">
@@ -160,14 +162,30 @@ export default async function CommunityMembersPage({
         ) : (
           <ul className="mt-8 divide-y divide-line border-y border-line">
             {membersPage.members.map((member) => (
-              <li key={member.profileId} className="py-4">
-                <Link
-                  href={`/u/${member.username}`}
-                  className="text-ink hover:text-accent"
-                >
-                  {member.displayName}
-                </Link>
-                <p className="text-sm text-muted">@{member.username}</p>
+              <li
+                key={member.profileId}
+                className="flex flex-wrap items-center justify-between gap-3 py-4"
+              >
+                <div>
+                  <Link
+                    href={`/u/${member.username}`}
+                    className="text-ink hover:text-accent"
+                  >
+                    {member.displayName}
+                  </Link>
+                  <p className="text-sm text-muted">@{member.username}</p>
+                </div>
+                {canManage && profile ? (
+                  <MemberAdminActions
+                    slug={community.slug}
+                    profileId={member.profileId}
+                    displayName={member.displayName}
+                    isYou={member.profileId === profile.id}
+                    isLastAdmin={
+                      member.role === "admin" && community.hostCount <= 1
+                    }
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

@@ -782,6 +782,7 @@ export default async function CommunityEditionYearPage({
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
         bannerUrl={community.bannerUrl}
+        socialLinks={community.socialLinks}
       />
 
       {edition.status === "published" && view === "entrance" ? (

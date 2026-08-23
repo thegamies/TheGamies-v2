@@ -222,32 +222,43 @@ export const profiles = pgTable("profiles", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-/** Private community that can later host live rankings and editions. */
-export const communities = pgTable("communities", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  slug: text("slug").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description").notNull().default(""),
-  avatarUrl: text("avatar_url"),
-  bannerUrl: text("banner_url"),
-  createdByProfileId: uuid("created_by_profile_id").references(
-    () => profiles.id,
-    { onDelete: "set null" },
-  ),
-  liveRankingsEnabled: boolean("live_rankings_enabled")
-    .notNull()
-    .default(false),
-  /** When true, public live board reads frozen snapshots until unlocked. */
-  liveRankingsLocked: boolean("live_rankings_locked").notNull().default(false),
-  /** When set and reached, live scores are public for every year. Null = hidden. */
-  liveScoresVisibleFrom: timestamp("live_scores_visible_from", { mode: "date" }),
-  /** Current join code. Rotating replaces it and retires the old link. */
-  inviteCode: text("invite_code").notNull().unique(),
-  /** When true, members can copy the invite from the community header. */
-  openInvites: boolean("open_invites").notNull().default(false),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+/** Community that hosts live rankings and editions. Default visibility is private. */
+export const communities = pgTable(
+  "communities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    slug: text("slug").notNull().unique(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    avatarUrl: text("avatar_url"),
+    bannerUrl: text("banner_url"),
+    socialLinks: jsonb("social_links").$type<Record<string, string>>(),
+    /** `private` (invite) or `public` (discoverable + open join). */
+    visibility: text("visibility").notNull().default("private"),
+    createdByProfileId: uuid("created_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+    liveRankingsEnabled: boolean("live_rankings_enabled")
+      .notNull()
+      .default(false),
+    /** When true, public live board reads frozen snapshots until unlocked. */
+    liveRankingsLocked: boolean("live_rankings_locked").notNull().default(false),
+    /** When set and reached, live scores are public for every year. Null = hidden. */
+    liveScoresVisibleFrom: timestamp("live_scores_visible_from", {
+      mode: "date",
+    }),
+    /** Current join code. Rotating replaces it and retires the old link. */
+    inviteCode: text("invite_code").notNull().unique(),
+    /** When true, members can copy the invite from the community header. */
+    openInvites: boolean("open_invites").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("communities_visibility_name_idx").on(t.visibility, t.name),
+  ],
+);
 
 /** Invite-only membership. role is internal (`admin` | `member`); public UI does not say admin. */
 export const communityMembers = pgTable(
@@ -265,6 +276,51 @@ export const communityMembers = pgTable(
   (t) => [
     primaryKey({ columns: [t.communityId, t.profileId] }),
     index("community_members_profile_id_idx").on(t.profileId),
+  ],
+);
+
+/** Blocks invite rejoin until an admin removes the ban. */
+export const communityBans = pgTable(
+  "community_bans",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    bannedByProfileId: uuid("banned_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+    bannedAt: timestamp("banned_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.profileId] }),
+    index("community_bans_profile_id_idx").on(t.profileId),
+  ],
+);
+
+/** Admin-submitted request to remove a community (ops fulfill; no self-serve wipe). */
+export const communityDeletionRequests = pgTable(
+  "community_deletion_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    requestedByProfileId: uuid("requested_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+    status: text("status").notNull().default("pending"),
+    requestedAt: timestamp("requested_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("community_deletion_requests_pending_community_uidx")
+      .on(t.communityId)
+      .where(sql`${t.status} = 'pending'`),
+    index("community_deletion_requests_status_idx").on(t.status),
   ],
 );
 

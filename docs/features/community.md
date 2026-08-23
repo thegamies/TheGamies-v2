@@ -11,7 +11,7 @@ Communities may turn **Live Rankings** on or off. Events are the end-of-year awa
 
 ## Identity + membership (shipped)
 
-Signed-in users with a **profile** can **create** a community (name + optional description; URL slug is derived from the name). The creator is the first internal `admin` member. Communities are **private**: `/communities` lists only memberships, interiors are members-only, and people join with an **invite code**. Admins always see **Copy invite** in the community header. They manage the current code, generate a new one, and optionally turn on **open invites** (members can copy the invite from the header) under Settings → Invite. Admins set **banner** and **avatar** under Settings → Community (same R2 bucket as profile photos). Admins can add other admins under Settings → Community. The last admin cannot leave — that note lives on Settings, not Overview. The last host also cannot delete their account until they add another host or delete the community. Account deletion tombs the profile: lists and memberships go; published ceremonies keep an anonymized **Former member** voter line (scores stay frozen, including Results Comparison host columns).
+Signed-in users with a **profile** can **create** a community (name + optional description + **visibility**; URL slug is derived from the name). The creator is the first internal `admin` member. Default visibility is **private** (invite-only; not listed on profiles). **Public** communities anyone can join from the community page, and they appear on member **profiles**. `/communities` lists **My Communities** (memberships only) — not a public Discover directory. Private interiors stay members-only; public non-members see a limited home (about + Join). Live, Events, members, ballot, and settings stay members-only. Private join still uses an **invite code**. Admins always see **Copy invite** in the community header. They manage the current code, generate a new one, and optionally turn on **open invites** (members can copy the invite from the header) under Settings → Invite. Admins set **banner**, **avatar**, **social links**, and **visibility** under Settings → Community. Admins can edit **name** and **description** there; the URL **slug stays fixed**. Admins can add other admins under Settings → Community. Admins can **remove** or **ban** members from the Members page (remove allows rejoin with invite or public Join; ban blocks join until unbanned). Banned people are listed under Settings → Community with Unban. Admins can **request deletion** (type the community name to confirm); the request is stored as `pending` in `community_deletion_requests` for ops to fulfill — the community is not wiped immediately. The last admin cannot leave — that note lives on Settings, not Overview. The last host also cannot delete their account until they add another host. Account deletion tombs the profile: lists and memberships go; published ceremonies keep an anonymized **Former member** voter line (scores stay frozen, including Results Comparison host columns).
 
 Public member lists never say admin / judge / expert — people are listed by display name. Settings → Community uses **Admin**. Event boards still say **Host**. Internal role is `admin` | `member`.
 
@@ -40,20 +40,20 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - `/communities` — **Communities** page with a **My Communities** list of signed-in memberships only (paged; 24 per page). Not a public directory.
 - `/communities/new` — signed-in create (requires profile)
 - `/communities/join/[code]` — join with a current invite code
-- `/communities/[slug]` — members-only home (identity, about, leave for members; up to three public events ordered open → coming soon → closed → results, then newest created; hosts with no events yet see **Create event**). Non-members see a private notice.
-- `/communities/[slug]/members` — paged member roster
+- `/communities/[slug]` — home: members see about, leave, and up to three events (hosts with none yet see **Create event**). **Public** non-members see limited about + Join. **Private** non-members see an invite-only notice.
+- `/communities/[slug]/members` — paged member roster (members only)
 - `/communities/[slug]/live` → current year; `/communities/[slug]/live/[year]?page=`
 - `/communities/[slug]/edition` → featured year; `/communities/[slug]/edition/[year]` — GOTY event (vote + results by schedule)
 - `/communities/[slug]/ballot` → redirects to edition
 - `/communities/[slug]/results` → redirects to edition
-- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), **Community** (`?tab=community`), and **Invite** (`?tab=invite`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: banner + avatar upload, add/remove admins (last admin cannot be removed), and leave. Invite: copy the current join link, generate a new code (retires the old one), and toggle **open invites** so members (not only admins) can copy the invite from the header.
+- `/communities/[slug]/settings` — hosts only. Secondary tabs: **Live Rankings** (`?tab=live`, default), **Events** (`?tab=events`), **Community** (`?tab=community`), and **Invite** (`?tab=invite`). Events: **Create event** plus a list of years with links to **Edition settings** / **Manage hosts** / **Host preview** (open/closed). Community: name + description + **visibility** + social links, banner + avatar upload, add/remove admins (SQL-capped search; last admin cannot be removed), banned list + unban, leave, and request deletion (type name to confirm → `community_deletion_requests`). Invite: copy the current join link, generate a new code (retires the old one), and toggle **open invites** so members (not only admins) can copy the invite from the header.
 - `/communities/[slug]/create/event` — hosts only. Create event: year, schedule, categories, tie numbering. Redirects to that year’s Edition settings.
-- Profile `/u/[username]` **Communities** tab (`?tab=communities`) lists communities the person belongs to (paged; 24 per page)
+- Profile `/u/[username]` **Communities** tab (`?tab=communities`) lists **public** communities the person belongs to (paged; 24 per page). Private memberships stay off profiles.
 
 ### Non-goals (next slices)
 
 - Weighted Combined (Host %)
-- Approval join, bans, extra roles
+- Approval join, extra roles
 - Site-admin-only create gate
 - Per-community custom defs / multi / ranked edition category modes
 - Full all-member ballot matrix virtualization

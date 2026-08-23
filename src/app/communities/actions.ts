@@ -9,16 +9,26 @@ import {
 import {
   createCommunity,
   getCommunityBySlug,
+  joinCommunityPublic,
   joinCommunityWithInvite,
   leaveCommunity,
   rotateCommunityInviteCode,
+  searchCommunityMembersForAdmin,
   setCommunityImageUrl,
   setCommunityLiveScoresVisibleFrom,
   setCommunityMemberRole,
   setCommunityOpenInvites,
   setLiveRankingsEnabled,
   setLiveRankingsLocked,
+  updateCommunityIdentity,
 } from "@/lib/communities/service";
+import {
+  banCommunityMember,
+  removeCommunityMember,
+  requestCommunityDeletion,
+  unbanCommunityMember,
+} from "@/lib/communities/moderation";
+import { SOCIAL_LINK_KEYS } from "@/lib/profile/social-links";
 import { COMMUNITY_ROLES } from "@/lib/communities/schema";
 import {
   AVATAR_MAX_BYTES,
@@ -145,6 +155,7 @@ export async function createCommunityAction(
   const result = await createCommunity(gate.profile.id, {
     name: String(formData.get("name") ?? ""),
     description: String(formData.get("description") ?? ""),
+    visibility: String(formData.get("visibility") ?? "private"),
   });
   if ("error" in result) return { error: result.error };
 
@@ -163,6 +174,23 @@ export async function joinCommunityAction(
   if (!gate.ok) return { error: gate.error };
 
   const result = await joinCommunityWithInvite(code, gate.profile.id);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(result.slug, gate.profile.username);
+  redirect(`/communities/${result.slug}`);
+}
+
+export async function joinCommunityPublicAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await joinCommunityPublic(slug, gate.profile.id);
   if ("error" in result) return { error: result.error };
 
   revalidateCommunity(result.slug, gate.profile.username);
@@ -355,6 +383,151 @@ export async function setCommunityMemberRoleAction(
 
   revalidateCommunity(slug, gate.profile.username);
   return null;
+}
+
+export async function updateCommunityIdentityAction(
+  _prev: { error: string } | { ok: true } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const socialLinks = Object.fromEntries(
+    SOCIAL_LINK_KEYS.map((key) => [
+      key,
+      String(formData.get(`social_${key}`) ?? ""),
+    ]),
+  );
+
+  const result = await updateCommunityIdentity(slug, gate.profile.id, {
+    name: String(formData.get("name") ?? ""),
+    description: String(formData.get("description") ?? ""),
+    visibility: String(formData.get("visibility") ?? "private"),
+    socialLinks,
+  });
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return { ok: true };
+}
+
+export async function searchCommunityMembersForAdminAction(input: {
+  slug: string;
+  q: string;
+}): Promise<
+  | {
+      ok: true;
+      results: Array<{
+        profileId: string;
+        username: string;
+        displayName: string;
+        role: "admin" | "member";
+      }>;
+    }
+  | { error: string }
+> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const community = await getCommunityBySlug(slug, gate.profile.id);
+  if (!community) return { error: "Community not found." };
+  if (!canManageCommunity(community.viewerRole)) {
+    return { error: "Only admins can search members." };
+  }
+
+  const results = await searchCommunityMembersForAdmin(community.id, {
+    q: input.q,
+  });
+  return { ok: true, results };
+}
+
+export async function removeCommunityMemberAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await removeCommunityMember(
+    slug,
+    gate.profile.id,
+    profileId,
+  );
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function banCommunityMemberAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await banCommunityMember(slug, gate.profile.id, profileId);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function unbanCommunityMemberAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await unbanCommunityMember(slug, gate.profile.id, profileId);
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return null;
+}
+
+export async function requestCommunityDeletionAction(
+  _prev: { error: string } | { ok: true; alreadyPending?: boolean } | null,
+  formData: FormData,
+): Promise<{ error: string } | { ok: true; alreadyPending?: boolean } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const confirmName = String(formData.get("confirmName") ?? "");
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await requestCommunityDeletion(
+    slug,
+    gate.profile.id,
+    confirmName,
+  );
+  if ("error" in result) return { error: result.error };
+
+  revalidateCommunity(slug, gate.profile.username);
+  return { ok: true, alreadyPending: result.alreadyPending };
 }
 
 export async function setLiveRankingsEnabledAction(

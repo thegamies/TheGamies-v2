@@ -3,7 +3,9 @@
   "name": "thegamies-igdb-webhooks",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-10",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "triggers": {
     "crons": ["*/1 * * * *"]
   },
@@ -11,11 +13,29 @@
   "env": {
     "develop": {
       "name": "thegamies-igdb-webhooks-develop",
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+          "head_sampling_rate": 1
+        }
+      },
       "queues": {
         "producers": [
           {
             "binding": "IGDB_WEBHOOK_QUEUE",
             "queue": "igdb-webhooks-develop"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "igdb-webhooks-develop",
+            "max_batch_size": 25,
+            "max_concurrency": 1,
+            "max_retries": 5,
+            "max_batch_timeout": 5
           }
         ]
       },
@@ -39,6 +59,15 @@
             "binding": "IGDB_WEBHOOK_QUEUE",
             "queue": "igdb-webhooks"
           }
+        ],
+        "consumers": [
+          {
+            "queue": "igdb-webhooks",
+            "max_batch_size": 25,
+            "max_concurrency": 1,
+            "max_retries": 5,
+            "max_batch_timeout": 5
+          }
         ]
       },
       "kv_namespaces": [
@@ -50,7 +79,7 @@
       "vars": {
         "CLOUDFLARE_ACCOUNT_ID": "9af9febe891657de7e58f92a682e3a5a",
         "IGDB_WEBHOOK_QUEUE_ID": "010c08c38c0b4c0d81a5a769b660717b",
-        "IGDB_WEBHOOK_PUBLIC_URL": ""
+        "IGDB_WEBHOOK_PUBLIC_URL": "https://thegamies-igdb-webhooks.ecdm981.workers.dev"
       }
     }
   }

@@ -23,7 +23,7 @@ export default async function AdminWebhooksPage() {
           Catalog webhooks
         </h1>
         <p className="mt-3 max-w-2xl text-muted">
-          Queue IGDB catalog updates and control how often they are applied.
+          Hold IGDB catalog updates, then apply them while delivery is open.
         </p>
         <div className="mt-10">
           <AdminWebhooksClient authorized={authorized} />

@@ -34,11 +34,17 @@ IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel
 **Flow:**
 
 1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
-2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon.
-3. A **cron every minute** checks KV cadence (`intervalMinutes`, `maxMessagesPerDrain`, `paused`). When due, it **pulls** a batch, writes `igdb_webhook_events`, applies catalog upserts/deletes, then acks/retries.
-4. Ops configure cadence and registrations on `/admin/webhooks` (proxied to the Worker with the admin code).
+2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon (except **Live** mode).
+3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 1`, batch 25) applies each batch on a fresh isolate. Cron every minute only **pauses or resumes** queue delivery from KV (Auto window, sticky Open, or Closed). Saving settings syncs that immediately.
+4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (proxied to the Worker with the admin code).
 
-**Cadence / mode:** default **Queued** — every 15 minutes, pull batches until empty. Switch to **Live** in `/admin/webhooks` to apply each delivery immediately (wakes Neon per event). Pause in Live routes new deliveries to the queue instead; **Drain now** still clears any backlog.
+A queue can have only one consumer type. This Worker is the consumer — do not also attach HTTP pull.
+
+**Staging logs:** Workers Logs is enabled for `thegamies-igdb-webhooks-develop` (`wrangler tail --env develop`, or the Worker’s Logs tab). Cron emits JSON with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"`. Production stays off until we want the volume.
+
+**Cadence / mode:** default **Queued** + **Auto** — open delivery for `windowMinutes` (default 5) at the start of each `intervalMinutes` cycle (UTC). **Open** keeps applying; cron will not pause. **Closed** holds messages; cron will not resume; ingress still enqueues. **Open delivery now** resumes the queue; in Auto that stays open until the next scheduled close. **Live** applies on ingress unless delivery is Closed (then new events go to the queue). A `Failed query: <sql>` in the event log is almost always a dropped Neon HTTP call, not a bad game row.
+
+Game create/update upserts already clear `igdb_removed_at`; there is no extra update after that.
 
 **Game deletes** set `games.igdb_removed_at` (soft delist) so list and standings rows are not cascaded away. Create/update clears that timestamp.
 

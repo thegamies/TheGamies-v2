@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
+import { RadioOption } from "@/components/ui/Radio";
 import { createCommunityAction } from "../actions";
 
 export function CreateCommunityForm() {
@@ -31,6 +32,24 @@ export function CreateCommunityForm() {
           className={fieldInputClass}
         />
       </label>
+      <fieldset className="space-y-2">
+        <legend className="text-sm text-muted">Visibility</legend>
+        <RadioOption
+          name="visibility"
+          value="private"
+          defaultChecked
+          hint="Invite only. Not listed on member profiles."
+        >
+          Private
+        </RadioOption>
+        <RadioOption
+          name="visibility"
+          value="public"
+          hint="Anyone can join, and the community appears on member profiles."
+        >
+          Public
+        </RadioOption>
+      </fieldset>
       {state?.error ? (
         <p className="text-sm text-accent" role="alert">
           {state.error}

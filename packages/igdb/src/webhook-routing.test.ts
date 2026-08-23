@@ -8,7 +8,20 @@ import {
 import { assertIgdbGame, assertIgdbCover } from "./webhook-apply-parsers";
 import {
   clampDrainSettings,
+  clampDeliveryMode,
+  desiredQueueOpen,
+  nextScheduledCloseAt,
+  drainBatchSize,
+  drainVisibilityTimeoutMs,
+  isDrainLocked,
+  parseDrainContinue,
+  parseDrainHop,
+  parseDrainLock,
+  parseQueuePullBacklogCount,
+  shouldChainDrain,
   shouldRunDrain,
+  isDrainPullExhausted,
+  WORKER_DRAIN_BATCH_CEILING,
 } from "./webhook-settings";
 import { timingSafeEqualString } from "./timing-safe";
 
@@ -80,10 +93,14 @@ describe("drain settings", () => {
       }),
     ).toEqual({
       processingMode: "queued",
+      deliveryMode: "closed",
       intervalMinutes: 1,
+      windowMinutes: 1,
       maxMessagesPerDrain: 100,
       paused: true,
       lastDrainAt: null,
+      forceOpenUntil: null,
+      drainPending: false,
     });
   });
 
@@ -118,5 +135,193 @@ describe("drain settings", () => {
     expect(
       shouldRunDrain({ ...settings, paused: true }, new Date("2026-08-20T13:00:00.000Z")),
     ).toBe(false);
+  });
+
+  it("skips while a drain lock is held", () => {
+    const settings = clampDrainSettings({
+      lastDrainAt: null,
+      paused: false,
+    });
+    const lock = parseDrainLock({ until: "2026-08-20T12:05:00.000Z" });
+    expect(
+      shouldRunDrain(settings, new Date("2026-08-20T12:00:00.000Z"), lock),
+    ).toBe(false);
+    expect(
+      shouldRunDrain(settings, new Date("2026-08-20T12:06:00.000Z"), lock),
+    ).toBe(true);
+    expect(isDrainLocked(null)).toBe(false);
+  });
+
+  it("keeps draining leftover work even if a lock is held", () => {
+    const settings = clampDrainSettings({
+      drainPending: true,
+      lastDrainAt: "2026-08-20T12:00:00.000Z",
+      paused: false,
+    });
+    const lock = parseDrainLock({ until: "2026-08-20T12:15:00.000Z" });
+    expect(
+      shouldRunDrain(settings, new Date("2026-08-20T12:01:00.000Z"), lock),
+    ).toBe(true);
+  });
+
+  it("caps worker batch size and sizes the queue lease", () => {
+    expect(drainBatchSize(100)).toBe(WORKER_DRAIN_BATCH_CEILING);
+    expect(drainBatchSize(10)).toBe(10);
+    expect(drainVisibilityTimeoutMs(25)).toBe(25 * 15_000);
+    expect(drainVisibilityTimeoutMs(1)).toBe(2 * 60_000);
+    expect(drainVisibilityTimeoutMs(80)).toBe(40 * 15_000);
+  });
+
+  it("chains hops until the cap", () => {
+    expect(parseDrainHop("3")).toBe(3);
+    expect(parseDrainHop("nope")).toBe(0);
+    expect(parseDrainContinue("1")).toBe(true);
+    expect(parseDrainContinue(null)).toBe(false);
+    expect(shouldChainDrain(true, 0)).toBe(false);
+    expect(shouldChainDrain(false, 0)).toBe(true);
+    expect(shouldChainDrain(false, 98)).toBe(true);
+    expect(shouldChainDrain(false, 99)).toBe(false);
+  });
+
+  it("does not treat a short HTTP pull as an empty queue", () => {
+    expect(
+      isDrainPullExhausted({
+        pulled: 10,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 10,
+      }),
+    ).toBe(true);
+    expect(
+      isDrainPullExhausted({
+        pulled: 10,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 80,
+      }),
+    ).toBe(false);
+    expect(
+      isDrainPullExhausted({
+        pulled: 25,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 25,
+      }),
+    ).toBe(false);
+    expect(
+      isDrainPullExhausted({
+        pulled: 8,
+        batchSize: 25,
+        retried: 2,
+        backlogCount: 8,
+      }),
+    ).toBe(false);
+    expect(
+      isDrainPullExhausted({
+        pulled: 0,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 4,
+      }),
+    ).toBe(false);
+    expect(
+      isDrainPullExhausted({
+        pulled: 0,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("reads queue backlog from pull metrics, not missing-as-zero", () => {
+    expect(
+      parseQueuePullBacklogCount({
+        metadata: { metrics: { backlog_count: 14000 } },
+      }),
+    ).toBe(14000);
+    expect(parseQueuePullBacklogCount({ message_backlog_count: 12 })).toBe(12);
+    expect(parseQueuePullBacklogCount({ messages: [] })).toBeNull();
+  });
+
+  it("maps paused to closed delivery and honors sticky open", () => {
+    expect(clampDeliveryMode(undefined, true)).toBe("closed");
+    expect(clampDeliveryMode("open")).toBe("open");
+    expect(
+      desiredQueueOpen(
+        { deliveryMode: "closed", intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:00:00.000Z"),
+      ),
+    ).toBe(false);
+    expect(
+      desiredQueueOpen(
+        { deliveryMode: "open", intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:14:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      desiredQueueOpen(
+        { deliveryMode: "auto", intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:00:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      desiredQueueOpen(
+        { deliveryMode: "auto", intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:06:00.000Z"),
+      ),
+    ).toBe(false);
+    expect(
+      nextScheduledCloseAt(
+        { intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:00:00.000Z"),
+      ).toISOString(),
+    ).toBe("2026-08-22T12:05:00.000Z");
+    expect(
+      nextScheduledCloseAt(
+        { intervalMinutes: 15, windowMinutes: 5 },
+        new Date("2026-08-22T12:06:00.000Z"),
+      ).toISOString(),
+    ).toBe("2026-08-22T12:20:00.000Z");
+    expect(
+      nextScheduledCloseAt(
+        { intervalMinutes: 60, windowMinutes: 5 },
+        new Date("2026-08-22T12:30:00.000Z"),
+      ).toISOString(),
+    ).toBe("2026-08-22T13:05:00.000Z");
+    expect(
+      desiredQueueOpen(
+        {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          windowMinutes: 5,
+          forceOpenUntil: "2026-08-22T12:20:00.000Z",
+        },
+        new Date("2026-08-22T12:06:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      desiredQueueOpen(
+        {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          windowMinutes: 5,
+          forceOpenUntil: "2026-08-22T12:20:00.000Z",
+        },
+        new Date("2026-08-22T12:20:00.000Z"),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps pulling every minute while the queue still has work", () => {
+    const settings = clampDrainSettings({
+      intervalMinutes: 15,
+      paused: false,
+      lastDrainAt: "2026-08-20T12:00:00.000Z",
+      drainPending: true,
+    });
+    expect(
+      shouldRunDrain(settings, new Date("2026-08-20T12:01:00.000Z")),
+    ).toBe(true);
   });
 });

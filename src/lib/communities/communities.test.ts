@@ -9,14 +9,19 @@ import { COMMUNITY_MEMBERS_PAGE_SIZE, paginateCommunityMembers } from "./members
 import {
   canManageCommunity,
   canSeeCommunityInvite,
+  communityDeletionRequestConfirmMatches,
   demoteHostBlockedReason,
   leaveBlockedReason,
+  removeCommunityMemberBlockedReason,
+  banCommunityMemberBlockedReason,
   setCommunityRoleBlockedReason,
 } from "./rules";
 import {
+  canBrowseCommunityHome,
   communitySlugSchema,
   communitySlugWithSuffix,
   createCommunitySchema,
+  isCommunityPublic,
   normalizeCommunitySlug,
   parseCreateCommunityInput,
   slugifyCommunityName,
@@ -62,6 +67,7 @@ describe("createCommunitySchema", () => {
     ).toEqual({
       name: "Kinda Funny",
       description: "Awards crew.",
+      visibility: "private",
     });
     expect(
       parseCreateCommunityInput({
@@ -72,6 +78,19 @@ describe("createCommunitySchema", () => {
       slug: "kinda_funny",
       name: "Kinda Funny",
       description: "Awards crew.",
+      visibility: "private",
+    });
+  });
+
+  it("accepts public visibility", () => {
+    expect(
+      parseCreateCommunityInput({
+        name: "Open Crew",
+        visibility: "public",
+      }),
+    ).toMatchObject({
+      slug: "open_crew",
+      visibility: "public",
     });
   });
 
@@ -80,6 +99,20 @@ describe("createCommunitySchema", () => {
       name: "",
     });
     expect("error" in emptyName).toBe(true);
+  });
+});
+
+describe("community visibility helpers", () => {
+  it("treats only public as public", () => {
+    expect(isCommunityPublic("public")).toBe(true);
+    expect(isCommunityPublic("private")).toBe(false);
+    expect(isCommunityPublic("")).toBe(false);
+  });
+
+  it("lets members browse any home; guests only public", () => {
+    expect(canBrowseCommunityHome("private", "member")).toBe(true);
+    expect(canBrowseCommunityHome("private", null)).toBe(false);
+    expect(canBrowseCommunityHome("public", null)).toBe(true);
   });
 });
 
@@ -177,6 +210,77 @@ describe("setCommunityRoleBlockedReason", () => {
         hostCount: 1,
       }),
     ).toMatch(/last admin/i);
+  });
+});
+
+describe("removeCommunityMemberBlockedReason", () => {
+  it("blocks self and last admin", () => {
+    expect(
+      removeCommunityMemberBlockedReason({
+        actorCanManage: true,
+        actorProfileId: "a",
+        targetProfileId: "a",
+        targetIsMember: true,
+        targetRole: "admin",
+        hostCount: 2,
+      }),
+    ).toMatch(/leave/i);
+    expect(
+      removeCommunityMemberBlockedReason({
+        actorCanManage: true,
+        actorProfileId: "a",
+        targetProfileId: "b",
+        targetIsMember: true,
+        targetRole: "admin",
+        hostCount: 1,
+      }),
+    ).toMatch(/last admin/i);
+  });
+
+  it("allows removing another member", () => {
+    expect(
+      removeCommunityMemberBlockedReason({
+        actorCanManage: true,
+        actorProfileId: "a",
+        targetProfileId: "b",
+        targetIsMember: true,
+        targetRole: "member",
+        hostCount: 1,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("banCommunityMemberBlockedReason", () => {
+  it("blocks already banned", () => {
+    expect(
+      banCommunityMemberBlockedReason({
+        actorCanManage: true,
+        actorProfileId: "a",
+        targetProfileId: "b",
+        targetIsMember: true,
+        targetRole: "member",
+        hostCount: 1,
+        alreadyBanned: true,
+      }),
+    ).toMatch(/already banned/i);
+  });
+});
+
+describe("communityDeletionRequestConfirmMatches", () => {
+  it("requires the exact trimmed name", () => {
+    expect(
+      communityDeletionRequestConfirmMatches("Kinda Funny", "Kinda Funny"),
+    ).toBe(true);
+    expect(
+      communityDeletionRequestConfirmMatches("Kinda Funny", " Kinda Funny "),
+    ).toBe(true);
+    expect(
+      communityDeletionRequestConfirmMatches("Kinda Funny", "kinda funny"),
+    ).toBe(false);
+    expect(communityDeletionRequestConfirmMatches("Kinda Funny", "")).toBe(
+      false,
+    );
   });
 });
 

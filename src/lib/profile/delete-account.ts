@@ -39,10 +39,10 @@ export function lastHostAccountDeleteMessage(communityNames: string[]): string |
   if (communityNames.length === 0) return null;
   if (communityNames.length === 1) {
     const name = communityNames[0];
-    return `Add another host to ${name}, or delete that community, before deleting your account.`;
+    return `Add another host to ${name} before deleting your account.`;
   }
   const listed = communityNames.join(", ");
-  return `Add another host to ${listed}, or delete those communities, before deleting your account.`;
+  return `Add another host to ${listed} before deleting your account.`;
 }
 
 export function tombstoneProfileFields(profileId: string, now: Date) {

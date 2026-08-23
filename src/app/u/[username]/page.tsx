@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { CommunityListCard } from "@/components/communities/CommunityListCard";
 import { ProfileListPreviewCard } from "@/components/profile/ProfileListPreviewCard";
 import { ProfilePager } from "@/components/profile/ProfilePager";
 import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
@@ -227,33 +228,17 @@ async function ProfileCommunities({
 
   return (
     <div className="mt-6">
-      <ul className="divide-y divide-line border-y border-line">
+      <ul className="grid gap-x-6 gap-y-5 border-y border-line py-4 sm:grid-cols-2">
         {memberships.communities.map((community) => (
-          <li key={community.slug} className="py-4">
-            <Link
-              href={`/communities/${community.slug}`}
-              className="flex items-center gap-3 text-lg text-ink hover:text-accent"
-            >
-              {community.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={community.avatarUrl}
-                  alt=""
-                  width={40}
-                  height={40}
-                  className="h-10 w-10 rounded-full border border-line object-cover"
-                />
-              ) : (
-                <span
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-panel font-display text-sm tracking-wide text-ink"
-                  aria-hidden
-                >
-                  {community.name.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              {community.name}
-            </Link>
-          </li>
+          <CommunityListCard
+            key={community.id}
+            slug={community.slug}
+            name={community.name}
+            description={community.description}
+            avatarUrl={community.avatarUrl}
+            bannerUrl={community.bannerUrl}
+            memberCount={community.memberCount}
+          />
         ))}
       </ul>
       <ProfilePager

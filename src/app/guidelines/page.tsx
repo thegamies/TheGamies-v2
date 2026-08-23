@@ -43,8 +43,8 @@ export default function GuidelinesPage() {
 
       <h2>Communities and Hosts</h2>
       <p>
-        Communities are invite-only spaces. Hosts may add or remove members and
-        run events within these guidelines and the Terms. Do not raid, scrape,
+        Communities are invite-only spaces. Hosts may add, remove, or ban members
+        and run events within these guidelines and the Terms. Do not raid, scrape,
         or try to force your way into a community you were not invited to.
       </p>
 
