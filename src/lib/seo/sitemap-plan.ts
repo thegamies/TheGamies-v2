@@ -1,5 +1,8 @@
 export const SITEMAP_PAGE_SIZE = 5_000;
 
+/** Most popular catalog titles included per release year (IGDB popularity). */
+export const SITEMAP_GAMES_PER_YEAR = 100;
+
 export const SITEMAP_STATIC_PATHS = [
   "/",
   "/games",
@@ -22,7 +25,7 @@ export const ROBOTS_DISALLOW = [
   "/communities/join",
 ] as const;
 
-export type SitemapKind = "static" | "games" | "profiles" | "lists" | "communities";
+export type SitemapKind = "static" | "games" | "communities";
 
 export type SitemapShard = {
   kind: SitemapKind;
@@ -40,7 +43,7 @@ export function formatSitemapShardId(shard: SitemapShard): string {
 
 export function parseSitemapShardId(id: string): SitemapShard | null {
   if (id === "static") return { kind: "static", page: 0 };
-  const match = /^(games|profiles|lists|communities)-(\d+)$/.exec(id);
+  const match = /^(games|communities)-(\d+)$/.exec(id);
   if (!match) return null;
   const page = Number(match[2]);
   if (!Number.isInteger(page) || page < 0) return null;
@@ -49,12 +52,10 @@ export function parseSitemapShardId(id: string): SitemapShard | null {
 
 export function sitemapShardsForCounts(counts: {
   games: number;
-  profiles: number;
-  lists: number;
   communities: number;
 }): SitemapShard[] {
   const shards: SitemapShard[] = [{ kind: "static", page: 0 }];
-  const kinds = ["games", "profiles", "lists", "communities"] as const;
+  const kinds = ["games", "communities"] as const;
   for (const kind of kinds) {
     const pages = sitemapPageCount(counts[kind]);
     for (let page = 0; page < pages; page += 1) {

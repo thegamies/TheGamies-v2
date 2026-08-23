@@ -1,9 +1,9 @@
-import { and, asc, count, eq, isNotNull, isNull } from "drizzle-orm";
+import { asc, count, eq, sql } from "drizzle-orm";
 import { createDb } from "@thegamies/db";
-import { communities, games, lists, profiles } from "@thegamies/db/schema";
+import { communities } from "@thegamies/db/schema";
 import { listPublicStandingsYears } from "@/lib/live-aggregate/service";
 import {
-  ownedListSitemapPath,
+  SITEMAP_GAMES_PER_YEAR,
   SITEMAP_PAGE_SIZE,
   SITEMAP_STATIC_PATHS,
   type SitemapShard,
@@ -13,41 +13,40 @@ function getDb() {
   return createDb();
 }
 
-const publicGameWhere = and(isNull(games.igdbRemovedAt), eq(games.isAdult, false));
-const publicProfileWhere = and(
-  eq(profiles.visibility, "public"),
-  isNull(profiles.deletedAt),
-);
+/** Top `SITEMAP_GAMES_PER_YEAR` slugs per release year, by IGDB popularity. */
+const popularGamesByYear = sql`
+  select slug
+  from (
+    select
+      slug,
+      row_number() over (
+        partition by year
+        order by popularity desc, slug asc
+      ) as rn
+    from games
+    where igdb_removed_at is null
+      and is_adult = false
+      and year is not null
+  ) ranked
+  where rn <= ${SITEMAP_GAMES_PER_YEAR}
+`;
 
 export async function getSitemapCounts(): Promise<{
   games: number;
-  profiles: number;
-  lists: number;
   communities: number;
 }> {
   const db = getDb();
-  const [gameRow] = await db
-    .select({ value: count() })
-    .from(games)
-    .where(publicGameWhere);
-  const [profileRow] = await db
-    .select({ value: count() })
-    .from(profiles)
-    .where(publicProfileWhere);
-  const [listRow] = await db
-    .select({ value: count() })
-    .from(lists)
-    .innerJoin(profiles, eq(profiles.id, lists.profileId))
-    .where(and(publicProfileWhere, isNotNull(lists.slug)));
+  const gamesResult = await db.execute(sql`
+    select count(*)::int as value
+    from (${popularGamesByYear}) popular_games
+  `);
   const [communityRow] = await db
     .select({ value: count() })
     .from(communities)
     .where(eq(communities.visibility, "public"));
 
   return {
-    games: gameRow?.value ?? 0,
-    profiles: profileRow?.value ?? 0,
-    lists: listRow?.value ?? 0,
+    games: Number(gamesResult.rows[0]?.value ?? 0),
     communities: communityRow?.value ?? 0,
   };
 }
@@ -67,43 +66,18 @@ export async function sitemapUrlsForShard(
   const offset = shard.page * SITEMAP_PAGE_SIZE;
 
   if (shard.kind === "games") {
-    const rows = await db
-      .select({ slug: games.slug })
-      .from(games)
-      .where(publicGameWhere)
-      .orderBy(asc(games.slug))
-      .limit(SITEMAP_PAGE_SIZE)
-      .offset(offset);
-    return rows.map((row) => ({ path: `/games/${row.slug}` }));
-  }
-
-  if (shard.kind === "profiles") {
-    const rows = await db
-      .select({ username: profiles.username })
-      .from(profiles)
-      .where(publicProfileWhere)
-      .orderBy(asc(profiles.username))
-      .limit(SITEMAP_PAGE_SIZE)
-      .offset(offset);
-    return rows.map((row) => ({ path: `/u/${row.username}` }));
-  }
-
-  if (shard.kind === "lists") {
-    const rows = await db
-      .select({
-        username: profiles.username,
-        slug: lists.slug,
+    const result = await db.execute(sql`
+      ${popularGamesByYear}
+      order by slug
+      limit ${SITEMAP_PAGE_SIZE}
+      offset ${offset}
+    `);
+    return result.rows
+      .map((row) => {
+        const slug = typeof row.slug === "string" ? row.slug : null;
+        return slug ? { path: `/games/${slug}` } : null;
       })
-      .from(lists)
-      .innerJoin(profiles, eq(profiles.id, lists.profileId))
-      .where(and(publicProfileWhere, isNotNull(lists.slug)))
-      .orderBy(asc(profiles.username), asc(lists.slug))
-      .limit(SITEMAP_PAGE_SIZE)
-      .offset(offset);
-    return rows
-      .map((row) => ownedListSitemapPath(row))
-      .filter((path): path is string => Boolean(path))
-      .map((path) => ({ path }));
+      .filter((entry): entry is { path: string } => Boolean(entry));
   }
 
   const rows = await db

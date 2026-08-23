@@ -84,4 +84,28 @@ describe("YearSelect", () => {
       "/game-of-the-year/2026",
     );
   });
+
+  it("lists All as a link back to the GOTY landing", () => {
+    render(
+      <YearSelect
+        year={2025}
+        options={[
+          { href: "/game-of-the-year", label: "All" },
+          ...OPTIONS,
+        ]}
+        alwaysShow
+        label="Standings year"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Standings year" }));
+    expect(screen.getByRole("link", { name: "All" }).getAttribute("href")).toBe(
+      "/game-of-the-year",
+    );
+    expect(screen.getByRole("option", { name: "All" }).getAttribute("aria-selected")).toBe(
+      "false",
+    );
+    expect(screen.getByRole("option", { name: "2025" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
 });

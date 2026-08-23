@@ -163,6 +163,8 @@ export type LiveStandingsBoardProps = {
   yearOptions: number[];
   /** Path without query, e.g. `/game-of-the-year/2026`. */
   basePath: string;
+  /** When set, the year menu includes All → this href (site GOTY landing). */
+  allYearsHref?: string;
   title: string;
   /** Short meta under the title — typically list count. */
   listCountLabel?: string | null;
@@ -187,6 +189,7 @@ export function LiveStandingsBoard({
   page,
   yearOptions,
   basePath,
+  allYearsHref,
   title,
   listCountLabel,
   statusNotes = [],
@@ -203,14 +206,17 @@ export function LiveStandingsBoard({
     parts[parts.length - 1] = String(y);
     return parts.join("/");
   };
-  const yearOptionsLinks = yearOptions.map((y) => ({
-    year: y,
-    href: liveStandingsHref(yearBase(y), {
-      group: page.categoryGroup,
-      view: page.view,
-      category: page.categoryId,
-    }),
-  }));
+  const yearOptionsLinks = [
+    ...(allYearsHref ? [{ href: allYearsHref, label: "All" }] : []),
+    ...yearOptions.map((y) => ({
+      year: y,
+      href: liveStandingsHref(yearBase(y), {
+        group: page.categoryGroup,
+        view: page.view,
+        category: page.categoryId,
+      }),
+    })),
+  ];
   const Heading = headingLevel;
   const detailBlock = page.categories[0] ?? null;
 

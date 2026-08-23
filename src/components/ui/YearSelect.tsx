@@ -9,8 +9,9 @@ import {
 } from "@/components/ui/yearSelectMenu";
 
 export type YearSelectOption = {
-  year: number;
   href: string;
+  year?: number;
+  label?: string;
 };
 
 type Props = {
@@ -138,9 +139,10 @@ export function YearSelect({
           }`}
         >
           {options.map((opt) => {
-            const active = opt.year === year;
+            const text = opt.label ?? (opt.year != null ? String(opt.year) : opt.href);
+            const active = opt.year != null ? opt.year === year : year == null;
             return (
-              <li key={opt.year} role="option" aria-selected={active}>
+              <li key={opt.href} role="option" aria-selected={active}>
                 <Link
                   href={opt.href}
                   className={`block px-3 py-2 text-sm tracking-wide ${
@@ -150,7 +152,7 @@ export function YearSelect({
                   }`}
                   onClick={() => setOpen(false)}
                 >
-                  {opt.year}
+                  {text}
                 </Link>
               </li>
             );

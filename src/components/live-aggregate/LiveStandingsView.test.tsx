@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LiveStandingsView } from "./LiveStandingsView";
 import type { StandingsPage } from "@/lib/live-aggregate/service";
@@ -95,6 +95,10 @@ describe("LiveStandingsView", () => {
     expect(
       year.parentElement?.parentElement?.parentElement?.className,
     ).toContain("h-[1em]");
+    fireEvent.click(year);
+    expect(screen.getByRole("link", { name: "All" }).getAttribute("href")).toBe(
+      "/game-of-the-year",
+    );
   });
 
   it("puts the creator link on the list-total row", () => {

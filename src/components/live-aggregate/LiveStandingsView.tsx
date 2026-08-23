@@ -39,6 +39,7 @@ export function LiveStandingsView({
         page={page}
         yearOptions={yearOptions}
         basePath={basePath}
+        allYearsHref="/game-of-the-year"
         title={`${page.year} Game of the Year`}
         listCountLabel={
           page.gotyPublic && page.listCount > 0

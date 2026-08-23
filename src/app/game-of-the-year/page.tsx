@@ -95,10 +95,13 @@ export default async function GameOfTheYearLandingPage() {
           <div className="flex h-[1em] shrink-0 items-center text-5xl md:text-7xl">
             <div className="text-base leading-none">
               <YearSelect
-                options={sections.map((section) => ({
-                  year: section.year,
-                  href: `/game-of-the-year/${section.year}`,
-                }))}
+                options={[
+                  { href: "/game-of-the-year", label: "All" },
+                  ...sections.map((section) => ({
+                    year: section.year,
+                    href: `/game-of-the-year/${section.year}`,
+                  })),
+                ]}
                 label="All"
                 triggerLabel="All"
               />

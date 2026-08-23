@@ -4,6 +4,7 @@ import {
   ownedListSitemapPath,
   parseSitemapShardId,
   shouldIndexProfile,
+  SITEMAP_GAMES_PER_YEAR,
   sitemapPageCount,
   sitemapShardsForCounts,
 } from "./sitemap-plan";
@@ -12,17 +13,13 @@ describe("sitemap shards", () => {
   it("always includes the static shard", () => {
     expect(sitemapShardsForCounts({
       games: 0,
-      profiles: 0,
-      lists: 0,
       communities: 0,
     })).toEqual([{ kind: "static", page: 0 }]);
   });
 
-  it("pages large collections", () => {
+  it("pages games and communities only", () => {
     const shards = sitemapShardsForCounts({
       games: 12_000,
-      profiles: 1,
-      lists: 0,
       communities: 3,
     });
     expect(shards.map(formatSitemapShardId)).toEqual([
@@ -30,7 +27,6 @@ describe("sitemap shards", () => {
       "games-0",
       "games-1",
       "games-2",
-      "profiles-0",
       "communities-0",
     ]);
   });
@@ -38,7 +34,12 @@ describe("sitemap shards", () => {
   it("parses shard ids", () => {
     expect(parseSitemapShardId("static")).toEqual({ kind: "static", page: 0 });
     expect(parseSitemapShardId("games-2")).toEqual({ kind: "games", page: 2 });
+    expect(parseSitemapShardId("profiles-0")).toBeNull();
     expect(parseSitemapShardId("nope")).toBeNull();
+  });
+
+  it("caps catalog games per year", () => {
+    expect(SITEMAP_GAMES_PER_YEAR).toBe(100);
   });
 
   it("counts pages", () => {

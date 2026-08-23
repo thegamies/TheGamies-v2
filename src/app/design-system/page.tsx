@@ -362,6 +362,7 @@ export default function DesignSystemPage() {
               <YearSelect
                 year={2026}
                 options={[
+                  { href: "/game-of-the-year", label: "All" },
                   { year: 2026, href: "/game-of-the-year/2026" },
                   { year: 2025, href: "/game-of-the-year/2025" },
                   { year: 2024, href: "/game-of-the-year/2024" },

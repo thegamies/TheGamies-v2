@@ -96,7 +96,7 @@ Today:
 
 Shipped on Cloudflare:
 
-- `robots.txt` / paged `sitemap.xml` (games, public profiles, owned lists, GOTY boards, public community homes)
+- `robots.txt` / paged `sitemap.xml` (top 100 popular games per year, public GOTY boards, public community homes; no people)
 - `metadataBase` from `NEXT_PUBLIC_APP_URL`
 - Open Graph / Twitter metadata, a static default card (`/og.png`), and generated cards at `/api/og` (game, list, profile, GOTY year, public community)
 - Editorial `not-found` / `error` pages
