@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ogImagePath } from "./og-path";
+import { envAppOrigin } from "./origin";
 
 export const SITE_NAME = "The Gamies";
 
@@ -9,7 +10,7 @@ export const SITE_DESCRIPTION =
 export const noIndexRobots = { index: false, follow: false } as const;
 
 export function appOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  return envAppOrigin();
 }
 
 export function publicPageMetadata(input: {

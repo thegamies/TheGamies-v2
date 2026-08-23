@@ -1,9 +1,9 @@
 import type { MetadataRoute } from "next";
-import { appOrigin } from "@/lib/seo/site";
+import { resolvePublicOrigin } from "@/lib/seo/origin";
 import { ROBOTS_DISALLOW } from "@/lib/seo/sitemap-plan";
 
-export default function robots(): MetadataRoute.Robots {
-  const origin = appOrigin();
+export default async function robots(): Promise<MetadataRoute.Robots> {
+  const origin = await resolvePublicOrigin();
   return {
     rules: {
       userAgent: "*",

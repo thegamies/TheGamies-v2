@@ -33,7 +33,7 @@ export async function generateMetadata({
       title: game.title,
       description: game.summary?.slice(0, 160) ?? undefined,
       path: `/games/${slug}`,
-      image: game.coverUrl ?? ogImagePath({ kind: "game", slug }),
+      image: ogImagePath({ kind: "game", slug }),
     });
   } catch {
     return { title: "Game" };

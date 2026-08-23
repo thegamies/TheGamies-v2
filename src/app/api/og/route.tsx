@@ -4,8 +4,9 @@ import { getCommunityBySlug } from "@/lib/communities/service";
 import { isCommunityPublic } from "@/lib/communities/schema";
 import { getShareListByUsernameSlug, getShareListItems } from "@/lib/lists/service";
 import { getProfileByUsername } from "@/lib/profile/service";
+import { igdbImage } from "@thegamies/igdb";
 import type { OgCardCover } from "@/lib/seo/og-card";
-import { renderOgImage } from "@/lib/seo/og-image";
+import { renderGameOgImage, renderOgImage } from "@/lib/seo/og-image";
 import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 
@@ -33,11 +34,10 @@ async function renderForKind(kind: string, params: URLSearchParams) {
     const slug = params.get("slug") ?? "";
     const game = await getGameBySlug(slug);
     if (!game) return defaultCard();
-    return renderOgImage({
-      kicker: "Game",
+    return renderGameOgImage({
       title: game.title,
-      subtitle: game.year ? String(game.year) : undefined,
-      covers: game.coverUrl ? [{ url: game.coverUrl }] : [],
+      year: game.year,
+      coverUrl: igdbImage(game.coverUrl, "1080p") ?? game.coverUrl,
     });
   }
 
