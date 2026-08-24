@@ -1,11 +1,14 @@
 import { inArray, sql } from "drizzle-orm";
 import {
+  gameArtworks,
   gameCompanies,
   gameGenres,
   gameKeywords,
   gamePlatforms,
   games,
+  gameScreenshots,
   gameThemes,
+  gameVideoLinks,
   type Db,
 } from "@thegamies/db";
 import { insertChunked } from "./chunk";
@@ -41,6 +44,21 @@ export function gameJunctionDeleteSql(gameIds: string[]) {
       c AS (
         DELETE FROM ${gameCompanies}
         WHERE ${gameCompanies.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      a AS (
+        DELETE FROM ${gameArtworks}
+        WHERE ${gameArtworks.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      s AS (
+        DELETE FROM ${gameScreenshots}
+        WHERE ${gameScreenshots.gameId} IN (${idList})
+        RETURNING 1
+      ),
+      v AS (
+        DELETE FROM ${gameVideoLinks}
+        WHERE ${gameVideoLinks.gameId} IN (${idList})
         RETURNING 1
       )
     SELECT 1
@@ -123,6 +141,9 @@ export async function upsertGamesWithLinks(
   const themeLinks: { gameId: string; themeIgdbId: number }[] = [];
   const keywordLinks: { gameId: string; keywordIgdbId: number }[] = [];
   const companyLinks: { gameId: string; involvedCompanyIgdbId: number }[] = [];
+  const artworkLinks: { gameId: string; artworkIgdbId: number }[] = [];
+  const screenshotLinks: { gameId: string; screenshotIgdbId: number }[] = [];
+  const videoLinks: { gameId: string; videoIgdbId: number }[] = [];
 
   for (const row of rows) {
     const gameId = idByIgdb.get(row.igdbId);
@@ -141,6 +162,15 @@ export async function upsertGamesWithLinks(
     }
     for (const involvedCompanyIgdbId of row.involvedCompanyIgdbIds) {
       companyLinks.push({ gameId, involvedCompanyIgdbId });
+    }
+    for (const artworkIgdbId of row.artworkIgdbIds) {
+      artworkLinks.push({ gameId, artworkIgdbId });
+    }
+    for (const screenshotIgdbId of row.screenshotIgdbIds) {
+      screenshotLinks.push({ gameId, screenshotIgdbId });
+    }
+    for (const videoIgdbId of row.videoIgdbIds) {
+      videoLinks.push({ gameId, videoIgdbId });
     }
   }
 
@@ -162,6 +192,15 @@ export async function upsertGamesWithLinks(
   );
   await insertChunked(companyLinks, (chunk) =>
     db.insert(gameCompanies).values(chunk).onConflictDoNothing(),
+  );
+  await insertChunked(artworkLinks, (chunk) =>
+    db.insert(gameArtworks).values(chunk).onConflictDoNothing(),
+  );
+  await insertChunked(screenshotLinks, (chunk) =>
+    db.insert(gameScreenshots).values(chunk).onConflictDoNothing(),
+  );
+  await insertChunked(videoLinks, (chunk) =>
+    db.insert(gameVideoLinks).values(chunk).onConflictDoNothing(),
   );
 
   return rows.length;

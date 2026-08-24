@@ -17,6 +17,10 @@ import {
 const ENTITY_LABELS: Record<WebhookEntity, string> = {
   games: "Games",
   covers: "Covers",
+  artworks: "Artworks",
+  screenshots: "Screenshots",
+  game_videos: "Game videos",
+  image_types: "Image types",
   platforms: "Platforms",
   keywords: "Keywords",
   themes: "Themes",

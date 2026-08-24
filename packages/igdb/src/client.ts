@@ -15,6 +15,9 @@ export type IgdbGame = {
   themes?: number[];
   keywords?: number[];
   involved_companies?: number[];
+  artworks?: number[];
+  screenshots?: number[];
+  videos?: number[];
   game_type?: number;
   parent_game?: number;
   version_parent?: number;
@@ -188,6 +191,9 @@ export type MappedGame = {
   themeIgdbIds: number[];
   keywordIgdbIds: number[];
   involvedCompanyIgdbIds: number[];
+  artworkIgdbIds: number[];
+  screenshotIgdbIds: number[];
+  videoIgdbIds: number[];
 };
 
 export function mapIgdbGame(
@@ -222,13 +228,17 @@ export function mapIgdbGame(
     themeIgdbIds: game.themes ?? [],
     keywordIgdbIds: game.keywords ?? [],
     involvedCompanyIgdbIds: game.involved_companies ?? [],
+    artworkIgdbIds: game.artworks ?? [],
+    screenshotIgdbIds: game.screenshots ?? [],
+    videoIgdbIds: game.videos ?? [],
   };
 }
 
 const GAME_FIELDS =
   "fields id, name, slug, summary, first_release_date, updated_at, cover, " +
   "platforms, genres, themes, keywords, involved_companies, game_type, " +
-  "parent_game, version_parent, total_rating, total_rating_count, follows, hypes;";
+  "parent_game, version_parent, total_rating, total_rating_count, follows, hypes, " +
+  "artworks, screenshots, videos;";
 
 export function yearUnixRange(year: number): { start: number; end: number } {
   const start = Math.floor(Date.UTC(year, 0, 1) / 1000);
@@ -283,6 +293,17 @@ export function coverUrlFromImageId(imageId?: string | null): string | null {
   return imageId
     ? `https://images.igdb.com/igdb/image/upload/t_cover_big/${imageId}.jpg`
     : null;
+}
+
+export function wideImageUrlFromImageId(imageId?: string | null): string | null {
+  return imageId
+    ? `https://images.igdb.com/igdb/image/upload/t_720p/${imageId}.jpg`
+    : null;
+}
+
+export function youtubePosterUrl(videoId?: string | null): string | null {
+  const id = videoId?.trim();
+  return id ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
 }
 
 export type IgdbImageSize =

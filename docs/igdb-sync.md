@@ -8,7 +8,7 @@ Game metadata comes from the [IGDB API](https://api-docs.igdb.com/). Sync runs o
 
 1. **Games sync** upserts product rows and writes **junction links** by IGDB id (`game_platforms.platform_igdb_id`, etc.). No placeholder name rows in lookup tables.
 2. **Enrich** loads distinct link ids for a scope (e.g. `--year 2026`), subtracts ids already in the lookup table, fetches **only missing** entities from IGDB, upserts real rows.
-3. Cover art uses the `covers` table (`image_id` → CDN URL).
+3. Cover art uses the `covers` table (`image_id` → CDN URL). Artworks, screenshots, and videos use the same enrich/webhook model; wide stills use `t_720p`.
 
 Entity stubbing (fake `[stub]` names) is not used.
 
@@ -17,7 +17,11 @@ Entity stubbing (fake `[stub]` names) is not used.
 | Step | IGDB endpoint | Local writes |
 |---|---|---|
 | Core games | `/v4/games` | `games` + junction links; `cover_igdb_id`, `game_type_igdb_id` |
-| Covers | `/v4/covers` | `covers` |
+| Covers | `/v4/covers` | `covers` (including `image_type`) |
+| Artworks | `/v4/artworks` | `artworks` + `game_artworks` (no deprecated `artwork_type`) |
+| Screenshots | `/v4/screenshots` | `screenshots` + `game_screenshots` |
+| Game videos | `/v4/game_videos` | `game_videos` + `game_video_links` |
+| Image types | `/v4/image_types` | `image_types` |
 | Platforms | `/v4/platforms` | `platforms` |
 | Genres | `/v4/genres` | `genres` |
 | Themes | `/v4/themes` | `themes` |
@@ -36,7 +40,7 @@ IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel
 1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
 2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon (except **Live** mode).
 3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 1`, batch 25) applies each batch on a fresh isolate. Cron every minute only **pauses or resumes** queue delivery from KV (Auto window, sticky Open, or Closed). Saving settings syncs that immediately.
-4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`).
+4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`). After this media work, re-register so **Artworks, Screenshots, Game videos, and Image types** slots exist (staging then production). Do not register deprecated Artwork Types.
 
 A queue can have only one consumer type. This Worker is the consumer — do not also attach HTTP pull.
 

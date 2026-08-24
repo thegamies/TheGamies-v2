@@ -68,7 +68,7 @@ Site
 
 ### Catalog
 - Games browse with filters and sorting (parity intent with prior TheGamies app)
-- Game detail with the same information classes as the prior build (cover, title, dates, platforms, genres, companies, playtime, etc. as catalog supports)
+- Game detail with the same information classes as the prior build (cover, title, dates, platforms, genres, companies, playtime, videos, artwork, screenshots, etc. as catalog supports)
 
 ### Lists
 - **GOTY list** per year: up to **100** ranked games

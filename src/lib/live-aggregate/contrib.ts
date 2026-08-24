@@ -18,7 +18,6 @@ import {
   liveGotyYearStats,
   type Db,
 } from "@thegamies/db";
-import { gotyEligibilityError } from "@/lib/lists/rules";
 import { parseAwardCategoryEligibility } from "./award-category-defs";
 import { categoryEligibilityError } from "./category-eligibility";
 import {
@@ -163,9 +162,25 @@ export async function syncOwnedGotyContribFromList(
     .delete(liveCategoryContrib)
     .where(eq(liveCategoryContrib.listId, listId));
 
-  const catContrib = voteRows.filter(
-    (v) =>
-      gotyEligibilityError(
+  const voteCategoryIds = [...new Set(voteRows.map((v) => v.categoryId))];
+  const voteCats =
+    voteCategoryIds.length === 0
+      ? []
+      : await db
+          .select({
+            id: awardCategories.id,
+            eligibility: awardCategories.eligibility,
+            allowEditions: awardCategories.allowEditions,
+          })
+          .from(awardCategories)
+          .where(inArray(awardCategories.id, voteCategoryIds));
+  const voteCatById = new Map(voteCats.map((c) => [c.id, c]));
+
+  const catContrib = voteRows.filter((v) => {
+    const cat = voteCatById.get(v.categoryId);
+    if (!cat) return false;
+    return (
+      categoryEligibilityError(
         {
           id: v.gameId,
           year: v.year,
@@ -174,8 +189,11 @@ export async function syncOwnedGotyContribFromList(
           isAdult: v.isAdult,
         },
         list.year!,
-      ) == null,
-  );
+        parseAwardCategoryEligibility(cat.eligibility),
+        { allowEditions: cat.allowEditions },
+      ) == null
+    );
+  });
   if (catContrib.length > 0) {
     await db.insert(liveCategoryContrib).values(
       catContrib.map((v) => ({

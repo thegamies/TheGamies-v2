@@ -453,6 +453,7 @@ export async function replaceItems(
       firstReleaseDate: games.firstReleaseDate,
       versionParentIgdbId: games.versionParentIgdbId,
       isAdult: games.isAdult,
+      gameTypeIgdbId: games.gameTypeIgdbId,
     })
     .from(games)
     .where(inArray(games.id, gameIds));
@@ -941,6 +942,7 @@ async function writeItemsFromIgdb(
       firstReleaseDate: games.firstReleaseDate,
       versionParentIgdbId: games.versionParentIgdbId,
       isAdult: games.isAdult,
+      gameTypeIgdbId: games.gameTypeIgdbId,
     })
     .from(games)
     .where(inArray(games.igdbId, igdbIds));

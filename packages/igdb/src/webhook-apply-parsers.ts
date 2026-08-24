@@ -4,6 +4,12 @@ export type ParsedIgdbCover = {
   url?: string;
   width?: number;
   height?: number;
+  alpha_channel?: boolean;
+  animated?: boolean;
+  checksum?: string;
+  game?: number;
+  game_localization?: number;
+  image_type?: number;
 };
 
 export type ParsedIgdbPlatform = {
@@ -78,7 +84,7 @@ function parseOptionalBoolean(
 ): boolean | undefined {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "boolean") {
-    throw new Error(`Webhook involved company payload ${label} must be a boolean`);
+    throw new Error(`Webhook payload ${label} must be a boolean`);
   }
   return value;
 }
@@ -109,6 +115,9 @@ export function assertIgdbGame(payload: unknown): {
   total_rating_count?: number;
   follows?: number;
   hypes?: number;
+  artworks?: number[];
+  screenshots?: number[];
+  videos?: number[];
 } {
   if (!isRecord(payload)) {
     throw new Error("Webhook game payload must be an object");
@@ -184,6 +193,15 @@ export function assertIgdbGame(payload: unknown): {
   if (payload.hypes !== undefined) {
     game.hypes = parseOptionalFiniteNumber(payload.hypes);
   }
+  if (payload.artworks !== undefined) {
+    game.artworks = parseNumericIdArray(payload.artworks, "artworks");
+  }
+  if (payload.screenshots !== undefined) {
+    game.screenshots = parseNumericIdArray(payload.screenshots, "screenshots");
+  }
+  if (payload.videos !== undefined) {
+    game.videos = parseNumericIdArray(payload.videos, "videos");
+  }
 
   return game;
 }
@@ -206,7 +224,209 @@ export function assertIgdbCover(payload: unknown): ParsedIgdbCover {
   if (payload.height !== undefined) {
     cover.height = requireNumericId(payload.height, "height");
   }
+  if (payload.alpha_channel !== undefined) {
+    cover.alpha_channel = parseOptionalBoolean(
+      payload.alpha_channel,
+      "alpha_channel",
+    );
+  }
+  if (payload.animated !== undefined) {
+    cover.animated = parseOptionalBoolean(payload.animated, "animated");
+  }
+  if (payload.checksum !== undefined) {
+    cover.checksum =
+      payload.checksum == null ? undefined : String(payload.checksum);
+  }
+  if (payload.game !== undefined) {
+    cover.game =
+      payload.game == null ? undefined : requireNumericId(payload.game, "game");
+  }
+  if (payload.game_localization !== undefined) {
+    cover.game_localization =
+      payload.game_localization == null
+        ? undefined
+        : requireNumericId(payload.game_localization, "game_localization");
+  }
+  if (payload.image_type !== undefined) {
+    cover.image_type =
+      payload.image_type == null
+        ? undefined
+        : requireNumericId(payload.image_type, "image_type");
+  }
   return cover;
+}
+
+export type ParsedIgdbArtwork = {
+  id: number;
+  alpha_channel?: boolean;
+  animated?: boolean;
+  checksum?: string;
+  game?: number;
+  height?: number;
+  image_id?: string;
+  image_type?: number;
+  url?: string;
+  width?: number;
+};
+
+export function assertIgdbArtwork(payload: unknown): ParsedIgdbArtwork {
+  if (!isRecord(payload)) {
+    throw new Error("Webhook artwork payload must be an object");
+  }
+  const row: ParsedIgdbArtwork = { id: requireNumericId(payload.id, "id") };
+  if (payload.alpha_channel !== undefined) {
+    row.alpha_channel = parseOptionalBoolean(
+      payload.alpha_channel,
+      "alpha_channel",
+    );
+  }
+  if (payload.animated !== undefined) {
+    row.animated = parseOptionalBoolean(payload.animated, "animated");
+  }
+  if (payload.checksum !== undefined) {
+    row.checksum =
+      payload.checksum == null ? undefined : String(payload.checksum);
+  }
+  if (payload.game !== undefined) {
+    row.game =
+      payload.game == null ? undefined : requireNumericId(payload.game, "game");
+  }
+  if (payload.height !== undefined) {
+    row.height = requireNumericId(payload.height, "height");
+  }
+  if (payload.image_id !== undefined) {
+    row.image_id =
+      payload.image_id == null ? undefined : String(payload.image_id);
+  }
+  if (payload.image_type !== undefined) {
+    row.image_type =
+      payload.image_type == null
+        ? undefined
+        : requireNumericId(payload.image_type, "image_type");
+  }
+  if (payload.url !== undefined) {
+    row.url = payload.url == null ? undefined : String(payload.url);
+  }
+  if (payload.width !== undefined) {
+    row.width = requireNumericId(payload.width, "width");
+  }
+  return row;
+}
+
+export type ParsedIgdbScreenshot = {
+  id: number;
+  alpha_channel?: boolean;
+  animated?: boolean;
+  checksum?: string;
+  game?: number;
+  height?: number;
+  image_id?: string;
+  url?: string;
+  width?: number;
+};
+
+export function assertIgdbScreenshot(payload: unknown): ParsedIgdbScreenshot {
+  if (!isRecord(payload)) {
+    throw new Error("Webhook screenshot payload must be an object");
+  }
+  const row: ParsedIgdbScreenshot = { id: requireNumericId(payload.id, "id") };
+  if (payload.alpha_channel !== undefined) {
+    row.alpha_channel = parseOptionalBoolean(
+      payload.alpha_channel,
+      "alpha_channel",
+    );
+  }
+  if (payload.animated !== undefined) {
+    row.animated = parseOptionalBoolean(payload.animated, "animated");
+  }
+  if (payload.checksum !== undefined) {
+    row.checksum =
+      payload.checksum == null ? undefined : String(payload.checksum);
+  }
+  if (payload.game !== undefined) {
+    row.game =
+      payload.game == null ? undefined : requireNumericId(payload.game, "game");
+  }
+  if (payload.height !== undefined) {
+    row.height = requireNumericId(payload.height, "height");
+  }
+  if (payload.image_id !== undefined) {
+    row.image_id =
+      payload.image_id == null ? undefined : String(payload.image_id);
+  }
+  if (payload.url !== undefined) {
+    row.url = payload.url == null ? undefined : String(payload.url);
+  }
+  if (payload.width !== undefined) {
+    row.width = requireNumericId(payload.width, "width");
+  }
+  return row;
+}
+
+export type ParsedIgdbGameVideo = {
+  id: number;
+  checksum?: string;
+  game?: number;
+  name?: string;
+  video_id?: string;
+};
+
+export function assertIgdbGameVideo(payload: unknown): ParsedIgdbGameVideo {
+  if (!isRecord(payload)) {
+    throw new Error("Webhook game video payload must be an object");
+  }
+  const row: ParsedIgdbGameVideo = { id: requireNumericId(payload.id, "id") };
+  if (payload.checksum !== undefined) {
+    row.checksum =
+      payload.checksum == null ? undefined : String(payload.checksum);
+  }
+  if (payload.game !== undefined) {
+    row.game =
+      payload.game == null ? undefined : requireNumericId(payload.game, "game");
+  }
+  if (payload.name !== undefined) {
+    row.name = payload.name == null ? undefined : String(payload.name);
+  }
+  if (payload.video_id !== undefined) {
+    row.video_id =
+      payload.video_id == null ? undefined : String(payload.video_id);
+  }
+  return row;
+}
+
+export type ParsedIgdbImageType = {
+  id: number;
+  checksum?: string;
+  created_at?: number;
+  name?: string;
+  updated_at?: number;
+};
+
+export function assertIgdbImageType(payload: unknown): ParsedIgdbImageType {
+  if (!isRecord(payload)) {
+    throw new Error("Webhook image type payload must be an object");
+  }
+  const row: ParsedIgdbImageType = { id: requireNumericId(payload.id, "id") };
+  if (payload.checksum !== undefined) {
+    row.checksum =
+      payload.checksum == null ? undefined : String(payload.checksum);
+  }
+  if (payload.name !== undefined) {
+    row.name = payload.name == null ? undefined : String(payload.name);
+  }
+  if (payload.created_at !== undefined) {
+    row.created_at =
+      payload.created_at == null
+        ? undefined
+        : requireNumericId(payload.created_at, "created_at");
+  }
+  if (payload.updated_at !== undefined) {
+    row.updated_at =
+      payload.updated_at == null
+        ? undefined
+        : requireNumericId(payload.updated_at, "updated_at");
+  }
+  return row;
 }
 
 export function assertIgdbPlatform(payload: unknown): ParsedIgdbPlatform {

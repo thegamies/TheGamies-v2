@@ -14,6 +14,10 @@ export const adminSyncBodySchema = z.object({
   entity: z
     .enum([
       "covers",
+      "artworks",
+      "screenshots",
+      "game_videos",
+      "image_types",
       "platforms",
       "genres",
       "themes",

@@ -19,7 +19,7 @@ The consumer product is largely built. The remaining risk is **production wiring
 
 These v1 loops exist in the app today:
 
-- Games browse (title / year / sort / release status) and game detail (cover, summary, dates, platforms, genres, companies, time-to-beat, site GOTY rank, category #1s)
+- Games browse (title / year / sort / release status) and game detail (cover, summary, dates, platforms, genres, companies, time-to-beat, site GOTY rank, category #1s, videos / artwork / screenshots)
 - GOTY + custom lists, anonymous build, sign-in to save/share, editorial list view, image export
 - Profiles, account settings, username cooldown, password change / forgot, account deletion (tombstone)
 - Site live GOTY + categories, public floor, reveal gate, admin refresh/rebuild

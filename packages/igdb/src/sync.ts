@@ -1,19 +1,26 @@
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db } from "@thegamies/db";
 import {
+  artworks,
   companies,
   covers,
+  gameArtworks,
   gameCompanies,
   gameGenres,
   gameKeywords,
   gamePlatforms,
   games,
+  gameScreenshots,
   gameThemes,
   gameTimeToBeats,
   gameTypes,
+  gameVideoLinks,
+  gameVideos,
   genres,
+  imageTypes,
   keywords,
   platforms,
+  screenshots,
   syncRuns,
   themes,
 } from "@thegamies/db/schema";
@@ -27,6 +34,23 @@ import {
 } from "./client";
 import { evaluateBackfillResume } from "./backfill-resume";
 import { INSERT_CHUNK, insertChunked } from "./chunk";
+import {
+  ARTWORK_FIELDS,
+  COVER_FIELDS,
+  GAME_VIDEO_FIELDS,
+  IMAGE_TYPE_FIELDS,
+  SCREENSHOT_FIELDS,
+  mapArtworkRow,
+  mapCoverRow,
+  mapGameVideoRow,
+  mapImageTypeRow,
+  mapScreenshotRow,
+  type IgdbArtworkRow,
+  type IgdbCoverRow,
+  type IgdbGameVideoRow,
+  type IgdbImageTypeRow,
+  type IgdbScreenshotRow,
+} from "./igdb-media";
 import {
   finishSyncRun,
   getLastSuccessfulSyncDate,
@@ -247,6 +271,10 @@ export async function getBackfillResumeInfo(
 
 export type EnrichEntity =
   | "covers"
+  | "artworks"
+  | "screenshots"
+  | "game_videos"
+  | "image_types"
   | "platforms"
   | "genres"
   | "themes"
@@ -282,22 +310,13 @@ export async function runEnrich(
         needed,
         () => db.select({ igdbId: covers.igdbId }).from(covers),
         async (missing) => {
-          const rows = await fetchByIds<{
-            id: number;
-            image_id?: string;
-            url?: string;
-            width?: number;
-            height?: number;
-          }>("covers", missing, "id, image_id, url, width, height");
+          const rows = await fetchByIds<IgdbCoverRow>(
+            "covers",
+            missing,
+            COVER_FIELDS,
+          );
           await insertChunked(
-            rows.map((r) => ({
-              igdbId: r.id,
-              imageId: r.image_id ?? null,
-              url: r.url ?? null,
-              width: r.width ?? null,
-              height: r.height ?? null,
-              syncedAt: new Date(),
-            })),
+            rows.map(mapCoverRow),
             (chunk) =>
               db
                 .insert(covers)
@@ -309,6 +328,172 @@ export async function runEnrich(
                     url: sql`excluded.url`,
                     width: sql`excluded.width`,
                     height: sql`excluded.height`,
+                    alphaChannel: sql`excluded.alpha_channel`,
+                    animated: sql`excluded.animated`,
+                    checksum: sql`excluded.checksum`,
+                    gameIgdbId: sql`excluded.game_igdb_id`,
+                    gameLocalizationIgdbId: sql`excluded.game_localization_igdb_id`,
+                    imageTypeIgdbId: sql`excluded.image_type_igdb_id`,
+                    syncedAt: sql`now()`,
+                  },
+                }),
+          );
+          return rows.length;
+        },
+      );
+    } else if (entity === "artworks") {
+      const neededRows = await db
+        .selectDistinct({ id: gameArtworks.artworkIgdbId })
+        .from(gameArtworks)
+        .innerJoin(games, eq(games.id, gameArtworks.gameId))
+        .where(y);
+      fetched = await upsertMissing(
+        neededRows.map((r) => r.id),
+        () => db.select({ igdbId: artworks.igdbId }).from(artworks),
+        async (missing) => {
+          const rows = await fetchByIds<IgdbArtworkRow>(
+            "artworks",
+            missing,
+            ARTWORK_FIELDS,
+          );
+          await insertChunked(
+            rows.map(mapArtworkRow),
+            (chunk) =>
+              db
+                .insert(artworks)
+                .values(chunk)
+                .onConflictDoUpdate({
+                  target: artworks.igdbId,
+                  set: {
+                    alphaChannel: sql`excluded.alpha_channel`,
+                    animated: sql`excluded.animated`,
+                    checksum: sql`excluded.checksum`,
+                    gameIgdbId: sql`excluded.game_igdb_id`,
+                    height: sql`excluded.height`,
+                    imageId: sql`excluded.image_id`,
+                    imageTypeIgdbId: sql`excluded.image_type_igdb_id`,
+                    url: sql`excluded.url`,
+                    width: sql`excluded.width`,
+                    syncedAt: sql`now()`,
+                  },
+                }),
+          );
+          return rows.length;
+        },
+      );
+    } else if (entity === "screenshots") {
+      const neededRows = await db
+        .selectDistinct({ id: gameScreenshots.screenshotIgdbId })
+        .from(gameScreenshots)
+        .innerJoin(games, eq(games.id, gameScreenshots.gameId))
+        .where(y);
+      fetched = await upsertMissing(
+        neededRows.map((r) => r.id),
+        () => db.select({ igdbId: screenshots.igdbId }).from(screenshots),
+        async (missing) => {
+          const rows = await fetchByIds<IgdbScreenshotRow>(
+            "screenshots",
+            missing,
+            SCREENSHOT_FIELDS,
+          );
+          await insertChunked(
+            rows.map(mapScreenshotRow),
+            (chunk) =>
+              db
+                .insert(screenshots)
+                .values(chunk)
+                .onConflictDoUpdate({
+                  target: screenshots.igdbId,
+                  set: {
+                    alphaChannel: sql`excluded.alpha_channel`,
+                    animated: sql`excluded.animated`,
+                    checksum: sql`excluded.checksum`,
+                    gameIgdbId: sql`excluded.game_igdb_id`,
+                    height: sql`excluded.height`,
+                    imageId: sql`excluded.image_id`,
+                    url: sql`excluded.url`,
+                    width: sql`excluded.width`,
+                    syncedAt: sql`now()`,
+                  },
+                }),
+          );
+          return rows.length;
+        },
+      );
+    } else if (entity === "game_videos") {
+      const neededRows = await db
+        .selectDistinct({ id: gameVideoLinks.videoIgdbId })
+        .from(gameVideoLinks)
+        .innerJoin(games, eq(games.id, gameVideoLinks.gameId))
+        .where(y);
+      fetched = await upsertMissing(
+        neededRows.map((r) => r.id),
+        () => db.select({ igdbId: gameVideos.igdbId }).from(gameVideos),
+        async (missing) => {
+          const rows = await fetchByIds<IgdbGameVideoRow>(
+            "game_videos",
+            missing,
+            GAME_VIDEO_FIELDS,
+          );
+          await insertChunked(
+            rows.map(mapGameVideoRow),
+            (chunk) =>
+              db
+                .insert(gameVideos)
+                .values(chunk)
+                .onConflictDoUpdate({
+                  target: gameVideos.igdbId,
+                  set: {
+                    checksum: sql`excluded.checksum`,
+                    gameIgdbId: sql`excluded.game_igdb_id`,
+                    name: sql`excluded.name`,
+                    videoId: sql`excluded.video_id`,
+                    syncedAt: sql`now()`,
+                  },
+                }),
+          );
+          return rows.length;
+        },
+      );
+    } else if (entity === "image_types") {
+      const [fromArtworks, fromCovers] = await Promise.all([
+        db
+          .selectDistinct({ id: artworks.imageTypeIgdbId })
+          .from(artworks)
+          .innerJoin(games, eq(games.igdbId, artworks.gameIgdbId))
+          .where(and(isNotNull(artworks.imageTypeIgdbId), y)),
+        db
+          .selectDistinct({ id: covers.imageTypeIgdbId })
+          .from(covers)
+          .innerJoin(games, eq(games.igdbId, covers.gameIgdbId))
+          .where(and(isNotNull(covers.imageTypeIgdbId), y)),
+      ]);
+      const needed = [
+        ...fromArtworks.map((r) => r.id),
+        ...fromCovers.map((r) => r.id),
+      ].filter((id): id is number => id != null);
+      fetched = await upsertMissing(
+        needed,
+        () => db.select({ igdbId: imageTypes.igdbId }).from(imageTypes),
+        async (missing) => {
+          const rows = await fetchByIds<IgdbImageTypeRow>(
+            "image_types",
+            missing,
+            IMAGE_TYPE_FIELDS,
+          );
+          await insertChunked(
+            rows.map(mapImageTypeRow),
+            (chunk) =>
+              db
+                .insert(imageTypes)
+                .values(chunk)
+                .onConflictDoUpdate({
+                  target: imageTypes.igdbId,
+                  set: {
+                    name: sql`excluded.name`,
+                    checksum: sql`excluded.checksum`,
+                    igdbCreatedAt: sql`excluded.igdb_created_at`,
+                    igdbUpdatedAt: sql`excluded.igdb_updated_at`,
                     syncedAt: sql`now()`,
                   },
                 }),
@@ -701,6 +886,10 @@ async function upsertMissing(
 
 export const ALL_ENRICH_ENTITIES: EnrichEntity[] = [
   "covers",
+  "artworks",
+  "screenshots",
+  "game_videos",
+  "image_types",
   "platforms",
   "genres",
   "themes",

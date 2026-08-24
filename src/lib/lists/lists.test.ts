@@ -67,8 +67,29 @@ describe("gotyEligibilityError", () => {
     expect(gotyEligibilityError(base, 2026, new Date("2026-08-01"))).toBeNull();
   });
 
-  it("rejects wrong year, editions, adult, and upcoming", () => {
+  it("accepts expansions and remakes", () => {
+    expect(
+      gotyEligibilityError(
+        { ...base, gameTypeIgdbId: 2 },
+        2026,
+        new Date("2026-08-01"),
+      ),
+    ).toBeNull();
+    expect(
+      gotyEligibilityError(
+        { ...base, gameTypeIgdbId: 8 },
+        2026,
+        new Date("2026-08-01"),
+      ),
+    ).toBeNull();
+  });
+
+  it("rejects wrong year, unknown year, missing date, editions, adult, upcoming, and add-ons", () => {
     expect(gotyEligibilityError({ ...base, year: 2025 }, 2026)).toMatch(/2026/);
+    expect(gotyEligibilityError({ ...base, year: null }, 2026)).toMatch(/2026/);
+    expect(
+      gotyEligibilityError({ ...base, firstReleaseDate: null }, 2026),
+    ).toMatch(/release date/);
     expect(
       gotyEligibilityError({ ...base, versionParentIgdbId: 99 }, 2026),
     ).toMatch(/Edition/);
@@ -82,6 +103,12 @@ describe("gotyEligibilityError", () => {
         new Date("2026-08-01"),
       ),
     ).toMatch(/Upcoming/);
+    expect(
+      gotyEligibilityError({ ...base, gameTypeIgdbId: 1 }, 2026),
+    ).toMatch(/add-ons/);
+    expect(
+      gotyEligibilityError({ ...base, gameTypeIgdbId: 13 }, 2026),
+    ).toMatch(/add-ons/);
   });
 });
 

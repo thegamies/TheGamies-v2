@@ -25,6 +25,7 @@ export async function searchGamesForList(
       year,
       releaseStatus: input.gotyMode ? "released" : "all",
       excludeEditions: Boolean(input.gotyMode),
+      gotyEligibleTypes: Boolean(input.gotyMode),
     }),
     sort: "popularity",
     sortDir: "desc",

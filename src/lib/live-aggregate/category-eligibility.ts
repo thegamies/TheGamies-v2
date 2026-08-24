@@ -1,5 +1,5 @@
 import type { GotyGameCandidate } from "@/lib/lists/rules";
-import { gotyEligibilityError } from "@/lib/lists/rules";
+import { gotyYearAndReleaseError } from "@/lib/lists/rules";
 import type { AwardCategoryEligibility } from "./award-category-defs";
 
 export type CategoryGameCandidate = GotyGameCandidate;
@@ -27,13 +27,7 @@ export function categoryEligibilityError(
   }
 
   if (eligibility === "current_year") {
-    return gotyEligibilityError(
-      allowEditions
-        ? { ...game, versionParentIgdbId: null }
-        : game,
-      year,
-      now,
-    );
+    return gotyYearAndReleaseError(game, year, now);
   }
 
   if (eligibility === "upcoming") {

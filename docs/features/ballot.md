@@ -17,7 +17,7 @@ Tables `community_edition_ballots` + `community_edition_ballot_items` — **not*
 
 - **Eligibility:** signed-in community members (invite-only)
 - **Edit:** allowed while edition status is `open` (until `closesAt`); read-only after close/publish
-- GOTY eligibility matches personal GOTY helpers (`gotyEligibilityError`)
+- GOTY eligibility matches personal GOTY helpers (`gotyEligibilityError`): year, released date, no editions, no adult, no pack/DLC-addon types; expansions allowed
 
 ## Categories
 

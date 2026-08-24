@@ -6,6 +6,10 @@ import {
 export type WebhookEntity =
   | "games"
   | "covers"
+  | "artworks"
+  | "screenshots"
+  | "game_videos"
+  | "image_types"
   | "platforms"
   | "keywords"
   | "themes"
@@ -20,6 +24,10 @@ export type WebhookMethod = "create" | "update" | "delete";
 export const WEBHOOK_ENTITIES = new Set<WebhookEntity>([
   "games",
   "covers",
+  "artworks",
+  "screenshots",
+  "game_videos",
+  "image_types",
   "platforms",
   "keywords",
   "themes",
@@ -86,6 +94,9 @@ export function inferWebhookEntityFromPayload(
 ): WebhookEntity | null {
   if (!isRecord(payload)) return null;
 
+  if ("video_id" in payload) return "game_videos";
+  if ("game_localization" in payload) return "covers";
+  if ("image_id" in payload && "image_type" in payload) return "artworks";
   if ("image_id" in payload) return "covers";
   if ("abbreviation" in payload || "platform_logo" in payload) {
     return "platforms";
@@ -132,6 +143,18 @@ export function inferWebhookEntityFromPayload(
     !("image_id" in payload)
   ) {
     return "game_types";
+  }
+
+  if (
+    "name" in payload &&
+    "created_at" in payload &&
+    "updated_at" in payload &&
+    !("slug" in payload) &&
+    !("abbreviation" in payload) &&
+    !("image_id" in payload) &&
+    !("game" in payload)
+  ) {
+    return "image_types";
   }
 
   if ("name" in payload && !("game" in payload) && !("company" in payload)) {

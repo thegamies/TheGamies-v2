@@ -1,4 +1,5 @@
 import { LIST_MAX_ITEMS } from "@/lib/lists/schema";
+import { isGotyEligibleGameType } from "@/lib/igdb-game-types";
 
 export type RankedGameRef = {
   gameId: string;
@@ -12,6 +13,7 @@ export type GotyGameCandidate = {
   firstReleaseDate: Date | null;
   versionParentIgdbId: number | null;
   isAdult: boolean;
+  gameTypeIgdbId?: number | null;
 };
 
 /** Sort by rank and reassign contiguous 1..n (preserves blurb and other fields). */
@@ -30,9 +32,27 @@ export function assertWithinMaxItems(count: number): string | null {
   return null;
 }
 
+/** Exact catalog year and a real release date that is not in the future. */
+export function gotyYearAndReleaseError(
+  game: Pick<GotyGameCandidate, "year" | "firstReleaseDate">,
+  year: number,
+  now: Date = new Date(),
+): string | null {
+  if (game.year == null || game.year !== year) {
+    return `Only ${year} releases belong on this GOTY list.`;
+  }
+  if (game.firstReleaseDate == null) {
+    return "Titles without a release date cannot be added to GOTY lists.";
+  }
+  if (game.firstReleaseDate > now) {
+    return "Upcoming titles cannot be added to GOTY lists.";
+  }
+  return null;
+}
+
 /**
- * GOTY eligibility: matching year when known, released (or unknown date),
- * not a version/edition child, not adult.
+ * GOTY eligibility: exact year, released with a known date, not a
+ * version/edition child, not adult, not pack/DLC/addon-style types.
  */
 export function gotyEligibilityError(
   game: GotyGameCandidate,
@@ -45,24 +65,23 @@ export function gotyEligibilityError(
   if (game.versionParentIgdbId != null) {
     return "Edition or version titles cannot be added to GOTY lists.";
   }
-  if (game.year != null && game.year !== year) {
-    return `Only ${year} releases belong on this GOTY list.`;
+  if (!isGotyEligibleGameType(game.gameTypeIgdbId)) {
+    return "Packs, add-ons, and bundles cannot be added to GOTY lists.";
   }
-  if (game.firstReleaseDate && game.firstReleaseDate > now) {
-    return "Upcoming titles cannot be added to GOTY lists.";
-  }
-  return null;
+  return gotyYearAndReleaseError(game, year, now);
 }
 
-/** Client-side GOTY filter (year match + already released when date known). */
+/** Client-side GOTY filter (exact year + already released with a known date). */
 export function isAllowedOnGotyList(
   game: { year: number | null; firstReleaseDate?: Date | null },
   gotyYear: number,
   now: Date = new Date(),
 ): boolean {
-  if (game.year != null && game.year !== gotyYear) return false;
-  if (game.firstReleaseDate && game.firstReleaseDate > now) return false;
-  return true;
+  return gotyYearAndReleaseError(
+    { year: game.year, firstReleaseDate: game.firstReleaseDate ?? null },
+    gotyYear,
+    now,
+  ) == null;
 }
 
 /** Slug for owned custom lists. */

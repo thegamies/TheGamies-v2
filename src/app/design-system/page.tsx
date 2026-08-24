@@ -5,6 +5,7 @@ import {
 } from "@/app/design-system/BallotFixtures";
 import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
 import { GameGotyRankingsFixture } from "@/app/design-system/GameGotyRankingsFixture";
+import { GameMediaFixture } from "@/app/design-system/GameMediaFixture";
 import { StandingCardLayoutFixture } from "@/app/design-system/StandingCardLayoutFixture";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
@@ -544,6 +545,15 @@ export default function DesignSystemPage() {
           description. The others are for comparison.
         </p>
         <GameGotyRankingsFixture />
+      </Section>
+
+      <Section title="Game detail · media">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Full-width chapters under the cover/credits hero: one YouTube player
+          with titled posters, Images with secondary type tabs (logos omitted),
+          then Screenshots. Empty kinds are left out.
+        </p>
+        <GameMediaFixture />
       </Section>
 
       <Section title="Horizontal scroll">

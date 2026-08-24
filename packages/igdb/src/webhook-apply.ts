@@ -1,14 +1,21 @@
 import { eq, sql } from "drizzle-orm";
 import {
+  artworks,
   companies,
   covers,
+  gameArtworks,
   gameCompanies,
   games,
+  gameScreenshots,
   gameTimeToBeats,
   gameTypes,
+  gameVideoLinks,
+  gameVideos,
   genres,
+  imageTypes,
   keywords,
   platforms,
+  screenshots,
   themes,
   type Db,
 } from "@thegamies/db";
@@ -18,30 +25,45 @@ import {
 } from "./client";
 import { upsertGamesWithLinks } from "./upsert-games";
 import {
+  mapArtworkRow,
+  mapCoverRow,
+  mapGameVideoRow,
+  mapImageTypeRow,
+  mapScreenshotRow,
+} from "./igdb-media";
+import {
+  assertIgdbArtwork,
   assertIgdbCompany,
   assertIgdbCover,
   assertIgdbGame,
   assertIgdbGameTimeToBeat,
   assertIgdbGameType,
+  assertIgdbGameVideo,
   assertIgdbGenre,
+  assertIgdbImageType,
   assertIgdbInvolvedCompany,
   assertIgdbKeyword,
   assertIgdbPlatform,
+  assertIgdbScreenshot,
   assertIgdbTheme,
   parseDeleteIgdbIdFromPayload,
 } from "./webhook-apply-parsers";
 import type { WebhookEntity, WebhookMethod } from "./webhook-routing";
 
 export {
+  assertIgdbArtwork,
   assertIgdbCompany,
   assertIgdbCover,
   assertIgdbGame,
   assertIgdbGameTimeToBeat,
   assertIgdbGameType,
+  assertIgdbGameVideo,
   assertIgdbGenre,
+  assertIgdbImageType,
   assertIgdbInvolvedCompany,
   assertIgdbKeyword,
   assertIgdbPlatform,
+  assertIgdbScreenshot,
   assertIgdbTheme,
   parseDeleteIgdbIdFromPayload as parseDeleteIgdbId,
 } from "./webhook-apply-parsers";
@@ -65,16 +87,10 @@ async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {
 
 async function applyCover(db: Db, payload: unknown): Promise<void> {
   const cover = assertIgdbCover(payload);
+  const row = mapCoverRow(cover);
   await db
     .insert(covers)
-    .values({
-      igdbId: cover.id,
-      imageId: cover.image_id ?? null,
-      url: cover.url ?? null,
-      width: cover.width ?? null,
-      height: cover.height ?? null,
-      syncedAt: new Date(),
-    })
+    .values(row)
     .onConflictDoUpdate({
       target: covers.igdbId,
       set: {
@@ -82,6 +98,126 @@ async function applyCover(db: Db, payload: unknown): Promise<void> {
         url: sql`excluded.url`,
         width: sql`excluded.width`,
         height: sql`excluded.height`,
+        alphaChannel: sql`excluded.alpha_channel`,
+        animated: sql`excluded.animated`,
+        checksum: sql`excluded.checksum`,
+        gameIgdbId: sql`excluded.game_igdb_id`,
+        gameLocalizationIgdbId: sql`excluded.game_localization_igdb_id`,
+        imageTypeIgdbId: sql`excluded.image_type_igdb_id`,
+        syncedAt: sql`now()`,
+      },
+    });
+}
+
+async function linkMedia(
+  db: Db,
+  gameIgdbId: number | null | undefined,
+  insert: (gameId: string) => Promise<void>,
+): Promise<void> {
+  if (gameIgdbId == null) return;
+  const [game] = await db
+    .select({ id: games.id })
+    .from(games)
+    .where(eq(games.igdbId, gameIgdbId))
+    .limit(1);
+  if (!game) return;
+  await insert(game.id);
+}
+
+async function applyArtwork(db: Db, payload: unknown): Promise<void> {
+  const parsed = assertIgdbArtwork(payload);
+  const row = mapArtworkRow(parsed);
+  await db
+    .insert(artworks)
+    .values(row)
+    .onConflictDoUpdate({
+      target: artworks.igdbId,
+      set: {
+        alphaChannel: sql`excluded.alpha_channel`,
+        animated: sql`excluded.animated`,
+        checksum: sql`excluded.checksum`,
+        gameIgdbId: sql`excluded.game_igdb_id`,
+        height: sql`excluded.height`,
+        imageId: sql`excluded.image_id`,
+        imageTypeIgdbId: sql`excluded.image_type_igdb_id`,
+        url: sql`excluded.url`,
+        width: sql`excluded.width`,
+        syncedAt: sql`now()`,
+      },
+    });
+  await linkMedia(db, row.gameIgdbId, async (gameId) => {
+    await db
+      .insert(gameArtworks)
+      .values({ gameId, artworkIgdbId: row.igdbId })
+      .onConflictDoNothing();
+  });
+}
+
+async function applyScreenshot(db: Db, payload: unknown): Promise<void> {
+  const parsed = assertIgdbScreenshot(payload);
+  const row = mapScreenshotRow(parsed);
+  await db
+    .insert(screenshots)
+    .values(row)
+    .onConflictDoUpdate({
+      target: screenshots.igdbId,
+      set: {
+        alphaChannel: sql`excluded.alpha_channel`,
+        animated: sql`excluded.animated`,
+        checksum: sql`excluded.checksum`,
+        gameIgdbId: sql`excluded.game_igdb_id`,
+        height: sql`excluded.height`,
+        imageId: sql`excluded.image_id`,
+        url: sql`excluded.url`,
+        width: sql`excluded.width`,
+        syncedAt: sql`now()`,
+      },
+    });
+  await linkMedia(db, row.gameIgdbId, async (gameId) => {
+    await db
+      .insert(gameScreenshots)
+      .values({ gameId, screenshotIgdbId: row.igdbId })
+      .onConflictDoNothing();
+  });
+}
+
+async function applyGameVideo(db: Db, payload: unknown): Promise<void> {
+  const parsed = assertIgdbGameVideo(payload);
+  const row = mapGameVideoRow(parsed);
+  await db
+    .insert(gameVideos)
+    .values(row)
+    .onConflictDoUpdate({
+      target: gameVideos.igdbId,
+      set: {
+        checksum: sql`excluded.checksum`,
+        gameIgdbId: sql`excluded.game_igdb_id`,
+        name: sql`excluded.name`,
+        videoId: sql`excluded.video_id`,
+        syncedAt: sql`now()`,
+      },
+    });
+  await linkMedia(db, row.gameIgdbId, async (gameId) => {
+    await db
+      .insert(gameVideoLinks)
+      .values({ gameId, videoIgdbId: row.igdbId })
+      .onConflictDoNothing();
+  });
+}
+
+async function applyImageType(db: Db, payload: unknown): Promise<void> {
+  const parsed = assertIgdbImageType(payload);
+  const row = mapImageTypeRow(parsed);
+  await db
+    .insert(imageTypes)
+    .values(row)
+    .onConflictDoUpdate({
+      target: imageTypes.igdbId,
+      set: {
+        name: sql`excluded.name`,
+        checksum: sql`excluded.checksum`,
+        igdbCreatedAt: sql`excluded.igdb_created_at`,
+        igdbUpdatedAt: sql`excluded.igdb_updated_at`,
         syncedAt: sql`now()`,
       },
     });
@@ -232,6 +368,25 @@ async function deleteByEntity(
     case "covers":
       await db.delete(covers).where(eq(covers.igdbId, igdbId));
       return;
+    case "artworks":
+      await db.delete(gameArtworks).where(eq(gameArtworks.artworkIgdbId, igdbId));
+      await db.delete(artworks).where(eq(artworks.igdbId, igdbId));
+      return;
+    case "screenshots":
+      await db
+        .delete(gameScreenshots)
+        .where(eq(gameScreenshots.screenshotIgdbId, igdbId));
+      await db.delete(screenshots).where(eq(screenshots.igdbId, igdbId));
+      return;
+    case "game_videos":
+      await db
+        .delete(gameVideoLinks)
+        .where(eq(gameVideoLinks.videoIgdbId, igdbId));
+      await db.delete(gameVideos).where(eq(gameVideos.igdbId, igdbId));
+      return;
+    case "image_types":
+      await db.delete(imageTypes).where(eq(imageTypes.igdbId, igdbId));
+      return;
     case "platforms":
       await db.delete(platforms).where(eq(platforms.igdbId, igdbId));
       return;
@@ -299,6 +454,18 @@ export async function applyWebhook(
       return;
     case "covers":
       await applyCover(db, payload);
+      return;
+    case "artworks":
+      await applyArtwork(db, payload);
+      return;
+    case "screenshots":
+      await applyScreenshot(db, payload);
+      return;
+    case "game_videos":
+      await applyGameVideo(db, payload);
+      return;
+    case "image_types":
+      await applyImageType(db, payload);
       return;
     case "platforms":
       await applyPlatform(db, payload);

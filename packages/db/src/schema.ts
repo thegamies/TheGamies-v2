@@ -46,8 +46,109 @@ export const covers = pgTable("covers", {
   url: text("url"),
   width: integer("width"),
   height: integer("height"),
+  alphaChannel: boolean("alpha_channel"),
+  animated: boolean("animated"),
+  checksum: text("checksum"),
+  gameIgdbId: integer("game_igdb_id"),
+  gameLocalizationIgdbId: integer("game_localization_igdb_id"),
+  imageTypeIgdbId: integer("image_type_igdb_id"),
   syncedAt: timestamp("synced_at", { mode: "date" }),
 });
+
+/** IGDB Image Type (not deprecated Artwork Type). */
+export const imageTypes = pgTable("image_types", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  igdbId: integer("igdb_id").notNull().unique(),
+  name: text("name").notNull(),
+  checksum: text("checksum"),
+  igdbCreatedAt: timestamp("igdb_created_at", { mode: "date" }),
+  igdbUpdatedAt: timestamp("igdb_updated_at", { mode: "date" }),
+  syncedAt: timestamp("synced_at", { mode: "date" }),
+});
+
+export const artworks = pgTable(
+  "artworks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    igdbId: integer("igdb_id").notNull().unique(),
+    alphaChannel: boolean("alpha_channel"),
+    animated: boolean("animated"),
+    checksum: text("checksum"),
+    gameIgdbId: integer("game_igdb_id"),
+    height: integer("height"),
+    imageId: text("image_id"),
+    imageTypeIgdbId: integer("image_type_igdb_id"),
+    url: text("url"),
+    width: integer("width"),
+    syncedAt: timestamp("synced_at", { mode: "date" }),
+  },
+  (t) => [index("artworks_game_igdb_id_idx").on(t.gameIgdbId)],
+);
+
+export const screenshots = pgTable(
+  "screenshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    igdbId: integer("igdb_id").notNull().unique(),
+    alphaChannel: boolean("alpha_channel"),
+    animated: boolean("animated"),
+    checksum: text("checksum"),
+    gameIgdbId: integer("game_igdb_id"),
+    height: integer("height"),
+    imageId: text("image_id"),
+    url: text("url"),
+    width: integer("width"),
+    syncedAt: timestamp("synced_at", { mode: "date" }),
+  },
+  (t) => [index("screenshots_game_igdb_id_idx").on(t.gameIgdbId)],
+);
+
+export const gameVideos = pgTable(
+  "game_videos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    igdbId: integer("igdb_id").notNull().unique(),
+    checksum: text("checksum"),
+    gameIgdbId: integer("game_igdb_id"),
+    name: text("name"),
+    videoId: text("video_id"),
+    syncedAt: timestamp("synced_at", { mode: "date" }),
+  },
+  (t) => [index("game_videos_game_igdb_id_idx").on(t.gameIgdbId)],
+);
+
+export const gameArtworks = pgTable(
+  "game_artworks",
+  {
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    artworkIgdbId: integer("artwork_igdb_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.artworkIgdbId] })],
+);
+
+export const gameScreenshots = pgTable(
+  "game_screenshots",
+  {
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    screenshotIgdbId: integer("screenshot_igdb_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.screenshotIgdbId] })],
+);
+
+export const gameVideoLinks = pgTable(
+  "game_video_links",
+  {
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    videoIgdbId: integer("video_igdb_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.gameId, t.videoIgdbId] })],
+);
 
 export const platforms = pgTable("platforms", {
   id: uuid("id").defaultRandom().primaryKey(),

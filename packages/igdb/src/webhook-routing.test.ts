@@ -5,7 +5,7 @@ import {
   resolveWebhookRouting,
   verifyIgdbWebhookSecret,
 } from "./webhook-routing";
-import { assertIgdbGame, assertIgdbCover } from "./webhook-apply-parsers";
+import { assertIgdbGame, assertIgdbCover, assertIgdbArtwork } from "./webhook-apply-parsers";
 import {
   clampDrainSettings,
   clampDeliveryMode,
@@ -55,10 +55,45 @@ describe("webhook routing", () => {
     expect(routed).toEqual({ entity: "covers", method: "update" });
   });
 
+  it("routes screenshots from X-Endpoint when the payload looks like a cover", () => {
+    const routed = resolveWebhookRouting({
+      receivedSecret: base,
+      baseSecret: base,
+      endpointHeader: "screenshots",
+      operationHeader: "create",
+      payload: { id: 9, image_id: "shot", game: 1 },
+    });
+    expect(routed).toEqual({ entity: "screenshots", method: "create" });
+  });
+
   it("infers cover entity from payload", () => {
     expect(inferWebhookEntityFromPayload({ id: 1, image_id: "abc" })).toBe(
       "covers",
     );
+  });
+
+  it("does not treat artworks or videos as covers", () => {
+    expect(
+      inferWebhookEntityFromPayload({
+        id: 2,
+        image_id: "art",
+        image_type: 4,
+      }),
+    ).toBe("artworks");
+    expect(
+      inferWebhookEntityFromPayload({ id: 3, video_id: "yt", name: "Trailer" }),
+    ).toBe("game_videos");
+    expect(
+      inferWebhookEntityFromPayload({ id: 5, image_id: "shot" }),
+    ).toBe("covers");
+    expect(
+      inferWebhookEntityFromPayload({
+        id: 4,
+        name: "Cover",
+        created_at: 1,
+        updated_at: 2,
+      }),
+    ).toBe("image_types");
   });
 });
 
@@ -80,6 +115,22 @@ describe("webhook parsers", () => {
     expect(
       assertIgdbCover({ id: 3, image_id: "img", width: 100, height: 200 }),
     ).toMatchObject({ id: 3, image_id: "img", width: 100, height: 200 });
+    expect(
+      assertIgdbArtwork({
+        id: 8,
+        image_id: "art",
+        image_type: 2,
+        game: 100,
+        artwork_type: 99,
+      }),
+    ).toMatchObject({ id: 8, image_id: "art", image_type: 2, game: 100 });
+    expect(
+      assertIgdbArtwork({
+        id: 8,
+        image_id: "art",
+        artwork_type: 99,
+      }),
+    ).not.toHaveProperty("artwork_type");
   });
 });
 

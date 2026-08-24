@@ -423,6 +423,7 @@ export async function upsertEditionBallot(input: {
         firstReleaseDate: games.firstReleaseDate,
         versionParentIgdbId: games.versionParentIgdbId,
         isAdult: games.isAdult,
+        gameTypeIgdbId: games.gameTypeIgdbId,
       })
       .from(games)
       .where(inArray(games.id, gameIds));

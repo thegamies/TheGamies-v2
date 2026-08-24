@@ -3,9 +3,17 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { GameCategoryWins } from "@/components/games/GameCategoryWins";
 import { GameGotyRankings } from "@/components/games/GameGotyRankings";
+import { GameImagesSection } from "@/components/games/GameImagesSection";
+import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
 import { GameSummary } from "@/components/games/GameSummary";
+import { GameVideosSection } from "@/components/games/GameVideosSection";
 import { GameCover } from "@/components/ui/GameCover";
-import { getGameBySlug } from "@/lib/catalog";
+import {
+  getGameArtworksForDetail,
+  getGameBySlug,
+  getGameScreenshotsForDetail,
+  getGameVideosForDetail,
+} from "@/lib/catalog";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
 import {
@@ -63,6 +71,9 @@ export default async function GameDetailPage({ params }: { params: Params }) {
 
   let rankings: GameGotyRankingsData = { byYear: [], viaParent: null };
   let categoryWins: GameCategoryWin[] = [];
+  let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
+  let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
+  let videos: Awaited<ReturnType<typeof getGameVideosForDetail>> = [];
   try {
     rankings = await getGameDetailGotyRankings(game);
   } catch {
@@ -73,6 +84,17 @@ export default async function GameDetailPage({ params }: { params: Params }) {
     categoryWins = awards.wins;
   } catch {
     categoryWins = [];
+  }
+  try {
+    [artworks, screenshots, videos] = await Promise.all([
+      getGameArtworksForDetail(game.id),
+      getGameScreenshotsForDetail(game.id),
+      getGameVideosForDetail(game.id),
+    ]);
+  } catch {
+    artworks = [];
+    screenshots = [];
+    videos = [];
   }
 
   const developers = game.companies.filter((c) => c.developer);
@@ -111,10 +133,12 @@ export default async function GameDetailPage({ params }: { params: Params }) {
               layout="broadcast-compact"
               className="mt-8"
             />
+          </div>
+        </div>
 
-            <GameCategoryWins wins={categoryWins} className="mt-8" />
+        <GameCategoryWins wins={categoryWins} className="mt-10" />
 
-            <dl className="mt-8 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
+        <dl className="mt-10 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-muted">Released</dt>
                 <dd className="mt-1 text-ink">
@@ -163,7 +187,7 @@ export default async function GameDetailPage({ params }: { params: Params }) {
                 </div>
               ) : null}
               {game.timeToBeat ? (
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-2 lg:col-span-3">
                   <dt className="text-muted">Time to beat</dt>
                   <dd className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
                     {TIME_TO_BEAT_LABELS.map(([key, label]) => {
@@ -180,8 +204,14 @@ export default async function GameDetailPage({ params }: { params: Params }) {
                 </div>
               ) : null}
             </dl>
+
+        {videos.length || artworks.length || screenshots.length ? (
+          <div className="mt-14 space-y-10">
+            <GameVideosSection videos={videos} />
+            <GameImagesSection artworks={artworks} />
+            <GameScreenshotsSection screenshots={screenshots} />
           </div>
-        </div>
+        ) : null}
       </main>
     </>
   );

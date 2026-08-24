@@ -19,9 +19,10 @@ function lanDevOrigins(): string[] {
   return [...hosts];
 }
 
-function r2PublicBasePattern(): NonNullable<
-  NextConfig["images"]
->["remotePatterns"] {
+function r2PublicBasePattern(): Array<{
+  protocol: "http" | "https";
+  hostname: string;
+}> {
   const raw = process.env.AVATAR_PUBLIC_BASE_URL?.trim();
   if (!raw) return [];
   try {
@@ -49,6 +50,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "images.igdb.com",
         pathname: "/igdb/image/upload/**",
+      },
+      {
+        protocol: "https",
+        hostname: "i.ytimg.com",
+        pathname: "/vi/**",
       },
       // TGA nominees, avatars, and community art (R2 public / custom base).
       {

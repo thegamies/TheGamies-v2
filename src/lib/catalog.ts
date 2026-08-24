@@ -1,8 +1,21 @@
-import { and, desc, eq, ilike, isNull, lte, gte, or, sql } from "drizzle-orm";
-import { createDb, type Db } from "@thegamies/db";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  lte,
+  gte,
+  or,
+  sql,
+} from "drizzle-orm";
+import { GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS } from "@/lib/igdb-game-types";
 import {
   companies,
   covers,
+  createDb,
   gameCompanies,
   gameGenres,
   gamePlatforms,
@@ -11,8 +24,17 @@ import {
   gameTypes,
   genres,
   platforms,
-} from "@thegamies/db/schema";
-import { coverUrlFromImageId } from "@thegamies/igdb";
+  type Db,
+} from "@thegamies/db";
+import { coverUrlFromImageId, wideImageUrlFromImageId, youtubePosterUrl } from "@thegamies/igdb";
+import {
+  GAME_DETAIL_ARTWORK_CAP,
+  GAME_DETAIL_SCREENSHOT_CAP,
+  GAME_DETAIL_VIDEO_CAP,
+  gameArtworksForDetailQuery,
+  gameScreenshotsForDetailQuery,
+  gameVideosForDetailQuery,
+} from "@/lib/catalog-game-detail";
 
 export type BrowseSort = "popularity" | "name" | "first_release_date";
 export type ReleaseStatus = "all" | "released" | "upcoming";
@@ -28,6 +50,8 @@ export type BrowseGamesInput = {
   sortDir?: "asc" | "desc";
   releaseStatus?: ReleaseStatus;
   excludeEditions?: boolean;
+  /** Main games + expansions/remakes; excludes packs, DLC/addons, bundles. */
+  gotyEligibleTypes?: boolean;
   limit?: number;
   offset?: number;
   includeAdult?: boolean;
@@ -49,6 +73,7 @@ export async function browseGames(input: BrowseGamesInput = {}) {
     sortDir = "desc",
     releaseStatus = "all",
     excludeEditions = false,
+    gotyEligibleTypes = false,
     limit = 48,
     offset = 0,
     includeAdult = false,
@@ -82,6 +107,14 @@ export async function browseGames(input: BrowseGamesInput = {}) {
   }
   if (excludeEditions) {
     conditions.push(isNull(games.versionParentIgdbId));
+  }
+  if (gotyEligibleTypes) {
+    conditions.push(
+      or(
+        isNull(games.gameTypeIgdbId),
+        inArray(games.gameTypeIgdbId, [...GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS]),
+      )!,
+    );
   }
   if (releaseStatus === "released") {
     conditions.push(
@@ -211,4 +244,86 @@ export async function getGameBySlug(slug: string) {
     companies: companyRows,
     timeToBeat: ttb,
   };
+}
+
+export {
+  GAME_DETAIL_ARTWORK_CAP,
+  GAME_DETAIL_SCREENSHOT_CAP,
+  GAME_DETAIL_VIDEO_CAP,
+  gameArtworksForDetailQuery,
+  gameScreenshotsForDetailQuery,
+  gameVideosForDetailQuery,
+};
+
+export type GameArtworkStill = {
+  igdbId: number;
+  imageUrl: string;
+  imageTypeName: string | null;
+  width: number | null;
+  height: number | null;
+};
+
+export type GameScreenshotStill = {
+  igdbId: number;
+  imageUrl: string;
+  width: number | null;
+  height: number | null;
+};
+
+export type GameVideoClip = {
+  igdbId: number;
+  name: string;
+  videoId: string;
+  posterUrl: string | null;
+};
+
+export async function getGameArtworksForDetail(
+  gameId: string,
+): Promise<GameArtworkStill[]> {
+  const rows = await gameArtworksForDetailQuery(getDb(), gameId);
+
+  return rows.flatMap((row) => {
+    const imageUrl = wideImageUrlFromImageId(row.imageId);
+    if (!imageUrl) return [];
+    return [
+      {
+        igdbId: row.igdbId,
+        imageUrl,
+        imageTypeName: row.imageTypeName,
+        width: row.width,
+        height: row.height,
+      },
+    ];
+  });
+}
+
+export async function getGameScreenshotsForDetail(
+  gameId: string,
+): Promise<GameScreenshotStill[]> {
+  const rows = await gameScreenshotsForDetailQuery(getDb(), gameId);
+
+  return rows.flatMap((row) => {
+    const imageUrl = wideImageUrlFromImageId(row.imageId);
+    if (!imageUrl) return [];
+    return [{ igdbId: row.igdbId, imageUrl, width: row.width, height: row.height }];
+  });
+}
+
+export async function getGameVideosForDetail(
+  gameId: string,
+): Promise<GameVideoClip[]> {
+  const rows = await gameVideosForDetailQuery(getDb(), gameId);
+
+  return rows.flatMap((row) => {
+    const videoId = row.videoId?.trim();
+    if (!videoId) return [];
+    return [
+      {
+        igdbId: row.igdbId,
+        name: row.name?.trim() || "Trailer",
+        videoId,
+        posterUrl: youtubePosterUrl(videoId),
+      },
+    ];
+  });
 }

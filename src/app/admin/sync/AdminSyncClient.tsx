@@ -25,6 +25,10 @@ type ResumeInfo = {
 /** One HTTP request each — avoids Vercel killing a single enrich-all call. */
 const ENRICH_STEPS = [
   "covers",
+  "artworks",
+  "screenshots",
+  "game_videos",
+  "image_types",
   "platforms",
   "genres",
   "themes",

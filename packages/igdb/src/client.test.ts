@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   computePopularity,
   coverUrlFromImageId,
+  wideImageUrlFromImageId,
+  youtubePosterUrl,
   isAdultGame,
   mapIgdbGame,
   yearUnixRange,
@@ -60,6 +62,9 @@ describe("mapIgdbGame", () => {
       themes: [1],
       keywords: [2],
       involved_companies: [9],
+      artworks: [21, 22],
+      screenshots: [31],
+      videos: [41],
       total_rating: 88.4,
       total_rating_count: 5,
       follows: 1,
@@ -79,6 +84,9 @@ describe("mapIgdbGame", () => {
       platformIgdbIds: [6, 48],
       genreIgdbIds: [12],
       involvedCompanyIgdbIds: [9],
+      artworkIgdbIds: [21, 22],
+      screenshotIgdbIds: [31],
+      videoIgdbIds: [41],
     });
     expect(mapped?.firstReleaseDate?.toISOString()).toBe(
       "2026-06-15T00:00:00.000Z",
@@ -106,6 +114,22 @@ describe("yearUnixRange", () => {
       "2026-01-01T00:00:00.000Z",
     );
     expect(new Date(end * 1000).toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  });
+});
+
+describe("wideImageUrlFromImageId", () => {
+  it("uses t_720p", () => {
+    expect(wideImageUrlFromImageId("co9wvg")).toBe(
+      "https://images.igdb.com/igdb/image/upload/t_720p/co9wvg.jpg",
+    );
+  });
+});
+
+describe("youtubePosterUrl", () => {
+  it("uses hqdefault on i.ytimg.com", () => {
+    expect(youtubePosterUrl("abc")).toBe(
+      "https://i.ytimg.com/vi/abc/hqdefault.jpg",
+    );
   });
 });
 

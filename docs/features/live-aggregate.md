@@ -20,6 +20,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 
 - `lists.profileId IS NOT NULL` and `listType = 'goty'`
 - Adult games excluded from contrib
+- GOTY ranking rows must pass `gotyEligibilityError` on save (packs/DLC-addons never score on the GOTY board)
 - Default scoring: top 10 only (`pointsForRank` → 11 − rank)
 
 ## Write path

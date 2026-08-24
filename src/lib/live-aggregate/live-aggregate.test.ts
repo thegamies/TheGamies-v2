@@ -108,7 +108,7 @@ describe("GOTY category vote eligibility", () => {
     isAdult: false,
   };
 
-  it("reuses list GOTY rules for current-year categories", () => {
+  it("reuses year and release rules for current-year categories, not GOTY type bans", () => {
     expect(gotyEligibilityError(base, year, now)).toBeNull();
     expect(
       categoryEligibilityError(base, year, "current_year", { now }),
@@ -118,6 +118,17 @@ describe("GOTY category vote eligibility", () => {
         now,
       }),
     ).toMatch(/2026/);
+    expect(
+      gotyEligibilityError({ ...base, gameTypeIgdbId: 1 }, year, now),
+    ).toMatch(/add-ons/);
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 1 },
+        year,
+        "current_year",
+        { now },
+      ),
+    ).toBeNull();
   });
 
   it("allows earlier released titles for current-or-active", () => {
