@@ -12,6 +12,7 @@ import {
   type EditionStatus,
   validateEditionSchedule,
 } from "./edition-status";
+import { seedEditionVoicesFromCurrentHosts } from "./community-hosts";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
 import { maybeKickEditionFreeze } from "./edition-freeze";
@@ -236,6 +237,12 @@ export async function createCommunityEdition(
       })
       .returning();
     if (!created) return { error: "Could not create that event." };
+    await seedEditionVoicesFromCurrentHosts(
+      created.id,
+      detail.id,
+      profileId,
+      db,
+    );
     return afterEditionWrite(created, db);
   } catch {
     return { error: "Could not create that event." };

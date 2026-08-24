@@ -1,4 +1,5 @@
 import { profileHref } from "@/lib/profile/profile-page";
+import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 
 export type SiteNavLink = {
   href: string;
@@ -37,12 +38,18 @@ export function showDesignSystemNav(env: {
 }
 
 /** Primary chrome links shared by desktop nav and the mobile drawer. */
-export function buildPrimarySiteNavLinks(): SiteNavLink[] {
-  return [
+export function buildPrimarySiteNavLinks(options?: {
+  tgaHref?: string | null;
+}): SiteNavLink[] {
+  const links: SiteNavLink[] = [
     { href: "/games", label: "Games" },
     { href: "/game-of-the-year", label: "GOTY" },
-    { href: "/communities", label: "Communities" },
   ];
+  if (options?.tgaHref) {
+    links.push({ href: options.tgaHref, label: TGA_PUBLIC_LABEL });
+  }
+  links.push({ href: "/communities", label: "Communities" });
+  return links;
 }
 
 export function siteCreateLink(): SiteNavLink {

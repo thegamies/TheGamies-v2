@@ -17,14 +17,21 @@ The long-term differentiator: creators, podcasts, Discord communities, Twitch st
 
 ---
 
-## Two ranking systems (do not conflate)
+## Three ranking systems (do not conflate)
+
+### Video Game Awards Pick’em (external show)
+
+- Site-wide prediction game for the external Game Awards show (not this site’s own awards). Public UI uses **Video Game Awards Pick’em**.
+- Admin builds the year slate (categories + nominees), then **Go live** / **On** / **Promote**.
+- Picks lock at **show start**. Admin calls winners live; leaderboards update per award.
+- Communities may opt in: separate pick sheets, same official winners.
 
 ### Editions (year awards ceremony)
 
 - Community runs an end-of-year **edition** (GOTY year).
 - Members (and Hosts) submit **ballots**: GOTY ranking + categories.
 - Results stay **hidden** until the edition closes.
-- Published results are a **frozen snapshot** — they never recalculate.
+- Published **Community** results are a frozen snapshot. The **Hosts** board can rebuild if that year’s Host list changes after close.
 - Public results show Combined / Community / Hosts, plus **current users / voters** exploration.
 
 ### Live rankings (ongoing board)
@@ -42,15 +49,17 @@ The long-term differentiator: creators, podcasts, Discord communities, Twitch st
 ```text
 Site
   ├─ Live GOTY aggregate (signed-in lists; admin-lockable)
+  ├─ Video Game Awards Pick’em (official slate; show-start lock; live winner calls)
   ├─ Games browse + game detail
   ├─ Users + lists (GOTY + custom; anonymous create with soft sign-in prompt)
   └─ Communities
         ├─ Live rankings (optional on/off; admin-lockable)
-        └─ Editions (year)
-              ├─ Ballots hidden until close
-              ├─ Frozen results (Combined / Community / Hosts)
-              ├─ GOTY + categories
-              └─ Voter / current-user exploration
+        ├─ Editions (year)
+        │     ├─ Ballots hidden until close
+        │     ├─ Frozen results (Combined / Community / Hosts)
+        │     ├─ GOTY + categories
+        │     └─ Voter / current-user exploration
+        └─ Video Game Awards Pick’em (optional; same official slate, own sheets)
 ```
 
 ---
@@ -104,6 +113,7 @@ Site
 - GraphQL / microservices
 - Real-time recalculation of **frozen edition** results
 - Heavy admin tools embedded in public community pages
+- Video Game Awards Pick’em is **later than v1 launch** (not a go-live blocker)
 
 ---
 

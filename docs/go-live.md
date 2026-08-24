@@ -179,6 +179,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - `<Suspense>` streaming of heavy page sections
 - Expo / native
 - Postgres RLS after Auth JWT → DB role is defined
+- Video Game Awards Pick’em (site + community; admin slate and show room)
 
 ---
 

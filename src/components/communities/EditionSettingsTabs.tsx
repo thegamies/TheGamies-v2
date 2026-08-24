@@ -29,6 +29,7 @@ export function EditionSettingsTabs({
     >
       <Link
         href={editionHostSettingsHref(slug, year)}
+        scroll={false}
         className={navItemClass("tertiary", active === "edition")}
       >
         Edition settings
@@ -38,6 +39,7 @@ export function EditionSettingsTabs({
       </span>
       <Link
         href={editionHostHostsHref(slug, year)}
+        scroll={false}
         className={navItemClass("tertiary", active === "hosts")}
       >
         Manage hosts
@@ -49,6 +51,7 @@ export function EditionSettingsTabs({
           </span>
           <Link
             href={editionHostPreviewHref(slug, year)}
+            scroll={false}
             className={navItemClass("tertiary", active === "preview")}
           >
             Host preview

@@ -288,6 +288,20 @@
       "when": 1788652800000,
       "tag": "0040_community_visibility",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788739200000,
+      "tag": "0041_tga_pickem",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788825600000,
+      "tag": "0042_community_hosts",
+      "breakpoints": true
     }
   ]
 }

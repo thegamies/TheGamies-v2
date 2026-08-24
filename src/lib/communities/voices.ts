@@ -1,6 +1,7 @@
-import { and, asc, eq, exists, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, exists, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   communityEditionVoices,
+  communityHosts,
   communityMembers,
   createDb,
   profiles,
@@ -23,11 +24,8 @@ export type EditionVoicePublic = {
 };
 
 export function editionVoicesWriteBlockedReason(
-  status: ReturnType<typeof computeEditionStatus>,
+  _status: ReturnType<typeof computeEditionStatus>,
 ): string | null {
-  if (status === "published") {
-    return "Hosts are locked after results are published.";
-  }
   return null;
 }
 
@@ -116,6 +114,14 @@ export async function setEditionVoice(
       );
   }
 
+  if (edition.status === "closed" || edition.status === "published") {
+    const { rebuildEditionHostsResultsFrozen } = await import(
+      "./edition-results"
+    );
+    const rebuilt = await rebuildEditionHostsResultsFrozen(edition.id, db);
+    if ("error" in rebuilt) return rebuilt;
+  }
+
   return { ok: true };
 }
 
@@ -127,7 +133,7 @@ export type EditionHostMemberRow = {
   isVoice: boolean;
 };
 
-/** Default Manage Hosts list: community hosts + current event Hosts. Still capped. */
+/** Default Manage Hosts list: current community Hosts + this event’s Hosts. Still capped. */
 export const EDITION_HOST_ROSTER_LIMIT = 50;
 /** Typeahead hits for Manage Hosts — SQL search, not a client filter. */
 export const EDITION_HOST_SEARCH_LIMIT = 20;
@@ -184,12 +190,24 @@ export async function listEditionHostRoster(
         ),
       ),
   );
+  const currentCommunityHost = exists(
+    db
+      .select({ one: sql`1` })
+      .from(communityHosts)
+      .where(
+        and(
+          eq(communityHosts.communityId, communityId),
+          eq(communityHosts.profileId, communityMembers.profileId),
+          isNull(communityHosts.retiredAt),
+        ),
+      ),
+  );
 
   const rows = await hostMemberJoins(editionId, db)
     .where(
       and(
         eq(communityMembers.communityId, communityId),
-        or(eq(communityMembers.role, "admin"), voiceOnEdition),
+        or(currentCommunityHost, voiceOnEdition),
       ),
     )
     .orderBy(asc(profiles.displayName), asc(profiles.username))

@@ -2,6 +2,7 @@ import { asc, count, eq, sql } from "drizzle-orm";
 import { createDb } from "@thegamies/db";
 import { communities } from "@thegamies/db/schema";
 import { listPublicStandingsYears } from "@/lib/live-aggregate/service";
+import { listTgaYears } from "@/lib/tga-pickem/service";
 import {
   SITEMAP_GAMES_PER_YEAR,
   SITEMAP_PAGE_SIZE,
@@ -56,9 +57,13 @@ export async function sitemapUrlsForShard(
 ): Promise<Array<{ path: string }>> {
   if (shard.kind === "static") {
     const years = await listPublicStandingsYears().catch(() => [] as number[]);
+    const tgaYears = await listTgaYears()
+      .then((rows) => rows.filter((row) => row.enabled).map((row) => row.year))
+      .catch(() => [] as number[]);
     return [
       ...SITEMAP_STATIC_PATHS.map((path) => ({ path })),
       ...years.map((year) => ({ path: `/game-of-the-year/${year}` })),
+      ...tgaYears.map((year) => ({ path: `/the-game-awards/${year}` })),
     ];
   }
 

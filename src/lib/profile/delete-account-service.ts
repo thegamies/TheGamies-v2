@@ -159,6 +159,10 @@ export async function purgeAndTombstoneProfile(
   if (blocked) return { error: blocked };
 
   await deleteOwnedListsForProfile(profileId, db);
+  const { retireCommunityHostEverywhere } = await import(
+    "@/lib/communities/community-hosts"
+  );
+  await retireCommunityHostEverywhere(profileId, db);
   await dropUnpublishedEditionRows(profileId, db);
 
   // Comparison reads Host columns from freeze voters + live ballot ranks

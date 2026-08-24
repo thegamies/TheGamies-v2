@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { getAuthOrNull } from "@/lib/auth/server";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { getPromotedTgaYear } from "@/lib/tga-pickem/service";
+import { picksAreOpen } from "@/lib/tga-pickem/status";
 
 export const metadata: Metadata = {
   title: "Create a list",
@@ -38,6 +40,8 @@ function resumeHref(draft: {
 export default async function CreateChooserPage() {
   const signedIn = await isSignedIn();
   const draft = signedIn ? null : await readListDraftCookie();
+  const tga = await getPromotedTgaYear().catch(() => null);
+  const tgaOpen = tga ? picksAreOpen(tga) : false;
 
   return (
     <div className="w-full">
@@ -75,6 +79,22 @@ export default async function CreateChooserPage() {
               Search limited to releases from that year.
             </p>
           </Link>
+          {tgaOpen && tga ? (
+            <Link
+              href={`/the-game-awards/${tga.year}`}
+              className="block w-full border border-line bg-panel px-5 py-6 text-left transition-colors hover:border-accent"
+            >
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-accent">
+                Video Game Awards Pick’em
+              </p>
+              <p className="mt-2 text-lg font-semibold text-ink">
+                Make your picks
+              </p>
+              <p className="mt-2 text-sm text-muted">
+                Every official category, plus a World Premieres guess.
+              </p>
+            </Link>
+          ) : null}
           <Link
             href="/create/custom"
             className="block w-full border border-line bg-panel px-5 py-6 text-left transition-colors hover:border-accent"

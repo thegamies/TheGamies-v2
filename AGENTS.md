@@ -48,6 +48,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | IGDB catalog sync | `docs/igdb-sync.md` |
 | Auth emails | `docs/email-templates.md` |
 | Community / ballot / results / lists | `docs/features/` |
+| Video Game Awards Pick’em | `docs/features/tga-pickem.md` |
 
 ## Workflow
 

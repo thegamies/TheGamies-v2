@@ -5,10 +5,12 @@ import {
   communityEditionBallots,
   communityEditionVoices,
   communityEditions,
+  communityHosts,
   communityMembers,
   communities,
   createDb,
   profiles,
+  tgaCommunityHosts,
   type Db,
 } from "@thegamies/db";
 import { insertInChunks } from "@/lib/db/insert-chunks";
@@ -523,6 +525,25 @@ export async function seedCommunityEditionBallots(
         })),
       )
       .onConflictDoNothing();
+    await db
+      .insert(communityHosts)
+      .values(
+        voiceProfiles.map((p) => ({
+          communityId: community.id,
+          profileId: p.id,
+          promotedAt: designatedAt,
+          promotedByProfileId: null,
+          retiredAt: null,
+          retiredByProfileId: null,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [communityHosts.communityId, communityHosts.profileId],
+        set: {
+          retiredAt: null,
+          retiredByProfileId: null,
+        },
+      });
     voicesSet = voiceProfiles.length;
   }
 
@@ -768,6 +789,22 @@ export async function clearCommunitySeeds(
   }
 
   if (communityId) {
+    await db
+      .delete(communityHosts)
+      .where(
+        and(
+          eq(communityHosts.communityId, communityId),
+          inArray(communityHosts.profileId, seedIds),
+        ),
+      );
+    await db
+      .delete(tgaCommunityHosts)
+      .where(
+        and(
+          eq(tgaCommunityHosts.communityId, communityId),
+          inArray(tgaCommunityHosts.profileId, seedIds),
+        ),
+      );
     const memberRows = await db
       .delete(communityMembers)
       .where(
@@ -779,6 +816,12 @@ export async function clearCommunitySeeds(
       .returning({ profileId: communityMembers.profileId });
     removedMembers = memberRows.length;
   } else {
+    await db
+      .delete(communityHosts)
+      .where(inArray(communityHosts.profileId, seedIds));
+    await db
+      .delete(tgaCommunityHosts)
+      .where(inArray(tgaCommunityHosts.profileId, seedIds));
     const memberRows = await db
       .delete(communityMembers)
       .where(inArray(communityMembers.profileId, seedIds))

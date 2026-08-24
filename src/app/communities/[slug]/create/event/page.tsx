@@ -19,6 +19,7 @@ import {
 import type { EditionStatus } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 
@@ -90,6 +91,8 @@ export default async function CreateCommunityEventPage({
         liveEnabled={community.liveRankingsEnabled}
         canManage
         editionStatus={featuredStatus}
+        communityId={community.id}
+        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

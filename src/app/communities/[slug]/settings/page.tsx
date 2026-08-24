@@ -22,7 +22,9 @@ import {
   listCommunityAdminRoster,
 } from "@/lib/communities/service";
 import { listCommunityBansPage, getPendingCommunityDeletionRequest } from "@/lib/communities/moderation";
+import { CommunityDesignatedHostsForm } from "./CommunityDesignatedHostsForm";
 import { CommunityHostsForm } from "./CommunityHostsForm";
+import { TgaCommunityHostsForm } from "./TgaCommunityHostsForm";
 import { CommunityIdentitySettings } from "./CommunityIdentitySettings";
 import { CommunityBansSettings } from "./CommunityBansSettings";
 import { CommunityLeaveForm } from "./CommunityLeaveForm";
@@ -31,6 +33,14 @@ import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
+import { TgaSettingsForm } from "./TgaSettingsForm";
+import { listCurrentCommunityHosts } from "@/lib/communities/community-hosts";
+import {
+  communityTgaNavVisible,
+  isCommunityTgaOptedIn,
+  listTgaYears,
+} from "@/lib/tga-pickem/service";
+import { listTgaCommunityHostRoster } from "@/lib/tga-pickem/community-hosts";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -121,6 +131,22 @@ export default async function CommunitySettingsPage({
   }
   const canLeave =
     leaveBlockedReason("admin", community.hostCount) == null;
+  const tgaYears = (await listTgaYears().catch(() => [])).filter(
+    (row) => row.enabled,
+  );
+  const tgaYear =
+    tgaYears.find((row) => row.promoted)?.year ?? tgaYears[0]?.year ?? null;
+  const tgaOptedIn =
+    tgaYear != null &&
+    (await isCommunityTgaOptedIn(community.id, tgaYear).catch(() => false));
+  const designatedHosts =
+    tab === "hosts"
+      ? await listCurrentCommunityHosts(community.id).catch(() => [])
+      : [];
+  const tgaHosts =
+    tab === "tga" && tgaOptedIn && tgaYear != null
+      ? await listTgaCommunityHostRoster(community.id, tgaYear).catch(() => [])
+      : [];
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -130,6 +156,9 @@ export default async function CommunitySettingsPage({
         liveEnabled={community.liveRankingsEnabled}
         canManage
         editionStatus={featuredStatus}
+        editionYear={featuredStatus && featured ? featured.year : null}
+        communityId={community.id}
+        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
@@ -142,7 +171,8 @@ export default async function CommunitySettingsPage({
           Settings
         </h2>
         <p className="mt-2 max-w-xl text-sm text-muted">
-          Live rankings, yearly awards, community admins, and invites.
+          Live rankings, yearly awards, Video Game Awards Pick’em, Hosts,
+          community admins, and invites.
         </p>
         <CommunitySettingsTabs slug={community.slug} tab={tab} />
 
@@ -170,6 +200,26 @@ export default async function CommunitySettingsPage({
           </>
         ) : tab === "events" ? (
           <EditionSettings slug={community.slug} editions={editions} />
+        ) : tab === "tga" ? (
+          <>
+            <TgaSettingsForm
+              slug={community.slug}
+              year={tgaYear}
+              enabled={tgaOptedIn}
+            />
+            {tgaOptedIn && tgaYear != null ? (
+              <TgaCommunityHostsForm
+                slug={community.slug}
+                year={tgaYear}
+                members={tgaHosts}
+              />
+            ) : null}
+          </>
+        ) : tab === "hosts" ? (
+          <CommunityDesignatedHostsForm
+            slug={community.slug}
+            hosts={designatedHosts}
+          />
         ) : tab === "invite" ? (
           <CommunityInviteSettings
             slug={community.slug}

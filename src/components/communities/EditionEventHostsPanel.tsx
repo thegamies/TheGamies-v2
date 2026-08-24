@@ -24,7 +24,7 @@ export function EditionEventHostsPanel({
         year={year}
         status={status}
         members={voiceMembers}
-        locked={status === "published"}
+        locked={false}
       />
     </div>
   );

@@ -14,12 +14,14 @@ export function ProfileTabs({
     <ScrollableNav aria-label="Profile" className="mt-10">
       <Link
         href={profileHref(username, { tab: "lists" })}
+        scroll={false}
         className={navItemClass("secondary", tab === "lists")}
       >
         Lists
       </Link>
       <Link
         href={profileHref(username, { tab: "communities" })}
+        scroll={false}
         className={navItemClass("secondary", tab === "communities")}
       >
         Communities

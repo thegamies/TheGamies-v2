@@ -13,6 +13,7 @@ import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 import { noIndexRobots } from "@/lib/seo/site";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
@@ -150,6 +151,13 @@ export default async function CommunityLiveYearPage({
         liveEnabled
         canManage={canManage}
         editionStatus={editionStatus}
+        editionYear={
+          featuredEdition && featuredEdition.status !== "draft"
+            ? featuredEdition.year
+            : null
+        }
+        communityId={community.id}
+        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
         active="live"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

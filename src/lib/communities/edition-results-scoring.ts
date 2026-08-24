@@ -47,6 +47,17 @@ export function parseEditionShowSource(raw: unknown): EditionShowSource {
   return raw === "live" ? "live" : "demo";
 }
 
+/** Hosts-only freeze rebuild replaces `voices` rows; Community stays. */
+export function hostsRebuildStorageMode(): "voices" {
+  return "voices";
+}
+
+export function freezeRowsKeptAfterHostsRebuild<T extends { mode: string }>(
+  rows: T[],
+): T[] {
+  return rows.filter((row) => row.mode !== hostsRebuildStorageMode());
+}
+
 /** Combined (legacy URL) and community share storage rows. */
 export function storageModeFor(
   mode: EditionResultMode,

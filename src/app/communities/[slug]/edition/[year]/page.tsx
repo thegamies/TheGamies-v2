@@ -16,6 +16,7 @@ import {
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
@@ -75,7 +76,12 @@ import {
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
-import { isEditionResultsEntranceOpen } from "@/lib/communities/edition-results-entrance";
+import { cookies } from "next/headers";
+import {
+  ENTRANCE_PREF_COOKIE,
+  hasEditionResultsEntrancePreferenceCookie,
+  isEditionResultsEntranceOpen,
+} from "@/lib/communities/edition-results-entrance";
 import type { EditionResultsViewId } from "@/lib/communities/edition-results-scoring";
 import { editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
@@ -246,9 +252,16 @@ export default async function CommunityEditionYearPage({
   let settingsPanel = resolvedHost.panel;
 
   if (edition.status === "published" && !hasExplicitView) {
-    view = isEditionResultsEntranceOpen(edition.publishesAt)
-      ? "entrance"
-      : "overview";
+    const entranceCookie = (await cookies()).get(ENTRANCE_PREF_COOKIE)?.value;
+    const skipEntrance = hasEditionResultsEntrancePreferenceCookie(
+      entranceCookie,
+      community.slug,
+      edition.year,
+    );
+    view =
+      isEditionResultsEntranceOpen(edition.publishesAt) && !skipEntrance
+        ? "entrance"
+        : "overview";
     settingsPanel = "edition";
   }
 
@@ -586,6 +599,7 @@ export default async function CommunityEditionYearPage({
       }>;
       categories: Array<{ id: string; label: string }>;
     } | null;
+    standingsPage: Awaited<ReturnType<typeof getEditionGotyPage>> | null;
   } | null = null;
 
   let entranceFreezeReady = false;
@@ -628,6 +642,11 @@ export default async function CommunityEditionYearPage({
         };
 
         if (view === "standings") {
+          const standingsPage = await getEditionGotyPage(edition.id, mode, {
+            page: categoryPageNum,
+            pageSize: STANDINGS_PAGE_SIZE,
+            rankMode,
+          });
           resultsBundle = {
             meta,
             topTen: [],
@@ -638,6 +657,7 @@ export default async function CommunityEditionYearPage({
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
+            standingsPage,
           };
         } else if (view === "categories" || view === "category") {
           const categoryMeta = await listEditionCategoryMeta(edition.id, mode);
@@ -665,6 +685,7 @@ export default async function CommunityEditionYearPage({
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
+            standingsPage: null,
           };
         } else if (view === "voters") {
           const voters = await getEditionVotersPage(edition.id, {
@@ -683,6 +704,7 @@ export default async function CommunityEditionYearPage({
             voters: { ...voters, q: votersQ },
             matrix: emptyMatrix,
             publicBallot: null,
+            standingsPage: null,
           };
         } else if (view === "ballot") {
           let publicBallot: {
@@ -740,6 +762,7 @@ export default async function CommunityEditionYearPage({
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot,
+            standingsPage: null,
           };
         } else {
           // Reveal + Results Ranked: top 10 + category podiums only.
@@ -764,6 +787,7 @@ export default async function CommunityEditionYearPage({
             voters: emptyVoters,
             matrix: emptyMatrix,
             publicBallot: null,
+            standingsPage: null,
           };
         }
       }
@@ -780,6 +804,9 @@ export default async function CommunityEditionYearPage({
         liveEnabled={community.liveRankingsEnabled}
         canManage={canManage}
         editionStatus={navStatus}
+        editionYear={featured?.year ?? edition.year}
+        communityId={community.id}
+        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
         active="edition"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
@@ -840,6 +867,7 @@ export default async function CommunityEditionYearPage({
             categoryComparison={resultsBundle.categoryComparison}
             categoryMeta={resultsBundle.categoryMeta}
             categoryPage={resultsBundle.categoryPage}
+            standingsPage={resultsBundle.standingsPage}
             voters={resultsBundle.voters}
             matrix={resultsBundle.matrix}
             yourProfileId={profile?.id ?? null}
@@ -952,7 +980,6 @@ export default async function CommunityEditionYearPage({
                   categoryComparison={hostRevealCategoryComparison}
                   freezeStatus={edition.freezeStatus}
                   liveReady={hostRevealLiveReady}
-                  rankMode={edition.rankMode}
                 />
               ) : prePublishView === "voters" && liveVoters ? (
                 <div className="mt-6">

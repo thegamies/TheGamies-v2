@@ -17,6 +17,7 @@ import {
   showDesignSystemNav,
   type SiteNavAccount,
 } from "@/lib/site-nav";
+import { getPromotedTgaHref } from "@/lib/tga-pickem/service";
 
 export async function SiteHeader() {
   const user = await getRequestSessionUser();
@@ -28,7 +29,8 @@ export async function SiteHeader() {
     nodeEnv: process.env.NODE_ENV,
     showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
   });
-  const primaryLinks = buildPrimarySiteNavLinks();
+  const tgaHref = await getPromotedTgaHref().catch(() => null);
+  const primaryLinks = buildPrimarySiteNavLinks({ tgaHref });
   const utilityLinks = buildUtilitySiteNavLinks({ includeDesignSystem });
   const account: SiteNavAccount = user
     ? {
@@ -50,7 +52,12 @@ export async function SiteHeader() {
           aria-label="Site"
         >
           {primaryLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="hover:text-ink">
+            <Link
+              key={link.href}
+              href={link.href}
+              scroll={false}
+              className="hover:text-ink"
+            >
               {link.label}
             </Link>
           ))}

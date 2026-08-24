@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -276,6 +277,39 @@ export const communityMembers = pgTable(
   (t) => [
     primaryKey({ columns: [t.communityId, t.profileId] }),
     index("community_members_profile_id_idx").on(t.profileId),
+  ],
+);
+
+/**
+ * Community-level Host designation (Promote / Retire).
+ * Current Hosts have `retired_at` null. Year snapshots stay on
+ * `community_edition_voices` and `tga_community_hosts`.
+ */
+export const communityHosts = pgTable(
+  "community_hosts",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
+    promotedAt: timestamp("promoted_at", { mode: "date" }).defaultNow().notNull(),
+    promotedByProfileId: uuid("promoted_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+    retiredAt: timestamp("retired_at", { mode: "date" }),
+    retiredByProfileId: uuid("retired_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.profileId] }),
+    index("community_hosts_current_idx")
+      .on(t.communityId)
+      .where(sql`${t.retiredAt} is null`),
   ],
 );
 
@@ -963,3 +997,252 @@ export const siteSettings = pgTable("site_settings", {
     .default(2.2),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/** One The Game Awards pick’em year (site slate + lock). */
+export const tgaYears = pgTable(
+  "tga_years",
+  {
+    year: integer("year").primaryKey(),
+    enabled: boolean("enabled").notNull().default(false),
+    promoted: boolean("promoted").notNull().default(false),
+    opensAt: timestamp("opens_at", { mode: "date" }),
+    showStartsAt: timestamp("show_starts_at", { mode: "date" }),
+    worldPremieresOfficial: integer("world_premieres_official"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("tga_years_promoted_uidx")
+      .on(t.promoted)
+      .where(sql`${t.promoted} = true`),
+  ],
+);
+
+export const tgaCategories = pgTable(
+  "tga_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    description: text("description"),
+    kind: text("kind").notNull().$type<"game" | "other">(),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("tga_categories_year_sort_idx").on(t.year, t.sortOrder)],
+);
+
+export const tgaNominees = pgTable(
+  "tga_nominees",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    displayName: text("display_name").notNull(),
+    gameId: uuid("game_id").references(() => games.id, { onDelete: "restrict" }),
+    imageUrl: text("image_url"),
+  },
+  (t) => [index("tga_nominees_year_idx").on(t.year)],
+);
+
+export const tgaCategoryNominees = pgTable(
+  "tga_category_nominees",
+  {
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => tgaCategories.id, { onDelete: "cascade" }),
+    nomineeId: uuid("nominee_id")
+      .notNull()
+      .references(() => tgaNominees.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.categoryId, t.nomineeId] }),
+    index("tga_category_nominees_nominee_idx").on(t.nomineeId),
+  ],
+);
+
+export const tgaWinners = pgTable("tga_winners", {
+  categoryId: uuid("category_id")
+    .primaryKey()
+    .references(() => tgaCategories.id, { onDelete: "cascade" }),
+  nomineeId: uuid("nominee_id")
+    .notNull()
+    .references(() => tgaNominees.id, { onDelete: "restrict" }),
+  calledAt: timestamp("called_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const tgaSiteSheets = pgTable(
+  "tga_site_sheets",
+  {
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    worldPremieresGuess: integer("world_premieres_guess"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.profileId, t.year] })],
+);
+
+export const tgaSitePicks = pgTable(
+  "tga_site_picks",
+  {
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => tgaCategories.id, { onDelete: "cascade" }),
+    nomineeId: uuid("nominee_id")
+      .notNull()
+      .references(() => tgaNominees.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.profileId, t.year, t.categoryId] }),
+    index("tga_site_picks_category_idx").on(t.categoryId, t.nomineeId),
+  ],
+);
+
+export const tgaSiteScores = pgTable(
+  "tga_site_scores",
+  {
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    points: integer("points").notNull().default(0),
+    wpDelta: integer("wp_delta"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.year, t.profileId] }),
+    index("tga_site_scores_board_idx").on(t.year, t.points, t.wpDelta),
+  ],
+);
+
+export const tgaCommunityYears = pgTable(
+  "tga_community_years",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.communityId, t.year] })],
+);
+
+/** Host snapshot for one community pick’em year (no Hosts board in v1). */
+export const tgaCommunityHosts = pgTable(
+  "tga_community_hosts",
+  {
+    communityId: uuid("community_id").notNull(),
+    year: integer("year").notNull(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "restrict" }),
+    designatedAt: timestamp("designated_at", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    designatedByProfileId: uuid("designated_by_profile_id").references(
+      () => profiles.id,
+      { onDelete: "set null" },
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.year, t.profileId] }),
+    foreignKey({
+      columns: [t.communityId, t.year],
+      foreignColumns: [tgaCommunityYears.communityId, tgaCommunityYears.year],
+      name: "tga_community_hosts_year_fk",
+    }).onDelete("cascade"),
+    index("tga_community_hosts_year_idx").on(t.communityId, t.year),
+  ],
+);
+
+export const tgaCommunitySheets = pgTable(
+  "tga_community_sheets",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    worldPremieresGuess: integer("world_premieres_guess"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.communityId, t.profileId, t.year] })],
+);
+
+export const tgaCommunityPicks = pgTable(
+  "tga_community_picks",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => tgaCategories.id, { onDelete: "cascade" }),
+    nomineeId: uuid("nominee_id")
+      .notNull()
+      .references(() => tgaNominees.id, { onDelete: "restrict" }),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.communityId, t.profileId, t.year, t.categoryId],
+    }),
+    index("tga_community_picks_category_idx").on(
+      t.communityId,
+      t.categoryId,
+      t.nomineeId,
+    ),
+  ],
+);
+
+export const tgaCommunityScores = pgTable(
+  "tga_community_scores",
+  {
+    communityId: uuid("community_id")
+      .notNull()
+      .references(() => communities.id, { onDelete: "cascade" }),
+    year: integer("year")
+      .notNull()
+      .references(() => tgaYears.year, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    points: integer("points").notNull().default(0),
+    wpDelta: integer("wp_delta"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.communityId, t.year, t.profileId] }),
+    index("tga_community_scores_board_idx").on(
+      t.communityId,
+      t.year,
+      t.points,
+      t.wpDelta,
+    ),
+  ],
+);

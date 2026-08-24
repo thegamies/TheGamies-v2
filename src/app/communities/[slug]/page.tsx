@@ -26,6 +26,7 @@ import {
   isCommunityPublic,
 } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
 import { MembershipActions } from "./MembershipActions";
@@ -104,6 +105,9 @@ export default async function CommunityHomePage({
       ? featuredEdition.status
       : (overviewEditions[0]?.status ?? null);
   const showCreateEvent = canManage && editions.length === 0;
+  const tgaEnabled =
+    isMember &&
+    (await communityTgaNavVisible(community.id).catch(() => false));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -113,6 +117,13 @@ export default async function CommunityHomePage({
         liveEnabled={isMember && community.liveRankingsEnabled}
         canManage={canManage}
         editionStatus={isMember ? navEditionStatus : null}
+        editionYear={
+          featuredEdition && featuredEdition.status !== "draft"
+            ? featuredEdition.year
+            : (overviewEditions[0]?.year ?? null)
+        }
+        communityId={community.id}
+        tgaEnabled={tgaEnabled}
         active="overview"
         invitePath={
           isMember

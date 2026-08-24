@@ -19,6 +19,18 @@ describe("communitySettingsHref", () => {
     );
   });
 
+  it("sets tab for The Game Awards", () => {
+    expect(communitySettingsHref("test", { tab: "tga" })).toBe(
+      "/communities/test/settings?tab=tga",
+    );
+  });
+
+  it("sets tab for Hosts", () => {
+    expect(communitySettingsHref("test", { tab: "hosts" })).toBe(
+      "/communities/test/settings?tab=hosts",
+    );
+  });
+
   it("sets tab for Community", () => {
     expect(communitySettingsHref("test", { tab: "community" })).toBe(
       "/communities/test/settings?tab=community",
@@ -55,6 +67,8 @@ describe("parseCommunitySettingsTab", () => {
     expect(parseCommunitySettingsTab("live")).toBe("live");
     expect(parseCommunitySettingsTab("nope")).toBe("live");
     expect(parseCommunitySettingsTab("events")).toBe("events");
+    expect(parseCommunitySettingsTab("tga")).toBe("tga");
+    expect(parseCommunitySettingsTab("hosts")).toBe("hosts");
     expect(parseCommunitySettingsTab("community")).toBe("community");
     expect(parseCommunitySettingsTab("invite")).toBe("invite");
   });

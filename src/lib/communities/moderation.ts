@@ -107,6 +107,13 @@ export async function removeCommunityMember(
   if (blocked) return { error: blocked };
   if (!target) return { error: "That person is not a member." };
 
+  const { retireCommunityHostInCommunity } = await import("./community-hosts");
+  await retireCommunityHostInCommunity(
+    detail.id,
+    targetProfileId,
+    actorProfileId,
+    db,
+  );
   await dropUnpublishedEditionRowsForCommunityMember(
     detail.id,
     targetProfileId,
@@ -169,6 +176,13 @@ export async function banCommunityMember(
   if (blocked) return { error: blocked };
   if (!target) return { error: "That person is not a member." };
 
+  const { retireCommunityHostInCommunity } = await import("./community-hosts");
+  await retireCommunityHostInCommunity(
+    detail.id,
+    targetProfileId,
+    actorProfileId,
+    db,
+  );
   await dropUnpublishedEditionRowsForCommunityMember(
     detail.id,
     targetProfileId,

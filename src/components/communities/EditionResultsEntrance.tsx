@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useLayoutEffect } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   hasEditionResultsEntrancePreference,
@@ -27,7 +27,6 @@ export function EditionResultsEntrance({
   mode?: EditionResultsPublicMode;
 }) {
   const router = useRouter();
-  const [ready, setReady] = useState(false);
   const revealHref = editionResultsHref(slug, year, {
     mode,
     view: "reveal",
@@ -37,19 +36,11 @@ export function EditionResultsEntrance({
     view: "overview",
   });
 
-  useEffect(() => {
-    if (hasEditionResultsEntrancePreference(slug, year)) {
-      router.replace(resultsHref);
-      return;
-    }
-    setReady(true);
+  useLayoutEffect(() => {
+    if (!hasEditionResultsEntrancePreference(slug, year)) return;
+    markEditionResultsEntranceSeen(slug, year);
+    router.replace(resultsHref);
   }, [slug, year, resultsHref, router]);
-
-  if (!ready) {
-    return (
-      <div className="mt-10 min-h-[12rem]" aria-busy="true" aria-label="Loading" />
-    );
-  }
 
   function skipToResults() {
     markEditionResultsEntranceSeen(slug, year);

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { communityLiveNavYear } from "@/lib/communities/community-primary-nav";
 
 type Params = Promise<{ slug: string }>;
 
@@ -9,6 +10,6 @@ export default async function CommunityLiveIndexPage({
 }) {
   const { slug } = await params;
   redirect(
-    `/communities/${encodeURIComponent(slug)}/live/${new Date().getUTCFullYear()}`,
+    `/communities/${encodeURIComponent(slug)}/live/${communityLiveNavYear()}`,
   );
 }

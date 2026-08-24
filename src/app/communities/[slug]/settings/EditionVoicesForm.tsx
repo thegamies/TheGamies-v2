@@ -6,6 +6,8 @@ import {
   setEditionVoiceAction,
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import Link from "next/link";
 
 export type EditionVoiceMemberOption = {
   profileId: string;
@@ -36,7 +38,7 @@ export function EditionVoicesForm({
   year,
   status,
   members,
-  locked,
+  locked: _locked,
 }: {
   slug: string;
   year: number;
@@ -61,7 +63,6 @@ export function EditionVoicesForm({
   }
 
   useEffect(() => {
-    if (locked) return;
     const q = query.trim();
     if (q.length < 1) return;
     const handle = window.setTimeout(() => {
@@ -81,7 +82,7 @@ export function EditionVoicesForm({
       });
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [query, slug, year, locked]);
+  }, [query, slug, year]);
 
   const trimmed = query.trim();
   const visible = trimmed ? hits : roster;
@@ -131,16 +132,16 @@ export function EditionVoicesForm({
     <div className="mt-8 border-t border-line pt-6">
       <h3 className="font-display text-2xl tracking-wide text-ink">Hosts</h3>
       <p className="mt-2 max-w-xl text-sm text-muted">
-        Designate Hosts for the {year} event ({status}). Current Hosts are
-        listed by default — search to find other members. Roster locks when
-        results publish.
+        Designate Hosts for the {year} event ({status}). This year only — it
+        does not promote or retire them for the community.{" "}
+        <Link
+          href={communitySettingsHref(slug, { tab: "hosts" })}
+          className="underline underline-offset-2"
+        >
+          Community Hosts
+        </Link>
+        .
       </p>
-
-      {locked ? (
-        <p className="mt-4 text-sm text-muted">
-          Hosts for this event are locked.
-        </p>
-      ) : null}
 
       <div className="mt-4">
         <label htmlFor={searchId} className="sr-only">
@@ -154,7 +155,6 @@ export function EditionVoicesForm({
           placeholder="Search members by name or @username"
           className="w-full max-w-md border border-line bg-paper px-3 py-2 text-sm text-ink placeholder:text-muted"
           autoComplete="off"
-          disabled={locked}
         />
       </div>
 
@@ -186,19 +186,15 @@ export function EditionVoicesForm({
                   <span className="text-muted"> · {roleLabel(member)}</span>
                 </p>
               </div>
-              {locked ? (
-                <p className="text-sm text-muted">{roleLabel(member)}</p>
-              ) : (
-                <Button
-                  type="button"
-                  variant="bordered"
-                  disabled={mutating}
-                  className="text-sm"
-                  onClick={() => toggleVoice(member)}
-                >
-                  {member.isVoice ? "Remove Host" : "Make Host"}
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="bordered"
+                disabled={mutating}
+                className="text-sm"
+                onClick={() => toggleVoice(member)}
+              >
+                {member.isVoice ? "Remove Host" : "Make Host"}
+              </Button>
             </li>
           ))}
         </ul>

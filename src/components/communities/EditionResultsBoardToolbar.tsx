@@ -89,6 +89,7 @@ export function EditionResultsBoardToolbar({
                   category:
                     view === "category" ? categoryId ?? undefined : undefined,
                 })}
+                scroll={false}
                 aria-current={active ? "page" : undefined}
                 className={segmentFitBtnClass(active)}
               >

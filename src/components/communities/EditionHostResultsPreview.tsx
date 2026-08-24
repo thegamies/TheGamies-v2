@@ -15,7 +15,6 @@ import type {
 import { editionHostRevealShowHref } from "@/lib/communities/edition-results-href";
 import type { EditionShowSource } from "@/lib/communities/edition-results-scoring";
 import type { EditionFreezeStatus } from "@/lib/communities/edition-freeze";
-import type { SharedRankMode } from "@/lib/standings/shared-rank";
 
 export type HostResultsPreviewView =
   | "show"
@@ -58,7 +57,6 @@ export function EditionHostResultsPreview({
   categoryComparison = EMPTY_CATEGORY_COMPARISON,
   freezeStatus,
   liveReady,
-  rankMode = "competition",
 }: {
   slug: string;
   year: number;
@@ -74,7 +72,6 @@ export function EditionHostResultsPreview({
   freezeStatus: EditionFreezeStatus;
   /** True when live freeze rows were loaded. */
   liveReady: boolean;
-  rankMode?: SharedRankMode;
 }) {
   const isLive = source === "live";
   const demoHref = editionHostRevealShowHref(slug, year, {
@@ -138,6 +135,7 @@ export function EditionHostResultsPreview({
               source,
               view: v.id,
             })}
+            scroll={false}
             className={navItemClass("tertiary", previewView === v.id)}
           >
             {v.label}
@@ -167,9 +165,12 @@ export function EditionHostResultsPreview({
             slug={slug}
             year={year}
             mode="community"
-            rankMode={rankMode}
-            totalGames={gotyTotal}
-            initialRows={gotyBoard}
+            page={1}
+            pageSize={gotyBoard.length || 1}
+            total={gotyTotal}
+            totalPages={1}
+            rows={gotyBoard}
+            paginate={false}
           />
         </div>
       ) : previewView === "categories" ? (

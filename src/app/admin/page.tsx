@@ -23,6 +23,11 @@ const ADMIN_LINKS = [
     description: "Reveal scores, refresh dirty keys, or rebuild a year.",
   },
   {
+    href: "/admin/the-game-awards",
+    title: "Video Game Awards Pick’em",
+    description: "Set up the year, nominees, and call winners during the show.",
+  },
+  {
     href: "/admin/seed",
     title: "Standings seed",
     description: "Create synthetic GOTY voters for standings QA.",
@@ -32,6 +37,12 @@ const ADMIN_LINKS = [
     title: "Community seed",
     description:
       "Seed community members, Hosts, and edition ballots for ceremony QA.",
+  },
+  {
+    href: "/admin/the-game-awards/seed",
+    title: "Video Game Awards Pick’em seed",
+    description:
+      "Fill leftover seed accounts that have no pick sheet yet.",
   },
 ] as const;
 

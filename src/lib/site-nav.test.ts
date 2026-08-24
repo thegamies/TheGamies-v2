@@ -60,6 +60,15 @@ describe("buildPrimarySiteNavLinks", () => {
       { href: "/communities", label: "Communities" },
     ]);
   });
+
+  it("inserts Video Game Awards Pick’em when promoted", () => {
+    expect(buildPrimarySiteNavLinks({ tgaHref: "/the-game-awards/2026" })).toEqual([
+      { href: "/games", label: "Games" },
+      { href: "/game-of-the-year", label: "GOTY" },
+      { href: "/the-game-awards/2026", label: "Video Game Awards Pick’em" },
+      { href: "/communities", label: "Communities" },
+    ]);
+  });
 });
 
 describe("siteCreateLink", () => {

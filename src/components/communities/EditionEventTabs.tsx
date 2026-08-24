@@ -41,6 +41,7 @@ export function EditionEventTabs({
       {includeRevealShow ? (
         <Link
           href={editionHostRevealShowHref(slug, year)}
+          scroll={false}
           className={navItemClass("secondary", active === "show")}
         >
           Results preview
@@ -48,6 +49,7 @@ export function EditionEventTabs({
       ) : null}
       <Link
         href={ballotHref}
+        scroll={false}
         className={navItemClass("secondary", active === "ballot")}
       >
         {ballotLabel}
@@ -55,6 +57,7 @@ export function EditionEventTabs({
       {includeVoters ? (
         <Link
           href={votersHref}
+          scroll={false}
           className={navItemClass("secondary", active === "voters")}
         >
           Voters
@@ -63,6 +66,7 @@ export function EditionEventTabs({
       {canManage ? (
         <Link
           href={editionHostSettingsHref(slug, year)}
+          scroll={false}
           className={navItemClass("secondary", active === "settings")}
         >
           Settings

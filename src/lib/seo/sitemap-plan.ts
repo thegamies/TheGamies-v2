@@ -7,6 +7,7 @@ export const SITEMAP_STATIC_PATHS = [
   "/",
   "/games",
   "/game-of-the-year",
+  "/the-game-awards",
   "/about",
   "/contact",
   "/guidelines",

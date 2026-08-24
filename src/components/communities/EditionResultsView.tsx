@@ -11,6 +11,7 @@ import { EditionFullStandings } from "@/components/communities/EditionFullStandi
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
+import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { VoterProfileHandle } from "@/components/communities/VoterProfileHandle";
 import { isAnonymizedVoter } from "@/lib/profile/delete-account";
 import { navItemClass } from "@/components/ui/navLevels";
@@ -120,6 +121,7 @@ export function EditionResultsViewNav({
                         q: votersQ,
                       })
                 }
+                scroll={false}
                 className={navItemClass("secondary", active)}
               >
                 {v.label}
@@ -158,6 +160,7 @@ export function EditionResultsView({
   categoryComparison,
   categoryMeta,
   categoryPage = null,
+  standingsPage = null,
   voters,
   matrix,
   yourProfileId,
@@ -184,6 +187,13 @@ export function EditionResultsView({
     total: number;
     totalPages: number;
     rows: EditionCategoryStandingRow[];
+  } | null;
+  standingsPage?: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    rows: EditionGotyStandingRow[];
   } | null;
   voters: {
     page: number;
@@ -264,8 +274,11 @@ export function EditionResultsView({
           slug={slug}
           year={year}
           mode={mode}
-          rankMode={rankMode}
-          totalGames={gotyTotal}
+          page={standingsPage?.page ?? 1}
+          pageSize={standingsPage?.pageSize ?? STANDINGS_PAGE_SIZE}
+          total={standingsPage?.total ?? gotyTotal}
+          totalPages={standingsPage?.totalPages ?? 1}
+          rows={standingsPage?.rows ?? []}
         />
       ) : view === "category" ? (
         selectedCategory && categoryPage ? (

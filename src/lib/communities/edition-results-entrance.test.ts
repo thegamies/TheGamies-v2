@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EDITION_RESULTS_ENTRANCE_WINDOW_DAYS,
+  ENTRANCE_PREF_COOKIE,
   editionResultsEntranceStorageKey,
   hasEditionResultsEntrancePreference,
+  hasEditionResultsEntrancePreferenceCookie,
   isEditionResultsEntranceOpen,
   markEditionResultsEntranceSeen,
+  mergeEntrancePrefCookieValue,
 } from "./edition-results-entrance";
 
 describe("isEditionResultsEntranceOpen", () => {
@@ -29,9 +32,11 @@ describe("isEditionResultsEntranceOpen", () => {
 
 describe("edition results entrance preference", () => {
   const store = new Map<string, string>();
+  const cookies = new Map<string, string>();
 
   beforeEach(() => {
     store.clear();
+    cookies.clear();
     vi.stubGlobal("window", {
       localStorage: {
         getItem: (key: string) => store.get(key) ?? null,
@@ -44,6 +49,19 @@ describe("edition results entrance preference", () => {
         clear: () => {
           store.clear();
         },
+      },
+    });
+    vi.stubGlobal("document", {
+      get cookie() {
+        return [...cookies.entries()]
+          .map(([key, value]) => `${key}=${value}`)
+          .join("; ");
+      },
+      set cookie(raw: string) {
+        const pair = raw.split(";")[0] ?? "";
+        const eq = pair.indexOf("=");
+        if (eq === -1) return;
+        cookies.set(pair.slice(0, eq), pair.slice(eq + 1));
       },
     });
   });
@@ -62,5 +80,19 @@ describe("edition results entrance preference", () => {
     expect(hasEditionResultsEntrancePreference("demo", 2026)).toBe(false);
     markEditionResultsEntranceSeen("demo", 2026);
     expect(hasEditionResultsEntrancePreference("demo", 2026)).toBe(true);
+  });
+
+  it("mirrors the preference in a cookie the Events page can read", () => {
+    expect(
+      hasEditionResultsEntrancePreferenceCookie(undefined, "demo", 2026),
+    ).toBe(false);
+    markEditionResultsEntranceSeen("demo", 2026);
+    expect(cookies.get(ENTRANCE_PREF_COOKIE)).toBe("demo:2026");
+    expect(
+      hasEditionResultsEntrancePreferenceCookie("demo:2026", "demo", 2026),
+    ).toBe(true);
+    expect(mergeEntrancePrefCookieValue("demo:2026", "eric", 2025)).toBe(
+      "demo:2026|eric:2025",
+    );
   });
 });

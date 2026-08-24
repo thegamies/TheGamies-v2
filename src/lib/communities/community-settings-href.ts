@@ -1,7 +1,15 @@
-export type CommunitySettingsTab = "live" | "events" | "community" | "invite";
+export type CommunitySettingsTab =
+  | "live"
+  | "events"
+  | "tga"
+  | "hosts"
+  | "community"
+  | "invite";
 
 export function parseCommunitySettingsTab(raw: unknown): CommunitySettingsTab {
   if (raw === "events") return "events";
+  if (raw === "tga") return "tga";
+  if (raw === "hosts") return "hosts";
   if (raw === "community") return "community";
   if (raw === "invite") return "invite";
   return "live";
@@ -18,6 +26,10 @@ export function communitySettingsHref(
   const tab = opts.tab ?? "live";
   if (tab === "events") {
     params.set("tab", "events");
+  } else if (tab === "tga") {
+    params.set("tab", "tga");
+  } else if (tab === "hosts") {
+    params.set("tab", "hosts");
   } else if (tab === "community") {
     params.set("tab", "community");
   } else if (tab === "invite") {

@@ -3,12 +3,7 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import {
-  listEditionsForCommunity,
-  pickFeaturedEdition,
-  type CommunityEditionPublic,
-} from "@/lib/communities/editions";
-import { showEditionNav } from "@/lib/communities/edition-status";
+import { resolveCommunityEditionNavYear } from "@/lib/communities/community-primary-nav";
 import { getCommunityBySlug } from "@/lib/communities/service";
 
 type Params = Promise<{ slug: string }>;
@@ -37,15 +32,9 @@ export default async function CommunityEditionIndexPage({
     redirect(`/communities/${encodeURIComponent(community.slug)}`);
   }
 
-  let editions: CommunityEditionPublic[] = [];
-  try {
-    editions = await listEditionsForCommunity(community.id);
-  } catch {
-    editions = [];
-  }
-  const publicEditions = editions.filter((e) => showEditionNav(e.status));
-  const featured = pickFeaturedEdition(publicEditions);
-  const year = featured?.year ?? publicEditions[0]?.year;
+  const year = await resolveCommunityEditionNavYear(community.id).catch(
+    () => null,
+  );
 
   if (!year) {
     redirect(`/communities/${encodeURIComponent(community.slug)}`);

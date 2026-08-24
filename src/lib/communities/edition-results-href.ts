@@ -115,6 +115,19 @@ export function editionVoterBallotHref(
   });
 }
 
+/** Paginated Game of the Year full standings. */
+export function editionGotyStandingsHref(
+  slug: string,
+  year: number,
+  opts: { mode?: EditionResultsPublicMode; page?: number } = {},
+) {
+  return editionResultsHref(slug, year, {
+    mode: opts.mode,
+    view: "standings",
+    page: opts.page,
+  });
+}
+
 /** Full standings for one category award. */
 export function editionCategoryStandingsHref(
   slug: string,

@@ -615,6 +615,17 @@ export async function leaveCommunity(
   const blocked = leaveBlockedReason(detail.viewerRole, detail.hostCount);
   if (blocked) return { error: blocked };
 
+  const { dropUnpublishedEditionRowsForCommunityMember } = await import(
+    "./moderation"
+  );
+  const { retireCommunityHostInCommunity } = await import("./community-hosts");
+  await retireCommunityHostInCommunity(detail.id, profileId, profileId, db);
+  await dropUnpublishedEditionRowsForCommunityMember(
+    detail.id,
+    profileId,
+    db,
+  );
+
   await db
     .delete(communityMembers)
     .where(

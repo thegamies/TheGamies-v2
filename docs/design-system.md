@@ -75,7 +75,7 @@ Stacking identical treatments is forbidden — each level must read quieter than
 | Level | Role | Look | Use |
 |---|---|---|---|
 | **Primary** | Community section switcher | Bordered chips inside `CommunityHeader` (`--panel` band) | Overview · Live Rankings · Events · Members · Settings |
-| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Community. Site GOTY + community Live: Game of the Year · Categories |
+| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Hosts · Community. Site GOTY + community Live: Game of the Year · Categories |
 | **Tertiary** | Board / filter | Segmented controls on one row below the Results view divider | Community / Hosts. Results: Ranked / Comparison. Dev **Debug** popover (local only) |
 
 Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.
@@ -88,7 +88,7 @@ Rules:
 - Chips scroll horizontally on small screens (`overflow-x-auto`, no wrap, no arrow controls)
 - Do **not** put secondary underlines in the community masthead (that clones Results)
 - Results in-page views stay secondary underlines under the awards title (`{year} Video Game Awards`)
-- Community Settings in-page views stay secondary underlines under **Settings**: Live Rankings · Events · Community
+- Community Settings in-page views stay secondary underlines under **Settings**: Live Rankings · Events · Hosts · Community
 - Never stack identical primary chip rows
 - Results board filters use the shared `segmentBtnClass` control group (same language as list Format), not middot text. They sit on one line below the view-tab divider. Dev-only Reveal stress tools live in a **Debug** popover on that row.
 - Panel fill is for the community masthead band and interactive blocks (ballots, dialogs) — not a card wrapped around Results
@@ -185,6 +185,9 @@ Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 | `--muted` | Secondary text | `#aaa69e` |
 | `--line` | Borders / dividers | `#2b2a28` |
 | `--accent` | Rank, selection, status | `#ff5a1f` |
+| `--success` | TGA pick’em correct | `#3d9a5b` |
+| `--miss` | TGA pick’em incorrect | `red` |
+| `--gold` | TGA pick’em winner (not your pick) | `#d4af37` |
 | `--danger` | Irreversible destroy | `#c7372a` |
 | `--radius-control` | Buttons / inputs | `2px` |
 | `--radius-artwork` | Covers | `0px` |
@@ -200,7 +203,10 @@ Defined in `src/app/globals.css` and wired through Tailwind `@theme`.
 Rules:
 
 - Orange communicates selection, rank, or event status
-- `--danger` is only for irreversible destroy (delete event) — not schedule warnings or form errors elsewhere
+- `--success` is TGA Correct only — not generic “saved” chrome
+- `--miss` is TGA Incorrect only
+- `--gold` is TGA Winner only, when it is not your pick
+- `--danger` is irreversible destroy (delete event) — not schedule warnings or form errors elsewhere
 - Artwork uses a consistent cover ratio
 - Data sections prefer dividers and spacing over visible containers
 - New colors, radii, shadows, and spacing require a deliberate system change

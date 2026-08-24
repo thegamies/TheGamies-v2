@@ -8,7 +8,7 @@ A group that can host an awards event (podcast, streamer, Discord, site, friend 
 
 ### Host
 
-A member designated for the event **Hosts** board. Public UI uses **Host** / **Hosts**. Internal/code for that board stays **Voice** (`?mode=voices`, `community_edition_voices`).
+A member **Promoted** on the community Hosts roster (`community_hosts`). Open GOTY events and open pick’em years inherit that roster. Each year still has its own snapshot (`community_edition_voices`, `tga_community_hosts`) that can be edited by hand, including after close. Public UI uses **Host** / **Hosts**. Internal/code for that board stays **Voice** (`?mode=voices`).
 
 ### Admin
 
@@ -45,3 +45,7 @@ Scheduled event with opening time, deadline, and final locked result. Public UI 
 ### Always-Live Aggregate
 
 Ongoing community ranking derived from members' personal lists. Public UI uses **Live Rankings**.
+
+### Video Game Awards Pick’em
+
+Public name for the site (and optional community) pick’em that predicts the external Game Awards show. Not an Event. Events remain a community’s own yearly awards (`{year} Video Game Awards`). Code and URLs use `tga` / `/the-game-awards`.

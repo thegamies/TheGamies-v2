@@ -164,6 +164,145 @@ export async function rebuildEditionResultsFrozen(
   return freezeEditionResults(editionId, db);
 }
 
+/**
+ * Rebuild Hosts freeze rows only. Community freeze stays write-once.
+ * No-op when this edition has not been frozen yet.
+ */
+export async function rebuildEditionHostsResultsFrozen(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<EditionResultsMeta | { ok: true } | { error: string }> {
+  const existing = await getEditionResultsMeta(editionId, db);
+  if (!existing) return { ok: true };
+
+  const ballots = await db
+    .select({
+      profileId: communityEditionBallots.profileId,
+    })
+    .from(communityEditionBallots)
+    .where(eq(communityEditionBallots.editionId, editionId));
+
+  const voiceIds = await listEditionVoiceProfileIds(editionId, db);
+  const [voicesGoty, voicesCats, editionCats] = await Promise.all([
+    sqlAggregateEditionGoty(editionId, true, db),
+    sqlAggregateEditionCategories(editionId, true, db),
+    listEditionAwardCategories(editionId, db),
+  ]);
+
+  const catDefById = new Map(editionCats.map((c) => [c.id, c]));
+  const enabledCategoryIds = new Set(editionCats.map((c) => c.id));
+  const ballotCountVoices = ballots.filter((b) =>
+    voiceIds.has(b.profileId),
+  ).length;
+
+  const gotyRows = voicesGoty.map((row) => ({
+    editionId,
+    mode: "voices" as const,
+    place: row.place,
+    gameId: row.gameId,
+    slug: row.slug,
+    title: row.title,
+    gameYear: row.gameYear,
+    coverUrl: row.coverUrl,
+    points: row.points,
+    firstPlaceVotes: row.firstPlaceVotes,
+    appearances: row.appearances,
+  }));
+
+  const categoryRows = voicesCats
+    .filter((row) => enabledCategoryIds.has(row.categoryId))
+    .map((row) => {
+      const def = catDefById.get(row.categoryId);
+      return {
+        editionId,
+        mode: "voices" as const,
+        categoryId: row.categoryId,
+        label: def?.label ?? row.categoryId,
+        description: def?.description ?? null,
+        sortOrder: def?.sortOrder ?? 0,
+        place: row.place,
+        gameId: row.gameId,
+        slug: row.slug,
+        title: row.title,
+        coverUrl: row.coverUrl,
+        votes: row.votes,
+      };
+    });
+
+  try {
+    await db
+      .delete(communityEditionResultGoty)
+      .where(
+        and(
+          eq(communityEditionResultGoty.editionId, editionId),
+          eq(communityEditionResultGoty.mode, "voices"),
+        ),
+      );
+    await db
+      .delete(communityEditionResultCategories)
+      .where(
+        and(
+          eq(communityEditionResultCategories.editionId, editionId),
+          eq(communityEditionResultCategories.mode, "voices"),
+        ),
+      );
+
+    if (gotyRows.length > 0) {
+      await insertInChunks(
+        gotyRows,
+        (chunk) => db.insert(communityEditionResultGoty).values(chunk),
+        100,
+      );
+    }
+    if (categoryRows.length > 0) {
+      await insertInChunks(
+        categoryRows,
+        (chunk) => db.insert(communityEditionResultCategories).values(chunk),
+        100,
+      );
+    }
+
+    await db
+      .update(communityEditionResultVoters)
+      .set({ isVoice: false })
+      .where(eq(communityEditionResultVoters.editionId, editionId));
+    if (voiceIds.size > 0) {
+      await db
+        .update(communityEditionResultVoters)
+        .set({ isVoice: true })
+        .where(
+          and(
+            eq(communityEditionResultVoters.editionId, editionId),
+            inArray(communityEditionResultVoters.profileId, [...voiceIds]),
+          ),
+        );
+    }
+
+    const [updated] = await db
+      .update(communityEditionResultMeta)
+      .set({
+        ballotCountVoices,
+        gotyTotalVoices: voicesGoty.length,
+      })
+      .where(eq(communityEditionResultMeta.editionId, editionId))
+      .returning();
+
+    return updated
+      ? {
+          frozenAt: updated.frozenAt,
+          ballotCountCommunity: updated.ballotCountCommunity,
+          ballotCountVoices: updated.ballotCountVoices,
+          gotyTotalCommunity: updated.gotyTotalCommunity,
+          gotyTotalVoices: updated.gotyTotalVoices,
+        }
+      : existing;
+  } catch (err) {
+    const detail =
+      err instanceof Error ? err.message : "Could not rebuild Hosts results.";
+    return { error: detail };
+  }
+}
+
 /** Delete freeze snapshot rows only (ballots unchanged). Resets freeze job status. */
 export async function clearEditionResultsFrozen(
   editionId: string,

@@ -17,6 +17,7 @@ import {
   listCommunityMembersPage,
 } from "@/lib/communities/service";
 import { noIndexRobots } from "@/lib/seo/site";
+import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -125,6 +126,9 @@ export default async function CommunityMembersPage({
         liveEnabled={community.liveRankingsEnabled}
         canManage={canManage}
         editionStatus={publicEdition?.status ?? null}
+        editionYear={publicEdition?.year ?? null}
+        communityId={community.id}
+        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
         active="members"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

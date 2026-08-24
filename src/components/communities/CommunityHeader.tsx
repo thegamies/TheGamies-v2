@@ -5,19 +5,23 @@ import { MastheadBanner } from "@/components/ui/MastheadBanner";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import {
+  communityLiveNavYear,
+  communityPrimaryHref,
+  resolveCommunityEditionNavYear,
+  type CommunityNavActive,
+} from "@/lib/communities/community-primary-nav";
+import {
   EDITION_PUBLIC_LABEL,
   showEditionNav,
   type EditionStatus,
 } from "@/lib/communities/edition-status";
+import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
+import { resolveTgaLandingYear } from "@/lib/tga-pickem/service";
+
+export { TGA_PUBLIC_LABEL };
+export type { CommunityNavActive };
 
 export const LIVE_PUBLIC_LABEL = "Live Rankings";
-
-export type CommunityNavActive =
-  | "overview"
-  | "live"
-  | "edition"
-  | "members"
-  | "settings";
 
 type NavProps = {
   slug: string;
@@ -25,7 +29,14 @@ type NavProps = {
   canManage: boolean;
   /** Non-draft featured edition status, or null if none public. */
   editionStatus: EditionStatus | null;
+  tgaEnabled?: boolean;
   active: CommunityNavActive;
+  /** Featured public event year — avoids a `/edition` redirect that resets scroll. */
+  editionYear?: number | null;
+  /** Promoted pick’em year — avoids a `/the-game-awards` redirect that resets scroll. */
+  tgaYear?: number | null;
+  /** When set, missing years are resolved to match the index redirects. */
+  communityId?: string;
 };
 
 /**
@@ -37,33 +48,52 @@ export function CommunityNav({
   liveEnabled,
   canManage,
   editionStatus,
+  tgaEnabled = false,
   active,
+  editionYear = null,
+  tgaYear = null,
 }: NavProps) {
+  const years = {
+    edition: editionYear,
+    live: liveEnabled ? communityLiveNavYear() : null,
+    tga: tgaYear,
+  };
   const items: { href: string; label: string; key: CommunityNavActive }[] = [
-    { href: `/communities/${slug}`, label: "Overview", key: "overview" },
+    {
+      href: communityPrimaryHref(slug, "overview"),
+      label: "Overview",
+      key: "overview",
+    },
   ];
   if (liveEnabled) {
     items.push({
-      href: `/communities/${slug}/live`,
+      href: communityPrimaryHref(slug, "live", years),
       label: LIVE_PUBLIC_LABEL,
       key: "live",
     });
   }
   if (editionStatus && showEditionNav(editionStatus)) {
     items.push({
-      href: `/communities/${slug}/edition`,
+      href: communityPrimaryHref(slug, "edition", years),
       label: EDITION_PUBLIC_LABEL,
       key: "edition",
     });
   }
+  if (tgaEnabled) {
+    items.push({
+      href: communityPrimaryHref(slug, "tga", years),
+      label: TGA_PUBLIC_LABEL,
+      key: "tga",
+    });
+  }
   items.push({
-    href: `/communities/${slug}/members`,
+    href: communityPrimaryHref(slug, "members"),
     label: "Members",
     key: "members",
   });
   if (canManage) {
     items.push({
-      href: `/communities/${slug}/settings`,
+      href: communityPrimaryHref(slug, "settings"),
       label: "Settings",
       key: "settings",
     });
@@ -80,6 +110,7 @@ export function CommunityNav({
         <Link
           key={item.key}
           href={item.href}
+          scroll={false}
           className={navItemClass("primary", active === item.key)}
         >
           {item.label}
@@ -99,6 +130,30 @@ type HeaderProps = NavProps & {
   showNav?: boolean;
 };
 
+/** Resolves landing years so primary chips skip index redirects (scroll reset). */
+export async function CommunityPrimaryNav(props: NavProps) {
+  let editionYear = props.editionYear ?? null;
+  let tgaYear = props.tgaYear ?? null;
+  const needEdition =
+    Boolean(props.editionStatus && showEditionNav(props.editionStatus)) &&
+    editionYear == null &&
+    Boolean(props.communityId);
+  const needTga = Boolean(props.tgaEnabled) && tgaYear == null;
+  if (needEdition || needTga) {
+    const [resolvedEdition, resolvedTga] = await Promise.all([
+      needEdition
+        ? resolveCommunityEditionNavYear(props.communityId!).catch(() => null)
+        : Promise.resolve(editionYear),
+      needTga ? resolveTgaLandingYear().catch(() => null) : Promise.resolve(tgaYear),
+    ]);
+    if (needEdition) editionYear = resolvedEdition;
+    if (needTga) tgaYear = resolvedTga;
+  }
+  return (
+    <CommunityNav {...props} editionYear={editionYear} tgaYear={tgaYear} />
+  );
+}
+
 /**
  * Community masthead — optional banner, avatar + name, primary section chips.
  */
@@ -108,12 +163,16 @@ export function CommunityHeader({
   liveEnabled,
   canManage,
   editionStatus,
+  tgaEnabled = false,
   active,
   invitePath = null,
   avatarUrl = null,
   bannerUrl = null,
   socialLinks = null,
   showNav = true,
+  editionYear = null,
+  tgaYear = null,
+  communityId,
 }: HeaderProps) {
   const initial = name.trim().slice(0, 1).toUpperCase() || "?";
 
@@ -160,12 +219,16 @@ export function CommunityHeader({
         </div>
         {showNav ? (
           <div className="mt-6">
-            <CommunityNav
+            <CommunityPrimaryNav
               slug={slug}
               liveEnabled={liveEnabled}
               canManage={canManage}
               editionStatus={editionStatus}
+              tgaEnabled={tgaEnabled}
               active={active}
+              editionYear={editionYear}
+              tgaYear={tgaYear}
+              communityId={communityId}
             />
           </div>
         ) : null}

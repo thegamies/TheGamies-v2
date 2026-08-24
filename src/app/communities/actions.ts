@@ -63,6 +63,12 @@ import {
   searchEditionHostMembers,
   setEditionVoice,
 } from "@/lib/communities/voices";
+import {
+  listCurrentCommunityHosts,
+  promoteCommunityHost,
+  retireCommunityHost,
+  searchCommunityMembersForHost,
+} from "@/lib/communities/community-hosts";
 
 async function requireProfile() {
   const user = await getRequestSessionUser();
@@ -972,6 +978,72 @@ export async function searchEditionHostMembersAction(input: {
   if (!edition) return { error: "Event not found." };
 
   const results = await searchEditionHostMembers(detail.id, edition.id, {
+    q: input.q,
+  });
+  return { ok: true, results };
+}
+
+export async function promoteCommunityHostAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await promoteCommunityHost(slug, gate.profile.id, profileId);
+  if ("error" in result) return { error: result.error };
+  revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}`);
+  return null;
+}
+
+export async function retireCommunityHostAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "").trim().toLowerCase();
+  const profileId = String(formData.get("profileId") ?? "").trim();
+  if (!slug) return { error: "Community not found." };
+  if (!profileId) return { error: "Choose a member." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const result = await retireCommunityHost(slug, gate.profile.id, profileId);
+  if ("error" in result) return { error: result.error };
+  revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}`);
+  return null;
+}
+
+export async function searchCommunityMembersForHostAction(input: {
+  slug: string;
+  q: string;
+}): Promise<
+  | {
+      ok: true;
+      results: Awaited<ReturnType<typeof listCurrentCommunityHosts>>;
+    }
+  | { error: string }
+> {
+  const slug = input.slug.trim().toLowerCase();
+  if (!slug) return { error: "Community not found." };
+
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+
+  const detail = await getCommunityBySlug(slug, gate.profile.id);
+  if (!detail) return { error: "Community not found." };
+  if (!canManageCommunity(detail.viewerRole)) {
+    return { error: "Only admins can edit the Hosts roster." };
+  }
+
+  const results = await searchCommunityMembersForHost(detail.id, {
     q: input.q,
   });
   return { ok: true, results };

@@ -1,115 +1,40 @@
-"use client";
-
-import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   StandingGameCard,
   StandingGameCardGrid,
 } from "@/components/communities/StandingGameCard";
 import type { EditionGotyStandingRow } from "@/lib/communities/edition-results";
+import { editionGotyStandingsHref } from "@/lib/communities/edition-results-href";
 import {
   editionBoardLabel,
   type EditionResultsPublicMode,
-  type SharedRankMode,
 } from "@/lib/communities/edition-results-scoring";
-
-type StandingsPayload = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  rows: EditionGotyStandingRow[];
-};
 
 export function EditionFullStandings({
   slug,
   year,
   mode,
-  rankMode = "competition",
-  totalGames,
-  initialRows,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  rows,
+  paginate = true,
 }: {
   slug: string;
   year: number;
   mode: EditionResultsPublicMode;
-  rankMode?: SharedRankMode;
-  totalGames: number;
-  /** When set, render these rows and skip the published standings API. */
-  initialRows?: EditionGotyStandingRow[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  rows: EditionGotyStandingRow[];
+  /** Host preview can show a first slice without page links. */
+  paginate?: boolean;
 }) {
-  const ssrOnly = initialRows != null;
-  const [rows, setRows] = useState<EditionGotyStandingRow[]>([]);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
-  const displayRows = ssrOnly ? initialRows : rows;
-
-  async function fetchPage(nextPage: number): Promise<StandingsPayload> {
-    const params = new URLSearchParams({
-      mode,
-      page: String(nextPage),
-    });
-    const res = await fetch(
-      `/api/communities/${encodeURIComponent(slug)}/edition/${year}/standings?${params}`,
-    );
-    if (!res.ok) {
-      throw new Error("Could not load standings.");
-    }
-    return (await res.json()) as StandingsPayload;
-  }
-
-  useEffect(() => {
-    if (ssrOnly) return;
-    let cancelled = false;
-    startTransition(async () => {
-      setRows([]);
-      setPage(0);
-      setError(null);
-      try {
-        const data = await fetchPage(1);
-        if (cancelled) return;
-        setPage(data.page);
-        setTotalPages(data.totalPages);
-        setRows(data.rows);
-      } catch {
-        if (!cancelled) {
-          setError("Could not load full standings. Try again.");
-        }
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- board identity only
-  }, [slug, year, mode, rankMode, ssrOnly]);
-
-  function loadMore() {
-    startTransition(async () => {
-      try {
-        setError(null);
-        const data = await fetchPage(page + 1);
-        setPage(data.page);
-        setTotalPages(data.totalPages);
-        setRows((prev) => [...prev, ...data.rows]);
-      } catch {
-        setError("Could not load more standings. Try again.");
-      }
-    });
-  }
-
-  if (totalGames <= 0) {
-    return (
-      <section>
-        <h3 className="font-display text-3xl tracking-wide text-ink">
-          Full standings
-        </h3>
-        <p className="mt-4 text-sm text-muted">
-          No Game of the Year scores for this board yet.
-        </p>
-      </section>
-    );
-  }
+  const rangeFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeTo = Math.min(page * pageSize, total);
+  const showPager = paginate && totalPages > 1;
 
   return (
     <section>
@@ -117,20 +42,18 @@ export function EditionFullStandings({
         Full standings
       </h3>
       <p className="mt-2 text-sm text-muted">
-        {totalGames} game{totalGames === 1 ? "" : "s"} on the{" "}
-        {editionBoardLabel(mode)} board.
+        {total} game{total === 1 ? "" : "s"} on the {editionBoardLabel(mode)}{" "}
+        board.
       </p>
 
-      {error ? <p className="mt-4 text-sm text-accent">{error}</p> : null}
-
-      {displayRows.length === 0 && pending ? (
-        <p className="mt-6 text-sm text-muted">Loading standings…</p>
-      ) : null}
-
-      {displayRows.length > 0 ? (
+      {rows.length === 0 ? (
+        <p className="mt-6 text-sm text-muted">
+          No Game of the Year scores for this board yet.
+        </p>
+      ) : (
         <>
           <StandingGameCardGrid>
-            {displayRows.map((row) => (
+            {rows.map((row) => (
               <li key={row.gameId}>
                 <StandingGameCard
                   place={row.rank}
@@ -142,26 +65,56 @@ export function EditionFullStandings({
               </li>
             ))}
           </StandingGameCardGrid>
-          {!ssrOnly && page < totalPages ? (
-            <div className="mt-8">
-              <button
-                type="button"
-                onClick={loadMore}
-                disabled={pending}
-                className="border border-line px-3 py-2 text-sm text-ink hover:border-accent disabled:opacity-60"
-              >
-                {pending ? "Loading…" : "Load more"}
-              </button>
-            </div>
+          {showPager ? (
+            <nav
+              className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3 text-sm"
+              aria-label="Full standings pages"
+            >
+              <p className="text-muted">
+                {rangeFrom}–{rangeTo} of {total} · page {page} of {totalPages}
+              </p>
+              <div className="flex gap-2">
+                {page > 1 ? (
+                  <Link
+                    href={editionGotyStandingsHref(slug, year, {
+                      mode,
+                      page: page - 1,
+                    })}
+                    className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
+                  >
+                    Previous
+                  </Link>
+                ) : (
+                  <span className="border border-line px-3 py-1.5 text-muted/50">
+                    Previous
+                  </span>
+                )}
+                {page < totalPages ? (
+                  <Link
+                    href={editionGotyStandingsHref(slug, year, {
+                      mode,
+                      page: page + 1,
+                    })}
+                    className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
+                  >
+                    Next
+                  </Link>
+                ) : (
+                  <span className="border border-line px-3 py-1.5 text-muted/50">
+                    Next
+                  </span>
+                )}
+              </div>
+            </nav>
           ) : null}
-          {ssrOnly && displayRows.length < totalGames ? (
+          {!paginate && rows.length < total ? (
             <p className="mt-6 text-sm text-muted">
-              Showing the first {displayRows.length} of {totalGames}. The full
-              board opens when results publish.
+              Showing the first {rows.length} of {total}. The full board opens
+              when results publish.
             </p>
           ) : null}
         </>
-      ) : null}
+      )}
     </section>
   );
 }

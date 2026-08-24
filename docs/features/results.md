@@ -22,7 +22,7 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 5. **Summary** — sticky chapter header (`{year} Summary`) with Top 10 + category #1 boards; tied category winners use the rotating stack  
 6. **Continue to full results** + **Return to top**
 
-**Entrance (spoiler-safe)** — bare `/communities/[slug]/edition/[year]` with no `view`, only while `publishesAt` is within the last **30 days** and the browser has not yet chosen Results. Copy: results are here; **Start the Reveal** / **View Full Results**. Preference is stored in `localStorage` per community + year when the user skips to Results or finishes Reveal via **Continue to full results**. After the preference or after 30 days, bare URL opens **Results**. Explicit `?view=reveal` / `?view=results` always honor. No GOTY art on the entrance.
+**Entrance (spoiler-safe)** — bare `/communities/[slug]/edition/[year]` with no `view`, only while `publishesAt` is within the last **30 days** and the browser has not yet chosen Results. Copy: results are here; **Start the Reveal** / **View Full Results**. Preference is stored in `localStorage` and a `tg_ed_res` cookie per community + year when the user skips to Results or finishes Reveal via **Continue to full results**. The cookie lets the server open **Results** on the first paint (no client bounce). After the preference or after 30 days, bare URL opens **Results**. Explicit `?view=reveal` / `?view=results` always honor. No GOTY art on the entrance.
 
 **Host results preview** (while voting is **closed**, before publish): secondary tab **Results preview** before Ballot (`?view=show`), community hosts only. Inner nav: Reveal · Results · Full standings · Categories (same URLs as public results views, host-gated while closed). Default **demo** uses placeholder covers and Game 1… titles for GOTY + each event award. Results keeps **Ranked · Comparison** (SSR matrices; no published-only API). **Show real results** navigates to `&source=live` (separate request) and SSR-loads freeze boards. Public standings/comparison APIs stay published-only; host Full standings uses SSR rows (first page when live).
 
@@ -55,7 +55,7 @@ Reveal    Results    Full standings    Categories    Voters    Your ballot
 [ Ranked | Comparison ]  [ Community | Hosts ]              [ Debug ]
 ```
 
-Community = all submitted ballots. Hosts = designated Host ballots only.
+Community = all submitted ballots. Hosts = designated Host ballots only. After close, changing that year’s Host list rebuilds the Hosts freeze board only. Community freeze rows stay write-once.
 
 ## Displayed rank
 

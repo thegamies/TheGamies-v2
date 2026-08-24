@@ -7,6 +7,8 @@ import {
   parseEditionResultMode,
   parseEditionResultsView,
   placeEditionCategoryTallies,
+  freezeRowsKeptAfterHostsRebuild,
+  hostsRebuildStorageMode,
   placeEditionGotyTallies,
   resolveEditionHostSettings,
   storageModeFor,
@@ -54,6 +56,22 @@ describe("storageModeFor / parseEditionResultMode", () => {
   });
 });
 
+describe("hosts-only freeze rebuild", () => {
+  it("replaces voices rows and keeps community rows", () => {
+    expect(hostsRebuildStorageMode()).toBe("voices");
+    expect(
+      freezeRowsKeptAfterHostsRebuild([
+        { mode: "community", place: 1 },
+        { mode: "voices", place: 1 },
+        { mode: "community", place: 2 },
+      ]),
+    ).toEqual([
+      { mode: "community", place: 1 },
+      { mode: "community", place: 2 },
+    ]);
+  });
+});
+
 describe("parseEditionRankMode", () => {
   it("parses stored competition vs dense numbering", async () => {
     const { parseEditionRankMode } = await import("./edition-results-scoring");
@@ -85,6 +103,12 @@ describe("editionResultsHref", () => {
         mode: "voices",
       }),
     ).toBe("/communities/demo/edition/2025?mode=voices&view=results");
+  });
+
+  it("serializes Full standings pages", () => {
+    expect(
+      editionResultsHref("demo", 2026, { view: "standings", page: 2 }),
+    ).toBe("/communities/demo/edition/2026?view=standings&page=2");
   });
 });
 
