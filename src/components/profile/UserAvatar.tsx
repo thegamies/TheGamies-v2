@@ -3,11 +3,13 @@ export function UserAvatar({
   username,
   avatarUrl,
   size = 80,
+  className = "",
 }: {
   displayName: string;
   username: string;
   avatarUrl?: string | null;
   size?: number;
+  className?: string;
 }) {
   const initial = (displayName.trim() || username).slice(0, 1).toUpperCase();
 
@@ -19,7 +21,7 @@ export function UserAvatar({
         alt=""
         width={size}
         height={size}
-        className="rounded-full border border-line object-cover"
+        className={`shrink-0 rounded-full border border-line object-cover ${className}`}
         style={{ width: size, height: size }}
       />
     );
@@ -27,7 +29,7 @@ export function UserAvatar({
 
   return (
     <div
-      className="flex items-center justify-center rounded-full border border-line bg-panel font-display tracking-wide text-ink"
+      className={`flex shrink-0 items-center justify-center rounded-full border border-line bg-panel font-display tracking-wide text-ink ${className}`}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
       aria-hidden
     >

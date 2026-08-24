@@ -2,6 +2,7 @@ import Link from "next/link";
 import { EditionCategoryResults } from "@/components/communities/EditionCategoryResults";
 import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
+import { EditionResultsBoardToolbar } from "@/components/communities/EditionResultsBoardToolbar";
 import { EditionResultsOverview } from "@/components/communities/EditionResultsOverview";
 import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { navItemClass } from "@/components/ui/navLevels";
@@ -19,6 +20,7 @@ import type { EditionFreezeStatus } from "@/lib/communities/edition-freeze";
 export type HostResultsPreviewView =
   | "show"
   | "overview"
+  | "comparison"
   | "standings"
   | "categories";
 
@@ -128,19 +130,25 @@ export function EditionHostResultsPreview({
       </div>
 
       <ScrollableNav aria-label="Results preview view" className="mt-6">
-        {PREVIEW_VIEWS.map((v) => (
-          <Link
-            key={v.id}
-            href={editionHostRevealShowHref(slug, year, {
-              source,
-              view: v.id,
-            })}
-            scroll={false}
-            className={navItemClass("tertiary", previewView === v.id)}
-          >
-            {v.label}
-          </Link>
-        ))}
+        {PREVIEW_VIEWS.map((v) => {
+          const active =
+            v.id === "overview"
+              ? previewView === "overview" || previewView === "comparison"
+              : previewView === v.id;
+          return (
+            <Link
+              key={v.id}
+              href={editionHostRevealShowHref(slug, year, {
+                source,
+                view: v.id,
+              })}
+              scroll={false}
+              className={navItemClass("tertiary", active)}
+            >
+              {v.label}
+            </Link>
+          );
+        })}
       </ScrollableNav>
 
       {isLive && !liveReady ? (
@@ -184,11 +192,21 @@ export function EditionHostResultsPreview({
           />
         </div>
       ) : (
-        <div className="mt-8" key={`results-${source}`}>
+        <div className="mt-8" key={`results-${source}-${previewView}`}>
+          <EditionResultsBoardToolbar
+            slug={slug}
+            year={year}
+            mode="community"
+            view={previewView === "comparison" ? "comparison" : "overview"}
+            showLayout
+            showBoardModes={false}
+            source={source}
+          />
           <EditionResultsOverview
             slug={slug}
             year={year}
             mode="community"
+            layout={previewView === "comparison" ? "comparison" : "ranked"}
             topTen={topTen}
             matrix={matrix}
             gotyTotal={gotyTotal}

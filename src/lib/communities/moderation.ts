@@ -245,6 +245,7 @@ export type CommunityBanRow = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   bannedAt: Date;
 };
 
@@ -290,6 +291,7 @@ export async function listCommunityBansPage(
       profileId: communityBans.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       bannedAt: communityBans.bannedAt,
     })
     .from(communityBans)

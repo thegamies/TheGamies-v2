@@ -36,7 +36,7 @@ IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel
 1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
 2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon (except **Live** mode).
 3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 1`, batch 25) applies each batch on a fresh isolate. Cron every minute only **pauses or resumes** queue delivery from KV (Auto window, sticky Open, or Closed). Saving settings syncs that immediately.
-4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (proxied to the Worker with the admin code).
+4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`).
 
 A queue can have only one consumer type. This Worker is the consumer — do not also attach HTTP pull.
 
@@ -71,7 +71,7 @@ Or `pnpm sync:igdb:secrets …`.
 
 ## Admin
 
-`/admin/sync` — unlock with `ADMIN_SYNC_SECRET`, then run the same actions. Use **Continue year** to resume a truncated/failed year backfill; **Backfill year (from start)** forces `afterId: 0`. Check **Enrich all years** to omit the year filter (full catalog). Browser never talks to IGDB directly.
+`/admin/sync` — site operators only. Use **Continue year** to resume a truncated/failed year backfill; **Backfill year (from start)** forces `afterId: 0`. Check **Enrich all years** to omit the year filter (full catalog). Browser never talks to IGDB directly.
 
 ### Hosted timeouts (Vercel / Cloudflare)
 

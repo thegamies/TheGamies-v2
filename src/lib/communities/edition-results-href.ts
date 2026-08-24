@@ -39,6 +39,7 @@ export function editionResultsHref(
     opts.source === "live" &&
     (view === "show" ||
       view === "overview" ||
+      view === "comparison" ||
       view === "standings" ||
       view === "categories" ||
       view === "category")
@@ -94,7 +95,7 @@ export function editionHostRevealShowHref(
   year: number,
   opts: {
     source?: "demo" | "live";
-    view?: "show" | "overview" | "standings" | "categories";
+    view?: "show" | "overview" | "comparison" | "standings" | "categories";
   } = {},
 ) {
   return editionResultsHref(slug, year, {

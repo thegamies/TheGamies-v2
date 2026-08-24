@@ -74,6 +74,7 @@ export type CommunityMemberPublic = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   role: CommunityRole;
   joinedAt: Date;
 };
@@ -358,6 +359,7 @@ export async function listCommunityMembersPage(
       joinedAt: communityMembers.joinedAt,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(communityMembers)
     .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
@@ -371,6 +373,7 @@ export async function listCommunityMembersPage(
       profileId: row.profileId,
       username: row.username,
       displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
       role: asRole(row.role),
       joinedAt: row.joinedAt,
     })),
@@ -392,6 +395,7 @@ export async function listCommunityMemberOptions(
       joinedAt: communityMembers.joinedAt,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(communityMembers)
     .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
@@ -402,6 +406,7 @@ export async function listCommunityMemberOptions(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     role: asRole(row.role),
     joinedAt: row.joinedAt,
   }));
@@ -970,6 +975,7 @@ export type CommunityAdminMemberRow = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   role: CommunityRole;
 };
 
@@ -982,6 +988,7 @@ export async function listCommunityAdminRoster(
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       role: communityMembers.role,
     })
     .from(communityMembers)
@@ -999,6 +1006,7 @@ export async function listCommunityAdminRoster(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     role: asRole(row.role),
   }));
 }
@@ -1027,6 +1035,7 @@ export async function searchCommunityMembersForAdmin(
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       role: communityMembers.role,
     })
     .from(communityMembers)
@@ -1044,6 +1053,7 @@ export async function searchCommunityMembersForAdmin(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     role: asRole(row.role),
   }));
 }

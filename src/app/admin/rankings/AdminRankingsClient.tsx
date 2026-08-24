@@ -45,7 +45,6 @@ const RANK_MODE_OPTIONS: Array<{
 ];
 
 type Props = {
-  authorized: boolean;
   initialYear: number;
   initialStats: YearStats | null;
   initialLandingYears: number[] | null;
@@ -56,7 +55,6 @@ type Props = {
 };
 
 export function AdminRankingsClient({
-  authorized: initiallyAuthorized,
   initialYear,
   initialStats,
   initialLandingYears,
@@ -65,8 +63,6 @@ export function AdminRankingsClient({
   initialPublicBoardMinCategoryVotes,
   initialStandingFillMinVisible,
 }: Props) {
-  const [authorized, setAuthorized] = useState(initiallyAuthorized);
-  const [secret, setSecret] = useState("");
   const [year, setYear] = useState(initialYear);
   const [stats, setStats] = useState<YearStats | null>(initialStats);
   const [landingYearsInput, setLandingYearsInput] = useState(
@@ -97,24 +93,6 @@ export function AdminRankingsClient({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-    const res = await fetch("/api/admin/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secret }),
-    });
-    if (!res.ok) {
-      setMessage("Could not unlock admin controls.");
-      return;
-    }
-    setAuthorized(true);
-    setSecret("");
-    const loaded = await loadYearStatsAction(year);
-    if ("stats" in loaded && loaded.stats) setStats(loaded.stats);
-  }
-
   function run(fn: () => Promise<void>) {
     startTransition(async () => {
       setMessage(null);
@@ -124,30 +102,6 @@ export function AdminRankingsClient({
         setMessage("Something went wrong.");
       }
     });
-  }
-
-  if (!authorized) {
-    return (
-      <form onSubmit={unlock} className="max-w-md space-y-4">
-        <p className="text-sm text-muted">
-          Enter the admin unlock code to manage live standings.
-        </p>
-        <input
-          type="password"
-          className={fieldInputClass}
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          autoComplete="off"
-          required
-        />
-        <Button type="submit">Unlock</Button>
-        {message ? (
-          <p className="text-sm text-accent" role="alert">
-            {message}
-          </p>
-        ) : null}
-      </form>
-    );
   }
 
   return (

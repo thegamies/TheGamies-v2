@@ -78,17 +78,25 @@ describe("siteCreateLink", () => {
 });
 
 describe("buildUtilitySiteNavLinks", () => {
-  it("always includes Admin", () => {
-    expect(buildUtilitySiteNavLinks({ includeDesignSystem: false })).toEqual([
-      { href: "/admin", label: "Admin" },
-    ]);
+  it("omits Admin unless the viewer is a site operator", () => {
+    expect(buildUtilitySiteNavLinks({ includeDesignSystem: false })).toEqual([]);
+  });
+
+  it("includes Admin for site operators", () => {
+    expect(
+      buildUtilitySiteNavLinks({
+        includeAdmin: true,
+        includeDesignSystem: false,
+      }),
+    ).toEqual([{ href: "/admin", label: "Admin" }]);
   });
 
   it("appends Design system when enabled", () => {
     expect(
-      buildUtilitySiteNavLinks({ includeDesignSystem: true }).map(
-        (link) => link.href,
-      ),
+      buildUtilitySiteNavLinks({
+        includeAdmin: true,
+        includeDesignSystem: true,
+      }).map((link) => link.href),
     ).toEqual(["/admin", "/design-system"]);
   });
 });
@@ -97,6 +105,7 @@ describe("buildAccountMenuGroups", () => {
   it("links a username to profile tabs", () => {
     const groups = buildAccountMenuGroups({
       username: "ecdm98",
+      includeAdmin: true,
       includeDesignSystem: true,
     });
     expect(groups.flatMap((group) => group.items)).toEqual([
@@ -109,6 +118,19 @@ describe("buildAccountMenuGroups", () => {
     ]);
   });
 
+  it("omits Admin for people who are not site operators", () => {
+    const groups = buildAccountMenuGroups({
+      username: "ecdm98",
+      includeDesignSystem: false,
+    });
+    expect(groups.flatMap((group) => group.items)).toEqual([
+      { href: "/u/ecdm98", label: "View Profile" },
+      { href: "/u/ecdm98", label: "My Lists" },
+      { href: "/u/ecdm98?tab=communities", label: "My Communities" },
+      { href: "/account", label: "Settings" },
+    ]);
+  });
+
   it("sends users without a username to account settings", () => {
     const groups = buildAccountMenuGroups({
       username: null,
@@ -117,7 +139,6 @@ describe("buildAccountMenuGroups", () => {
     expect(groups.flatMap((group) => group.items)).toEqual([
       { href: "/account", label: "View Profile" },
       { href: "/account", label: "Settings" },
-      { href: "/admin", label: "Admin" },
     ]);
   });
 });

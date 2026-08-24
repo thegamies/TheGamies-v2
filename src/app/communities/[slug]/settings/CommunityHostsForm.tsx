@@ -6,12 +6,14 @@ import {
   setCommunityMemberRoleAction,
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import type { CommunityRole } from "@/lib/communities/schema";
 
 export type CommunityHostMemberOption = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   role: CommunityRole;
 };
 
@@ -156,17 +158,21 @@ export function CommunityHostsForm({
                 key={member.profileId}
                 className="flex flex-wrap items-center justify-between gap-3 py-3"
               >
-                <div>
-                  <p className="text-ink">{member.displayName}</p>
-                  <p className="text-sm text-muted">
-                    @{member.username}
-                    {isYou ? " · You" : null}
-                    <span className="text-muted">
-                      {" "}
-                      · {isAdmin ? "Admin" : "Member"}
-                    </span>
-                  </p>
-                </div>
+                <PersonIdentity
+                  displayName={member.displayName}
+                  username={member.username}
+                  avatarUrl={member.avatarUrl}
+                  subtitle={
+                    <p className="text-sm text-muted">
+                      @{member.username}
+                      {isYou ? " · You" : null}
+                      <span className="text-muted">
+                        {" "}
+                        · {isAdmin ? "Admin" : "Member"}
+                      </span>
+                    </p>
+                  }
+                />
                 {cannotRemove ? (
                   <p className="text-sm text-muted">Last admin</p>
                 ) : (

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isAdminAuthorized } from "@/lib/admin-auth";
+import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 import { countTgaSheetSeeds } from "@/lib/tga-pickem/seed-sheets";
 import { listTgaYears } from "@/lib/tga-pickem/service";
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminTgaSeedPage() {
-  const authorized = await isAdminAuthorized();
+  await requireSiteAdminPage();
   let years: number[] = [];
   let initialYear = new Date().getUTCFullYear();
   let initialStats: {
@@ -22,19 +22,17 @@ export default async function AdminTgaSeedPage() {
     seedVoterSheets: number;
     seedVotersWithoutSheet: number;
   } | null = null;
-  if (authorized) {
-    try {
-      const rows = await listTgaYears();
-      years = rows.map((row) => row.year);
-      if (years.includes(initialYear) === false && years[0] != null) {
-        initialYear = years[0];
-      }
-      if (years.length > 0) {
-        initialStats = await countTgaSheetSeeds(initialYear);
-      }
-    } catch {
-      years = [];
+  try {
+    const rows = await listTgaYears();
+    years = rows.map((row) => row.year);
+    if (years.includes(initialYear) === false && years[0] != null) {
+      initialYear = years[0];
     }
+    if (years.length > 0) {
+      initialStats = await countTgaSheetSeeds(initialYear);
+    }
+  } catch {
+    years = [];
   }
 
   return (
@@ -54,7 +52,6 @@ export default async function AdminTgaSeedPage() {
       </p>
       <div className="mt-10">
         <AdminTgaSeedClient
-          authorized={authorized}
           years={years}
           initialYear={initialYear}
           initialStats={initialStats}

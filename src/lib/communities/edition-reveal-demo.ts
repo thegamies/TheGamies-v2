@@ -34,11 +34,13 @@ const DEMO_HOST_COLUMNS: MatrixVoiceColumn[] = [
     profileId: "demo-host-a",
     displayName: "Host A",
     username: "host_a",
+    avatarUrl: null,
   },
   {
     profileId: "demo-host-b",
     displayName: "Host B",
     username: "host_b",
+    avatarUrl: null,
   },
 ];
 

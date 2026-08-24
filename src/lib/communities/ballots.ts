@@ -187,6 +187,7 @@ export async function getEditionBallotSubmittersPage(
     profileId: string;
     displayName: string;
     username: string;
+    avatarUrl: string | null;
     isVoice: boolean;
     itemCount: number;
     submittedAt: Date;
@@ -205,6 +206,7 @@ export async function getEditionBallotSubmittersPage(
         profileId: communityEditionBallots.profileId,
         displayName: profiles.displayName,
         username: profiles.username,
+        avatarUrl: profiles.avatarUrl,
         submittedAt: communityEditionBallots.submittedAt,
         total: sql<number>`count(*) over()`.mapWith(Number),
         isVoice: sql<boolean>`exists (
@@ -255,6 +257,7 @@ export async function getEditionBallotSubmittersPage(
       profileId: row.profileId,
       displayName: row.displayName,
       username: row.username,
+      avatarUrl: row.avatarUrl,
       isVoice: Boolean(row.isVoice),
       itemCount: Number(row.itemCount ?? 0),
       submittedAt: row.submittedAt,
@@ -291,6 +294,7 @@ export async function getLiveEditionVotersPage(
     profileId: string;
     displayName: string;
     username: string;
+    avatarUrl: string | null;
     isVoice: boolean;
   }>;
 }> {
@@ -314,6 +318,7 @@ export async function getLiveEditionVotersPage(
         profileId: communityEditionBallots.profileId,
         displayName: profiles.displayName,
         username: profiles.username,
+        avatarUrl: profiles.avatarUrl,
         voiceProfileId: communityEditionVoices.profileId,
       })
       .from(communityEditionBallots)
@@ -360,6 +365,7 @@ export async function getLiveEditionVotersPage(
       profileId: row.profileId,
       displayName: row.displayName,
       username: row.username,
+      avatarUrl: row.avatarUrl,
       isVoice: Boolean(row.voiceProfileId),
     })),
   };

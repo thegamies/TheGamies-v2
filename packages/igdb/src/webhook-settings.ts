@@ -42,6 +42,9 @@ export const WEBHOOK_DRAIN_LOCK_KV_KEY = "drain-lock";
 /** Cloudflare Worker fetch budget: cap messages so one isolate stays under ~1000 subrequests. */
 export const WORKER_DRAIN_BATCH_CEILING = 40;
 
+/** Must match `max_batch_size` on the queue consumer in wrangler.jsonc. */
+export const QUEUE_CONSUMER_MAX_BATCH_SIZE = 25;
+
 export const MAX_DRAIN_HOPS = 100;
 /** Same isolate only — Worker-to-Worker hops hit subrequest depth and return `Subrequest…`. */
 export const DRAIN_BATCHES_PER_INVOCATION = 3;
@@ -100,12 +103,50 @@ export function nextScheduledCloseAt(
   return new Date(startOfMinute + minutesUntilClose * 60_000);
 }
 
+export function currentIntervalStartAt(
+  intervalMinutes: number,
+  now = new Date(),
+): Date {
+  const interval = Math.max(1, intervalMinutes);
+  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const pos = minuteOfDay % interval;
+  const startOfMinute = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+    now.getUTCHours(),
+    now.getUTCMinutes(),
+    0,
+    0,
+  );
+  return new Date(startOfMinute - pos * 60_000);
+}
+
+/** This Auto interval already ran until a short (last) queue packet. */
+export function drainedThisWindow(
+  settings: Pick<
+    WebhookDrainSettings,
+    "intervalMinutes" | "lastDrainAt" | "drainPending"
+  >,
+  now = new Date(),
+): boolean {
+  if (settings.drainPending) return false;
+  if (!settings.lastDrainAt) return false;
+  const last = Date.parse(settings.lastDrainAt);
+  if (!Number.isFinite(last)) return false;
+  return last >= currentIntervalStartAt(settings.intervalMinutes, now).getTime();
+}
+
 /** Whether Cloudflare should deliver queue messages right now (UTC clock). */
 export function desiredQueueOpen(
   settings: Pick<
     WebhookDrainSettings,
     "deliveryMode" | "intervalMinutes" | "windowMinutes"
-  > & { forceOpenUntil?: string | null },
+  > & {
+    forceOpenUntil?: string | null;
+    lastDrainAt?: string | null;
+    drainPending?: boolean;
+  },
   now = new Date(),
 ): boolean {
   if (settings.deliveryMode === "closed") return false;
@@ -113,6 +154,18 @@ export function desiredQueueOpen(
   if (settings.forceOpenUntil) {
     const until = Date.parse(settings.forceOpenUntil);
     if (Number.isFinite(until) && now.getTime() < until) return true;
+  }
+  if (
+    drainedThisWindow(
+      {
+        intervalMinutes: settings.intervalMinutes,
+        lastDrainAt: settings.lastDrainAt ?? null,
+        drainPending: settings.drainPending ?? false,
+      },
+      now,
+    )
+  ) {
+    return false;
   }
   const interval = settings.intervalMinutes;
   const window = clampWindowMinutes(settings.windowMinutes, interval);
@@ -249,18 +302,16 @@ export function parseQueuePullBacklogCount(result: unknown): number | null {
 }
 
 /**
- * A short pull is not an empty queue. Unknown backlog is also not empty —
- * HTTP pull can return [] while the dashboard still shows thousands leased.
+ * Cloudflare delivers up to `batchSize` messages per `queue()` invocation.
+ * A smaller packet is the last one — stop Auto drain. Retries stay open so
+ * those messages can come back.
  */
 export function isDrainPullExhausted(input: {
   pulled: number;
-  batchSize: number;
-  retried: number;
-  backlogCount: number | null;
+  batchSize?: number;
+  retried?: number;
 }): boolean {
-  if (input.retried > 0) return false;
-  if (input.backlogCount == null) return false;
-  if (input.pulled === 0) return input.backlogCount === 0;
-  if (input.pulled >= input.batchSize) return false;
-  return input.backlogCount <= input.pulled;
+  if ((input.retried ?? 0) > 0) return false;
+  const packet = input.batchSize ?? QUEUE_CONSUMER_MAX_BATCH_SIZE;
+  return input.pulled < packet;
 }

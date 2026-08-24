@@ -52,7 +52,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 - Ranks always public.
 - Scores, list mentions, rank histograms, and category vote counts hidden until `detailedStatsRevealed`.
-- Site admin: `/admin/rankings` (same unlock as catalog sync).
+- Site admin: `/admin/rankings` (site operators).
 - Community live: all years gated by `communities.live_scores_visible_from` (null = hidden). Hosts set date under Settings.
 - Community live lock: `live_rankings_locked` + `community_live_lock_snapshots` freeze the public board until unlock.
 
@@ -99,7 +99,7 @@ GOTY years stay off the homepage, `/game-of-the-year`, year boards, and game-pag
 
 ## Ops: standings seed
 
-`/admin/seed` (same unlock as other admin tools) creates synthetic profiles
+`/admin/seed` (site operators) creates synthetic profiles
 (`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists
 **and** category votes (from each list’s ranked picks, top-rank weighted).
 

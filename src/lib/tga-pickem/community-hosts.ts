@@ -24,6 +24,7 @@ export type TgaHostMemberRow = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   isHost: boolean;
 };
 
@@ -125,6 +126,7 @@ export async function listTgaCommunityHostRoster(
       profileId: tgaCommunityHosts.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(tgaCommunityHosts)
     .innerJoin(profiles, eq(profiles.id, tgaCommunityHosts.profileId))
@@ -141,6 +143,7 @@ export async function listTgaCommunityHostRoster(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     isHost: true,
   }));
 }
@@ -166,6 +169,7 @@ export async function searchTgaCommunityHostMembers(
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       hostProfileId: tgaCommunityHosts.profileId,
     })
     .from(communityMembers)
@@ -191,6 +195,7 @@ export async function searchTgaCommunityHostMembers(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     isHost: Boolean(row.hostProfileId),
   }));
 }

@@ -219,6 +219,8 @@ export const profiles = pgTable("profiles", {
   deletedAt: timestamp("deleted_at", { mode: "date" }),
   /** Set when the public handle changes; NULL means the next rename is allowed immediately. */
   usernameChangedAt: timestamp("username_changed_at", { mode: "date" }),
+  /** Site operations (`/admin`). Not a community Admin. */
+  isSiteAdmin: boolean("is_site_admin").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

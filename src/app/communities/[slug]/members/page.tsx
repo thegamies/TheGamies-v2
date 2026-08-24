@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { MemberAdminActions } from "@/app/communities/[slug]/settings/MemberAdminActions";
+import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
-import { MemberAdminActions } from "@/app/communities/[slug]/settings/MemberAdminActions";
 import {
   COMMUNITY_MEMBERS_PAGE_SIZE,
   getCommunityBySlug,
@@ -172,15 +173,12 @@ export default async function CommunityMembersPage({
                 key={member.profileId}
                 className="flex flex-wrap items-center justify-between gap-3 py-4"
               >
-                <div>
-                  <Link
-                    href={`/u/${member.username}`}
-                    className="text-ink hover:text-accent"
-                  >
-                    {member.displayName}
-                  </Link>
-                  <p className="text-sm text-muted">@{member.username}</p>
-                </div>
+                <PersonIdentity
+                  displayName={member.displayName}
+                  username={member.username}
+                  avatarUrl={member.avatarUrl}
+                  href={`/u/${member.username}`}
+                />
                 {canManage && profile ? (
                   <MemberAdminActions
                     slug={community.slug}

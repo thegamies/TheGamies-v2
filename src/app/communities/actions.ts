@@ -430,6 +430,7 @@ export async function searchCommunityMembersForAdminAction(input: {
         profileId: string;
         username: string;
         displayName: string;
+        avatarUrl: string | null;
         role: "admin" | "member";
       }>;
     }
@@ -952,6 +953,7 @@ export async function searchEditionHostMembersAction(input: {
         profileId: string;
         username: string;
         displayName: string;
+        avatarUrl: string | null;
         role: "admin" | "member";
         isVoice: boolean;
       }>;

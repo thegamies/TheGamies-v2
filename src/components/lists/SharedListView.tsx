@@ -17,6 +17,7 @@ import { GameCover } from "@/components/ui/GameCover";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { RankMarker } from "@/components/ui/RankMarker";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import {
   parseStoredListFormat,
   parseStoredRankStyle,
@@ -48,7 +49,7 @@ type SharedCategoryPick = {
 };
 
 type SharedListViewData = {
-  owner: { username: string; displayName: string } | null;
+  owner: { username: string; displayName: string; avatarUrl?: string | null } | null;
   items: SharedListItem[];
   list: {
     publicId: string;
@@ -129,25 +130,24 @@ export function SharedListView({
         >
           {data.list.title}
         </h1>
-        <p className="mt-3 text-muted">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-muted">
           {data.owner ? (
-            <>
-              By{" "}
-              <Link
-                href={`/u/${data.owner.username}`}
-                className="text-ink hover:text-accent"
-              >
-                {data.owner.displayName}
-              </Link>
-            </>
+            <PersonIdentity
+              displayName={data.owner.displayName}
+              username={data.owner.username}
+              avatarUrl={data.owner.avatarUrl}
+              size={32}
+              href={`/u/${data.owner.username}`}
+              lede="By"
+              subtitle={null}
+            />
           ) : (
-            "Anonymous list"
+            <p>Anonymous list</p>
           )}
-          <span className="text-muted">
-            {" "}
+          <p>
             · {count} {countLabel}
-          </span>
-        </p>
+          </p>
+        </div>
 
         {saved ? (
           <p className="mt-4 text-sm text-ink">Saved to your account.</p>

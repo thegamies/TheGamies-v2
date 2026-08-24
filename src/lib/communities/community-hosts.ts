@@ -29,6 +29,7 @@ export type CommunityHostMemberRow = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   isHost: boolean;
 };
 
@@ -63,6 +64,7 @@ export async function listCurrentCommunityHosts(
       profileId: communityHosts.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(communityHosts)
     .innerJoin(profiles, eq(profiles.id, communityHosts.profileId))
@@ -79,6 +81,7 @@ export async function listCurrentCommunityHosts(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     isHost: true,
   }));
 }
@@ -103,6 +106,7 @@ export async function searchCommunityMembersForHost(
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       hostProfileId: communityHosts.profileId,
       retiredAt: communityHosts.retiredAt,
     })
@@ -128,6 +132,7 @@ export async function searchCommunityMembersForHost(
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     isHost: Boolean(row.hostProfileId) && row.retiredAt == null,
   }));
 }

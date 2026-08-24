@@ -92,13 +92,13 @@ Redeploy the develop Worker after changing this (`pnpm deploy:igdb-webhooks:deve
 
 ## Delivery
 
-The Worker `queue()` handler applies each batch (`max_concurrency: 1`). Cron every minute only pause/resumes Cloudflare queue delivery from KV:
+The Worker `queue()` handler applies each batch (`max_concurrency: 1`, `max_batch_size`: 25). A batch smaller than 25 is treated as the last packet: Auto drain pauses until the next interval (cron will not reopen the current window). Sticky **Open** stays on. A batch of 25 keeps delivery going. Cron every minute only pause/resumes Cloudflare queue delivery from KV:
 
 - **Auto** — open for `windowMinutes` at the start of each `intervalMinutes` cycle (UTC)
 - **Open** — always deliver; cron will not pause
 - **Closed** — always paused; cron will not resume; ingress still enqueues
 
-Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed). In Auto, that stays open until the next scheduled close.
+Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed) and marks the queue as still draining. In Auto, that stays open until a short batch (under 25) or the next scheduled close.
 
 `Failed query: <sql>` on a failed event is usually a dropped Neon HTTP call. The event log stores the underlying cause when present. Reprocess works for pending and failed.
 

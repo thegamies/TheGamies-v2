@@ -85,7 +85,7 @@ Configure on the repo:
 | `NEON_AUTH_COOKIE_SECRET` | Neon Auth cookie signing (32+ chars; staging + previews) |
 | `STAGING_VERCEL_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Vercel staging |
 | `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
-| `ADMIN_SYNC_SECRET` | Unlock `/admin/sync` (staging + PR previews) |
+| `ADMIN_SYNC_SECRET` | First site-operator claim + IGDB webhooks Worker proxy (staging + PR previews) |
 | `IGDB_CLIENT_ID` | IGDB / Twitch client id |
 | `IGDB_CLIENT_SECRET` | IGDB / Twitch client secret |
 | `R2_ACCOUNT_ID` | Cloudflare account for avatar R2 |

@@ -1,9 +1,8 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { EditionResultsBoardToolbar } from "./EditionResultsBoardToolbar";
-import { EditionResultsLayoutProvider } from "./EditionResultsLayout";
 import { EditionResultsOverview } from "./EditionResultsOverview";
 
 const emptyMatrix = {
@@ -15,22 +14,12 @@ const emptyMatrix = {
 
 afterEach(() => {
   cleanup();
-  vi.unstubAllGlobals();
 });
 
 describe("EditionResultsOverview comparison", () => {
-  it("fetches comparison when the toolbar selects Comparison", async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        matrix: emptyMatrix,
-        categoryComparison: emptyMatrix,
-      }),
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
+  it("renders Ranked and Comparison as Results layout links", () => {
     render(
-      <EditionResultsLayoutProvider>
+      <>
         <EditionResultsBoardToolbar
           slug="eric"
           year={2026}
@@ -41,6 +30,7 @@ describe("EditionResultsOverview comparison", () => {
         <EditionResultsOverview
           slug="eric"
           year={2026}
+          layout="ranked"
           topTen={[
             {
               place: 1,
@@ -62,15 +52,30 @@ describe("EditionResultsOverview comparison", () => {
           categoryComparison={emptyMatrix}
           youBallotHref={null}
         />
-      </EditionResultsLayoutProvider>,
+      </>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Comparison" }));
+    expect(screen.getByRole("link", { name: "Ranked" }).getAttribute("href")).toBe(
+      "/communities/eric/edition/2026?view=results",
+    );
+    expect(
+      screen.getByRole("link", { name: "Comparison" }).getAttribute("href"),
+    ).toBe("/communities/eric/edition/2026?view=comparison");
+  });
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/communities/eric/edition/2026/comparison",
-      );
-    });
+  it("hides Community and Hosts on the Comparison route", () => {
+    render(
+      <EditionResultsBoardToolbar
+        slug="eric"
+        year={2026}
+        mode="community"
+        view="comparison"
+        showLayout
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "Comparison" })).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Results board" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Community" })).toBeNull();
   });
 });

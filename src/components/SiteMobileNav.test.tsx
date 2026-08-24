@@ -36,10 +36,7 @@ const primaryLinks = [
   { href: "/communities", label: "Communities" },
 ];
 
-const utilityLinks = [
-  { href: "/admin", label: "Admin" },
-  { href: "/design-system", label: "Design system" },
-];
+const utilityLinks = [{ href: "/design-system", label: "Design system" }];
 
 afterEach(() => {
   cleanup();
@@ -82,10 +79,10 @@ describe("SiteMobileNav", () => {
       "href",
       "/auth/sign-in?next=%2Fgame-of-the-year%2F2026",
     );
-    expect(within(drawer).getByRole("link", { name: "Admin" })).toHaveAttribute(
-      "href",
-      "/admin",
-    );
+    expect(
+      within(drawer).getByRole("link", { name: "Design system" }),
+    ).toHaveAttribute("href", "/design-system");
+    expect(within(drawer).queryByRole("link", { name: "Admin" })).toBeNull();
     expect(document.body.style.overflow).toBe("hidden");
   });
 
@@ -97,8 +94,11 @@ describe("SiteMobileNav", () => {
         account={{
           status: "authenticated",
           label: "ecdm98",
+          username: "ecdm98",
+          avatarUrl: null,
           groups: buildAccountMenuGroups({
             username: "ecdm98",
+            includeAdmin: true,
             includeDesignSystem: true,
           }),
         }}

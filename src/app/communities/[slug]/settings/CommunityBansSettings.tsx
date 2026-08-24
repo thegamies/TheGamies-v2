@@ -3,11 +3,13 @@
 import { useActionState } from "react";
 import { unbanCommunityMemberAction } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 
 export type CommunityBanListItem = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl?: string | null;
 };
 
 export function CommunityBansSettings({
@@ -44,10 +46,11 @@ export function CommunityBansSettings({
               key={ban.profileId}
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
-              <div>
-                <p className="text-ink">{ban.displayName}</p>
-                <p className="text-sm text-muted">@{ban.username}</p>
-              </div>
+              <PersonIdentity
+                displayName={ban.displayName}
+                username={ban.username}
+                avatarUrl={ban.avatarUrl}
+              />
               <form action={formAction}>
                 <input type="hidden" name="slug" value={slug} />
                 <input type="hidden" name="profileId" value={ban.profileId} />

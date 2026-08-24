@@ -7,11 +7,13 @@ import {
   searchCommunityMembersForHostAction,
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 
 export type CommunityDesignatedHostOption = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   isHost: boolean;
 };
 
@@ -151,10 +153,11 @@ export function CommunityDesignatedHostsForm({
               key={member.profileId}
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
-              <div>
-                <p className="text-ink">{member.displayName}</p>
-                <p className="text-sm text-muted">@{member.username}</p>
-              </div>
+              <PersonIdentity
+                displayName={member.displayName}
+                username={member.username}
+                avatarUrl={member.avatarUrl}
+              />
               <Button
                 type="button"
                 variant="bordered"

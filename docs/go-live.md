@@ -83,14 +83,12 @@ Without this, events can close and sit on “calculating” until someone writes
 
 ### 6. Hide ops from the public product
 
-Today:
+**Shipped:** `/admin` is gated on `profiles.is_site_admin`. Admin is off consumer chrome except for site operators. Guessable `/admin` URLs 404 for everyone else. First operator claims with the admin code (never the env var name). Promote others under Admin → Site operators.
 
-- **Admin** is in the signed-in account menu **and** the signed-out mobile drawer
-- `/admin`, `/admin/seed`, `/admin/communities` are guessable (secret-gated, but visible)
+Still open:
+
 - `/design-system` is only hidden from nav on Vercel production; the URL still works and has no `robots: noindex`
-- `/admin/sync` tells the user to enter `ADMIN_SYNC_SECRET` (env var in product UI — against the copy rule)
-
-**Do:** hide Admin from consumer chrome (bookmark or signed-in site-ops allowlist). `noindex` design-system; 404 it in production. Strip env var names from admin unlock copy. Keep seed tools off the consumer path (or extra-confirm / disable when `VERCEL_ENV=production`).
+- Keep seed tools off the consumer path (or extra-confirm / disable when the app is production)
 
 ### 7. Share + crawl basics
 
@@ -185,7 +183,6 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 ## Cleanup (small, do on the way to `main`)
 
-- Admin unlock copy: “Enter the admin code,” never the env var name
 - Default favicon / apple-touch if the current `.ico` is a placeholder
 - README “Current status” still reads like a scaffold; retitle when production exists
 - `docs/setup-checklist.md` is still an unchecked wiring list — treat it as the **ops** companion to this doc
@@ -199,7 +196,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 2. **Domain + Auth + mail** — one origin, trusted domains, sending + inboxes  
 3. **Catalog** — backfill production, webhooks Worker live  
 4. **Freeze cron** on Cloudflare + `CRON_SECRET` on both hosts  
-5. **Chrome cleanup** — hide Admin / design-system / seed; fix admin copy  
+5. **Chrome cleanup** — design-system `noindex` / production 404; seed off production. Site operators are shipped.  
 6. **Share/SEO** — sitemap, robots, OG, error pages  
 7. **Games browse** — pagination (and filters if you want catalog parity)  
 8. **Staging ceremony QA** — ballot, close, freeze, reveal, comparison, account delete  

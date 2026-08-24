@@ -15,6 +15,8 @@ export type SiteNavAccount =
   | {
       status: "authenticated";
       label: string;
+      username: string;
+      avatarUrl: string | null;
       groups: SiteAccountMenuGroup[];
     }
   | { status: "anonymous" };
@@ -56,11 +58,15 @@ export function siteCreateLink(): SiteNavLink {
   return { href: SITE_CREATE_HREF, label: "+ Create" };
 }
 
-/** Admin and Design system — account menu / drawer utility cluster, not primary chrome. */
+/** Admin (site operators only) and Design system — account menu / drawer, not primary chrome. */
 export function buildUtilitySiteNavLinks(options: {
+  includeAdmin?: boolean;
   includeDesignSystem: boolean;
 }): SiteNavLink[] {
-  const links: SiteNavLink[] = [{ href: "/admin", label: "Admin" }];
+  const links: SiteNavLink[] = [];
+  if (options.includeAdmin) {
+    links.push({ href: "/admin", label: "Admin" });
+  }
   if (options.includeDesignSystem) {
     links.push({ href: "/design-system", label: "Design system" });
   }
@@ -69,6 +75,7 @@ export function buildUtilitySiteNavLinks(options: {
 
 export function buildAccountMenuGroups(options: {
   username: string | null;
+  includeAdmin?: boolean;
   includeDesignSystem: boolean;
 }): SiteAccountMenuGroup[] {
   const profileItems: SiteNavLink[] = options.username
@@ -82,14 +89,14 @@ export function buildAccountMenuGroups(options: {
       ]
     : [{ href: "/account", label: "View Profile" }];
 
+  const ops = buildUtilitySiteNavLinks({
+    includeAdmin: options.includeAdmin,
+    includeDesignSystem: options.includeDesignSystem,
+  });
+
   return [
     { id: "profile", items: profileItems },
     { id: "settings", items: [{ href: "/account", label: "Settings" }] },
-    {
-      id: "ops",
-      items: buildUtilitySiteNavLinks({
-        includeDesignSystem: options.includeDesignSystem,
-      }),
-    },
+    ...(ops.length > 0 ? [{ id: "ops", items: ops }] : []),
   ];
 }

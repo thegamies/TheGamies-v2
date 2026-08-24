@@ -87,6 +87,18 @@ describe("editionResultsHref", () => {
     );
   });
 
+  it("serializes Comparison as view=comparison", () => {
+    expect(editionResultsHref("demo", 2026, { view: "comparison" })).toBe(
+      "/communities/demo/edition/2026?view=comparison",
+    );
+    expect(
+      editionResultsHref("demo", 2026, {
+        view: "comparison",
+        source: "live",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=comparison&source=live");
+  });
+
   it("serializes Reveal explicitly so bare URL stays the entrance", () => {
     expect(editionResultsHref("demo", 2026, { view: "reveal" })).toBe(
       "/communities/demo/edition/2026?view=reveal",
@@ -116,6 +128,7 @@ describe("parseEditionResultsView", () => {
   it("defaults to reveal for unknown values and accepts entrance", () => {
     expect(parseEditionResultsView(undefined)).toBe("reveal");
     expect(parseEditionResultsView("entrance")).toBe("entrance");
+    expect(parseEditionResultsView("comparison")).toBe("comparison");
     expect(parseEditionResultsView("settings")).toBe("settings");
     expect(parseEditionResultsView("show")).toBe("show");
     expect(parseEditionResultsView("hosts")).toBe("hosts");
@@ -171,6 +184,12 @@ describe("editionHostRevealShowHref", () => {
         source: "live",
       }),
     ).toBe("/communities/demo/edition/2026?view=results&source=live");
+    expect(
+      editionHostRevealShowHref("demo", 2026, {
+        view: "comparison",
+        source: "live",
+      }),
+    ).toBe("/communities/demo/edition/2026?view=comparison&source=live");
     expect(
       editionHostRevealShowHref("demo", 2026, {
         view: "standings",

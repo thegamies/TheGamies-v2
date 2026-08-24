@@ -24,6 +24,7 @@ export type EditionResultsViewId =
   | "entrance"
   | "reveal"
   | "overview"
+  | "comparison"
   | "standings"
   | "categories"
   | "category"
@@ -77,6 +78,7 @@ export function parseEditionResultsView(
   raw: string | undefined,
 ): EditionResultsViewId {
   if (raw === "overview" || raw === "results") return "overview";
+  if (raw === "comparison") return "comparison";
   if (raw === "standings") return "standings";
   if (raw === "categories") return "categories";
   if (raw === "category") return "category";

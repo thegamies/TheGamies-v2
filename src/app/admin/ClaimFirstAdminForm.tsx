@@ -1,45 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import { fieldInputClass } from "@/components/ui/controls";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { fieldInputClass } from "@/components/ui/controls";
+import { claimFirstSiteAdminAction } from "./actions";
 
-export function AdminTgaGate({
-  authorized: initiallyAuthorized,
-  children,
-  onUnlocked,
-}: {
-  authorized: boolean;
-  children: React.ReactNode;
-  onUnlocked?: () => void;
-}) {
-  const [authorized, setAuthorized] = useState(initiallyAuthorized);
+export function ClaimFirstAdminForm() {
+  const router = useRouter();
   const [secret, setSecret] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-
-  if (authorized) return children;
+  const [busy, setBusy] = useState(false);
 
   return (
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        setBusy(true);
         setMessage(null);
-        const res = await fetch("/api/admin/session", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ secret }),
-        });
-        if (!res.ok) {
-          setMessage("Could not unlock admin controls.");
+        const result = await claimFirstSiteAdminAction(secret);
+        setBusy(false);
+        if ("error" in result && result.error) {
+          setMessage(result.error);
           return;
         }
-        setAuthorized(true);
-        onUnlocked?.();
+        router.refresh();
       }}
       className="max-w-md space-y-4"
     >
       <p className="text-sm text-muted">
-        Enter the admin unlock code to manage Video Game Awards Pick’em.
+        No site operators yet. Enter the admin code to become one. Community
+        admins are separate.
       </p>
       <input
         type="password"
@@ -48,7 +39,9 @@ export function AdminTgaGate({
         onChange={(event) => setSecret(event.target.value)}
         autoComplete="current-password"
       />
-      <Button type="submit">Unlock</Button>
+      <Button type="submit" disabled={busy || secret.length < 1}>
+        Continue
+      </Button>
       {message ? (
         <p className="text-sm text-accent" role="alert">
           {message}

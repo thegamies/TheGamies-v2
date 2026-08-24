@@ -1,15 +1,20 @@
 import Link from "next/link";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { TgaBallotForm } from "@/components/tga-pickem/TgaBallotForm";
 import type { TgaBallotCategory } from "@/lib/tga-pickem/service";
 
 export function TgaPublicSheet({
   displayName,
+  username,
+  avatarUrl,
   standingsHref,
   categories,
   picks,
   guess,
 }: {
   displayName: string;
+  username: string;
+  avatarUrl?: string | null;
   standingsHref: string;
   categories: TgaBallotCategory[];
   picks: Record<string, string>;
@@ -22,9 +27,16 @@ export function TgaPublicSheet({
           Back to standings
         </Link>
       </p>
-      <h2 className="mt-6 font-display text-3xl tracking-wide text-ink">
-        {displayName}
-      </h2>
+      <div className="mt-6">
+        <PersonIdentity
+          displayName={displayName}
+          username={username}
+          avatarUrl={avatarUrl}
+          size={56}
+          href={`/u/${username}`}
+          nameClassName="font-display text-3xl tracking-wide text-ink"
+        />
+      </div>
       {Object.keys(picks).length === 0 && guess == null ? (
         <p className="mt-4 text-muted">No entry on this board.</p>
       ) : (

@@ -72,5 +72,5 @@ Work top to bottom.
 
 - [ ] `pnpm dev:secrets` loads the app locally
 - [ ] `pnpm lint && pnpm typecheck && pnpm build` locally
-- [ ] Staging URLs load; `/admin/sync` unlocks with `ADMIN_SYNC_SECRET`
+- [ ] Staging URLs load; a site operator can open `/admin` (first operator claims with the admin code)
 - [ ] Vercel + Cloudflare previews share Neon `preview/pr-<n>` when Neon secrets are set

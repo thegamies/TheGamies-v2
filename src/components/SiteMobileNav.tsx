@@ -7,6 +7,7 @@ import { signOutAction } from "@/app/auth/sign-out/actions";
 import { SignInLink } from "@/components/auth/SignInLink";
 import { SiteCreateLink } from "@/components/SiteCreateLink";
 import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/profile/UserAvatar";
 import type { SiteNavAccount, SiteNavLink } from "@/lib/site-nav";
 
 type SiteMobileNavProps = {
@@ -109,9 +110,17 @@ export function SiteMobileNav({
               </div>
               {account.status === "authenticated" ? (
                 <>
-                  <p className="pt-4 text-xs uppercase tracking-[0.16em] text-muted">
-                    {account.label}
-                  </p>
+                  <div className="flex items-center gap-3 pt-4">
+                    <UserAvatar
+                      displayName={account.label}
+                      username={account.username}
+                      avatarUrl={account.avatarUrl}
+                      size={32}
+                    />
+                    <p className="text-xs uppercase tracking-[0.16em] text-muted">
+                      {account.label}
+                    </p>
+                  </div>
                   {account.groups.map((group) =>
                     group.items.map((item) => (
                       <Link

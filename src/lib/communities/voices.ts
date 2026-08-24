@@ -129,6 +129,7 @@ export type EditionHostMemberRow = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   role: "admin" | "member";
   isVoice: boolean;
 };
@@ -142,6 +143,7 @@ function mapHostMemberRow(row: {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   role: string;
   voiceProfileId: string | null;
 }): EditionHostMemberRow {
@@ -149,6 +151,7 @@ function mapHostMemberRow(row: {
     profileId: row.profileId,
     username: row.username,
     displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
     role: row.role === "admin" ? "admin" : "member",
     isVoice: Boolean(row.voiceProfileId),
   };
@@ -160,6 +163,7 @@ function hostMemberJoins(editionId: string, db: Db) {
       profileId: communityMembers.profileId,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
       role: communityMembers.role,
       voiceProfileId: communityEditionVoices.profileId,
     })

@@ -17,18 +17,14 @@ const BATCH_SIZE = 50;
 type Stats = { profiles: number; lists: number; maxIndex: number };
 
 type Props = {
-  authorized: boolean;
   initialYear: number;
   initialStats: Stats | null;
 };
 
 export function AdminSeedClient({
-  authorized: initiallyAuthorized,
   initialYear,
   initialStats,
 }: Props) {
-  const [authorized, setAuthorized] = useState(initiallyAuthorized);
-  const [secret, setSecret] = useState("");
   const [year, setYear] = useState(initialYear);
   const [count, setCount] = useState(50);
   const [listSize, setListSize] = useState(10);
@@ -40,30 +36,6 @@ export function AdminSeedClient({
   const [running, setRunning] = useState(false);
   const [pending, startTransition] = useTransition();
   const stopRef = useRef(false);
-
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-    const res = await fetch("/api/admin/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secret }),
-    });
-    if (!res.ok) {
-      setMessage("Could not unlock admin controls.");
-      return;
-    }
-    setAuthorized(true);
-    setSecret("");
-    const loaded = await loadSeedStatsAction();
-    if ("profiles" in loaded) {
-      setStats({
-        profiles: loaded.profiles,
-        lists: loaded.lists,
-        maxIndex: loaded.maxIndex,
-      });
-    }
-  }
 
   async function refreshStats() {
     const loaded = await loadSeedStatsAction();
@@ -236,30 +208,6 @@ export function AdminSeedClient({
     } finally {
       setRunning(false);
     }
-  }
-
-  if (!authorized) {
-    return (
-      <form onSubmit={unlock} className="max-w-md space-y-4">
-        <p className="text-sm text-muted">
-          Enter the admin unlock code to create standings seed data.
-        </p>
-        <input
-          type="password"
-          className={fieldInputClass}
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          autoComplete="off"
-          required
-        />
-        <Button type="submit">Unlock</Button>
-        {message ? (
-          <p className="text-sm text-accent" role="alert">
-            {message}
-          </p>
-        ) : null}
-      </form>
-    );
   }
 
   const busy = pending || running;

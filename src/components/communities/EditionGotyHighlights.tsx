@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { type CSSProperties, type ReactNode } from "react";
+import { type CSSProperties } from "react";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
+import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import { RankedStandingBillboard } from "@/components/communities/RankedStandingBillboard";
 import {
@@ -17,9 +18,6 @@ import type {
   MatrixVoiceColumn,
 } from "@/lib/communities/edition-results";
 import { editionVoterBallotHref } from "@/lib/communities/edition-results-href";
-
-/** Cell padding each side (`px-2`). Column: 103+16 → 119; lg 206+16 → 222. */
-const CELL_PAD_X = 8;
 
 const LIST_COL =
   "box-border w-[var(--strip-col)] min-w-[var(--strip-col)] max-w-[var(--strip-col)] px-2 align-top";
@@ -41,39 +39,6 @@ function stripTableStyle(
     minWidth: `calc(${cols} * var(--strip-col))`,
     tableLayout: "fixed",
   };
-}
-
-function MatrixHeaderLabel({
-  children,
-  title,
-  href,
-}: {
-  children: ReactNode;
-  title?: string;
-  href?: string | null;
-}) {
-  const style = { width: `calc(var(--strip-col) - ${CELL_PAD_X * 2}px)` };
-  if (href) {
-    return (
-      <Link
-        href={href}
-        className="line-clamp-2 block text-left text-sm font-semibold leading-snug text-ink underline-offset-2 transition-colors hover:text-accent hover:underline"
-        title={title}
-        style={style}
-      >
-        {children}
-      </Link>
-    );
-  }
-  return (
-    <span
-      className="line-clamp-2 block text-left text-sm font-semibold leading-snug text-muted"
-      title={title}
-      style={style}
-    >
-      {children}
-    </span>
-  );
 }
 
 function MatrixCardCell({
@@ -144,23 +109,28 @@ function GotyComparisonStrip({
           <tr className="border-b border-line text-left">
             {showYou ? (
               <th scope="col" className={`${LIST_COL} py-2`}>
-                <MatrixHeaderLabel href={youBallotHref}>You</MatrixHeaderLabel>
+                <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
               </th>
             ) : null}
             <th scope="col" className={`${LIST_COL} py-2`}>
-              <MatrixHeaderLabel>Community</MatrixHeaderLabel>
+              <ComparisonStripHeader>Community</ComparisonStripHeader>
             </th>
             <th scope="col" className={`${LIST_COL} py-2`}>
-              <MatrixHeaderLabel>Hosts</MatrixHeaderLabel>
+              <ComparisonStripHeader>Hosts</ComparisonStripHeader>
             </th>
             {voiceColumns.map((v) => (
               <th key={v.profileId} scope="col" className={`${LIST_COL} py-2`}>
-                <MatrixHeaderLabel
+                <ComparisonStripHeader
                   title={`@${v.username}`}
                   href={editionVoterBallotHref(slug, year, v.username)}
+                  person={{
+                    displayName: v.displayName,
+                    username: v.username,
+                    avatarUrl: v.avatarUrl,
+                  }}
                 >
                   {v.displayName}
-                </MatrixHeaderLabel>
+                </ComparisonStripHeader>
               </th>
             ))}
           </tr>

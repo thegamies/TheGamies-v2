@@ -38,7 +38,6 @@ const ENRICH_STEPS = [
 type EnrichStep = (typeof ENRICH_STEPS)[number];
 
 type Props = {
-  authorized: boolean;
   initialRuns: SyncRun[];
   initialResume: ResumeInfo | null;
 };
@@ -51,12 +50,9 @@ function scopeLabel(scope: Record<string, unknown> | null): string {
 }
 
 export function AdminSyncClient({
-  authorized,
   initialRuns,
   initialResume,
 }: Props) {
-  const [authed, setAuthed] = useState(authorized);
-  const [secret, setSecret] = useState("");
   const [year, setYear] = useState(String(new Date().getUTCFullYear()));
   const [allYears, setAllYears] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -78,36 +74,13 @@ export function AdminSyncClient({
   }
 
   useEffect(() => {
-    if (!authed) return;
     const y = Number(year);
     if (!Number.isFinite(y)) return;
     const timer = setTimeout(() => {
       void loadStatus(y);
     }, 300);
     return () => clearTimeout(timer);
-  }, [authed, year]);
-
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/admin/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret }),
-      });
-      if (!res.ok) {
-        setMessage("Invalid secret");
-        return;
-      }
-      setAuthed(true);
-      setMessage("Unlocked");
-      await loadStatus();
-    } finally {
-      setBusy(false);
-    }
-  }
+  }, [year]);
 
   function enrichScope(): { year?: number } {
     return allYears ? {} : { year: Number(year) };
@@ -173,28 +146,6 @@ export function AdminSyncClient({
   }
 
   const yearNum = Number(year);
-
-  if (!authed) {
-    return (
-      <form onSubmit={unlock} className="max-w-md space-y-4">
-        <p className="text-muted">
-          Enter <code className="text-ink">ADMIN_SYNC_SECRET</code> to unlock
-          sync controls.
-        </p>
-        <input
-          type="password"
-          value={secret}
-          onChange={(e) => setSecret(e.target.value)}
-          className="w-full border border-line bg-panel px-3 py-2 text-ink"
-          placeholder="Admin secret"
-        />
-        <Button type="submit" disabled={busy}>
-          Unlock
-        </Button>
-        {message ? <p className="text-sm text-accent">{message}</p> : null}
-      </form>
-    );
-  }
 
   return (
     <div className="space-y-10">

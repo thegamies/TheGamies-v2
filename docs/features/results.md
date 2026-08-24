@@ -7,7 +7,7 @@ The final results page is the primary design-system foundation.
 One results toolbar under the Results heading:
 
 - **Secondary** underline tabs: Reveal · Results · Full standings · Categories · Voters · Your ballot (members only) · Settings (hosts)  
-- Below the divider, one row of segmented controls: on Results, Ranked / Comparison first, then Community / Hosts (hidden on Your ballot and while Comparison is showing). Local `next dev` only: a **Debug** popover on that row.
+- Below the divider, one row of segmented controls: on Results, Ranked / Comparison first, then Community / Hosts (hidden on Your ballot and while Comparison is showing). Local `next dev` only: a **Debug** popover on that row. Ranked is `?view=results`; Comparison is `?view=comparison`.
 
 Multi-year switching is a pop-open year control beside the Results heading (2+ public years). Switching years keeps the current view (Reveal · Results · …) and Community · Hosts board. Community Overview · Live Rankings · Events · Members · Settings stay **primary** bordered chips. See `docs/design-system.md` → Navigation hierarchy.
 
@@ -28,7 +28,7 @@ Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per cha
 
 **Results** (`?view=results`, also accepts `overview`)
 
-**Ranked / Comparison** segmented control on the board row (default Ranked) applies to both GOTY and Categories. SSR loads Ranked data only (GOTY through 10 + category podiums); Comparison matrices fetch on first Comparison click (`/api/.../comparison`).
+**Ranked / Comparison** segmented control on the board row (default Ranked) applies to both GOTY and Categories. Ranked is `?view=results`; Comparison is `?view=comparison` (Results stays the active secondary tab). Each URL SSR-loads only that layout — Ranked: GOTY through 10 + category podiums; Comparison: You / Community / Hosts / each Host matrices. Community / Hosts stay hidden on Comparison.
 
 1. **Game of the Year** — Ranked: one continuous wrapping Top 10 grid (no horizontal scroll); large place in front of the title. Comparison: per-rank chapters, each with You · Community · Hosts · each Host; **rank rows share one horizontal scroll** so columns stay aligned → link to **Full standings** when more than 10. Comparison numbering follows the event’s competition or dense setting (no Skip / Dense / Board picker).  
 2. Category awards — Ranked: every freeze row with **displayed rank ≤ 3** per award (full ties at the cutoff), **one line**, `HorizontalScroll` if needed; place in front of the title; #1 slightly wider. Comparison: same per-award chapters, each with You · Community (#1, stacked if tied) · Hosts (#1) · each Host. Each award links to **Full standings** for that category (`?view=category&category=`).  

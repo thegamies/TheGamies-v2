@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isAdminAuthorized } from "@/lib/admin-auth";
+import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { getTgaYear, listTgaBallot, listTgaYears } from "@/lib/tga-pickem/service";
 import { tgaStatusLabel } from "@/lib/tga-pickem/status";
-import { AdminTgaGate } from "../AdminTgaGate";
 import { AdminTgaYearClient } from "./AdminTgaYearClient";
 
 type Params = Promise<{ year: string }>;
@@ -26,11 +25,11 @@ export default async function AdminTgaYearPage({ params }: { params: Params }) {
   const { year: raw } = await params;
   const year = Number(raw);
   if (!Number.isInteger(year)) notFound();
-  const authorized = await isAdminAuthorized();
-  const slate = authorized ? await getTgaYear(year).catch(() => null) : null;
-  if (authorized && !slate) notFound();
-  const ballot = authorized && slate ? await listTgaBallot(year) : [];
-  const years = authorized ? await listTgaYears().catch(() => []) : [];
+  await requireSiteAdminPage();
+  const slate = await getTgaYear(year).catch(() => null);
+  if (!slate) notFound();
+  const ballot = await listTgaBallot(year);
+  const years = await listTgaYears().catch(() => []);
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
@@ -43,24 +42,20 @@ export default async function AdminTgaYearPage({ params }: { params: Params }) {
         {year}
       </h1>
       <div className="mt-10">
-        <AdminTgaGate authorized={authorized}>
-          {slate ? (
-            <AdminTgaYearClient
-              year={year}
-              statusLabel={tgaStatusLabel(slate.status)}
-              enabled={slate.enabled}
-              promoted={slate.promoted}
-              complete={slate.complete}
-              completeReason={slate.completeReason}
-              opensAt={toLocalInput(slate.opensAt)}
-              showStartsAt={toLocalInput(slate.showStartsAt)}
-              otherYears={years
-                .map((row) => row.year)
-                .filter((value) => value !== year)}
-              categories={ballot}
-            />
-          ) : null}
-        </AdminTgaGate>
+        <AdminTgaYearClient
+          year={year}
+          statusLabel={tgaStatusLabel(slate.status)}
+          enabled={slate.enabled}
+          promoted={slate.promoted}
+          complete={slate.complete}
+          completeReason={slate.completeReason}
+          opensAt={toLocalInput(slate.opensAt)}
+          showStartsAt={toLocalInput(slate.showStartsAt)}
+          otherYears={years
+            .map((row) => row.year)
+            .filter((value) => value !== year)}
+          categories={ballot}
+        />
       </div>
     </main>
   );

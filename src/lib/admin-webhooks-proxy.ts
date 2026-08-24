@@ -20,7 +20,7 @@ export async function proxyWebhooksWorker(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
-  if (!(await isAdminAuthorized(request))) {
+  if (!(await isAdminAuthorized())) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
 

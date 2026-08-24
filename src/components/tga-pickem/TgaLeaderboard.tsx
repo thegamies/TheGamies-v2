@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import type { TgaLeaderboardRow } from "@/lib/tga-pickem/scores";
 
 export function TgaLeaderboard({
@@ -30,23 +31,25 @@ export function TgaLeaderboard({
         {rows.map((row) => (
           <li
             key={row.profileId}
-            className="flex flex-wrap items-baseline justify-between gap-3 py-3"
+            className="flex flex-wrap items-center justify-between gap-3 py-3"
           >
-            <p className="text-ink">
-              <span className="font-display text-2xl tracking-wide">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="font-display text-2xl tracking-wide text-ink">
                 {row.place}
-              </span>{" "}
-              <Link
+              </span>
+              <PersonIdentity
+                displayName={row.displayName}
+                username={row.username}
+                avatarUrl={row.avatarUrl}
                 href={
                   sheetHref
                     ? sheetHref(row.username)
                     : `/u/${row.username}`
                 }
-                className="font-semibold hover:text-accent"
-              >
-                {row.displayName}
-              </Link>
-            </p>
+                nameClassName="font-semibold text-ink"
+                subtitle={null}
+              />
+            </div>
             <p className="text-sm text-muted">
               {row.points} {row.points === 1 ? "point" : "points"}
               {row.wpDelta != null ? ` · ${row.wpDelta} WP off` : ""}

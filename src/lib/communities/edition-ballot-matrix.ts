@@ -6,6 +6,7 @@ export type MatrixVoiceColumn = {
   profileId: string;
   displayName: string;
   username: string;
+  avatarUrl?: string | null;
 };
 
 export type MatrixGameCell = {

@@ -34,8 +34,10 @@ describe("SiteAccountMenu", () => {
     render(
       <SiteAccountMenu
         label="ecdm98"
+        username="ecdm98"
         groups={buildAccountMenuGroups({
           username: "ecdm98",
+          includeAdmin: true,
           includeDesignSystem: true,
         })}
       />,
@@ -75,8 +77,10 @@ describe("SiteAccountMenu", () => {
     render(
       <SiteAccountMenu
         label="ecdm98"
+        username="ecdm98"
         groups={buildAccountMenuGroups({
           username: "ecdm98",
+          includeAdmin: true,
           includeDesignSystem: false,
         })}
       />,
@@ -93,6 +97,7 @@ describe("SiteAccountMenu", () => {
     render(
       <SiteAccountMenu
         label="ecdm98"
+        username="ecdm98"
         groups={buildAccountMenuGroups({
           username: "ecdm98",
           includeDesignSystem: false,

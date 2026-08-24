@@ -21,6 +21,8 @@ import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/contro
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
+import { UserAvatar } from "@/components/profile/UserAvatar";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { RankMarker } from "@/components/ui/RankMarker";
 import { SectionRule } from "@/components/ui/SectionRule";
@@ -182,6 +184,25 @@ export default function DesignSystemPage() {
           <p className="text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
             Eyebrow / meta label
           </p>
+        </div>
+      </Section>
+
+      <Section title="People">
+        <p className="mb-4 max-w-xl text-sm text-muted">
+          Identity, not decoration. Initials when there is no photo. 36px in
+          lists; 80px on the profile page.
+        </p>
+        <div className="flex flex-wrap items-end gap-8 border border-line bg-panel p-5">
+          <UserAvatar displayName="Ada" username="ada" size={80} />
+          <PersonIdentity displayName="Ada" username="ada" avatarUrl={null} />
+          <PersonIdentity
+            displayName="Ada"
+            username="ada"
+            href="/u/ada"
+            lede="By"
+            subtitle={null}
+            size={32}
+          />
         </div>
       </Section>
 

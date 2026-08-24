@@ -6,6 +6,7 @@ import {
   setEditionVoiceAction,
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
 import Link from "next/link";
 
@@ -13,6 +14,7 @@ export type EditionVoiceMemberOption = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   /** Internal role — UI says Host, never admin. */
   role: "admin" | "member";
   isVoice: boolean;
@@ -179,13 +181,17 @@ export function EditionVoicesForm({
               key={member.profileId}
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
-              <div>
-                <p className="text-ink">{member.displayName}</p>
-                <p className="text-sm text-muted">
-                  @{member.username}
-                  <span className="text-muted"> · {roleLabel(member)}</span>
-                </p>
-              </div>
+              <PersonIdentity
+                displayName={member.displayName}
+                username={member.username}
+                avatarUrl={member.avatarUrl}
+                subtitle={
+                  <p className="text-sm text-muted">
+                    @{member.username}
+                    <span className="text-muted"> · {roleLabel(member)}</span>
+                  </p>
+                }
+              />
               <Button
                 type="button"
                 variant="bordered"

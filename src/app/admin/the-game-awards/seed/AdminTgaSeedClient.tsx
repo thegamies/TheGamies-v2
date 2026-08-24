@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { AdminTgaGate } from "../AdminTgaGate";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
@@ -13,7 +12,6 @@ import {
   clearTgaCommunitySeedSheetsAction,
   clearTgaSeedSheetsAction,
   loadTgaCommunitySeedStatsAction,
-  loadTgaSeedPageAction,
   loadTgaSeedStatsAction,
   seedTgaCommunitySheetsAction,
   seedTgaSheetsAction,
@@ -34,14 +32,12 @@ type CommunityStats = {
 };
 
 type Props = {
-  authorized: boolean;
   years: number[];
   initialYear: number;
   initialStats: Stats | null;
 };
 
 export function AdminTgaSeedClient({
-  authorized,
   years,
   initialYear,
   initialStats,
@@ -56,15 +52,6 @@ export function AdminTgaSeedClient({
   const [message, setMessage] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const stopRef = useRef(false);
-
-  async function hydratePage() {
-    const loaded = await loadTgaSeedPageAction();
-    if ("ok" in loaded && loaded.ok) {
-      setPageYears(loaded.years);
-      setYear(loaded.year);
-      setStats(loaded.stats);
-    }
-  }
 
   async function refreshCommunityStats(nextYear = year, slug = communitySlug) {
     const slugError = tgaCommunitySeedSlugError(slug);
@@ -171,8 +158,7 @@ export function AdminTgaSeedClient({
   }
 
   return (
-    <AdminTgaGate authorized={authorized} onUnlocked={() => void hydratePage()}>
-      <div className="max-w-xl space-y-8">
+    <div className="max-w-xl space-y-8">
         {stats ? (
           <p className="text-sm text-muted">
             {year}: {stats.seedVoterSheets} seed accounts already entered ·{" "}
@@ -332,6 +318,5 @@ export function AdminTgaSeedClient({
           </p>
         ) : null}
       </div>
-    </AdminTgaGate>
   );
 }

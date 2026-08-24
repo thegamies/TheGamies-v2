@@ -23,18 +23,14 @@ type Stats = {
 };
 
 type Props = {
-  authorized: boolean;
   initialYear: number;
   initialStats: Stats | null;
 };
 
 export function AdminCommunitiesClient({
-  authorized: initiallyAuthorized,
   initialYear,
   initialStats,
 }: Props) {
-  const [authorized, setAuthorized] = useState(initiallyAuthorized);
-  const [secret, setSecret] = useState("");
   const [slug, setSlug] = useState("");
   const [year, setYear] = useState(initialYear);
   const [count, setCount] = useState(10);
@@ -50,23 +46,6 @@ export function AdminCommunitiesClient({
   const [running, setRunning] = useState(false);
   const [pending, startTransition] = useTransition();
   const stopRef = useRef(false);
-
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setMessage(null);
-    const res = await fetch("/api/admin/session", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ secret }),
-    });
-    if (!res.ok) {
-      setMessage("Could not unlock admin controls.");
-      return;
-    }
-    setAuthorized(true);
-    setSecret("");
-    await refreshStats();
-  }
 
   async function refreshStats() {
     const loaded = await loadCommunitySeedStatsAction({
@@ -287,29 +266,6 @@ export function AdminCommunitiesClient({
       );
       await refreshStats();
     });
-  }
-
-  if (!authorized) {
-    return (
-      <form onSubmit={unlock} className="max-w-md space-y-4">
-        <label className="block text-sm text-muted">
-          Admin code
-          <input
-            className={`${fieldInputClass} mt-1`}
-            type="password"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            autoComplete="off"
-          />
-        </label>
-        <Button type="submit">Unlock</Button>
-        {message ? (
-          <p className="text-sm text-accent" role="alert">
-            {message}
-          </p>
-        ) : null}
-      </form>
-    );
   }
 
   const busy = pending || running;

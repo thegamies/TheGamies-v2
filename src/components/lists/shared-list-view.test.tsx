@@ -47,7 +47,7 @@ afterEach(() => {
 });
 
 const data = {
-  owner: { username: "eric4", displayName: "Eric" },
+  owner: { username: "eric4", displayName: "Eric", avatarUrl: null },
   items: [
     {
       gameId: "g1",

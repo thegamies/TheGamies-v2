@@ -94,6 +94,7 @@ describe("tombstoneProfileFields", () => {
     expect(fields.socialLinks).toBeNull();
     expect(fields.visibility).toBe("private");
     expect(fields.authUserId).toBe(deletedAuthUserIdSentinel(id));
+    expect(fields.isSiteAdmin).toBe(false);
     expect(fields.deletedAt).toBe(now);
   });
 });

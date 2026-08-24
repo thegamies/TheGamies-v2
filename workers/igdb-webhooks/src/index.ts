@@ -13,6 +13,8 @@ import {
   testIgdbWebhook,
   tryExtractWebhookIgdbId,
   verifyIgdbWebhookSecret,
+  isDrainPullExhausted,
+  QUEUE_CONSUMER_MAX_BATCH_SIZE,
   WEBHOOK_ENTITIES,
   WEBHOOK_METHODS,
   type IgdbWebhookEnvelope,
@@ -354,6 +356,7 @@ export default {
         await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
           forceOpenUntil,
           lastDrainAt: new Date().toISOString(),
+          drainPending: true,
         });
         await setQueueDeliveryPaused(env, false);
         return json({
@@ -425,6 +428,7 @@ export default {
     }
     bindProcessEnv(env);
     const db = createDb(env.DATABASE_URL);
+    let retried = 0;
     for (const message of batch.messages) {
       try {
         const envelope: IgdbWebhookEnvelope = isEnvelope(message.body)
@@ -440,13 +444,38 @@ export default {
             };
         const result = await processWebhookEnvelope(db, envelope, message.id);
         if (result.status === "failed" && !envelope.ingressError) {
+          retried += 1;
           message.retry();
         } else {
           message.ack();
         }
       } catch {
+        retried += 1;
         message.retry();
       }
+    }
+
+    const pulled = batch.messages.length;
+    if (
+      isDrainPullExhausted({
+        pulled,
+        batchSize: QUEUE_CONSUMER_MAX_BATCH_SIZE,
+        retried,
+      })
+    ) {
+      await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
+        drainPending: false,
+        forceOpenUntil: null,
+        lastDrainAt: new Date().toISOString(),
+      });
+      if (settings.deliveryMode !== "open") {
+        await setQueueDeliveryPaused(env, true);
+      }
+    } else if (pulled >= QUEUE_CONSUMER_MAX_BATCH_SIZE) {
+      await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
+        drainPending: true,
+        lastDrainAt: new Date().toISOString(),
+      });
     }
   },
 };

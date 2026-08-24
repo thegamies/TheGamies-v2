@@ -2,10 +2,6 @@
 
 import Link from "next/link";
 import { EditionCategoryDebugPopover } from "@/components/communities/EditionCategoryDebug";
-import {
-  useEditionResultsLayout,
-  type ResultsBoardLayout,
-} from "@/components/communities/EditionResultsLayout";
 import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/controls";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { editionResultsHref } from "@/lib/communities/edition-results-href";
@@ -13,11 +9,16 @@ import {
   editionBoardLabel,
   type EditionResultsPublicMode,
   type EditionResultsViewId,
+  type EditionShowSource,
 } from "@/lib/communities/edition-results-scoring";
 
-const LAYOUTS: Array<{ id: ResultsBoardLayout; label: string }> = [
-  { id: "ranked", label: "Ranked" },
-  { id: "comparison", label: "Comparison" },
+const LAYOUTS: Array<{
+  id: "ranked" | "comparison";
+  view: "overview" | "comparison";
+  label: string;
+}> = [
+  { id: "ranked", view: "overview", label: "Ranked" },
+  { id: "comparison", view: "comparison", label: "Comparison" },
 ];
 
 const MODES: EditionResultsPublicMode[] = ["community", "voices"];
@@ -30,6 +31,8 @@ export function EditionResultsBoardToolbar({
   categoryId = null,
   votersQ = "",
   showLayout,
+  showBoardModes = true,
+  source,
 }: {
   slug: string;
   year: number;
@@ -38,9 +41,11 @@ export function EditionResultsBoardToolbar({
   categoryId?: string | null;
   votersQ?: string;
   showLayout: boolean;
+  showBoardModes?: boolean;
+  source?: EditionShowSource;
 }) {
-  const board = useEditionResultsLayout();
-  const showBoardMode = !(showLayout && board?.layout === "comparison");
+  const layoutActive = view === "comparison" ? "comparison" : "ranked";
+  const showVoiceBoards = showBoardModes && view !== "comparison";
 
   return (
     <ScrollableNav
@@ -50,27 +55,36 @@ export function EditionResultsBoardToolbar({
       className="mt-3"
       rowClassName="gap-2 [&>[role=group]]:shrink-0"
     >
-      {showLayout && board ? (
+      {showLayout ? (
         <div
           role="group"
           aria-label="Results layout"
           className={`${controlGroupBarClass} w-max shrink-0`}
         >
-          {LAYOUTS.map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              aria-pressed={board.layout === opt.id}
-              className={segmentFitBtnClass(board.layout === opt.id)}
-              onClick={() => board.setLayout(opt.id)}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {LAYOUTS.map((opt) => {
+            const active = layoutActive === opt.id;
+            return (
+              <Link
+                key={opt.id}
+                href={editionResultsHref(slug, year, {
+                  mode,
+                  view: opt.view,
+                  source,
+                  votersPage: 1,
+                  q: votersQ,
+                })}
+                scroll={false}
+                aria-current={active ? "page" : undefined}
+                className={segmentFitBtnClass(active)}
+              >
+                {opt.label}
+              </Link>
+            );
+          })}
         </div>
       ) : null}
 
-      {showBoardMode ? (
+      {showVoiceBoards ? (
         <div
           role="group"
           aria-label="Results board"
@@ -84,6 +98,7 @@ export function EditionResultsBoardToolbar({
                 href={editionResultsHref(slug, year, {
                   mode: m,
                   view,
+                  source,
                   votersPage: 1,
                   q: votersQ,
                   category:

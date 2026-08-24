@@ -648,7 +648,7 @@ export async function deleteOwnedList(
 export type ShareListPayload = {
   list: ListRow;
   items: Awaited<ReturnType<typeof loadListItems>>;
-  owner: { username: string; displayName: string } | null;
+  owner: { username: string; displayName: string; avatarUrl: string | null } | null;
 };
 
 export type ShareListCategoryPick = {
@@ -706,12 +706,17 @@ export async function getShareListByPublicId(
 
   const includeItems = opts.includeItems !== false;
   const items = includeItems ? await loadListItems(list.id, db) : [];
-  let owner: { username: string; displayName: string } | null = null;
+  let owner: {
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+  } | null = null;
   if (list.profileId) {
     const [profile] = await db
       .select({
         username: profiles.username,
         displayName: profiles.displayName,
+        avatarUrl: profiles.avatarUrl,
       })
       .from(profiles)
       .where(eq(profiles.id, list.profileId))
@@ -720,6 +725,7 @@ export async function getShareListByPublicId(
       owner = {
         username: profile.username,
         displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
       };
     }
   }
@@ -738,6 +744,7 @@ export async function getShareListByUsernameSlug(
       list: lists,
       username: profiles.username,
       displayName: profiles.displayName,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(lists)
     .innerJoin(profiles, eq(profiles.id, lists.profileId))
@@ -754,6 +761,7 @@ export async function getShareListByUsernameSlug(
     owner: {
       username: row.username,
       displayName: row.displayName,
+      avatarUrl: row.avatarUrl,
     },
   };
 }

@@ -4,13 +4,18 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 import { signOutAction } from "@/app/auth/sign-out/actions";
 import { Button } from "@/components/ui/Button";
+import { UserAvatar } from "@/components/profile/UserAvatar";
 import type { SiteAccountMenuGroup } from "@/lib/site-nav";
 
 export function SiteAccountMenu({
   label,
+  username,
+  avatarUrl,
   groups,
 }: {
   label: string;
+  username: string;
+  avatarUrl?: string | null;
   groups: SiteAccountMenuGroup[];
 }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +62,12 @@ export function SiteAccountMenu({
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
       >
+        <UserAvatar
+          displayName={label}
+          username={username}
+          avatarUrl={avatarUrl}
+          size={22}
+        />
         {label}
         <ChevronIcon open={open} />
       </button>

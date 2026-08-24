@@ -302,6 +302,13 @@
       "when": 1788825600000,
       "tag": "0042_community_hosts",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788912000000,
+      "tag": "0043_profile_is_site_admin",
+      "breakpoints": true
     }
   ]
 }

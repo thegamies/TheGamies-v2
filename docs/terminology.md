@@ -14,6 +14,10 @@ A member **Promoted** on the community Hosts roster (`community_hosts`). Open GO
 
 Someone who can manage a community (Settings, live rankings, events, other admins). Settings → Community uses **Admin** / **Admins**. Internal role is `admin`. Public member lists still show display names only.
 
+### Site operator
+
+Someone who can use site `/admin` (catalog, live rankings, Pick’em ops, seed). Stored as `profiles.is_site_admin`. Not a community Admin. Account menu **Admin** is only for operators.
+
 ### Community ballot
 
 A ballot submitted by an eligible audience / community member.

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import type { EditionStatus } from "@/lib/communities/edition-status";
 
 export type EditionHostPreviewSubmitter = {
   profileId: string;
   displayName: string;
   username: string;
+  avatarUrl: string | null;
   isVoice: boolean;
   itemCount: number;
 };
@@ -51,19 +53,16 @@ export function EditionHostPreview({
             {submitters.map((submitter) => (
               <li
                 key={submitter.profileId}
-                className="flex justify-between gap-3 py-3"
+                className="flex items-center justify-between gap-3 py-3"
               >
-                <span>
-                  <Link
-                    href={`/u/${submitter.username}`}
-                    className="text-ink hover:text-accent"
-                  >
-                    {submitter.displayName}
-                  </Link>
-                  {submitter.isVoice ? (
-                    <span className="text-muted"> · Host</span>
-                  ) : null}
-                </span>
+                <PersonIdentity
+                  displayName={submitter.displayName}
+                  username={submitter.username}
+                  avatarUrl={submitter.avatarUrl}
+                  href={`/u/${submitter.username}`}
+                  nameSuffix={submitter.isVoice ? " · Host" : undefined}
+                  subtitle={null}
+                />
                 <span className="text-muted">
                   {submitter.itemCount}{" "}
                   {submitter.itemCount === 1 ? "game" : "games"}

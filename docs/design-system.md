@@ -12,7 +12,7 @@ Visual cues were mined from the local `goty` prototype (`references/visual-proto
 
 Internal catalog: [`/design-system`](/design-system)
 
-Shows tokens, type, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
+Shows tokens, type, **person identity**, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
 
 **Dev nav:** The account menu (and signed-out mobile drawer) includes a **Design system** link in local development and Vercel preview. Hidden on production (`VERCEL_ENV=production`). Other hosts can opt in with `SHOW_DESIGN_SYSTEM=1`.
 
@@ -130,7 +130,7 @@ When **scores are shown** (`points`), accent place stays **in front of the title
 | GOTY podium | Large `RankMarker` **above** cover; cover **bottoms** share a baseline (all rank-1 games use winner size) |
 | GOTY / category Reveal | Sticky scroll ceremony (default tab). GOTY #10→#1: number parks right on the Tied row; **tied ranks share one stage** — Tied lifts, then each cover in turn. Categories: `#1 · #2 · #3` columns in one board; each slides in from off-screen left (**#3→#2→#1**) and packs so earlier ranks push right; multi-row tied mosaics with titles. Short viewports raise the parked rank/Tied and scale covers so tiles stay below the chapter header. Not standings cards. `prefers-reduced-motion` skips scrubbing |
 | GOTY Ranked | Wrapping grid (no horizontal scroll); **large** display place in front of the title; pts hug the last title line. GOTY Top 10 even grid. Row gap matches column gap. |
-| GOTY / category Comparison strips | No place on the card (column headers name the source). Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Titles start at **18px** (same as standings cards) and shrink toward 12px. Tie stacks follow the event’s competition or dense numbering |
+| GOTY / category Comparison strips | No place on the card (column headers name the source). Host person columns use `UserAvatar` (22px) **in front of** the name. Cover `MATRIX_COVER` below `lg`, `MATRIX_COVER_WIDE` (podium size) from `lg`. Titles start at **18px** (same as standings cards) and shrink toward 12px. Tie stacks follow the event’s competition or dense numbering |
 | Category Ranked | One line per award; `HorizontalScroll` when displayed rank ≤ 3 overflows (full ties). Place in front of the title; votes hug the last title line; #1 slightly wider than #2/#3. Cover **bottoms** share a baseline (a wrapped title cannot lift the art). |
 | Rest of Top 10 / Full standings / Live (scores hidden) | Accent place **in front of the title** (tight `gap-1`). Live site GOTY + community Live Rankings use the same `StandingGameCardGrid` as edition full standings. Row gap matches column gap. |
 | Live GOTY / Categories (scores revealed) | Rank in front of the title; pts/votes hug the last title line. Category chapters: tick+hairline rule, title + quiet “Full standings” link on one baseline row. |
@@ -151,7 +151,11 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, `CookieConsentBanner`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, `CookieConsentBanner`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`, `UserAvatar` / `PersonIdentity`.
+
+## People
+
+`UserAvatar` is a circle photo or a one-letter initial. `PersonIdentity` is avatar + name (+ optional @handle) for people lists. 36px in rows, ~22px in the account menu and in front of a Comparison host name, 56px on a public ballot/sheet, 80px on the profile page. Not a chip, badge, or decorative icon.
 
 Planned: `EventNavigation`, `WinnerReveal`, `FinalStandings`, `ResultSourceSelector`, `GameVoteBreakdown`, `IndividualBallot`, `CategoryResult`, `VoterBreakdown`, `CommunityMemberRow`
 

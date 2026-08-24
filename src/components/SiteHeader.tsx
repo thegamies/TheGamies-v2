@@ -29,15 +29,22 @@ export async function SiteHeader() {
     nodeEnv: process.env.NODE_ENV,
     showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
   });
+  const includeAdmin = profile?.isSiteAdmin === true;
   const tgaHref = await getPromotedTgaHref().catch(() => null);
   const primaryLinks = buildPrimarySiteNavLinks({ tgaHref });
-  const utilityLinks = buildUtilitySiteNavLinks({ includeDesignSystem });
+  const utilityLinks = buildUtilitySiteNavLinks({
+    includeAdmin,
+    includeDesignSystem,
+  });
   const account: SiteNavAccount = user
     ? {
         status: "authenticated",
         label: profile?.displayName ?? user.name ?? "Account",
+        username: profile?.username ?? "account",
+        avatarUrl: profile?.avatarUrl ?? null,
         groups: buildAccountMenuGroups({
           username: profile?.username ?? null,
+          includeAdmin,
           includeDesignSystem,
         }),
       }
@@ -63,7 +70,12 @@ export async function SiteHeader() {
           ))}
           <SiteCreateLink />
           {account.status === "authenticated" ? (
-            <SiteAccountMenu label={account.label} groups={account.groups} />
+            <SiteAccountMenu
+              label={account.label}
+              username={account.username}
+              avatarUrl={account.avatarUrl}
+              groups={account.groups}
+            />
           ) : (
             <Suspense
               fallback={

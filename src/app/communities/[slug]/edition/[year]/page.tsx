@@ -281,6 +281,7 @@ export default async function CommunityEditionYearPage({
   if (
     (view === "show" ||
       view === "overview" ||
+      view === "comparison" ||
       view === "standings" ||
       view === "categories") &&
     !(canManage && edition.status === "closed") &&
@@ -313,6 +314,7 @@ export default async function CommunityEditionYearPage({
     edition.status === "closed" &&
     (view === "show" ||
       view === "overview" ||
+      view === "comparison" ||
       view === "standings" ||
       view === "categories");
   const showLiveVoters =
@@ -443,13 +445,21 @@ export default async function CommunityEditionYearPage({
     }
   }
   if (showHostResultsPreview) {
-    const loadComparison = view === "overview";
+    const loadComparison = view === "comparison";
     if (showSource === "live") {
       try {
         const meta = await getEditionResultsMeta(edition.id);
         if (meta) {
-          const [topTen, categoryPodiums, gotyPage, comparison] =
-            await Promise.all([
+          if (loadComparison) {
+            const comparison = await getEditionComparisonBundle(edition.id, {
+              viewerProfileId: profile?.id ?? null,
+              rankMode: edition.rankMode,
+            });
+            hostRevealMatrix = comparison.matrix;
+            hostRevealCategoryComparison = comparison.categoryComparison;
+            hostRevealLiveReady = true;
+          } else {
+            const [topTen, categoryPodiums, gotyPage] = await Promise.all([
               getEditionGotyThroughRank(edition.id, "community", {
                 maxRank: 10,
                 rankMode: edition.rankMode,
@@ -463,22 +473,13 @@ export default async function CommunityEditionYearPage({
                 pageSize: STANDINGS_PAGE_SIZE,
                 rankMode: edition.rankMode,
               }),
-              loadComparison
-                ? getEditionComparisonBundle(edition.id, {
-                    viewerProfileId: profile?.id ?? null,
-                    rankMode: edition.rankMode,
-                  })
-                : Promise.resolve(null),
             ]);
-          hostRevealTopTen = topTen;
-          hostRevealCategoryPodiums = categoryPodiums;
-          hostRevealGotyBoard = gotyPage.rows;
-          hostRevealGotyTotal = gotyPage.total;
-          if (comparison) {
-            hostRevealMatrix = comparison.matrix;
-            hostRevealCategoryComparison = comparison.categoryComparison;
+            hostRevealTopTen = topTen;
+            hostRevealCategoryPodiums = categoryPodiums;
+            hostRevealGotyBoard = gotyPage.rows;
+            hostRevealGotyTotal = gotyPage.total;
+            hostRevealLiveReady = true;
           }
-          hostRevealLiveReady = true;
         }
       } catch {
         hostRevealLiveReady = false;
@@ -584,6 +585,7 @@ export default async function CommunityEditionYearPage({
         profileId: string;
         displayName: string;
         username: string;
+        avatarUrl: string | null;
         isVoice: boolean;
       };
       items: Array<{
@@ -712,6 +714,7 @@ export default async function CommunityEditionYearPage({
               profileId: string;
               displayName: string;
               username: string;
+              avatarUrl: string | null;
               isVoice: boolean;
             };
             items: Array<{
@@ -766,29 +769,48 @@ export default async function CommunityEditionYearPage({
           };
         } else {
           // Reveal + Results Ranked: top 10 + category podiums only.
-          // Comparison matrices load on demand when that tertiary is selected.
-          const [topTen, categoryPodiums] = await Promise.all([
-            getEditionGotyThroughRank(edition.id, mode, {
-              maxRank: 10,
+          // Comparison (`?view=comparison`) SSR-loads matrices on this route.
+          if (view === "comparison") {
+            const comparison = await getEditionComparisonBundle(edition.id, {
+              viewerProfileId: profile?.id ?? null,
               rankMode,
-            }),
-            getEditionCategoryResults(edition.id, mode, {
-              maxRank: CATEGORY_RANKED_TOP,
-              rankMode,
-            }),
-          ]);
-          resultsBundle = {
-            meta,
-            topTen,
-            categoryPodiums,
-            categoryComparison: emptyCategoryComparison,
-            categoryMeta: [],
-            categoryPage: null,
-            voters: emptyVoters,
-            matrix: emptyMatrix,
-            publicBallot: null,
-            standingsPage: null,
-          };
+            });
+            resultsBundle = {
+              meta,
+              topTen: [],
+              categoryPodiums: [],
+              categoryComparison: comparison.categoryComparison,
+              categoryMeta: [],
+              categoryPage: null,
+              voters: emptyVoters,
+              matrix: comparison.matrix,
+              publicBallot: null,
+              standingsPage: null,
+            };
+          } else {
+            const [topTen, categoryPodiums] = await Promise.all([
+              getEditionGotyThroughRank(edition.id, mode, {
+                maxRank: 10,
+                rankMode,
+              }),
+              getEditionCategoryResults(edition.id, mode, {
+                maxRank: CATEGORY_RANKED_TOP,
+                rankMode,
+              }),
+            ]);
+            resultsBundle = {
+              meta,
+              topTen,
+              categoryPodiums,
+              categoryComparison: emptyCategoryComparison,
+              categoryMeta: [],
+              categoryPage: null,
+              voters: emptyVoters,
+              matrix: emptyMatrix,
+              publicBallot: null,
+              standingsPage: null,
+            };
+          }
         }
       }
     } catch {
@@ -967,6 +989,7 @@ export default async function CommunityEditionYearPage({
                   source={showSource}
                   previewView={
                     view === "overview" ||
+                    view === "comparison" ||
                     view === "standings" ||
                     view === "categories"
                       ? view

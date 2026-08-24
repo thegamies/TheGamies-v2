@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isAdminAuthorized } from "@/lib/admin-auth";
+import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { countCommunitySeeds } from "@/lib/communities/seed-community";
 import { AdminCommunitiesClient } from "./AdminCommunitiesClient";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminCommunitiesPage() {
-  const authorized = await isAdminAuthorized();
+  await requireSiteAdminPage();
   const year = new Date().getUTCFullYear();
   let initialStats: {
     profiles: number;
@@ -21,12 +21,10 @@ export default async function AdminCommunitiesPage() {
     membersInCommunity: number;
     ballotsInEdition: number;
   } | null = null;
-  if (authorized) {
-    try {
-      initialStats = await countCommunitySeeds();
-    } catch {
-      initialStats = null;
-    }
+  try {
+    initialStats = await countCommunitySeeds();
+  } catch {
+    initialStats = null;
   }
 
   return (
@@ -45,7 +43,6 @@ export default async function AdminCommunitiesPage() {
       </p>
       <div className="mt-10">
         <AdminCommunitiesClient
-          authorized={authorized}
           initialYear={year}
           initialStats={initialStats}
         />

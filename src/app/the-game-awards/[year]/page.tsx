@@ -207,6 +207,8 @@ async function TgaSiteSheet({
   return (
     <TgaPublicSheet
       displayName={owner.displayName}
+      username={owner.username}
+      avatarUrl={owner.avatarUrl}
       standingsHref={tgaYearHref(path, { view: "standings" })}
       categories={ballot}
       picks={sheet.picks}

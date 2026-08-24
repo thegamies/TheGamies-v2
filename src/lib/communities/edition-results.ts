@@ -114,6 +114,7 @@ export type EditionVoterListRow = {
   profileId: string;
   displayName: string;
   username: string;
+  avatarUrl: string | null;
   isVoice: boolean;
 };
 
@@ -1346,8 +1347,13 @@ export async function getEditionVotersPage(
       displayName: communityEditionResultVoters.displayName,
       username: communityEditionResultVoters.username,
       isVoice: communityEditionResultVoters.isVoice,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(communityEditionResultVoters)
+    .leftJoin(
+      profiles,
+      eq(profiles.id, communityEditionResultVoters.profileId),
+    )
     .where(where)
     .orderBy(
       asc(communityEditionResultVoters.displayName),
@@ -1496,8 +1502,13 @@ async function listEditionResultVoiceColumns(
       profileId: communityEditionResultVoters.profileId,
       displayName: communityEditionResultVoters.displayName,
       username: communityEditionResultVoters.username,
+      avatarUrl: profiles.avatarUrl,
     })
     .from(communityEditionResultVoters)
+    .leftJoin(
+      profiles,
+      eq(profiles.id, communityEditionResultVoters.profileId),
+    )
     .where(
       and(
         eq(communityEditionResultVoters.editionId, editionId),
@@ -1755,8 +1766,18 @@ export async function getEditionVoterDetail(
   }>;
 } | null> {
   const [voter] = await db
-    .select()
+    .select({
+      profileId: communityEditionResultVoters.profileId,
+      displayName: communityEditionResultVoters.displayName,
+      username: communityEditionResultVoters.username,
+      isVoice: communityEditionResultVoters.isVoice,
+      avatarUrl: profiles.avatarUrl,
+    })
     .from(communityEditionResultVoters)
+    .leftJoin(
+      profiles,
+      eq(profiles.id, communityEditionResultVoters.profileId),
+    )
     .where(
       and(
         eq(communityEditionResultVoters.editionId, editionId),
@@ -1777,6 +1798,7 @@ export async function getEditionVoterDetail(
       displayName: voter.displayName,
       username: voter.username,
       isVoice: voter.isVoice,
+      avatarUrl: voter.avatarUrl,
     },
     ranks: ranks.map((r) => ({
       rank: r.rank,

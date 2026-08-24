@@ -183,53 +183,33 @@ describe("drain settings", () => {
     expect(shouldChainDrain(false, 99)).toBe(false);
   });
 
-  it("does not treat a short HTTP pull as an empty queue", () => {
+  it("stops drain when the queue packet is smaller than max batch size", () => {
     expect(
       isDrainPullExhausted({
         pulled: 10,
         batchSize: 25,
         retried: 0,
-        backlogCount: 10,
       }),
     ).toBe(true);
-    expect(
-      isDrainPullExhausted({
-        pulled: 10,
-        batchSize: 25,
-        retried: 0,
-        backlogCount: 80,
-      }),
-    ).toBe(false);
     expect(
       isDrainPullExhausted({
         pulled: 25,
         batchSize: 25,
         retried: 0,
-        backlogCount: 25,
       }),
     ).toBe(false);
+    expect(
+      isDrainPullExhausted({
+        pulled: 0,
+        batchSize: 25,
+        retried: 0,
+      }),
+    ).toBe(true);
     expect(
       isDrainPullExhausted({
         pulled: 8,
         batchSize: 25,
         retried: 2,
-        backlogCount: 8,
-      }),
-    ).toBe(false);
-    expect(
-      isDrainPullExhausted({
-        pulled: 0,
-        batchSize: 25,
-        retried: 0,
-        backlogCount: 4,
-      }),
-    ).toBe(false);
-    expect(
-      isDrainPullExhausted({
-        pulled: 0,
-        batchSize: 25,
-        retried: 0,
-        backlogCount: null,
       }),
     ).toBe(false);
   });
@@ -311,6 +291,42 @@ describe("drain settings", () => {
         new Date("2026-08-22T12:20:00.000Z"),
       ),
     ).toBe(false);
+    expect(
+      desiredQueueOpen(
+        {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          windowMinutes: 5,
+          lastDrainAt: "2026-08-22T12:01:00.000Z",
+          drainPending: false,
+        },
+        new Date("2026-08-22T12:03:00.000Z"),
+      ),
+    ).toBe(false);
+    expect(
+      desiredQueueOpen(
+        {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          windowMinutes: 5,
+          lastDrainAt: "2026-08-22T12:01:00.000Z",
+          drainPending: true,
+        },
+        new Date("2026-08-22T12:03:00.000Z"),
+      ),
+    ).toBe(true);
+    expect(
+      desiredQueueOpen(
+        {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          windowMinutes: 5,
+          lastDrainAt: "2026-08-22T11:50:00.000Z",
+          drainPending: false,
+        },
+        new Date("2026-08-22T12:00:00.000Z"),
+      ),
+    ).toBe(true);
   });
 
   it("keeps pulling every minute while the queue still has work", () => {

@@ -53,18 +53,12 @@ type WebhookEvent = {
   error: string | null;
 };
 
-type Props = {
-  authorized: boolean;
-};
-
 function formatTime(value: string | Date | null | undefined): string {
   if (!value) return "—";
   return new Date(value).toLocaleString();
 }
 
-export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) {
-  const [authorized, setAuthorized] = useState(initiallyAuthorized);
-  const [secret, setSecret] = useState("");
+export function AdminWebhooksClient() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -149,7 +143,6 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
   }, [loadSettings, loadRegistrations, loadEvents, eventStatus, eventSort]);
 
   useEffect(() => {
-    if (!authorized) return;
     const timer = setTimeout(() => {
       void Promise.all([
         loadSettings(),
@@ -160,29 +153,7 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
       });
     }, 0);
     return () => clearTimeout(timer);
-  }, [authorized, loadSettings, loadRegistrations, loadEvents]);
-
-  async function unlock(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setMessage(null);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secret }),
-      });
-      if (!res.ok) {
-        setError("Could not unlock admin.");
-        return;
-      }
-      setAuthorized(true);
-      setSecret("");
-    } finally {
-      setBusy(false);
-    }
-  }
+  }, [loadSettings, loadRegistrations, loadEvents]);
 
   async function saveSettings(e: React.FormEvent) {
     e.preventDefault();
@@ -375,27 +346,6 @@ export function AdminWebhooksClient({ authorized: initiallyAuthorized }: Props) 
     } finally {
       setBusyEventId(null);
     }
-  }
-
-  if (!authorized) {
-    return (
-      <form onSubmit={unlock} className="max-w-md space-y-4">
-        <label className="block">
-          <span className="text-sm text-muted">Admin code</span>
-          <input
-            type="password"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            className={`mt-1 w-full ${fieldInputClass}`}
-            autoComplete="current-password"
-          />
-        </label>
-        {error ? <p className="text-sm text-danger">{error}</p> : null}
-        <Button type="submit" disabled={busy || !secret}>
-          Unlock
-        </Button>
-      </form>
-    );
   }
 
   return (

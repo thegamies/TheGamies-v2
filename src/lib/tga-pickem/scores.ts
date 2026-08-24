@@ -208,6 +208,7 @@ export type TgaLeaderboardRow = {
   profileId: string;
   displayName: string;
   username: string;
+  avatarUrl: string | null;
   points: number;
   wpDelta: number | null;
 };
@@ -225,6 +226,7 @@ function mapLeaderboardRow(row: Record<string, unknown>): TgaLeaderboardRow {
     profileId: String(row.profile_id),
     displayName: String(row.display_name),
     username: String(row.username),
+    avatarUrl: row.avatar_url == null ? null : String(row.avatar_url),
     points: Number(row.points),
     wpDelta: row.wp_delta == null ? null : Number(row.wp_delta),
   };
@@ -342,6 +344,7 @@ export async function listSiteLeaderboard(
         sc.wp_delta as wp_delta,
         p.display_name as display_name,
         p.username as username,
+        p.avatar_url as avatar_url,
         rank() over (
           order by sc.points desc, sc.wp_delta asc nulls last
         ) as place
@@ -417,6 +420,7 @@ export async function listCommunityLeaderboard(
         sc.wp_delta as wp_delta,
         p.display_name as display_name,
         p.username as username,
+        p.avatar_url as avatar_url,
         rank() over (
           order by sc.points desc, sc.wp_delta asc nulls last
         ) as place

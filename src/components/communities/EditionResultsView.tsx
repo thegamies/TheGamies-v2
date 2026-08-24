@@ -2,7 +2,6 @@ import Link from "next/link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionCategoryDebugProvider } from "@/components/communities/EditionCategoryDebug";
 import { EditionResultsBoardToolbar } from "@/components/communities/EditionResultsBoardToolbar";
-import { EditionResultsLayoutProvider } from "@/components/communities/EditionResultsLayout";
 import {
   EditionCategoryDetail,
   EditionCategoryResults,
@@ -13,6 +12,7 @@ import { EditionRevealView } from "@/components/communities/EditionRevealView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { VoterProfileHandle } from "@/components/communities/VoterProfileHandle";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { isAnonymizedVoter } from "@/lib/profile/delete-account";
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
@@ -107,7 +107,10 @@ export function EditionResultsViewNav({
                     ? view === "voters" || viewingPublicBallot
                     : v.id === "categories"
                       ? view === "categories" || view === "category"
-                      : v.id === view && !viewingPublicBallot;
+                      : v.id === "overview"
+                        ? (view === "overview" || view === "comparison") &&
+                          !viewingPublicBallot
+                        : v.id === view && !viewingPublicBallot;
             return (
               <Link
                 key={v.id}
@@ -139,7 +142,7 @@ export function EditionResultsViewNav({
           view={view}
           categoryId={categoryId}
           votersQ={votersQ}
-          showLayout={view === "overview"}
+          showLayout={view === "overview" || view === "comparison"}
         />
       ) : null}
     </div>
@@ -208,12 +211,7 @@ export function EditionResultsView({
   yourBallot: BallotPayload | null;
   /** Frozen public ballot when `?voter=` is set. */
   publicBallot: (BallotPayload & {
-    voter: {
-      displayName: string;
-      username: string;
-      isVoice: boolean;
-      profileId: string;
-    };
+    voter: EditionVoterListRow;
   }) | null;
   /** Raw `?voter=` value — used when lookup misses. */
   voterUsername?: string | null;
@@ -254,7 +252,6 @@ export function EditionResultsView({
       : null;
   return (
     <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
-    <EditionResultsLayoutProvider>
     <div className="mt-6 space-y-10">
       <EditionResultsViewNav
         slug={slug}
@@ -319,18 +316,26 @@ export function EditionResultsView({
               Voters
             </Link>
           </p>
-          <h3 className="mt-3 font-display text-3xl tracking-wide text-ink">
-            {publicBallot.voter.displayName}
-            {publicBallot.voter.isVoice ? " · Host" : ""}
-          </h3>
-          {isAnonymizedVoter(publicBallot.voter) ? null : (
-            <p className="mt-1 text-sm text-muted">
-              <VoterProfileHandle
-                username={publicBallot.voter.username}
-                displayName={publicBallot.voter.displayName}
-              />
-            </p>
-          )}
+          <div className="mt-3">
+            <PersonIdentity
+              displayName={publicBallot.voter.displayName}
+              username={publicBallot.voter.username}
+              avatarUrl={publicBallot.voter.avatarUrl}
+              size={56}
+              nameSuffix={publicBallot.voter.isVoice ? " · Host" : undefined}
+              nameClassName="font-display text-3xl tracking-wide text-ink"
+              subtitle={
+                isAnonymizedVoter(publicBallot.voter) ? null : (
+                  <p className="mt-1 text-sm text-muted">
+                    <VoterProfileHandle
+                      username={publicBallot.voter.username}
+                      displayName={publicBallot.voter.displayName}
+                    />
+                  </p>
+                )
+              }
+            />
+          </div>
           <EditionBallotReadonly
             items={publicBallot.items}
             categoryVotes={publicBallot.categoryVotes}
@@ -379,6 +384,7 @@ export function EditionResultsView({
           slug={slug}
           year={year}
           mode={mode}
+          layout={view === "comparison" ? "comparison" : "ranked"}
           topTen={topTen}
           matrix={matrix}
           gotyTotal={gotyTotal}
@@ -389,7 +395,6 @@ export function EditionResultsView({
         />
       )}
     </div>
-    </EditionResultsLayoutProvider>
     </EditionCategoryDebugProvider>
   );
 }

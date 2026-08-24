@@ -6,6 +6,7 @@ import {
   setTgaCommunityHostAction,
 } from "../the-game-awards/actions";
 import { Button } from "@/components/ui/Button";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
 import Link from "next/link";
 
@@ -13,6 +14,7 @@ export type TgaHostMemberOption = {
   profileId: string;
   username: string;
   displayName: string;
+  avatarUrl: string | null;
   isHost: boolean;
 };
 
@@ -166,10 +168,11 @@ export function TgaCommunityHostsForm({
               key={member.profileId}
               className="flex flex-wrap items-center justify-between gap-3 py-3"
             >
-              <div>
-                <p className="text-ink">{member.displayName}</p>
-                <p className="text-sm text-muted">@{member.username}</p>
-              </div>
+              <PersonIdentity
+                displayName={member.displayName}
+                username={member.username}
+                avatarUrl={member.avatarUrl}
+              />
               <Button
                 type="button"
                 variant="bordered"

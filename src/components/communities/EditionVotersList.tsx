@@ -7,6 +7,7 @@ import {
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { VoterProfileHandle } from "@/components/communities/VoterProfileHandle";
+import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import {
   editionBoardLabel,
   type EditionResultsPublicMode,
@@ -106,33 +107,32 @@ export function EditionVotersList({
         <ul className="mt-6 divide-y divide-line border-y border-line">
           {voters.rows.map((v) => (
             <li key={v.profileId} className="py-3">
-              {revealBallots ? (
-                <Link
-                  href={editionVoterBallotHref(slug, year, v.username)}
-                  className="text-ink hover:text-accent"
-                >
-                  {v.displayName}
-                  {yourProfileId === v.profileId ? " (you)" : ""}
-                </Link>
-              ) : (
-                <p className="text-ink">
-                  {v.displayName}
-                  {yourProfileId === v.profileId ? " (you)" : ""}
-                </p>
-              )}
-              {isAnonymizedVoter(v) && !v.isVoice ? null : (
-                <p className="text-sm text-muted">
-                  <VoterProfileHandle
-                    username={v.username}
-                    displayName={v.displayName}
-                  />
-                  {v.isVoice
-                    ? isAnonymizedVoter(v)
-                      ? "Host"
-                      : " · Host"
-                    : null}
-                </p>
-              )}
+              <PersonIdentity
+                displayName={v.displayName}
+                username={v.username}
+                avatarUrl={v.avatarUrl}
+                href={
+                  revealBallots
+                    ? editionVoterBallotHref(slug, year, v.username)
+                    : undefined
+                }
+                nameSuffix={yourProfileId === v.profileId ? " (you)" : undefined}
+                subtitle={
+                  isAnonymizedVoter(v) && !v.isVoice ? null : (
+                    <p className="text-sm text-muted">
+                      <VoterProfileHandle
+                        username={v.username}
+                        displayName={v.displayName}
+                      />
+                      {v.isVoice
+                        ? isAnonymizedVoter(v)
+                          ? "Host"
+                          : " · Host"
+                        : null}
+                    </p>
+                  )
+                }
+              />
             </li>
           ))}
         </ul>

@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { isAdminAuthorized } from "@/lib/admin-auth";
+import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { listTgaYears } from "@/lib/tga-pickem/service";
 import { tgaStatusLabel } from "@/lib/tga-pickem/status";
-import { AdminTgaGate } from "./AdminTgaGate";
 import { AdminTgaIndexClient } from "./AdminTgaIndexClient";
 
 export const metadata: Metadata = {
@@ -12,14 +11,12 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminTgaIndexPage() {
-  const authorized = await isAdminAuthorized();
+  await requireSiteAdminPage();
   let years: Awaited<ReturnType<typeof listTgaYears>> = [];
-  if (authorized) {
-    try {
-      years = await listTgaYears();
-    } catch {
-      years = [];
-    }
+  try {
+    years = await listTgaYears();
+  } catch {
+    years = [];
   }
 
   return (
@@ -39,17 +36,15 @@ export default async function AdminTgaIndexPage() {
         </Link>
       </p>
       <div className="mt-10">
-        <AdminTgaGate authorized={authorized}>
-          <AdminTgaIndexClient
-            years={years.map((year) => ({
-              year: year.year,
-              status: tgaStatusLabel(year.status),
-              enabled: year.enabled,
-              promoted: year.promoted,
-              complete: year.complete,
-            }))}
-          />
-        </AdminTgaGate>
+        <AdminTgaIndexClient
+          years={years.map((year) => ({
+            year: year.year,
+            status: tgaStatusLabel(year.status),
+            enabled: year.enabled,
+            promoted: year.promoted,
+            complete: year.complete,
+          }))}
+        />
       </div>
     </main>
   );

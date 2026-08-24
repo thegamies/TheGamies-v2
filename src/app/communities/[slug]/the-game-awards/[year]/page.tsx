@@ -193,6 +193,8 @@ export default async function CommunityTgaYearPage({
         ) : view === "sheet" && sheetOwner && !open ? (
           <TgaPublicSheet
             displayName={sheetOwner.displayName}
+            username={sheetOwner.username}
+            avatarUrl={sheetOwner.avatarUrl}
             standingsHref={tgaYearHref(path, { view: "standings" })}
             categories={ballot}
             picks={sheet.picks}

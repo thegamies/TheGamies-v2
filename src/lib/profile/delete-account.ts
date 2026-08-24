@@ -55,6 +55,7 @@ export function tombstoneProfileFields(profileId: string, now: Date) {
     socialLinks: null as Record<string, string> | null,
     visibility: "private" as const,
     authUserId: deletedAuthUserIdSentinel(profileId),
+    isSiteAdmin: false,
     deletedAt: now,
     updatedAt: now,
   };

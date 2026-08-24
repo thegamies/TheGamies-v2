@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { isAdminAuthorized } from "@/lib/admin-auth";
+import { ClaimFirstAdminForm } from "./ClaimFirstAdminForm";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -7,6 +9,11 @@ export const metadata: Metadata = {
 };
 
 const ADMIN_LINKS = [
+  {
+    href: "/admin/operators",
+    title: "Site operators",
+    description: "Make or remove people who can use these tools.",
+  },
   {
     href: "/admin/sync",
     title: "Catalog sync",
@@ -46,34 +53,41 @@ const ADMIN_LINKS = [
   },
 ] as const;
 
-export default function AdminIndexPage() {
-  return (
-    <>
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Ops</p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
-          Admin
-        </h1>
-        <p className="mt-3 max-w-2xl text-muted">
-          Site operations tools. Each screen unlocks with the admin code.
-        </p>
+export default async function AdminIndexPage() {
+  const authorized = await isAdminAuthorized();
 
-        <ul className="mt-10 max-w-xl divide-y divide-line border-y border-line">
-          {ADMIN_LINKS.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className="block py-5 transition-colors hover:text-accent"
-              >
-                <span className="font-display text-2xl tracking-wide text-ink">
-                  {item.title}
-                </span>
-                <p className="mt-1 text-sm text-muted">{item.description}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </main>
-    </>
+  return (
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted">Ops</p>
+      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
+        Admin
+      </h1>
+      {authorized ? (
+        <>
+          <p className="mt-3 max-w-2xl text-muted">
+            Site operations tools.
+          </p>
+          <ul className="mt-10 max-w-xl divide-y divide-line border-y border-line">
+            {ADMIN_LINKS.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="block py-5 transition-colors hover:text-accent"
+                >
+                  <span className="font-display text-2xl tracking-wide text-ink">
+                    {item.title}
+                  </span>
+                  <p className="mt-1 text-sm text-muted">{item.description}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="mt-10">
+          <ClaimFirstAdminForm />
+        </div>
+      )}
+    </main>
   );
 }

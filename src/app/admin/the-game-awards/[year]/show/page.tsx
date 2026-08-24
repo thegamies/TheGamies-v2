@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { isAdminAuthorized } from "@/lib/admin-auth";
+import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { listSiteLeaderboard } from "@/lib/tga-pickem/scores";
 import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
-import { AdminTgaGate } from "../../AdminTgaGate";
 import { AdminTgaShowClient } from "./AdminTgaShowClient";
 
 type Params = Promise<{ year: string }>;
@@ -18,19 +17,16 @@ export default async function AdminTgaShowPage({ params }: { params: Params }) {
   const { year: raw } = await params;
   const year = Number(raw);
   if (!Number.isInteger(year)) notFound();
-  const authorized = await isAdminAuthorized();
-  const slate = authorized ? await getTgaYear(year).catch(() => null) : null;
-  if (authorized && !slate) notFound();
-  const ballot = authorized && slate ? await listTgaBallot(year) : [];
-  const board =
-    authorized && slate
-      ? await listSiteLeaderboard(year, 1).catch(() => ({
-          rows: [],
-          total: 0,
-          page: 1,
-          totalPages: 1,
-        }))
-      : { rows: [], total: 0, page: 1, totalPages: 1 };
+  await requireSiteAdminPage();
+  const slate = await getTgaYear(year).catch(() => null);
+  if (!slate) notFound();
+  const ballot = await listTgaBallot(year);
+  const board = await listSiteLeaderboard(year, 1).catch(() => ({
+    rows: [],
+    total: 0,
+    page: 1,
+    totalPages: 1,
+  }));
   const called = ballot.filter((category) => category.winnerNomineeId).length;
 
   return (
@@ -44,18 +40,14 @@ export default async function AdminTgaShowPage({ params }: { params: Params }) {
         Show room
       </h1>
       <div className="mt-10">
-        <AdminTgaGate authorized={authorized}>
-          {slate ? (
-            <AdminTgaShowClient
-              year={year}
-              called={called}
-              total={ballot.length}
-              officialWp={slate.worldPremieresOfficial}
-              categories={ballot}
-              topRows={board.rows.slice(0, 8)}
-            />
-          ) : null}
-        </AdminTgaGate>
+        <AdminTgaShowClient
+          year={year}
+          called={called}
+          total={ballot.length}
+          officialWp={slate.worldPremieresOfficial}
+          categories={ballot}
+          topRows={board.rows.slice(0, 8)}
+        />
       </div>
     </main>
   );
