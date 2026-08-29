@@ -35,23 +35,23 @@ async function requireMember(slug: string) {
 }
 
 export async function setCommunityTgaOptInAction(
-  _prev: { error?: string } | null,
+  _prev: { error: string } | null,
   formData: FormData,
-) {
+): Promise<{ error: string } | null> {
   const slug = String(formData.get("slug") ?? "");
   const year = Number(formData.get("year"));
   const enabled = String(formData.get("enabled")) === "true";
   const auth = await requireMember(slug);
-  if ("error" in auth) return auth;
+  if ("error" in auth) return { error: auth.error };
   if (!canManageCommunity(auth.viewerRole)) {
     return { error: "Only community admins can change this." };
   }
   const result = await setCommunityTgaOptIn(auth.communityId, year, enabled);
-  if ("error" in result) return result;
+  if ("error" in result) return { error: result.error };
   revalidatePath(`/communities/${slug}`);
   revalidatePath(`/communities/${slug}/settings`);
   revalidatePath(`/communities/${slug}/the-game-awards`);
-  return { ok: true as const };
+  return null;
 }
 
 export async function saveCommunityTgaSheetAction(
