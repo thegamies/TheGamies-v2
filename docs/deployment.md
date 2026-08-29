@@ -41,7 +41,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
 - **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare uses a Worker Cron Trigger on the same schedule (`wrangler.jsonc` + `cloudflare-worker.ts`). The `scheduled` handler checks Workers KV `CRON_SETTINGS` (pause all CF jobs from `/admin/scheduled`), then calls the freeze route in-process via `WORKER_SELF_REFERENCE` with `Authorization: Bearer $CRON_SECRET`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
-- **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Staging/production CI deploys it **only when relevant paths change** (`workers/igdb-webhooks/**`, `packages/igdb/**`, `packages/db/**`, `pnpm-lock.yaml`). Manual `workflow_dispatch` on staging also deploys it by default. Manual CLI: `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Set Worker secrets/vars per `--env` (staging CI `secret bulk`; production bulk only if `PRODUCTION_DATABASE_URL` is in GitHub). Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
+- **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Staging/production CI deploys it **only when relevant paths change** (`workers/igdb-webhooks/**`, `packages/igdb/**`, `packages/db/**`, `pnpm-lock.yaml`). Manual `workflow_dispatch` on staging also deploys it by default. Manual CLI: `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Code deploys keep existing Worker secrets. Staging `secret bulk` only if dispatch checks `sync_igdb_webhook_secrets` (bulk publishes a second version). Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 
 ## Account setup (one-time)
@@ -118,8 +118,9 @@ Push / merge to develop (or workflow_dispatch)
   → staging: deploy Vercel with GitHub app secrets as --env
   → staging: deploy Cloudflare worker thegamies-v2-develop
        (.dev.vars for build + wrangler secret bulk for runtime / dashboard)
-  → igdb-webhooks: deploy thegamies-igdb-webhooks-develop when paths change
-       (or always on workflow_dispatch unless force_igdb_webhooks is false)
+  → igdb-webhooks: wrangler deploy thegamies-igdb-webhooks-develop when paths change
+       (or always on workflow_dispatch unless force_igdb_webhooks is false;
+        secret bulk only if sync_igdb_webhook_secrets)
 ```
 
 Migrations run before both host deploys. If `STAGING_DATABASE_URL` is missing, migrate is skipped (hosts still deploy if their secrets are set).

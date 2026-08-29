@@ -245,10 +245,12 @@ jobs:
 
           pnpm deploy:igdb-webhooks:production
 
-          if [ -n "$DATABASE_URL" ] && [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
+          # secret bulk publishes a second version. Code deploy keeps existing
+          # secrets. Set SYNC_IGDB_WEBHOOK_SECRETS=true on the job env to rotate.
+          if [ "${SYNC_IGDB_WEBHOOK_SECRETS:-}" = "true" ] && [ -n "$DATABASE_URL" ] && [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
             pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env production
           else
-            echo "Skipping wrangler secret bulk (no PRODUCTION_DATABASE_URL or empty secret set; existing Worker secrets are kept)."
+            echo "Skipping wrangler secret bulk (existing Worker secrets are kept)."
           fi
 
           echo "### IGDB webhooks production" >> "$GITHUB_STEP_SUMMARY"

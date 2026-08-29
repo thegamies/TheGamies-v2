@@ -9,6 +9,10 @@ on:
         description: Deploy IGDB webhooks Worker even if paths did not change
         type: boolean
         default: true
+      sync_igdb_webhook_secrets:
+        description: Also secret-bulk the develop webhooks Worker (creates a second deploy)
+        type: boolean
+        default: false
 
 concurrency:
   group: staging-deploy
@@ -375,10 +379,16 @@ jobs:
 
           pnpm deploy:igdb-webhooks:develop
 
-          if [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
-            pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env develop
+          # secret bulk publishes a new Worker version. Skip on push so we
+          # do not double-deploy; existing secrets persist across deploys.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.sync_igdb_webhook_secrets }}" = "true" ]; then
+            if [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
+              pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env develop
+            else
+              echo "Skipping wrangler secret bulk (no secrets to upload)."
+            fi
           else
-            echo "Skipping wrangler secret bulk (no secrets to upload)."
+            echo "Skipping wrangler secret bulk (secrets already on the Worker)."
           fi
 
           echo "### IGDB webhooks staging" >> "$GITHUB_STEP_SUMMARY"

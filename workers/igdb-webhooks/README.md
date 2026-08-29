@@ -71,7 +71,7 @@ Use the matching Neon branch URL for each env’s `DATABASE_URL`. Prefer differe
 
 Staging **workflow_dispatch** deploys the Worker even if those paths did not change (uncheck `force_igdb_webhooks` to follow the path filter). PR previews do **not** deploy this Worker.
 
-Staging CI also `secret bulk`s Worker secrets from GitHub. Production CI deploys code on path changes and `secret bulk`s only when `PRODUCTION_DATABASE_URL` is set (existing secrets are kept otherwise).
+Push deploys **code only** (`wrangler deploy`). Secrets already on the Worker stay put. `wrangler secret bulk` publishes a second version, so staging only bulk-syncs on **workflow_dispatch** with `sync_igdb_webhook_secrets`. Production only bulks if the job env has `SYNC_IGDB_WEBHOOK_SECRETS=true`.
 
 **Manual:**
 
