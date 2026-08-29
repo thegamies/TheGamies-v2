@@ -29,6 +29,7 @@ export {
 export { listRecentSyncRuns } from "./sync-runs";
 export {
   applyWebhook,
+  applyGameCreateUpdates,
   parseDeleteIgdbId,
   assertIgdbGame,
   assertIgdbCover,
@@ -84,12 +85,17 @@ export {
 export {
   listWebhookEvents,
   processWebhookEnvelope,
+  processWebhookBatch,
+  collapseGameOpsByIgdbId,
   reprocessWebhookEvent,
   formatDbError,
   clampWebhookEventSort,
   type WebhookEventStatus,
   type WebhookEventSort,
   type WebhookEventRow,
+  type WebhookBatchItem,
+  type WebhookBatchItemResult,
+  type GameOpCollapse,
 } from "./webhook-events";
 export {
   fetchWebhookRegistrationOverview,

@@ -39,7 +39,7 @@ IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel
 
 1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
 2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon (except **Live** mode).
-3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 1`, batch 25) applies each batch on a fresh isolate. Cron every minute only **pauses or resumes** queue delivery from KV (Auto window, sticky Open, or Closed). Saving settings syncs that immediately.
+3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 1`, batch 25) applies the batch on a fresh isolate: game create/updates share one catalog upsert (last write per IGDB id). Cron every minute only **pauses or resumes** queue delivery from KV (Auto window, sticky Open, or Closed). Saving settings syncs that immediately.
 4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`). After this media work, re-register so **Artworks, Screenshots, Game videos, and Image types** slots exist (staging then production). Do not register deprecated Artwork Types.
 
 A queue can have only one consumer type. This Worker is the consumer — do not also attach HTTP pull.

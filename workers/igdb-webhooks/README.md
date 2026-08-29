@@ -92,7 +92,7 @@ Redeploy the develop Worker after changing this (`pnpm deploy:igdb-webhooks:deve
 
 ## Delivery
 
-The Worker `queue()` handler applies each batch (`max_concurrency: 1`, `max_batch_size`: 25). A batch smaller than 25 is treated as the last packet: Auto drain pauses until the next interval (cron will not reopen the current window). Sticky **Open** stays on. A batch of 25 keeps delivery going. Cron every minute only pause/resumes Cloudflare queue delivery from KV:
+The Worker `queue()` handler applies each batch (`max_concurrency: 1`, `max_batch_size`: 25) as one catalog unit: game create/updates share one upsert. A batch smaller than 25 is treated as the last packet: Auto drain pauses until the next interval (cron will not reopen the current window). Sticky **Open** stays on. A batch of 25 keeps delivery going. Cron every minute only pause/resumes Cloudflare queue delivery from KV:
 
 - **Auto** — open for `windowMinutes` at the start of each `intervalMinutes` cycle (UTC)
 - **Open** — always deliver; cron will not pause

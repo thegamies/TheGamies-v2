@@ -5,6 +5,7 @@ import {
   listWebhookEvents,
   desiredQueueOpen,
   nextScheduledCloseAt,
+  processWebhookBatch,
   processWebhookEnvelope,
   registerIgdbWebhookSlot,
   registerMissingIgdbWebhooks,
@@ -429,27 +430,40 @@ export default {
     bindProcessEnv(env);
     const db = createDb(env.DATABASE_URL);
     let retried = 0;
-    for (const message of batch.messages) {
-      try {
-        const envelope: IgdbWebhookEnvelope = isEnvelope(message.body)
-          ? message.body
-          : {
-              receivedAt: new Date().toISOString(),
-              entity: null,
-              method: null,
-              igdbId: null,
-              headers: {},
-              body: message.body,
-              ingressError: "Queue message was not a webhook envelope",
-            };
-        const result = await processWebhookEnvelope(db, envelope, message.id);
+    const prepared = batch.messages.map((message) => {
+      const envelope: IgdbWebhookEnvelope = isEnvelope(message.body)
+        ? message.body
+        : {
+            receivedAt: new Date().toISOString(),
+            entity: null,
+            method: null,
+            igdbId: null,
+            headers: {},
+            body: message.body,
+            ingressError: "Queue message was not a webhook envelope",
+          };
+      return { message, envelope };
+    });
+    try {
+      const results = await processWebhookBatch(
+        db,
+        prepared.map(({ envelope, message }) => ({
+          envelope,
+          queueMessageId: message.id,
+        })),
+      );
+      for (let index = 0; index < prepared.length; index += 1) {
+        const { message, envelope } = prepared[index]!;
+        const result = results[index]!;
         if (result.status === "failed" && !envelope.ingressError) {
           retried += 1;
           message.retry();
         } else {
           message.ack();
         }
-      } catch {
+      }
+    } catch {
+      for (const { message } of prepared) {
         retried += 1;
         message.retry();
       }

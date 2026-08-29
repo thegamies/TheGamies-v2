@@ -75,14 +75,26 @@ async function softDelistGame(db: Db, igdbId: number): Promise<void> {
     .where(eq(games.igdbId, igdbId));
 }
 
-async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {
-  const game = assertIgdbGame(payload);
+export async function applyGameCreateUpdates(
+  db: Db,
+  payloads: unknown[],
+): Promise<void> {
+  if (payloads.length === 0) return;
   const filters = await resolveAdultFilters();
-  const mapped = mapIgdbGame(game, filters);
-  if (!mapped) {
-    throw new Error("Webhook game payload missing name");
+  const mapped = [];
+  for (const payload of payloads) {
+    const game = assertIgdbGame(payload);
+    const row = mapIgdbGame(game, filters);
+    if (!row) {
+      throw new Error("Webhook game payload missing name");
+    }
+    mapped.push(row);
   }
-  await upsertGamesWithLinks(db, [mapped]);
+  await upsertGamesWithLinks(db, mapped);
+}
+
+async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {
+  await applyGameCreateUpdates(db, [payload]);
 }
 
 async function applyCover(db: Db, payload: unknown): Promise<void> {
