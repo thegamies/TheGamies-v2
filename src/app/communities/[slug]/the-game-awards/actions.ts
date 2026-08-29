@@ -6,6 +6,7 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { canManageCommunity } from "@/lib/communities/rules";
+import type { CommunityRole } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { setCommunityTgaOptIn } from "@/lib/tga-pickem/service";
 import {
@@ -19,13 +20,22 @@ import {
   saveSiteSheet,
 } from "@/lib/tga-pickem/sheets";
 
-async function requireMember(slug: string) {
+type MemberAuth =
+  | { error: string }
+  | {
+      profileId: string;
+      communityId: string;
+      slug: string;
+      viewerRole: CommunityRole;
+    };
+
+async function requireMember(slug: string): Promise<MemberAuth> {
   const user = await getRequestSessionUser();
-  if (!user?.id) return { error: "Sign in to continue." } as const;
+  if (!user?.id) return { error: "Sign in to continue." };
   const profile = await getRequestProfileByAuthUserId(user.id);
-  if (!profile) return { error: "Finish your profile first." } as const;
+  if (!profile) return { error: "Finish your profile first." };
   const community = await getCommunityBySlug(slug, profile.id).catch(() => null);
-  if (!community?.viewerRole) return { error: "Join this community first." } as const;
+  if (!community?.viewerRole) return { error: "Join this community first." };
   return {
     profileId: profile.id,
     communityId: community.id,
@@ -42,7 +52,7 @@ export async function setCommunityTgaOptInAction(
   const year = Number(formData.get("year"));
   const enabled = String(formData.get("enabled")) === "true";
   const auth = await requireMember(slug);
-  if ("error" in auth) return { error: auth.error };
+  if ("error" in auth) return auth;
   if (!canManageCommunity(auth.viewerRole)) {
     return { error: "Only community admins can change this." };
   }
