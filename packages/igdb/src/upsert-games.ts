@@ -14,6 +14,52 @@ import {
 import { insertChunked } from "./chunk";
 import type { MappedGame } from "./client";
 
+export type GameLinkIdLists = Pick<
+  MappedGame,
+  | "platformIgdbIds"
+  | "genreIgdbIds"
+  | "themeIgdbIds"
+  | "keywordIgdbIds"
+  | "involvedCompanyIgdbIds"
+  | "artworkIgdbIds"
+  | "screenshotIgdbIds"
+  | "videoIgdbIds"
+>;
+
+function packedIds(ids: number[]): string {
+  return [...new Set(ids.filter((id) => Number.isFinite(id)))]
+    .sort((a, b) => a - b)
+    .join(",");
+}
+
+/** Stable fingerprint of junction id lists (order and duplicates do not matter). */
+export function gameLinksChecksum(row: GameLinkIdLists): string {
+  return [
+    packedIds(row.platformIgdbIds),
+    packedIds(row.genreIgdbIds),
+    packedIds(row.themeIgdbIds),
+    packedIds(row.keywordIgdbIds),
+    packedIds(row.involvedCompanyIgdbIds),
+    packedIds(row.artworkIgdbIds),
+    packedIds(row.screenshotIgdbIds),
+    packedIds(row.videoIgdbIds),
+  ].join("|");
+}
+
+export function igdbIdsNeedingLinkRewrite(
+  incoming: { igdbId: number; checksum: string }[],
+  existingByIgdbId: Map<number, string | null>,
+): Set<number> {
+  const need = new Set<number>();
+  for (const row of incoming) {
+    const previous = existingByIgdbId.get(row.igdbId);
+    if (previous === undefined || previous !== row.checksum) {
+      need.add(row.igdbId);
+    }
+  }
+  return need;
+}
+
 export function gameJunctionDeleteSql(gameIds: string[]) {
   const idList = sql.join(
     gameIds.map((id) => sql`${id}`),
@@ -71,6 +117,31 @@ export async function upsertGamesWithLinks(
 ): Promise<number> {
   if (rows.length === 0) return 0;
 
+  const checksumByIgdb = new Map(
+    rows.map((row) => [row.igdbId, gameLinksChecksum(row)]),
+  );
+  const igdbIds = rows.map((row) => row.igdbId);
+  const existingChecksum = new Map<number, string | null>();
+  if (igdbIds.length > 0) {
+    const existing = await db
+      .select({
+        igdbId: games.igdbId,
+        linksChecksum: games.linksChecksum,
+      })
+      .from(games)
+      .where(inArray(games.igdbId, igdbIds));
+    for (const row of existing) {
+      existingChecksum.set(row.igdbId, row.linksChecksum);
+    }
+  }
+  const rewriteIgdbIds = igdbIdsNeedingLinkRewrite(
+    rows.map((row) => ({
+      igdbId: row.igdbId,
+      checksum: checksumByIgdb.get(row.igdbId)!,
+    })),
+    existingChecksum,
+  );
+
   const idRows: { id: string; igdbId: number }[] = [];
   await insertChunked(
     rows.map((row) => ({
@@ -90,6 +161,7 @@ export async function upsertGamesWithLinks(
       follows: row.follows,
       hypes: row.hypes,
       popularity: row.popularity,
+      linksChecksum: checksumByIgdb.get(row.igdbId)!,
       syncedAt: new Date(),
     })),
     async (chunk) => {
@@ -114,6 +186,7 @@ export async function upsertGamesWithLinks(
             follows: sql`excluded.follows`,
             hypes: sql`excluded.hypes`,
             popularity: sql`excluded.popularity`,
+            linksChecksum: sql`excluded.links_checksum`,
             igdbRemovedAt: sql`null`,
             syncedAt: sql`now()`,
             updatedAt: sql`now()`,
@@ -125,7 +198,6 @@ export async function upsertGamesWithLinks(
   );
 
   if (idRows.length === 0) {
-    const igdbIds = rows.map((r) => r.igdbId);
     const fallback = await db
       .select({ id: games.id, igdbId: games.igdbId })
       .from(games)
@@ -134,7 +206,21 @@ export async function upsertGamesWithLinks(
   }
 
   const idByIgdb = new Map(idRows.map((r) => [r.igdbId, r.id]));
-  const gameIds = [...new Set(idByIgdb.values())];
+  const rewriteGameIds = [
+    ...new Set(
+      rows
+        .filter((row) => rewriteIgdbIds.has(row.igdbId))
+        .map((row) => idByIgdb.get(row.igdbId))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  if (rewriteGameIds.length === 0) return rows.length;
+
+  const rewriteIgdb = new Set(
+    rows
+      .filter((row) => rewriteIgdbIds.has(row.igdbId) && idByIgdb.has(row.igdbId))
+      .map((row) => row.igdbId),
+  );
 
   const platformLinks: { gameId: string; platformIgdbId: number }[] = [];
   const genreLinks: { gameId: string; genreIgdbId: number }[] = [];
@@ -146,6 +232,7 @@ export async function upsertGamesWithLinks(
   const videoLinks: { gameId: string; videoIgdbId: number }[] = [];
 
   for (const row of rows) {
+    if (!rewriteIgdb.has(row.igdbId)) continue;
     const gameId = idByIgdb.get(row.igdbId);
     if (!gameId) continue;
     for (const platformIgdbId of row.platformIgdbIds) {
@@ -174,9 +261,7 @@ export async function upsertGamesWithLinks(
     }
   }
 
-  if (gameIds.length > 0) {
-    await db.execute(gameJunctionDeleteSql(gameIds));
-  }
+  await db.execute(gameJunctionDeleteSql(rewriteGameIds));
 
   await insertChunked(platformLinks, (chunk) =>
     db.insert(gamePlatforms).values(chunk).onConflictDoNothing(),

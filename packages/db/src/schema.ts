@@ -34,6 +34,8 @@ export const games = pgTable("games", {
   popularity: integer("popularity").notNull().default(0),
   /** Set when IGDB removes the title; cleared on create/update webhooks. */
   igdbRemovedAt: timestamp("igdb_removed_at", { mode: "date" }),
+  /** Sorted junction id lists; skip wipe/rewrite when this matches the payload. */
+  linksChecksum: text("links_checksum"),
   syncedAt: timestamp("synced_at", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

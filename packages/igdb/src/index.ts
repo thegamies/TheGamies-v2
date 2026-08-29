@@ -16,6 +16,11 @@ export {
 export { evaluateBackfillResume } from "./backfill-resume";
 export { INSERT_CHUNK, insertChunked } from "./chunk";
 export {
+  gameLinksChecksum,
+  igdbIdsNeedingLinkRewrite,
+  upsertGamesWithLinks,
+} from "./upsert-games";
+export {
   ALL_ENRICH_ENTITIES,
   getBackfillResumeInfo,
   MAX_PAGES_PER_RUN,

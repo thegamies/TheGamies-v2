@@ -6,7 +6,7 @@ Game metadata comes from the [IGDB API](https://api-docs.igdb.com/). Sync runs o
 
 **Core-first + link-then-enrich** (goty backfill/incremental mechanics + selective lookups):
 
-1. **Games sync** upserts product rows and writes **junction links** by IGDB id (`game_platforms.platform_igdb_id`, etc.). No placeholder name rows in lookup tables.
+1. **Games sync** upserts product rows and writes **junction links** by IGDB id (`game_platforms.platform_igdb_id`, etc.). No placeholder name rows in lookup tables. Link wipe/rewrite runs only when the payload’s id lists change (`games.links_checksum`).
 2. **Enrich** loads distinct link ids for a scope (e.g. `--year 2026`), subtracts ids already in the lookup table, fetches **only missing** entities from IGDB, upserts real rows.
 3. Cover art uses the `covers` table (`image_id` → CDN URL). Artworks, screenshots, and videos use the same enrich/webhook model; wide stills use `t_720p`.
 
