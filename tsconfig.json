@@ -33,5 +33,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "references", "workers"]
+  "exclude": ["node_modules", "references", "workers", "cloudflare-worker.ts"]
 }

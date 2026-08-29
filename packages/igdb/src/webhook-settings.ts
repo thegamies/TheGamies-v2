@@ -8,15 +8,15 @@ export type WebhookDrainSettings = {
   processingMode: WebhookProcessingMode;
   deliveryMode: WebhookDeliveryMode;
   intervalMinutes: number;
-  /** How long Auto keeps delivery open each cycle. */
+  /** Unused; kept so older KV blobs still parse. Drain ends Auto, not a timer. */
   windowMinutes: number;
   maxMessagesPerDrain: number;
   /** True when deliveryMode is closed (legacy admin field). */
   paused: boolean;
   lastDrainAt: string | null;
-  /** Auto: keep delivery open until this instant (Drain now). */
+  /** Unused leftover; Drain now sets drainPending instead. */
   forceOpenUntil: string | null;
-  /** Queue still has work; cron should pull every minute until empty. */
+  /** Queue still has work; Auto stays open until the backlog is empty. */
   drainPending: boolean;
 };
 
@@ -44,6 +44,9 @@ export const WORKER_DRAIN_BATCH_CEILING = 40;
 
 /** Must match `max_batch_size` on the queue consumer in wrangler.jsonc. */
 export const QUEUE_CONSUMER_MAX_BATCH_SIZE = 25;
+
+/** Must match `max_concurrency` on the queue consumer in wrangler.jsonc. */
+export const QUEUE_CONSUMER_MAX_CONCURRENCY = 10;
 
 export const MAX_DRAIN_HOPS = 100;
 /** Same isolate only — Worker-to-Worker hops hit subrequest depth and return `Subrequest…`. */
@@ -78,29 +81,6 @@ export function clampWindowMinutes(
   const raw = Number(windowMinutes);
   const n = Number.isFinite(raw) ? Math.floor(raw) : 5;
   return Math.min(intervalMinutes, Math.max(1, n));
-}
-
-/** Next Auto close (UTC), including after an out-of-window Drain now. */
-export function nextScheduledCloseAt(
-  settings: Pick<WebhookDrainSettings, "intervalMinutes" | "windowMinutes">,
-  now = new Date(),
-): Date {
-  const interval = Math.max(1, settings.intervalMinutes);
-  const window = clampWindowMinutes(settings.windowMinutes, interval);
-  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
-  const pos = minuteOfDay % interval;
-  const minutesUntilClose =
-    pos < window ? window - pos : interval - pos + window;
-  const startOfMinute = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    now.getUTCHours(),
-    now.getUTCMinutes(),
-    0,
-    0,
-  );
-  return new Date(startOfMinute + minutesUntilClose * 60_000);
 }
 
 export function currentIntervalStartAt(
@@ -141,9 +121,8 @@ export function drainedThisWindow(
 export function desiredQueueOpen(
   settings: Pick<
     WebhookDrainSettings,
-    "deliveryMode" | "intervalMinutes" | "windowMinutes"
+    "deliveryMode" | "intervalMinutes"
   > & {
-    forceOpenUntil?: string | null;
     lastDrainAt?: string | null;
     drainPending?: boolean;
   },
@@ -151,10 +130,7 @@ export function desiredQueueOpen(
 ): boolean {
   if (settings.deliveryMode === "closed") return false;
   if (settings.deliveryMode === "open") return true;
-  if (settings.forceOpenUntil) {
-    const until = Date.parse(settings.forceOpenUntil);
-    if (Number.isFinite(until) && now.getTime() < until) return true;
-  }
+  if (settings.drainPending) return true;
   if (
     drainedThisWindow(
       {
@@ -167,10 +143,7 @@ export function desiredQueueOpen(
   ) {
     return false;
   }
-  const interval = settings.intervalMinutes;
-  const window = clampWindowMinutes(settings.windowMinutes, interval);
-  const minuteOfDay = now.getUTCHours() * 60 + now.getUTCMinutes();
-  return minuteOfDay % interval < window;
+  return true;
 }
 
 export function clampDrainSettings(
@@ -303,8 +276,8 @@ export function parseQueuePullBacklogCount(result: unknown): number | null {
 
 /**
  * Cloudflare delivers up to `batchSize` messages per `queue()` invocation.
- * A smaller packet is the last one — stop Auto drain. Retries stay open so
- * those messages can come back.
+ * A smaller packet is the last one when concurrency is 1. With concurrent
+ * consumers, prefer `shouldPauseAutoAfterBatch` and a live backlog count.
  */
 export function isDrainPullExhausted(input: {
   pulled: number;
@@ -314,4 +287,102 @@ export function isDrainPullExhausted(input: {
   if ((input.retried ?? 0) > 0) return false;
   const packet = input.batchSize ?? QUEUE_CONSUMER_MAX_BATCH_SIZE;
   return input.pulled < packet;
+}
+
+function backlogCountFromRecord(row: Record<string, unknown>): number | null {
+  for (const key of ["backlogCount", "backlog_count"] as const) {
+    const n = row[key];
+    if (typeof n === "number" && Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+/** Live producer `metrics()` (camelCase) or REST `{ result: { backlog_count } }`. */
+export function parseQueueProducerMetrics(result: unknown): number | null {
+  if (!result || typeof result !== "object") return null;
+  const row = result as Record<string, unknown>;
+  const direct = backlogCountFromRecord(row);
+  if (direct !== null) return direct;
+  const nested = row.result;
+  if (nested && typeof nested === "object") {
+    const inner = backlogCountFromRecord(nested as Record<string, unknown>);
+    if (inner !== null) return inner;
+  }
+  return parseQueuePullBacklogCount(result);
+}
+
+export type AutoQueueDeliveryPlan = {
+  open: boolean;
+  /** Write drainPending true so Auto stays open between cron ticks. */
+  markPending: boolean;
+  /** Write drainPending false + lastDrainAt; cron will not reopen this interval. */
+  markDrained: boolean;
+};
+
+/**
+ * Auto gate from Cloudflare backlog plus the drain-cycle clock
+ * (`intervalMinutes`). Open while count >= 25, unless this cycle already
+ * paused. Under 25: pause until the next cycle. Unknown backlog uses
+ * `desiredQueueOpen` only.
+ */
+export function planAutoQueueDelivery(input: {
+  settings: Pick<
+    WebhookDrainSettings,
+    "deliveryMode" | "intervalMinutes" | "lastDrainAt" | "drainPending"
+  >;
+  backlogCount: number | null;
+  now?: Date;
+  batchSize?: number;
+}): AutoQueueDeliveryPlan {
+  const now = input.now ?? new Date();
+  const batchSize = input.batchSize ?? QUEUE_CONSUMER_MAX_BATCH_SIZE;
+  const settings = input.settings;
+
+  if (settings.deliveryMode === "closed") {
+    return { open: false, markPending: false, markDrained: false };
+  }
+  if (settings.deliveryMode === "open") {
+    return { open: true, markPending: false, markDrained: false };
+  }
+
+  const cycleClosed = drainedThisWindow(
+    {
+      intervalMinutes: settings.intervalMinutes,
+      lastDrainAt: settings.lastDrainAt ?? null,
+      drainPending: settings.drainPending ?? false,
+    },
+    now,
+  );
+
+  const backlog = input.backlogCount;
+  if (backlog === null) {
+    const open = desiredQueueOpen(settings, now);
+    return { open, markPending: false, markDrained: false };
+  }
+
+  if (backlog >= batchSize) {
+    if (cycleClosed) {
+      return { open: false, markPending: false, markDrained: false };
+    }
+    return { open: true, markPending: true, markDrained: false };
+  }
+
+  return { open: false, markPending: false, markDrained: true };
+}
+
+/**
+ * Pause Auto when the queue is empty after this batch.
+ * Known backlog wins (safe with concurrent consumers). Unknown backlog
+ * falls back to a short packet.
+ */
+export function shouldPauseAutoAfterBatch(input: {
+  pulled: number;
+  batchSize?: number;
+  retried?: number;
+  backlogCount: number | null;
+}): boolean {
+  if ((input.retried ?? 0) > 0) return false;
+  if (input.backlogCount === 0) return true;
+  if (input.backlogCount !== null) return false;
+  return isDrainPullExhausted(input);
 }

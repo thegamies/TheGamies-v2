@@ -25,6 +25,11 @@ const ADMIN_LINKS = [
     description: "Queue IGDB updates and control drain cadence.",
   },
   {
+    href: "/admin/scheduled",
+    title: "Scheduled jobs",
+    description: "Pause Cloudflare minute jobs without waking the database.",
+  },
+  {
     href: "/admin/rankings",
     title: "Live rankings",
     description: "Reveal scores, refresh dirty keys, or rebuild a year.",

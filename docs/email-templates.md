@@ -52,4 +52,4 @@ On each lasting Auth environment, also set Application name to **The Gamies**. T
 
 ## Secrets
 
-Optional `AUTH_EMAIL_FROM` in Doppler / GitHub (Worker secret bulk on staging and previews). Production Cloudflare deploy uses `pnpm deploy:cf`; set the same var on the Worker if you do not want the default From address.
+Optional `AUTH_EMAIL_FROM` in Doppler / GitHub (Worker secret bulk on staging, previews, and production Cloudflare).

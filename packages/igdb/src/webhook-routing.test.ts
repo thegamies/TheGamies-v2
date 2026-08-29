@@ -10,7 +10,6 @@ import {
   clampDrainSettings,
   clampDeliveryMode,
   desiredQueueOpen,
-  nextScheduledCloseAt,
   drainBatchSize,
   drainVisibilityTimeoutMs,
   isDrainLocked,
@@ -18,7 +17,10 @@ import {
   parseDrainHop,
   parseDrainLock,
   parseQueuePullBacklogCount,
+  parseQueueProducerMetrics,
+  planAutoQueueDelivery,
   shouldChainDrain,
+  shouldPauseAutoAfterBatch,
   shouldRunDrain,
   isDrainPullExhausted,
   WORKER_DRAIN_BATCH_CEILING,
@@ -234,6 +236,124 @@ describe("drain settings", () => {
     expect(shouldChainDrain(false, 99)).toBe(false);
   });
 
+  it("reads producer and REST queue metrics envelopes", () => {
+    expect(parseQueueProducerMetrics({ backlogCount: 8103 })).toBe(8103);
+    expect(
+      parseQueueProducerMetrics({
+        success: true,
+        result: { backlog_count: 8103, backlog_bytes: 1 },
+      }),
+    ).toBe(8103);
+    expect(parseQueueProducerMetrics({ messages: [] })).toBeNull();
+  });
+
+  it("keeps Auto open while backlog is at least one batch, then pauses", () => {
+    const now = new Date("2026-08-26T18:30:00.000Z");
+    const draining = {
+      deliveryMode: "auto" as const,
+      intervalMinutes: 15,
+      lastDrainAt: "2026-08-26T18:20:00.000Z",
+      drainPending: true,
+    };
+    expect(
+      planAutoQueueDelivery({
+        settings: draining,
+        backlogCount: 8103,
+        now,
+      }),
+    ).toEqual({ open: true, markPending: true, markDrained: false });
+    expect(
+      planAutoQueueDelivery({
+        settings: draining,
+        backlogCount: 24,
+        now,
+      }),
+    ).toEqual({ open: false, markPending: false, markDrained: true });
+    expect(
+      planAutoQueueDelivery({
+        settings: {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          lastDrainAt: "2026-08-26T18:10:00.000Z",
+          drainPending: false,
+        },
+        backlogCount: 10,
+        now,
+      }),
+    ).toEqual({ open: false, markPending: false, markDrained: true });
+    expect(
+      planAutoQueueDelivery({
+        settings: {
+          deliveryMode: "open",
+          intervalMinutes: 15,
+          lastDrainAt: null,
+          drainPending: false,
+        },
+        backlogCount: 3,
+        now,
+      }),
+    ).toEqual({ open: true, markPending: false, markDrained: false });
+    expect(
+      planAutoQueueDelivery({
+        settings: {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          lastDrainAt: "2026-08-26T18:31:00.000Z",
+          drainPending: false,
+        },
+        backlogCount: 8103,
+        now,
+      }),
+    ).toEqual({ open: false, markPending: false, markDrained: false });
+    expect(
+      planAutoQueueDelivery({
+        settings: {
+          deliveryMode: "auto",
+          intervalMinutes: 15,
+          lastDrainAt: "2026-08-26T18:10:00.000Z",
+          drainPending: false,
+        },
+        backlogCount: 8103,
+        now,
+      }),
+    ).toEqual({ open: true, markPending: true, markDrained: false });
+  });
+
+  it("pauses Auto from live backlog, not a split concurrent packet", () => {
+    expect(
+      shouldPauseAutoAfterBatch({
+        pulled: 10,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 80,
+      }),
+    ).toBe(false);
+    expect(
+      shouldPauseAutoAfterBatch({
+        pulled: 25,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: 0,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPauseAutoAfterBatch({
+        pulled: 10,
+        batchSize: 25,
+        retried: 0,
+        backlogCount: null,
+      }),
+    ).toBe(true);
+    expect(
+      shouldPauseAutoAfterBatch({
+        pulled: 8,
+        batchSize: 25,
+        retried: 2,
+        backlogCount: 0,
+      }),
+    ).toBe(false);
+  });
+
   it("stops drain when the queue packet is smaller than max batch size", () => {
     expect(
       isDrainPullExhausted({
@@ -275,59 +395,30 @@ describe("drain settings", () => {
     expect(parseQueuePullBacklogCount({ messages: [] })).toBeNull();
   });
 
-  it("maps paused to closed delivery and honors sticky open", () => {
+  it("maps paused to closed delivery and keeps Auto open until drain", () => {
     expect(clampDeliveryMode(undefined, true)).toBe("closed");
     expect(clampDeliveryMode("open")).toBe("open");
     expect(
       desiredQueueOpen(
-        { deliveryMode: "closed", intervalMinutes: 15, windowMinutes: 5 },
+        { deliveryMode: "closed", intervalMinutes: 15 },
         new Date("2026-08-22T12:00:00.000Z"),
       ),
     ).toBe(false);
     expect(
       desiredQueueOpen(
-        { deliveryMode: "open", intervalMinutes: 15, windowMinutes: 5 },
+        { deliveryMode: "open", intervalMinutes: 15 },
         new Date("2026-08-22T12:14:00.000Z"),
       ),
     ).toBe(true);
     expect(
       desiredQueueOpen(
-        { deliveryMode: "auto", intervalMinutes: 15, windowMinutes: 5 },
+        { deliveryMode: "auto", intervalMinutes: 15 },
         new Date("2026-08-22T12:00:00.000Z"),
       ),
     ).toBe(true);
     expect(
       desiredQueueOpen(
-        { deliveryMode: "auto", intervalMinutes: 15, windowMinutes: 5 },
-        new Date("2026-08-22T12:06:00.000Z"),
-      ),
-    ).toBe(false);
-    expect(
-      nextScheduledCloseAt(
-        { intervalMinutes: 15, windowMinutes: 5 },
-        new Date("2026-08-22T12:00:00.000Z"),
-      ).toISOString(),
-    ).toBe("2026-08-22T12:05:00.000Z");
-    expect(
-      nextScheduledCloseAt(
-        { intervalMinutes: 15, windowMinutes: 5 },
-        new Date("2026-08-22T12:06:00.000Z"),
-      ).toISOString(),
-    ).toBe("2026-08-22T12:20:00.000Z");
-    expect(
-      nextScheduledCloseAt(
-        { intervalMinutes: 60, windowMinutes: 5 },
-        new Date("2026-08-22T12:30:00.000Z"),
-      ).toISOString(),
-    ).toBe("2026-08-22T13:05:00.000Z");
-    expect(
-      desiredQueueOpen(
-        {
-          deliveryMode: "auto",
-          intervalMinutes: 15,
-          windowMinutes: 5,
-          forceOpenUntil: "2026-08-22T12:20:00.000Z",
-        },
+        { deliveryMode: "auto", intervalMinutes: 15 },
         new Date("2026-08-22T12:06:00.000Z"),
       ),
     ).toBe(true);
@@ -336,18 +427,6 @@ describe("drain settings", () => {
         {
           deliveryMode: "auto",
           intervalMinutes: 15,
-          windowMinutes: 5,
-          forceOpenUntil: "2026-08-22T12:20:00.000Z",
-        },
-        new Date("2026-08-22T12:20:00.000Z"),
-      ),
-    ).toBe(false);
-    expect(
-      desiredQueueOpen(
-        {
-          deliveryMode: "auto",
-          intervalMinutes: 15,
-          windowMinutes: 5,
           lastDrainAt: "2026-08-22T12:01:00.000Z",
           drainPending: false,
         },
@@ -359,7 +438,6 @@ describe("drain settings", () => {
         {
           deliveryMode: "auto",
           intervalMinutes: 15,
-          windowMinutes: 5,
           lastDrainAt: "2026-08-22T12:01:00.000Z",
           drainPending: true,
         },
@@ -371,7 +449,6 @@ describe("drain settings", () => {
         {
           deliveryMode: "auto",
           intervalMinutes: 15,
-          windowMinutes: 5,
           lastDrainAt: "2026-08-22T11:50:00.000Z",
           drainPending: false,
         },

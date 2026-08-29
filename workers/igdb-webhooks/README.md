@@ -62,6 +62,19 @@ Use the matching Neon branch URL for each env’s `DATABASE_URL`. Prefer differe
 
 ## Deploy
 
+**CI (default):** push to `develop` / `main` deploys the matching Worker when these paths change:
+
+- `workers/igdb-webhooks/**`
+- `packages/igdb/**`
+- `packages/db/**`
+- `pnpm-lock.yaml`
+
+Staging **workflow_dispatch** deploys the Worker even if those paths did not change (uncheck `force_igdb_webhooks` to follow the path filter). PR previews do **not** deploy this Worker.
+
+Staging CI also `secret bulk`s Worker secrets from GitHub. Production CI deploys code on path changes and `secret bulk`s only when `PRODUCTION_DATABASE_URL` is set (existing secrets are kept otherwise).
+
+**Manual:**
+
 ```bash
 pnpm deploy:igdb-webhooks:develop
 pnpm deploy:igdb-webhooks:production
@@ -92,13 +105,13 @@ Redeploy the develop Worker after changing this (`pnpm deploy:igdb-webhooks:deve
 
 ## Delivery
 
-The Worker `queue()` handler applies each batch (`max_concurrency: 1`, `max_batch_size`: 25) as one catalog unit: game create/updates share one upsert. A batch smaller than 25 is treated as the last packet: Auto drain pauses until the next interval (cron will not reopen the current window). Sticky **Open** stays on. A batch of 25 keeps delivery going. Cron every minute only pause/resumes Cloudflare queue delivery from KV:
+The Worker `queue()` handler applies each batch (`max_concurrency: 10`, `max_batch_size`: 25) as one catalog unit: game create/updates share one upsert. It does not pause delivery. Cron every minute reads Cloudflare queue **metrics** (`backlog_count`) and pause/resumes:
 
-- **Auto** — open for `windowMinutes` at the start of each `intervalMinutes` cycle (UTC)
-- **Open** — always deliver; cron will not pause
+- **Auto** — each `intervalMinutes` cycle, open while backlog is 25 or more. Pause when it drops under 25. Stay paused until the next cycle even if more than 25 wait. Drain / Open can resume earlier.
+- **Open** — always deliver; drain will not pause
 - **Closed** — always paused; cron will not resume; ingress still enqueues
 
-Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed) and marks the queue as still draining. In Auto, that stays open until a short batch (under 25) or the next scheduled close.
+Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed) and marks the queue as still draining. In Auto, that stays open until cron sees fewer than 25 messages waiting.
 
 `Failed query: <sql>` on a failed event is usually a dropped Neon HTTP call. The event log stores the underlying cause when present. Reprocess works for pending and failed.
 

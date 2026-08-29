@@ -3,8 +3,7 @@ import {
   fetchWebhookRegistrationOverview,
   clampWebhookEventSort,
   listWebhookEvents,
-  desiredQueueOpen,
-  nextScheduledCloseAt,
+  planAutoQueueDelivery,
   processWebhookBatch,
   processWebhookEnvelope,
   registerIgdbWebhookSlot,
@@ -14,8 +13,6 @@ import {
   testIgdbWebhook,
   tryExtractWebhookIgdbId,
   verifyIgdbWebhookSecret,
-  isDrainPullExhausted,
-  QUEUE_CONSUMER_MAX_BATCH_SIZE,
   WEBHOOK_ENTITIES,
   WEBHOOK_METHODS,
   type IgdbWebhookEnvelope,
@@ -25,7 +22,7 @@ import {
 } from "@thegamies/igdb";
 import { createDb } from "@thegamies/db";
 import { bindProcessEnv, json, requireAdmin } from "./http";
-import { setQueueDeliveryPaused } from "./queue-delivery";
+import { readQueueBacklogCount, setQueueDeliveryPaused } from "./queue-delivery";
 import { readDrainSettings, writeDrainSettings } from "./settings";
 
 function isEnvelope(value: unknown): value is IgdbWebhookEnvelope {
@@ -34,11 +31,30 @@ function isEnvelope(value: unknown): value is IgdbWebhookEnvelope {
   return typeof row.receivedAt === "string" && "body" in row;
 }
 
-async function syncQueueDelivery(env: Env, now = new Date()): Promise<boolean> {
+async function syncQueueDelivery(
+  env: Env,
+  now = new Date(),
+): Promise<{ open: boolean; backlogCount: number | null }> {
   const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
-  const open = desiredQueueOpen(settings, now);
-  await setQueueDeliveryPaused(env, !open);
-  return open;
+  const backlogCount = await readQueueBacklogCount(
+    env.IGDB_WEBHOOK_QUEUE,
+    env,
+  );
+  const plan = planAutoQueueDelivery({ settings, backlogCount, now });
+  if (plan.markDrained) {
+    await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
+      drainPending: false,
+      forceOpenUntil: null,
+      lastDrainAt: now.toISOString(),
+    });
+  } else if (plan.markPending) {
+    await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
+      drainPending: true,
+      lastDrainAt: now.toISOString(),
+    });
+  }
+  await setQueueDeliveryPaused(env, !plan.open);
+  return { open: plan.open, backlogCount };
 }
 
 function callbackUrl(env: Env, request: Request): string {
@@ -175,7 +191,7 @@ async function handleAdminSettings(
       forceOpenUntil: body.deliveryMode === "closed" ? null : undefined,
     });
     try {
-      await setQueueDeliveryPaused(env, !desiredQueueOpen(settings));
+      await syncQueueDelivery(env);
     } catch (error) {
       console.error(
         "igdb-webhooks-delivery-sync",
@@ -350,12 +366,8 @@ export default {
             409,
           );
         }
-        const forceOpenUntil =
-          settings.deliveryMode === "auto"
-            ? nextScheduledCloseAt(settings).toISOString()
-            : null;
         await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
-          forceOpenUntil,
+          forceOpenUntil: null,
           lastDrainAt: new Date().toISOString(),
           drainPending: true,
         });
@@ -364,7 +376,7 @@ export default {
           accepted: true,
           open: true,
           deliveryMode: settings.deliveryMode,
-          forceOpenUntil,
+          forceOpenUntil: null,
         });
       }
 
@@ -398,9 +410,14 @@ export default {
     _ctx: ExecutionContext,
   ): Promise<void> {
     try {
-      const open = await syncQueueDelivery(env);
+      const { open, backlogCount } = await syncQueueDelivery(env);
       console.log(
-        JSON.stringify({ msg: "igdb-webhooks", event: "delivery-sync", open }),
+        JSON.stringify({
+          msg: "igdb-webhooks",
+          event: "delivery-sync",
+          open,
+          backlogCount,
+        }),
       );
     } catch (error) {
       console.error(
@@ -429,7 +446,6 @@ export default {
     }
     bindProcessEnv(env);
     const db = createDb(env.DATABASE_URL);
-    let retried = 0;
     const prepared = batch.messages.map((message) => {
       const envelope: IgdbWebhookEnvelope = isEnvelope(message.body)
         ? message.body
@@ -456,7 +472,6 @@ export default {
         const { message, envelope } = prepared[index]!;
         const result = results[index]!;
         if (result.status === "failed" && !envelope.ingressError) {
-          retried += 1;
           message.retry();
         } else {
           message.ack();
@@ -464,32 +479,8 @@ export default {
       }
     } catch {
       for (const { message } of prepared) {
-        retried += 1;
         message.retry();
       }
-    }
-
-    const pulled = batch.messages.length;
-    if (
-      isDrainPullExhausted({
-        pulled,
-        batchSize: QUEUE_CONSUMER_MAX_BATCH_SIZE,
-        retried,
-      })
-    ) {
-      await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
-        drainPending: false,
-        forceOpenUntil: null,
-        lastDrainAt: new Date().toISOString(),
-      });
-      if (settings.deliveryMode !== "open") {
-        await setQueueDeliveryPaused(env, true);
-      }
-    } else if (pulled >= QUEUE_CONSUMER_MAX_BATCH_SIZE) {
-      await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, {
-        drainPending: true,
-        lastDrainAt: new Date().toISOString(),
-      });
     }
   },
 };

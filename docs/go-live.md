@@ -37,14 +37,13 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 
 ### 1. Production pipeline parity
 
-`.github/workflows/production.yml` deploys Vercel (`vercel pull --environment=production`) and Cloudflare (`pnpm deploy:cf`). Compared with [staging.yml](../.github/workflows/staging.yml) it does **not**:
+`.github/workflows/production.yml` deploys Vercel (`vercel pull --environment=production`) and Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it does **not**:
 
 - Run `pnpm db:migrate` against a production Neon URL
-- Inject app secrets onto the Cloudflare Worker (`wrangler secret bulk`)
 - Point Neon Auth email webhooks at the production Worker
-- Pass `CRON_SECRET`, `IGDB_WEBHOOKS_WORKER_URL`, `IGDB_WEBHOOK_SECRET`, or `NEON_API_KEY` / `NEON_PROJECT_ID` (account close)
+- Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
 
-**Do:** give production the same migrate → secret-inject → deploy → Auth-webhook shape as staging, with **separate** production secrets (never reuse `STAGING_DATABASE_URL`). Confirm Vercel Production env vars and Worker secrets independently — `vercel pull` only helps Vercel.
+**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, and shared keys (`CRON_SECRET`, R2, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*`. Confirm Vercel Production env vars independently — `vercel pull` only helps Vercel.
 
 ### 2. Canonical public origin
 
@@ -72,14 +71,14 @@ Without this, sign-up confirmation and password reset fail in production.
 Empty browse is a launch-killer.
 
 - Backfill + enrich the production catalog (CLI; admin HTTP will time out on large enrich)
-- Deploy **production** IGDB webhooks Worker + queue + KV; set `IGDB_WEBHOOKS_WORKER_URL` / secrets; register slots from `/admin/webhooks` on production only
+- Deploy **production** IGDB webhooks Worker + queue + KV (CI deploys code when webhook paths change; first-time Queue/KV + `PRODUCTION_DATABASE_URL` bulk still need to exist); set `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` on GitHub so the production app Worker gets it; register slots from `/admin/webhooks` on production only
 - Confirm covers resolve (`AVATAR_PUBLIC_BASE_URL` is avatars; game art is IGDB CDN)
 
 ### 5. Edition freeze on both hosts
 
-Vercel Cron hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare does **not** auto-route Cron Triggers to App Router. If production traffic can land on Workers, schedule an HTTP cron with `Authorization: Bearer $CRON_SECRET`. Staging inject today also **omits** `CRON_SECRET` — add it to both lasting envs.
+**Shipped:** Vercel Cron hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare Cron Trigger on the OpenNext Worker POSTs the same route via `WORKER_SELF_REFERENCE`. Staging CI injects `CRON_SECRET` onto Vercel and `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
 
-Without this, events can close and sit on “calculating” until someone writes a schedule (the `after()` kick) or hits the route by hand.
+Still confirm `CRON_SECRET` exists in GitHub (and Vercel Production env, which uses `vercel pull`). Without it, Cloudflare’s handler no-ops and events can sit on “calculating” until a schedule write (`after()` kick) or a manual hit.
 
 ### 6. Hide ops from the public product
 
@@ -192,10 +191,10 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 ## Suggested order
 
-1. **Production workflow** — migrate, secret bulk, Auth webhook, separate prod secrets  
+1. **Production workflow** — migrate, Auth webhook, Vercel Production env parity  
 2. **Domain + Auth + mail** — one origin, trusted domains, sending + inboxes  
 3. **Catalog** — backfill production, webhooks Worker live  
-4. **Freeze cron** on Cloudflare + `CRON_SECRET` on both hosts  
+4. Confirm `CRON_SECRET` is in GitHub (and Vercel Production) so freeze Cron authorizes on both hosts  
 5. **Chrome cleanup** — design-system `noindex` / production 404; seed off production. Site operators are shipped.  
 6. **Share/SEO** — sitemap, robots, OG, error pages  
 7. **Games browse** — pagination (and filters if you want catalog parity)  

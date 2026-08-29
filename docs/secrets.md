@@ -57,7 +57,7 @@ Never commit `.env`.
 
 ## GitHub Actions → hosts (deploy path)
 
-CI reads repo secrets and injects them on every staging / preview deploy:
+CI reads repo secrets and injects them on staging / preview / production Cloudflare deploys:
 
 | GitHub secret | Becomes | Used by |
 |---|---|---|
@@ -66,12 +66,17 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 | `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
 | `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging only (or use `VERCEL_STAGING_ALIAS`) |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging only |
+| `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Production Cloudflare app Worker + IGDB webhooks Worker. Never `STAGING_DATABASE_URL` |
+| `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Cloudflare app Worker (production Neon Auth URL) |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Production Cloudflare (alias: GitHub `NEON_AUTH_COOKIE_SECRET`) |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production only |
+| `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |
-| `CRON_SECRET` | same | Vercel Cron + scheduled HTTP to `/api/cron/edition-freeze` (Bearer or `?secret=`) |
+| `CRON_SECRET` | same | Vercel Cron + Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
-| `IGDB_WEBHOOK_SECRET` | same | Base secret for IGDB webhook slots (`{base}:{entity}:{method}`) — Worker + local register |
-| `IGDB_WEBHOOKS_WORKER_URL` | same | Public origin of that env’s webhook Worker (`…-develop` staging, `thegamies-igdb-webhooks` production) |
+| `IGDB_WEBHOOK_SECRET` | same | Base secret for IGDB webhook slots (`{base}:{entity}:{method}`) — staging/production webhooks Worker `secret bulk` + local register |
+| `IGDB_WEBHOOKS_WORKER_URL` | same | Staging app → develop webhook Worker. Staging CI injects onto the app (defaults to `https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev` if unset) |
 | `IGDB_WEBHOOK_QUEUE_ID` | Worker var (per env) | Queue UUID for pause/resume (`igdb-webhooks-develop` vs `igdb-webhooks`) |
 | `CLOUDFLARE_API_TOKEN` | Worker secret | Queues Edit token used by the webhook Worker to pull/ack (may reuse deploy token if scoped) |
 | `R2_ACCOUNT_ID` | same | avatar uploads (Cloudflare R2) |
@@ -85,8 +90,8 @@ CI reads repo secrets and injects them on every staging / preview deploy:
 
 PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
 
-**Cloudflare:** CI runs `wrangler secret bulk` so secrets appear under Worker → Settings → Variables and Secrets.  
-**Vercel:** CI passes `--env` on each deployment.
+**Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). IGDB webhooks production bulk still requires `PRODUCTION_DATABASE_URL`. Empty keys are skipped; existing Worker secrets for those keys are left as-is.  
+**Vercel:** Staging CI passes `--env` on each deployment. Production Vercel still uses `vercel pull --environment=production` (set vars on the Vercel project).
 
 **Manual import (required):** Copy values into the GitHub secrets above when they change. Free-plan Doppler has no service-token CI path; do not rely on auto-sync for this deploy process.
 
@@ -105,4 +110,4 @@ PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static key
 2. **Manually import** app secrets into GitHub when they change — CI never pulls Doppler.
 3. Production DB URL never used for local or PR previews.
 4. PR databases are ephemeral — CI-owned.
-5. After changing GitHub app secrets, re-run **Staging dual deploy** (or push to `develop`) so Workers pick them up via `secret bulk`.
+5. After changing GitHub app secrets, re-run the matching deploy (**Staging dual deploy** or production on `main`) so Workers pick them up via `secret bulk`.

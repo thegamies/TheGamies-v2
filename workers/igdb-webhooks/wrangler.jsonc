@@ -32,9 +32,10 @@
         "consumers": [
           {
             "queue": "igdb-webhooks-develop",
-            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE (packages/igdb).
+            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE /
+            // QUEUE_CONSUMER_MAX_CONCURRENCY (packages/igdb).
             "max_batch_size": 25,
-            "max_concurrency": 1,
+            "max_concurrency": 10,
             "max_retries": 5,
             "max_batch_timeout": 5
           }
@@ -64,9 +65,10 @@
         "consumers": [
           {
             "queue": "igdb-webhooks",
-            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE (packages/igdb).
+            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE /
+            // QUEUE_CONSUMER_MAX_CONCURRENCY (packages/igdb).
             "max_batch_size": 25,
-            "max_concurrency": 1,
+            "max_concurrency": 10,
             "max_retries": 5,
             "max_batch_timeout": 5
           }

@@ -4,6 +4,11 @@ on:
   push:
     branches: [develop]
   workflow_dispatch:
+    inputs:
+      force_igdb_webhooks:
+        description: Deploy IGDB webhooks Worker even if paths did not change
+        type: boolean
+        default: true
 
 concurrency:
   group: staging-deploy
@@ -45,6 +50,24 @@ jobs:
           echo "### Migrate (staging)" >> "$GITHUB_STEP_SUMMARY"
           echo "- Applied \`pnpm db:migrate\` against \`STAGING_DATABASE_URL\`." >> "$GITHUB_STEP_SUMMARY"
 
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      igdb_webhooks: ${{ steps.filter.outputs.igdb_webhooks }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            igdb_webhooks:
+              - 'workers/igdb-webhooks/**'
+              - 'packages/igdb/**'
+              - 'packages/db/**'
+              - 'pnpm-lock.yaml'
+
   vercel:
     needs: migrate
     runs-on: ubuntu-latest
@@ -83,8 +106,10 @@ jobs:
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL || secrets.NEON_AUTH_BASE_URL }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          IGDB_WEBHOOKS_WORKER_URL: ${{ secrets.IGDB_WEBHOOKS_WORKER_URL }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -114,8 +139,12 @@ jobs:
             NEXT_PUBLIC_APP_URL=""
           fi
 
+          if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
+            IGDB_WEBHOOKS_WORKER_URL="https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev"
+          fi
+
           ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
+          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET CRON_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET IGDB_WEBHOOKS_WORKER_URL R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
             val="${!key}"
             if [ -n "$val" ]; then
               ARGS+=(--env "${key}=${val}")
@@ -178,8 +207,10 @@ jobs:
           NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL || secrets.NEON_AUTH_BASE_URL }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          IGDB_WEBHOOKS_WORKER_URL: ${{ secrets.IGDB_WEBHOOKS_WORKER_URL }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
@@ -196,11 +227,16 @@ jobs:
           if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
             echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set GitHub secret NEON_AUTH_COOKIE_SECRET"
           fi
+          if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
+            IGDB_WEBHOOKS_WORKER_URL="https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev"
+            export IGDB_WEBHOOKS_WORKER_URL
+          fi
           node -e "
             const fs=require('fs');
             const worker='thegamies-v2-develop';
             let s=fs.readFileSync('wrangler.jsonc','utf8');
             s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
+            s=s.replaceAll('9956d865bf3d4a8e92c84157db2da062', '03fe80b4d898487587901e0b6abced89');
             fs.writeFileSync('wrangler.jsonc', s);
           "
 
@@ -214,8 +250,10 @@ jobs:
             "NEON_AUTH_BASE_URL",
             "NEON_AUTH_COOKIE_SECRET",
             "ADMIN_SYNC_SECRET",
+            "CRON_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
+            "IGDB_WEBHOOKS_WORKER_URL",
             "R2_ACCOUNT_ID",
             "R2_ACCESS_KEY_ID",
             "R2_SECRET_ACCESS_KEY",
@@ -266,6 +304,87 @@ jobs:
           echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
           echo "- Secrets: GitHub Actions ? wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
 
+  igdb_webhooks:
+    needs: [migrate, changes]
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.force_igdb_webhooks != 'false') ||
+      needs.changes.outputs.igdb_webhooks == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      skipped: ${{ steps.guard.outputs.skipped }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare secrets missing; skipping IGDB webhooks Worker deploy."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_WEBHOOK_SECRET: ${{ secrets.IGDB_WEBHOOK_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const secrets = {};
+          const keys = [
+            ["DATABASE_URL", "DATABASE_URL"],
+            ["ADMIN_SYNC_SECRET", "ADMIN_SYNC_SECRET"],
+            ["IGDB_WEBHOOK_SECRET", "IGDB_WEBHOOK_SECRET"],
+            ["IGDB_CLIENT_ID", "IGDB_CLIENT_ID"],
+            ["IGDB_CLIENT_SECRET", "IGDB_CLIENT_SECRET"],
+            ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_TOKEN"],
+          ];
+          for (const [envKey, secretKey] of keys) {
+            const val = process.env[envKey];
+            if (!val) continue;
+            secrets[secretKey] = val;
+          }
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/igdb-webhooks-secrets.json",
+            JSON.stringify(secrets),
+          );
+          const names = Object.keys(secrets);
+          console.log(
+            names.length
+              ? `Prepared ${names.length} IGDB webhook secrets: ${names.join(", ")}`
+              : "WARNING: no IGDB webhook secrets set in GitHub Actions",
+          );
+          NODE
+
+          pnpm deploy:igdb-webhooks:develop
+
+          if [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
+            pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env develop
+          else
+            echo "Skipping wrangler secret bulk (no secrets to upload)."
+          fi
+
+          echo "### IGDB webhooks staging" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Worker: \`thegamies-igdb-webhooks-develop\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy: \`pnpm deploy:igdb-webhooks:develop\`" >> "$GITHUB_STEP_SUMMARY"
+
   auth_email:
     needs: cloudflare
     runs-on: ubuntu-latest
@@ -294,7 +413,7 @@ jobs:
           esac
 
   summary:
-    needs: [migrate, vercel, cloudflare, auth_email]
+    needs: [migrate, vercel, cloudflare, igdb_webhooks, auth_email]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -306,6 +425,8 @@ jobs:
           VERCEL_SKIPPED: ${{ needs.vercel.outputs.skipped }}
           CF_URL: ${{ needs.cloudflare.outputs.url }}
           CF_SKIPPED: ${{ needs.cloudflare.outputs.skipped }}
+          IGDB_RESULT: ${{ needs.igdb_webhooks.result }}
+          IGDB_SKIPPED: ${{ needs.igdb_webhooks.outputs.skipped }}
         run: |
           {
             echo "## Staging deploy (develop)"
@@ -329,9 +450,18 @@ jobs:
             else
               echo "| Cloudflare | deployed | $CF_URL |"
             fi
+            if [ "$IGDB_RESULT" = "skipped" ]; then
+              echo "| IGDB webhooks | skipped | paths unchanged |"
+            elif [ "$IGDB_SKIPPED" = "true" ]; then
+              echo "| IGDB webhooks | skipped | Cloudflare secrets missing |"
+            elif [ "$IGDB_RESULT" = "success" ]; then
+              echo "| IGDB webhooks | deployed | \`thegamies-igdb-webhooks-develop\` |"
+            else
+              echo "| IGDB webhooks | $IGDB_RESULT | |"
+            fi
             echo ""
             echo "Stable Cloudflare worker: \`thegamies-v2-develop\`."
-            echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`NEON_AUTH_COOKIE_SECRET\`, \`ADMIN_SYNC_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`."
+            echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`NEON_AUTH_COOKIE_SECRET\`, \`ADMIN_SYNC_SECRET\`, \`CRON_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`, \`IGDB_WEBHOOKS_WORKER_URL\`."
             echo "Per-host public URL: \`STAGING_VERCEL_APP_URL\` (or \`VERCEL_STAGING_ALIAS\`) and \`STAGING_CF_APP_URL\`."
             echo "Optional: \`VERCEL_STAGING_ALIAS\`."
           } >> "$GITHUB_STEP_SUMMARY"

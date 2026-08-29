@@ -229,6 +229,7 @@ jobs:
             const worker='thegamies-v2-pr-' + process.env.PR_NUMBER;
             let s=fs.readFileSync('wrangler.jsonc','utf8');
             s=s.replaceAll('\"thegamies-v2\"', JSON.stringify(worker));
+            s=s.replace(/,\\s*\"kv_namespaces\": \\[[\\s\\S]*?\\]/, '');
             fs.writeFileSync('wrangler.jsonc', s);
           "
           node <<'NODE'

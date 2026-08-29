@@ -26,7 +26,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 | File | Role |
 |---|---|
 | `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys; cron for edition freeze |
-| `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets |
+| `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets, Cron Trigger (`* * * * *`) |
+| `cloudflare-worker.ts` | OpenNext custom worker: `fetch` plus `scheduled` → edition freeze |
 | `workers/igdb-webhooks/wrangler.jsonc` | Dedicated IGDB webhook Worker (Queue producer + consumer, KV delivery gate, cron pause/resume) |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
@@ -39,8 +40,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 ## Cloudflare notes
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
-- **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). On Cloudflare, schedule an HTTP cron (or Worker Cron that `fetch`es the Worker URL) with `Authorization: Bearer $CRON_SECRET` — OpenNext does not auto-route CF Cron Triggers to App Router routes.
-- **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Deploy with `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Set Worker secrets/vars per `--env`. Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
+- **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare uses a Worker Cron Trigger on the same schedule (`wrangler.jsonc` + `cloudflare-worker.ts`). The `scheduled` handler checks Workers KV `CRON_SETTINGS` (pause all CF jobs from `/admin/scheduled`), then calls the freeze route in-process via `WORKER_SELF_REFERENCE` with `Authorization: Bearer $CRON_SECRET`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
+- **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Staging/production CI deploys it **only when relevant paths change** (`workers/igdb-webhooks/**`, `packages/igdb/**`, `packages/db/**`, `pnpm-lock.yaml`). Manual `workflow_dispatch` on staging also deploys it by default. Manual CLI: `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Set Worker secrets/vars per `--env` (staging CI `secret bulk`; production bulk only if `PRODUCTION_DATABASE_URL` is in GitHub). Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 
 ## Account setup (one-time)
@@ -85,6 +86,14 @@ Configure on the repo:
 | `NEON_AUTH_COOKIE_SECRET` | Neon Auth cookie signing (32+ chars; staging + previews) |
 | `STAGING_VERCEL_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Vercel staging |
 | `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
+| `PRODUCTION_DATABASE_URL` | Production Neon URL (`DATABASE_URL` on `thegamies-v2` and IGDB webhooks production). Never `STAGING_DATABASE_URL` |
+| `PRODUCTION_NEON_AUTH_BASE_URL` | Production Neon Auth URL |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | Optional. Production cookie secret (else `NEON_AUTH_COOKIE_SECRET`) |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` for Cloudflare production |
+| `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | Production app → production IGDB webhook Worker origin |
+| `CRON_SECRET` | Edition freeze cron (Vercel Cron + Cloudflare `scheduled` handler) |
+| `IGDB_WEBHOOKS_WORKER_URL` | Staging app → IGDB webhooks Worker origin (defaults to the develop `workers.dev` URL if unset) |
+| `IGDB_WEBHOOK_SECRET` | Base secret for IGDB webhook slots (Worker `secret bulk`) |
 | `ADMIN_SYNC_SECRET` | First site-operator claim + IGDB webhooks Worker proxy (staging + PR previews) |
 | `IGDB_CLIENT_ID` | IGDB / Twitch client id |
 | `IGDB_CLIENT_SECRET` | IGDB / Twitch client secret |
@@ -109,6 +118,8 @@ Push / merge to develop (or workflow_dispatch)
   → staging: deploy Vercel with GitHub app secrets as --env
   → staging: deploy Cloudflare worker thegamies-v2-develop
        (.dev.vars for build + wrangler secret bulk for runtime / dashboard)
+  → igdb-webhooks: deploy thegamies-igdb-webhooks-develop when paths change
+       (or always on workflow_dispatch unless force_igdb_webhooks is false)
 ```
 
 Migrations run before both host deploys. If `STAGING_DATABASE_URL` is missing, migrate is skipped (hosts still deploy if their secrets are set).
@@ -187,8 +198,9 @@ You do **not** need one Neon Auth project per preview host. One Neon project, ma
 
 1. Promote `develop` → `main` via PR.
 2. Vercel production deploy from `main`.
-3. Cloudflare production deploy of worker `thegamies-v2` (CI on `main` or `pnpm deploy:cf`).
-4. Neon production branch only.
+3. Cloudflare production deploy of worker `thegamies-v2` (CI on `main` or `pnpm deploy:cf`). CI writes `.dev.vars` from production GitHub secrets and `wrangler secret bulk` onto that Worker (never `STAGING_*`).
+4. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change.
+5. Neon production branch only.
 
 ## Environment variables
 

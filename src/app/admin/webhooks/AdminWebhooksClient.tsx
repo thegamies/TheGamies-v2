@@ -13,7 +13,6 @@ type DrainSettings = {
   processingMode: "queued" | "live";
   deliveryMode: "auto" | "open" | "closed";
   intervalMinutes: number;
-  windowMinutes: number;
   maxMessagesPerDrain: number;
   paused: boolean;
   lastDrainAt: string | null;
@@ -69,7 +68,6 @@ export function AdminWebhooksClient() {
     "queued",
   );
   const [intervalMinutes, setIntervalMinutes] = useState("15");
-  const [windowMinutes, setWindowMinutes] = useState("5");
   const [deliveryMode, setDeliveryMode] = useState<"auto" | "open" | "closed">(
     "auto",
   );
@@ -95,7 +93,6 @@ export function AdminWebhooksClient() {
     setSettings(json.settings);
     setProcessingMode(json.settings.processingMode ?? "queued");
     setIntervalMinutes(String(json.settings.intervalMinutes));
-    setWindowMinutes(String(json.settings.windowMinutes ?? 5));
     setDeliveryMode(json.settings.deliveryMode ?? (json.settings.paused ? "closed" : "auto"));
   }, []);
 
@@ -167,7 +164,6 @@ export function AdminWebhooksClient() {
         body: JSON.stringify({
           processingMode,
           intervalMinutes: Number(intervalMinutes),
-          windowMinutes: Number(windowMinutes),
           deliveryMode,
         }),
       });
@@ -186,7 +182,6 @@ export function AdminWebhooksClient() {
       setSettings(json.settings);
       setProcessingMode(json.settings.processingMode ?? "queued");
       setIntervalMinutes(String(json.settings.intervalMinutes));
-      setWindowMinutes(String(json.settings.windowMinutes ?? 5));
       setDeliveryMode(
         json.settings.deliveryMode ??
           (json.settings.paused ? "closed" : "auto"),
@@ -216,7 +211,7 @@ export function AdminWebhooksClient() {
         throw new Error(json?.error ?? "Could not open delivery.");
       }
       setMessage(
-        "Delivery is open. Catalog updates apply until the next scheduled close, or until you close it.",
+        "Delivery is open. Catalog updates apply until fewer than 25 remain, or until you close it.",
       );
       await refreshAll();
     } catch (err) {
@@ -448,7 +443,7 @@ export function AdminWebhooksClient() {
           >
             <label className="block">
               <span className="text-sm text-muted">
-                Minutes between open windows
+                Minutes between drain cycles
               </span>
               <input
                 type="number"
@@ -456,20 +451,6 @@ export function AdminWebhooksClient() {
                 max={1440}
                 value={intervalMinutes}
                 onChange={(e) => setIntervalMinutes(e.target.value)}
-                disabled={processingMode === "live" || deliveryMode !== "auto"}
-                className={`mt-1 w-full ${fieldInputClass}`}
-              />
-            </label>
-            <label className="block">
-              <span className="text-sm text-muted">
-                Minutes to stay open
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={1440}
-                value={windowMinutes}
-                onChange={(e) => setWindowMinutes(e.target.value)}
                 disabled={processingMode === "live" || deliveryMode !== "auto"}
                 className={`mt-1 w-full ${fieldInputClass}`}
               />
@@ -489,7 +470,8 @@ export function AdminWebhooksClient() {
               <span>
                 <span className="font-semibold">Auto</span>
                 <span className="mt-0.5 block text-muted">
-                  Open for a short window on a repeating schedule (UTC).
+                  Open each cycle while at least 25 updates are waiting.
+                  Pauses once fewer than 25 remain, until the next cycle.
                 </span>
               </span>
             </label>
@@ -504,7 +486,7 @@ export function AdminWebhooksClient() {
               <span>
                 <span className="font-semibold">Open</span>
                 <span className="mt-0.5 block text-muted">
-                  Keep applying. The schedule will not close delivery.
+                  Keep applying. A finished drain will not pause delivery.
                 </span>
               </span>
             </label>

@@ -12,13 +12,19 @@ describe("AWARD_CATEGORY_DEFS", () => {
     const ids = AWARD_CATEGORY_DEFS.map((d) => d.id);
     expect(new Set(ids).size).toBe(ids.length);
     const orders = AWARD_CATEGORY_DEFS.map((d) => d.sortOrder);
-    expect(orders).toEqual([...orders].sort((a, b) => a - b));
-    expect(orders[0]).toBe(2);
-    expect(orders.at(-1)).toBe(87);
+    expect(orders).toEqual(Array.from({ length: 86 }, (_, i) => i + 1));
     expect(AWARD_CATEGORY_DEFS.every((d) => d.description.length > 0)).toBe(
       true,
     );
     expect(AWARD_CATEGORY_DEFS).toHaveLength(86);
+    expect(AWARD_CATEGORY_DEFS[0]).toMatchObject({
+      id: "best-gameplay",
+      label: "Best Gameplay",
+      group: "premier",
+    });
+    expect(AWARD_CATEGORY_DEFS.map((d) => d.id)).not.toContain(
+      "best-game-design",
+    );
   });
 
   it("parses groups and standings query strings", () => {
@@ -39,10 +45,10 @@ describe("AWARD_CATEGORY_DEFS", () => {
     expect(
       standingsQueryString({
         view: "category",
-        category: "best-game-design",
+        category: "best-gameplay",
         group: "premier",
       }),
-    ).toBe("?group=premier&view=category&category=best-game-design");
+    ).toBe("?group=premier&view=category&category=best-gameplay");
   });
 
   it("parses live standings views", () => {
