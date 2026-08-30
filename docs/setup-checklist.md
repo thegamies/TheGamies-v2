@@ -19,6 +19,7 @@ Work top to bottom.
 ## 1. Neon
 
 - [ ] Create Neon project for The Gamies v2
+- [ ] Copy every GitHub Actions secret from [github-secrets.md](./github-secrets.md) (Settings → Secrets and variables → Actions)
 - [ ] Copy project id → GitHub secret `NEON_PROJECT_ID`
 - [ ] Create API key → GitHub secret `NEON_API_KEY`
 - [ ] Put develop Neon URL in GitHub `STAGING_DATABASE_URL` (and optionally Doppler `dev` for local). Neon branch name should be **`develop`** — PR/manual previews parent from it.

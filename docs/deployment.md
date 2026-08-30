@@ -70,6 +70,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 ## GitHub Actions secrets
 
+Full setup list (required vs optional, staging vs production): [github-secrets.md](./github-secrets.md).
+
 Configure on the repo:
 
 | Secret | Purpose |

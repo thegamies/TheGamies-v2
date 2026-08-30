@@ -5,6 +5,8 @@
 
 **CI does not read Doppler.** When app secrets change, **manually import / update them in GitHub Actions secrets**, then re-run the staging (or preview) deploy so hosts pick them up.
 
+**Setup checklist (every secret name):** [github-secrets.md](./github-secrets.md).
+
 Deploy credentials (`VERCEL_*`, `CLOUDFLARE_*`, `NEON_*` API keys) also stay in GitHub Actions.
 
 ## Doppler (local only)
