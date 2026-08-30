@@ -610,7 +610,7 @@ export function AdminWebhooksClient() {
               IGDB registrations
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted">
-              Callbacks point at this environment's webhook worker. Slots for
+              Callbacks point at this environment&apos;s webhook worker. Slots for
               another environment are omitted, even when IGDB lists them.
             </p>
             {overview ? (
