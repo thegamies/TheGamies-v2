@@ -8,6 +8,7 @@ export {
   isAdultGame,
   mapIgdbGame,
   yearUnixRange,
+  buildEntityPageQuery,
   type AdultFilters,
   type IgdbGame,
   type IgdbImageSize,
@@ -31,6 +32,30 @@ export {
   type EnrichEntity,
   type SyncChunkResult,
 } from "./sync";
+export {
+  CATALOG_ENTITY_ORDER,
+  isCatalogEntity,
+  nextCatalogEntity,
+  involvedCompaniesForKnownGames,
+  ttbRowsForKnownGames,
+  type CatalogEntity,
+} from "./catalog-entities";
+export {
+  evaluateEntityResume,
+  walkTruncated,
+} from "./entity-resume";
+export {
+  getWalkResume,
+  parseAllRunScope,
+  parseSinceUnix,
+  runCatalogSync,
+  runUpdatedSync,
+  runCatalogUntilComplete,
+  runUpdatedUntilComplete,
+  type CatalogEntityOrAll,
+  type WalkResumeInfo,
+  type EntityWalkSyncResult,
+} from "./catalog-sync";
 export { listRecentSyncRuns } from "./sync-runs";
 export {
   applyWebhook,
@@ -116,6 +141,7 @@ export {
   registerIgdbWebhookSlot,
   registerMissingIgdbWebhooks,
   normalizeWebhookRegistrations,
+  webhookCallbackUrlsMatch,
   supportedWebhookTypes,
   webhookTypeLabel,
   type WebhookRegistrationOverview,

@@ -7,6 +7,7 @@ import {
   isAdultGame,
   mapIgdbGame,
   yearUnixRange,
+  buildEntityPageQuery,
   type AdultFilters,
   type IgdbGame,
 } from "./client";
@@ -114,6 +115,43 @@ describe("yearUnixRange", () => {
       "2026-01-01T00:00:00.000Z",
     );
     expect(new Date(end * 1000).toISOString()).toBe("2027-01-01T00:00:00.000Z");
+  });
+});
+
+describe("buildEntityPageQuery", () => {
+  it("walks by id from lowest", () => {
+    expect(
+      buildEntityPageQuery({
+        fields: "id, name",
+        afterId: 0,
+        limit: 500,
+      }),
+    ).toBe("fields id, name; where id > 0; sort id asc; limit 500;");
+  });
+
+  it("adds updated_at for date walks and keeps id order", () => {
+    expect(
+      buildEntityPageQuery({
+        fields: "fields id, name;",
+        afterId: 40,
+        limit: 500,
+        sinceUnix: 1_700_000_000,
+      }),
+    ).toBe(
+      "fields id, name; where id > 40 & updated_at >= 1700000000; sort id asc; limit 500;",
+    );
+  });
+
+  it("supports a year extra filter", () => {
+    const { start, end } = yearUnixRange(2026);
+    expect(
+      buildEntityPageQuery({
+        fields: "fields id;",
+        afterId: 0,
+        limit: 500,
+        extraWhere: `first_release_date >= ${start} & first_release_date < ${end}`,
+      }),
+    ).toContain(`first_release_date >= ${start} & first_release_date < ${end}`);
   });
 });
 

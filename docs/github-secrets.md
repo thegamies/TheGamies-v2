@@ -38,7 +38,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `ADMIN_SYNC_SECRET` | same | Site-operator claim + IGDB Worker proxy |
 | `IGDB_CLIENT_ID` | same | Twitch / IGDB |
 | `IGDB_CLIENT_SECRET` | same | Twitch / IGDB |
-| `IGDB_WEBHOOK_SECRET` | same | Webhook slot base (`{base}:{entity}:{method}`) |
+| `IGDB_WEBHOOK_SECRET` | same | Staging webhook slot base (`{base}:{entity}:{method}`). Never reuse on production |
 | `IGDB_WEBHOOKS_WORKER_URL` | same | Staging app → develop webhook Worker. Optional; CI defaults to `https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev` |
 | `R2_ACCOUNT_ID` | same | Avatar uploads (account can be shared with production) |
 | `R2_ACCESS_KEY_ID` | same | Avatar uploads (token must reach the staging bucket) |
@@ -59,11 +59,11 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Optional. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production public origin |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
+| `PRODUCTION_IGDB_WEBHOOK_SECRET` | `IGDB_WEBHOOK_SECRET` | Production webhook slot base. Never the staging `IGDB_WEBHOOK_SECRET` |
 | `CRON_SECRET` | same | Same secret as staging unless you choose to rotate later |
 | `ADMIN_SYNC_SECRET` | same | Shared |
 | `IGDB_CLIENT_ID` | same | Shared |
 | `IGDB_CLIENT_SECRET` | same | Shared |
-| `IGDB_WEBHOOK_SECRET` | same | Shared base; slot URLs differ per env |
 | `R2_ACCOUNT_ID` | same | Shared account id (same Cloudflare account is fine) |
 | `R2_ACCESS_KEY_ID` | same | Shared (token must reach the **production** bucket) |
 | `R2_SECRET_ACCESS_KEY` | same | Shared |
@@ -81,10 +81,11 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` (or `NEON_AUTH_COOKIE_SECRET`) |
 | `NEXT_PUBLIC_APP_URL` | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
 | `IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` |
+| `IGDB_WEBHOOK_SECRET` | `IGDB_WEBHOOK_SECRET` | `PRODUCTION_IGDB_WEBHOOK_SECRET` |
 | `R2_AVATAR_BUCKET` | `STAGING_R2_AVATAR_BUCKET` (or `R2_AVATAR_BUCKET`) | `PRODUCTION_R2_AVATAR_BUCKET` |
 | `AVATAR_PUBLIC_BASE_URL` | `STAGING_AVATAR_PUBLIC_BASE_URL` (or `AVATAR_PUBLIC_BASE_URL`) | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` |
 
-Shared names (`CRON_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_*`, R2 account/keys, GA, `AUTH_EMAIL_FROM`) are one GitHub secret used by both lasting environments. **Upload bucket and public base are not shared.**
+Shared names (`CRON_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, R2 account/keys, GA, `AUTH_EMAIL_FROM`) are one GitHub secret used by both lasting environments. **Upload bucket, public base, and IGDB webhook slot secret are not shared.**
 
 ## Not GitHub secrets
 

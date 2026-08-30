@@ -54,42 +54,58 @@ Game create/update upserts already clear `igdb_removed_at`; there is no extra up
 
 **Game deletes** set `games.igdb_removed_at` (soft delist) so list and standings rows are not cascaded away. Create/update clears that timestamp.
 
-**Secrets / URLs:** see [secrets.md](./secrets.md) and [deployment.md](./deployment.md). Point IGDB registrations only at the Cloudflare webhook Worker URL. Do not auto-register PR preview workers against production IGDB slots. Staging and production CI deploy the Worker when `workers/igdb-webhooks`, `packages/igdb`, `packages/db`, or the lockfile change.
+**Secrets / URLs:** see [secrets.md](./secrets.md) and [deployment.md](./deployment.md). Point IGDB registrations only at the Cloudflare webhook Worker URL. Staging and production use **different** webhook slot bases. `/admin/webhooks` only shows slots for that environment’s callback URL. Do not auto-register PR preview workers against production IGDB slots. Staging and production CI deploy the Worker when `workers/igdb-webhooks`, `packages/igdb`, `packages/db`, or the lockfile change.
 
 ## CLI
 
 ```bash
+# pnpm sync:igdb wraps Doppler (doppler.yaml `dev`, or `dev_personal` if
+# personal configs apply). Force a config with:
+# doppler run --config dev_personal -- pnpm sync:igdb …
+
 # Year backfill — auto-resumes unfinished year runs (omit --after)
-doppler run -- pnpm sync:igdb backfill --year 2026
-doppler run -- pnpm sync:igdb backfill --year 2026 --after 0   # force restart
-doppler run -- pnpm sync:igdb enrich platforms --year 2026
-doppler run -- pnpm sync:igdb enrich all --year 2026
-doppler run -- pnpm sync:igdb enrich all                 # all years
-doppler run -- pnpm sync:igdb import --year 2026               # resumes year backfill, then enrich
-doppler run -- pnpm sync:igdb incremental
+pnpm sync:igdb backfill --year 2026
+pnpm sync:igdb backfill --year 2026 --after 0   # force restart
+pnpm sync:igdb enrich platforms --year 2026
+pnpm sync:igdb enrich all --year 2026
+pnpm sync:igdb enrich all                 # all years
+pnpm sync:igdb import --year 2026               # resumes year backfill, then enrich
+pnpm sync:igdb incremental
+
+# Full catalog by IGDB id (lowest first). Omit --max-pages to finish the entity.
+pnpm sync:igdb catalog --entity platforms
+pnpm sync:igdb catalog                          # all types, in order
+pnpm sync:igdb catalog --after 0                # restart all from the first type
+
+# Rows updated since a date (unix seconds or ISO). Same per-type id cursor.
+pnpm sync:igdb updated --entity games --since 2026-01-01
+pnpm sync:igdb updated                          # all types; since = last successful updated run
 ```
 
 Resume looks at the latest `backfill` `sync_runs` row for that year (or full catalog when `--year` is omitted). Continues when the run errored, is still running, hit its page cap, or was marked truncated.
 
+**Catalog / updated** each entity has its own IGDB id space (`catalog_covers` vs `catalog_games`). `all` runs types one after another; a failure resumes the current type from its last id and does not restart types that already finished in that pass. `--after 0` restarts the id cursor for that type (or the whole `all` pass).
+
 **Enrich** only fetches lookup rows whose IGDB ids appear on games/junctions but are **not yet** in the lookup table. It does not create stub/placeholder rows and does not re-hit IGDB for ids already enriched. Omit `--year` to enrich from the whole catalog.
 
-Or `pnpm sync:igdb:secrets …`.
+The CLI prints the Doppler config it is using (`dev` vs `dev_personal`). Admin Catalog sync still uses the Worker’s database for that hostname, not Doppler.
 
 ## Admin
 
-`/admin/sync` — site operators only. Use **Continue year** to resume a truncated/failed year backfill; **Backfill year (from start)** forces `afterId: 0`. Check **Enrich all years** to omit the year filter (full catalog). Browser never talks to IGDB directly.
+`/admin/sync` — site operators only. Use **Continue year** to resume a truncated/failed year backfill; **Backfill year (from start)** forces `afterId: 0`. Check **Enrich all years** to omit the year filter (full catalog). **Walk from start** / **Continue catalog** (and the matching update-since controls) loop one IGDB page per request until that type finishes; leave the tab open. Continue after a failed page uses the last saved id. Browser never talks to IGDB directly.
 
 ### Hosted timeouts (Cloudflare)
 
 `POST /api/admin/sync` can run for a long enrich. Cloudflare Workers cap request duration — prefer the CLI for large backfills.
 
 - **Backfill / incremental** already run in page chunks (`maxPages`) so you can Continue.
+- **Catalog / updated** in the admin UI fire **one IGDB page per request**; the page keeps requesting the next until that type (or all types) finishes. Leave the tab open. Continue after a failure uses the last saved id.
 - **Enrich all** in the admin UI fires **one entity per HTTP request** so each step gets its own budget. If a step times out, re-run — enrich only fetches missing lookups.
 - A **single** entity with a huge missing set (e.g. all-years keywords) can still exceed 60s; use the CLI with no timeout:
 
 ```bash
-doppler run -- pnpm sync:igdb enrich all
-doppler run -- pnpm sync:igdb enrich covers   # omit --year = all years
+pnpm sync:igdb enrich all
+pnpm sync:igdb enrich covers   # omit --year = all years
 ```
 
 ## Local Neon branch
@@ -99,7 +115,7 @@ Recommended: lasting personal branch + Doppler `dev` / `dev_personal`:
 1. Create Neon branch `local/<you>`.
 2. `doppler secrets set DATABASE_URL="…" --config dev_personal`
 3. `doppler run -- pnpm db:migrate`
-4. `doppler run -- pnpm sync:igdb import --year 2026`
+4. `pnpm sync:igdb import --year 2026`
 5. `pnpm dev:secrets`
 
 Shared `dev` keeps the shared Neon URL. Personal override only changes your machine.

@@ -44,7 +44,7 @@ doppler run --config dev_personal -- pnpm dev
 doppler run --config dev_personal -- pnpm sync:igdb import --year 2026
 ```
 
-`pnpm db:migrate:secrets` and `pnpm dev:secrets` only use `dev_personal` automatically when Doppler Development **personal configs are enabled** and the CLI is set up for them. Verify:
+`pnpm db:migrate:secrets`, `pnpm dev:secrets`, and `pnpm sync:igdb` only use `dev_personal` automatically when Doppler Development **personal configs are enabled** and the CLI is set up for them. Verify:
 
 ```bash
 doppler run -- node -e "console.log(process.env.DOPPLER_CONFIG)"
@@ -76,7 +76,8 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `CRON_SECRET` | same | Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
-| `IGDB_WEBHOOK_SECRET` | same | Base secret for IGDB webhook slots (`{base}:{entity}:{method}`) — staging/production webhooks Worker `secret bulk` + local register |
+| `IGDB_WEBHOOK_SECRET` | same | Staging webhook slot base (`{base}:{entity}:{method}`) — develop Worker `secret bulk` + local register. Never production |
+| `PRODUCTION_IGDB_WEBHOOK_SECRET` | `IGDB_WEBHOOK_SECRET` | Production webhook slot base. Never the staging value |
 | `IGDB_WEBHOOKS_WORKER_URL` | same | Staging app → develop webhook Worker. Staging CI injects onto the app (defaults to `https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev` if unset) |
 | `IGDB_WEBHOOK_QUEUE_ID` | Worker var (per env) | Queue UUID for pause/resume (`igdb-webhooks-develop` vs `igdb-webhooks`) |
 | `CLOUDFLARE_API_TOKEN` | Worker secret | Queues Edit token used by the webhook Worker to pull/ack (may reuse deploy token if scoped) |

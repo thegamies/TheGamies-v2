@@ -27,7 +27,6 @@ import {
 import {
   fetchByIds,
   fetchGamesPage,
-  fetchUpdatedGamesPage,
   igdbQuery,
   mapIgdbGame,
   resolveAdultFilters,
@@ -53,16 +52,12 @@ import {
 } from "./igdb-media";
 import {
   finishSyncRun,
-  getLastSuccessfulSyncDate,
   startSyncRun,
   updateSyncRun,
 } from "./sync-runs";
-import {
-  DEFAULT_LOOKBACK_SECONDS,
-  MAX_PAGES_PER_RUN,
-  OVERHANG_SECONDS,
-} from "./sync-constants";
+import { MAX_PAGES_PER_RUN } from "./sync-constants";
 import { upsertGamesWithLinks } from "./upsert-games";
+import { runUpdatedSync } from "./catalog-sync";
 
 export {
   DEFAULT_LOOKBACK_SECONDS,
@@ -168,61 +163,18 @@ export async function runIncrementalSync(
   db: Db,
   options: { maxPages?: number } = {},
 ): Promise<SyncChunkResult & { sinceUnix: number }> {
-  const maxPages = options.maxPages ?? MAX_PAGES_PER_RUN;
-  const filters = await resolveAdultFilters();
-  const lastSuccess = await getLastSuccessfulSyncDate(db);
-  const nowUnix = Math.floor(Date.now() / 1000);
-  const sinceUnix = lastSuccess
-    ? Math.floor(lastSuccess.getTime() / 1000) - OVERHANG_SECONDS
-    : nowUnix - DEFAULT_LOOKBACK_SECONDS;
-
-  const runId = await startSyncRun(db, "incremental", { sinceUnix });
-  let afterId = 0;
-  let synced = 0;
-  let pages = 0;
-
-  try {
-    while (pages < maxPages) {
-      const page = await fetchUpdatedGamesPage(sinceUnix, afterId, 500);
-      if (page.length === 0) break;
-
-      const rows = page
-        .map((g) => mapIgdbGame(g, filters))
-        .filter((r): r is NonNullable<typeof r> => r !== null);
-
-      await upsertGamesWithLinks(db, rows);
-      synced += rows.length;
-      pages += 1;
-      afterId = page[page.length - 1].id;
-
-      await updateSyncRun(db, runId, {
-        rowsProcessed: synced,
-        pages,
-        lastIgdbId: afterId,
-      });
-
-      if (page.length < 500) break;
-    }
-
-    const truncated = pages >= maxPages;
-    await finishSyncRun(db, runId, {
-      status: "success",
-      rowsProcessed: synced,
-      pages,
-      lastIgdbId: afterId,
-    });
-
-    return { synced, pages, lastId: afterId, truncated, runId, sinceUnix };
-  } catch (error) {
-    await finishSyncRun(db, runId, {
-      status: "error",
-      rowsProcessed: synced,
-      pages,
-      lastIgdbId: afterId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    throw error;
-  }
+  const result = await runUpdatedSync(db, {
+    entity: "games",
+    maxPages: options.maxPages,
+  });
+  return {
+    synced: result.synced,
+    pages: result.pages,
+    lastId: result.lastId,
+    truncated: result.truncated,
+    runId: result.runId,
+    sinceUnix: result.sinceUnix ?? 0,
+  };
 }
 
 export async function getBackfillResumeInfo(

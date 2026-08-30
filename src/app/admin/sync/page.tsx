@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createDb } from "@thegamies/db";
 import {
   getBackfillResumeInfo,
+  getWalkResume,
   listRecentSyncRuns,
 } from "@thegamies/igdb";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
@@ -18,15 +19,23 @@ export default async function AdminSyncPage() {
   let initialRuns: Awaited<ReturnType<typeof listRecentSyncRuns>> = [];
   let initialResume: Awaited<ReturnType<typeof getBackfillResumeInfo>> | null =
     null;
+  let initialCatalogResume: Awaited<ReturnType<typeof getWalkResume>> | null =
+    null;
+  let initialUpdatedResume: Awaited<ReturnType<typeof getWalkResume>> | null =
+    null;
 
   try {
     const db = createDb();
     const year = new Date().getUTCFullYear();
-    initialRuns = await listRecentSyncRuns(db, 25);
+    initialRuns = await listRecentSyncRuns(db, 40);
     initialResume = await getBackfillResumeInfo(db, { year });
+    initialCatalogResume = await getWalkResume(db, "catalog", "all");
+    initialUpdatedResume = await getWalkResume(db, "updated", "all");
   } catch {
     initialRuns = [];
     initialResume = null;
+    initialCatalogResume = null;
+    initialUpdatedResume = null;
   }
 
   return (
@@ -46,6 +55,8 @@ export default async function AdminSyncPage() {
         <AdminSyncClient
           initialRuns={initialRuns}
           initialResume={initialResume}
+          initialCatalogResume={initialCatalogResume}
+          initialUpdatedResume={initialUpdatedResume}
         />
       </div>
     </main>

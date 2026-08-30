@@ -42,8 +42,12 @@ Rebuild after code changes. Auth cookies are `secure` in this mode, so sign-in m
 
 **Doppler:** Repo pins `config: dev` in `doppler.yaml`. Local DB/URL overrides live on `dev_personal`. If migrate hits the wrong Neon branch, use `--config dev_personal` — details in [docs/secrets.md](docs/secrets.md).
 
+`pnpm sync:igdb` wraps Doppler (same as `dev:secrets`). It prints the config name and will not nest a second run if you already passed `doppler run --config dev_personal`.
+
 ```bash
-pnpm sync:igdb:secrets import --year 2026
+pnpm sync:igdb import --year 2026
+pnpm sync:igdb catalog --entity platforms --max-pages 1
+doppler run --config dev_personal -- pnpm sync:igdb catalog
 pnpm lint
 pnpm typecheck
 pnpm test
