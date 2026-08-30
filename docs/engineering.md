@@ -52,7 +52,7 @@ Keep feature branches short-lived. Prefer many small PRs over long-lived feature
 | Local | Developer machine | `next dev` (Node); `pnpm preview:cf` for Workers parity | Neon dev branch or local connection string |
 | Preview | PR into `develop` | Cloudflare Workers preview (one URL) | Shared Neon database branch for that PR |
 | Staging | Push to `develop` | Worker `thegamies-v2-develop`; IGDB webhooks Worker when paths change | Neon staging via `STAGING_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
-| Production | Merge to `main` | Worker `thegamies-v2` | Neon production branch |
+| Production | Merge to `main` | Worker `thegamies-v2` | Neon production via `PRODUCTION_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
 
 Rules:
 

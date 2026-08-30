@@ -54,7 +54,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 
 | Secret | Becomes on the host | Notes |
 |---|---|---|
-| `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Required for production CF `secret bulk` (app + webhooks Worker) |
+| `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Required. Production migrate + CF `secret bulk` (app + webhooks Worker). Never the develop Neon URL |
 | `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Neon Auth URL |
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Optional. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production public origin |

@@ -67,7 +67,7 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging (alias: GitHub `NEON_AUTH_BASE_URL` also accepted) |
 | `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging |
-| `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Production Cloudflare app Worker + IGDB webhooks Worker. Never `STAGING_DATABASE_URL` |
+| `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Production migrate on `main` + Cloudflare app Worker + IGDB webhooks Worker. Never `STAGING_DATABASE_URL` / develop Neon |
 | `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Cloudflare app Worker (production Neon Auth URL) |
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Production Cloudflare (alias: GitHub `NEON_AUTH_COOKIE_SECRET`) |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production |
@@ -95,7 +95,7 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 
 PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
 
-**Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). IGDB webhooks production bulk still requires `PRODUCTION_DATABASE_URL`. Empty keys are skipped; existing Worker secrets for those keys are left as-is.
+**Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI migrates with `PRODUCTION_DATABASE_URL` (required), writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). Empty optional keys are skipped; existing Worker secrets for those keys are left as-is. Empty `PRODUCTION_DATABASE_URL` fails the workflow.
 
 **Manual import (required):** Copy values into the GitHub secrets above when they change. Free-plan Doppler has no service-token CI path; do not rely on auto-sync for this deploy process.
 
