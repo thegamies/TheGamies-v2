@@ -1,0 +1,92 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "thegamies-igdb-webhooks",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-10",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "triggers": {
+    // Minute: pause/resume queue delivery (Cloudflare metrics only — no Neon).
+    // Hourly: truncate igdb_webhook_events when auto cleanup is enabled.
+    "crons": ["*/1 * * * *", "0 * * * *"]
+  },
+  // Deploy: wrangler deploy --env develop | --env production
+  "env": {
+    "develop": {
+      "name": "thegamies-igdb-webhooks-develop",
+      "observability": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+          "head_sampling_rate": 1
+        }
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "IGDB_WEBHOOK_QUEUE",
+            "queue": "igdb-webhooks-develop"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "igdb-webhooks-develop",
+            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE /
+            // QUEUE_CONSUMER_MAX_CONCURRENCY (packages/igdb).
+            "max_batch_size": 25,
+            "max_concurrency": 10,
+            "max_retries": 5,
+            "max_batch_timeout": 5
+          }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "IGDB_WEBHOOK_SETTINGS",
+          "id": "4685bc23fa7d40e3a56657a486993e70"
+        }
+      ],
+      "vars": {
+        "CLOUDFLARE_ACCOUNT_ID": "9af9febe891657de7e58f92a682e3a5a",
+        "IGDB_WEBHOOK_QUEUE_ID": "e3861a0a57eb4356ad85baf415d8a822",
+        "IGDB_WEBHOOK_PUBLIC_URL": "https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev"
+      }
+    },
+    "production": {
+      "name": "thegamies-igdb-webhooks",
+      "queues": {
+        "producers": [
+          {
+            "binding": "IGDB_WEBHOOK_QUEUE",
+            "queue": "igdb-webhooks"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "igdb-webhooks",
+            // Keep in sync with QUEUE_CONSUMER_MAX_BATCH_SIZE /
+            // QUEUE_CONSUMER_MAX_CONCURRENCY (packages/igdb).
+            "max_batch_size": 25,
+            "max_concurrency": 10,
+            "max_retries": 5,
+            "max_batch_timeout": 5
+          }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "IGDB_WEBHOOK_SETTINGS",
+          "id": "f25e460e98bc41c5adc8f93e1fa087aa"
+        }
+      ],
+      "vars": {
+        "CLOUDFLARE_ACCOUNT_ID": "9af9febe891657de7e58f92a682e3a5a",
+        "IGDB_WEBHOOK_QUEUE_ID": "010c08c38c0b4c0d81a5a769b660717b",
+        "IGDB_WEBHOOK_PUBLIC_URL": "https://thegamies-igdb-webhooks.ecdm981.workers.dev"
+      }
+    }
+  }
+}

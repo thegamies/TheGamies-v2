@@ -1,0 +1,103 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { isAdminAuthorized } from "@/lib/admin-auth";
+import { ClaimFirstAdminForm } from "./ClaimFirstAdminForm";
+
+export const metadata: Metadata = {
+  title: "Admin",
+  robots: { index: false, follow: false },
+};
+
+const ADMIN_LINKS = [
+  {
+    href: "/admin/operators",
+    title: "Site operators",
+    description: "Make or remove people who can use these tools.",
+  },
+  {
+    href: "/admin/database",
+    title: "Database size",
+    description: "Table, index, and toast sizes for the live database.",
+  },
+  {
+    href: "/admin/sync",
+    title: "Catalog sync",
+    description: "Import and enrich the game catalog.",
+  },
+  {
+    href: "/admin/webhooks",
+    title: "Catalog webhooks",
+    description: "Queue IGDB updates and control drain cadence.",
+  },
+  {
+    href: "/admin/scheduled",
+    title: "Scheduled jobs",
+    description: "Pause Cloudflare minute jobs without waking the database.",
+  },
+  {
+    href: "/admin/rankings",
+    title: "Live rankings",
+    description: "Reveal scores, refresh dirty keys, or rebuild a year.",
+  },
+  {
+    href: "/admin/the-game-awards",
+    title: "Video Game Awards Pick’em",
+    description: "Set up the year, nominees, and call winners during the show.",
+  },
+  {
+    href: "/admin/seed",
+    title: "Standings seed",
+    description: "Create synthetic GOTY voters for standings QA.",
+  },
+  {
+    href: "/admin/communities",
+    title: "Community seed",
+    description:
+      "Seed community members, Hosts, and edition ballots for ceremony QA.",
+  },
+  {
+    href: "/admin/the-game-awards/seed",
+    title: "Video Game Awards Pick’em seed",
+    description:
+      "Fill leftover seed accounts that have no pick sheet yet.",
+  },
+] as const;
+
+export default async function AdminIndexPage() {
+  const authorized = await isAdminAuthorized();
+
+  return (
+    <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted">Ops</p>
+      <h1 className="mt-2 font-display text-5xl tracking-wide text-ink md:text-6xl">
+        Admin
+      </h1>
+      {authorized ? (
+        <>
+          <p className="mt-3 max-w-2xl text-muted">
+            Site operations tools.
+          </p>
+          <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ADMIN_LINKS.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="block h-full border border-line px-5 py-5 transition-colors hover:border-accent"
+                >
+                  <span className="font-display text-2xl tracking-wide text-ink">
+                    {item.title}
+                  </span>
+                  <p className="mt-2 text-sm text-muted">{item.description}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <div className="mt-10">
+          <ClaimFirstAdminForm />
+        </div>
+      )}
+    </main>
+  );
+}

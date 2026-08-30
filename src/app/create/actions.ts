@@ -1,0 +1,511 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  clearListEditCookie,
+  readListEditCookie,
+} from "@/lib/lists/cookies";
+import {
+  clearListDraftCookie,
+} from "@/lib/lists/draft-cookie";
+import {
+  existingGotyEditHref,
+  existingGotyPreviewHref,
+} from "@/lib/lists/existing-goty";
+import { clientDraftGotyYear } from "@/lib/lists/create-goty-entry";
+import {
+  parseListShareView,
+  withListShareView,
+} from "@/lib/lists/urls";
+import {
+  claimList,
+  createDraft,
+  getEditableList,
+  getListShareTarget,
+  getOwnedGotyForYear,
+  hydrateGamesByIgdbIds,
+  resetDraft,
+  saveOwnedListFromClientDraft,
+  shareListFromClientDraft,
+  syncExistingSharedListFromClientDraft,
+  syncLiveAggregateForOwnedList,
+  deleteOwnedList,
+} from "@/lib/lists/service";
+import { getProfileByAuthUserId } from "@/lib/profile/service";
+import { profileHref } from "@/lib/profile/profile-page";
+import { replaceCategoryVotesForList } from "@/lib/live-aggregate/contrib";
+import { replaceCategoryVotesSchema } from "@/lib/live-aggregate/schema";
+
+async function currentProfileId(): Promise<string | null> {
+  const auth = getAuthOrNull();
+  if (!auth) return null;
+  try {
+    const { data: session } = await auth.getSession();
+    const userId = session?.user?.id;
+    if (!userId) return null;
+    const profile = await getProfileByAuthUserId(userId);
+    return profile?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function accessFor(publicId: string) {
+  const profileId = await currentProfileId();
+  const cookie = await readListEditCookie();
+  const editSecret =
+    cookie?.publicId === publicId ? cookie.secret : null;
+  return { profileId, editSecret };
+}
+
+export async function startGotyDraftAction(formData: FormData) {
+  const year = Number(formData.get("year"));
+  if (!Number.isFinite(year) || year < 1970 || year > 2100) {
+    redirect(`/create/goty?error=${encodeURIComponent("Pick a valid year.")}`);
+  }
+  const y = Math.floor(year);
+  const view = parseListShareView(formData.get("view"));
+  const profileId = await currentProfileId();
+
+  if (profileId) {
+    await clearListDraftCookie();
+    const existing = await getOwnedGotyForYear(profileId, y);
+    if (existing) {
+      redirect(withListShareView(existingGotyPreviewHref(y), view));
+    }
+    const result = await createDraft(
+      { listType: "goty", year: y },
+      { profileId },
+    );
+    if ("error" in result) {
+      redirect(`/create/goty?error=${encodeURIComponent(result.error)}`);
+    }
+    redirect(
+      withListShareView(`/create/goty?id=${result.list.publicId}`, view),
+    );
+  }
+
+  redirect(withListShareView(`/create/goty?year=${y}`, view));
+}
+
+export async function startCustomDraftAction(formData: FormData) {
+  const title = String(formData.get("title") ?? "").trim();
+  const yearRaw = String(formData.get("year") ?? "").trim();
+  if (!title) {
+    redirect(
+      `/create/custom?error=${encodeURIComponent("Give your list a title.")}`,
+    );
+  }
+  const year = yearRaw ? Number(yearRaw) : undefined;
+  if (yearRaw && !Number.isFinite(year)) {
+    redirect(
+      `/create/custom?error=${encodeURIComponent("Pick a valid year.")}`,
+    );
+  }
+  const profileId = await currentProfileId();
+
+  if (profileId) {
+    await clearListDraftCookie();
+    const result = await createDraft(
+      {
+        listType: "custom",
+        title,
+        year: year && Number.isFinite(year) ? Math.floor(year) : undefined,
+      },
+      { profileId },
+    );
+    if ("error" in result) {
+      redirect(`/create/custom?error=${encodeURIComponent(result.error)}`);
+    }
+    redirect(`/create/custom?id=${result.list.publicId}`);
+  }
+
+  const params = new URLSearchParams({ title });
+  if (year && Number.isFinite(year)) params.set("year", String(Math.floor(year)));
+  redirect(`/create/custom?${params.toString()}`);
+}
+
+/** Server cookie clear only — client still must wipe localStorage. */
+export async function clearListDraftCookieAction() {
+  await clearListDraftCookie();
+}
+
+export async function discardAnonDraftAction(formData?: FormData) {
+  await clearListDraftCookie();
+  const cookie = await readListEditCookie();
+  if (cookie) {
+    const access = await accessFor(cookie.publicId);
+    // Only wipe anonymous edit-cookie drafts, not owned account lists.
+    if (!access.profileId) {
+      await resetDraft(cookie.publicId, access).catch(() => null);
+    }
+    await clearListEditCookie();
+  }
+  const nextRaw = formData ? String(formData.get("next") ?? "/create") : "/create";
+  const next =
+    nextRaw.startsWith("/create") && !nextRaw.startsWith("//")
+      ? nextRaw
+      : "/create";
+  redirect(next);
+}
+
+function parseClientDraftPayload(formData: FormData): unknown {
+  const payload = String(formData.get("draftJson") ?? "");
+  try {
+    return JSON.parse(payload);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveOwnedListAction(
+  _prev: { error?: string; saved?: boolean; publicId?: string } | null,
+  formData: FormData,
+): Promise<{ error?: string; saved?: boolean; publicId?: string }> {
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    return {
+      error:
+        "Sign in to save this list to your account. Your ranking is already kept on this device.",
+    };
+  }
+
+  const draft = parseClientDraftPayload(formData);
+  if (!draft) return { error: "Could not save the ranking." };
+
+  const publicId =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+  const cookie = await readListEditCookie();
+  const editSecret =
+    publicId && cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await saveOwnedListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const votesRaw = String(formData.get("categoryVotesJson") ?? "").trim();
+  if (votesRaw && result.list.listType === "goty") {
+    let parsedVotes: unknown;
+    try {
+      parsedVotes = JSON.parse(votesRaw);
+    } catch {
+      return { error: "Could not save category picks." };
+    }
+    const votes = replaceCategoryVotesSchema.safeParse(parsedVotes);
+    if (!votes.success) {
+      return { error: "Only one game per category." };
+    }
+    const written = await replaceCategoryVotesForList(
+      result.list.id,
+      votes.data,
+    );
+    if ("error" in written) return { error: written.error };
+    await syncLiveAggregateForOwnedList(result.list);
+  }
+
+  await clearListDraftCookie();
+
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
+  revalidatePath("/");
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/l/${result.list.publicId}`);
+  return { saved: true, publicId: result.list.publicId };
+}
+
+/** Anon (or owner) auto-persist while editing an existing shared list. */
+export async function syncSharedListAction(
+  draftJson: string,
+): Promise<{ error?: string; ok?: boolean; publicId?: string }> {
+  let draft: unknown;
+  try {
+    draft = JSON.parse(draftJson);
+  } catch {
+    return { error: "Could not save the ranking." };
+  }
+  if (!draft || typeof draft !== "object") {
+    return { error: "Could not save the ranking." };
+  }
+
+  const publicId =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+  if (!publicId) return { error: "List not found." };
+
+  const profileId = await currentProfileId();
+  const cookie = await readListEditCookie();
+  const editSecret =
+    cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await syncExistingSharedListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+  if ("error" in result) return { error: result.error };
+
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/l/${result.list.publicId}`);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  return { ok: true, publicId: result.list.publicId };
+}
+
+export async function shareListAction(formData: FormData) {
+  const draft = parseClientDraftPayload(formData);
+  if (!draft || typeof draft !== "object") {
+    redirect(
+      `/create?error=${encodeURIComponent("Could not share this list.")}`,
+    );
+  }
+
+  const listType =
+    (draft as { listType?: string }).listType === "custom" ? "custom" : "goty";
+  const publicIdHint =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    redirect(
+      `/create/${listType}?error=${encodeURIComponent(
+        "Sign in to publish a share link.",
+      )}`,
+    );
+  }
+
+  const cookie = await readListEditCookie();
+  const editSecret =
+    publicIdHint && cookie?.publicId === publicIdHint ? cookie.secret : null;
+
+  const result = await shareListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+
+  if ("error" in result) {
+    redirect(
+      `/create/${listType}?error=${encodeURIComponent(result.error)}`,
+    );
+  }
+
+  await clearListDraftCookie();
+
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
+  redirect(share.path);
+}
+
+export async function resetActiveDraftAction() {
+  return discardAnonDraftAction();
+}
+
+export async function claimListAction(formData: FormData) {
+  const publicId = String(formData.get("publicId") ?? "");
+  const auth = getAuthOrNull();
+  const signInNext = `/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}&intent=save`;
+  if (!auth) {
+    redirect(signInNext);
+  }
+  const { data: session } = await auth.getSession();
+  if (!session?.user?.id) {
+    redirect(signInNext);
+  }
+  const profile = await getProfileByAuthUserId(session.user.id);
+  if (!profile) {
+    redirect(`/account?next=${encodeURIComponent(`/l/${publicId}`)}`);
+  }
+
+  const cookie = await readListEditCookie();
+  const editSecret =
+    cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await claimList(publicId, {
+    profileId: profile.id,
+    editSecret,
+  });
+  if ("error" in result) {
+    redirect(`/l/${publicId}?error=${encodeURIComponent(result.error)}`);
+  }
+  await clearListEditCookie();
+  await clearListDraftCookie();
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/u/${profile.username}`);
+  redirect(`${share.path}?saved=1`);
+}
+
+export async function loadEditorState(publicId: string) {
+  const access = await accessFor(publicId);
+  return getEditableList(publicId, access);
+}
+
+export async function hydrateDraftGamesAction(igdbIds: number[]) {
+  return hydrateGamesByIgdbIds(igdbIds);
+}
+
+/** Drop a local GOTY draft when the account already owns that year. */
+async function ownedGotyHrefIfLocalDraftConflicts(
+  profileId: string,
+  draft: unknown,
+): Promise<string | null> {
+  const year = clientDraftGotyYear(draft);
+  if (year == null) return null;
+  const existing = await getOwnedGotyForYear(profileId, year);
+  if (!existing) return null;
+  await clearListDraftCookie();
+  await clearListEditCookie();
+  return existingGotyEditHref(existing.publicId);
+}
+
+/**
+ * After sign-in with intent=save|share: promote the client draft to an owned
+ * list. Save stays in the editor; share redirects to the public URL.
+ * If that year is already owned, discard the local draft instead of overwriting.
+ */
+export async function completeListAuthIntentAction(
+  formData: FormData,
+): Promise<{
+  error?: string;
+  publicId?: string;
+  sharePath?: string;
+  intent?: "save" | "share";
+}> {
+  const intentRaw = String(formData.get("intent") ?? "");
+  const intent =
+    intentRaw === "save" || intentRaw === "share" ? intentRaw : null;
+  if (!intent) return { error: "Missing save or share intent." };
+
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    return { error: "Sign in to save this list to your account." };
+  }
+
+  const draft = parseClientDraftPayload(formData);
+  if (!draft) return { error: "Could not restore the ranking." };
+
+  // Must run before saveOwnedListFromClientDraft — that helper reuses an
+  // owned GOTY row and would overwrite it with the unsigned ranking.
+  const ownedConflictHref = await ownedGotyHrefIfLocalDraftConflicts(
+    profileId,
+    draft,
+  );
+  if (ownedConflictHref) {
+    redirect(ownedConflictHref);
+  }
+
+  const publicId =
+    typeof (draft as { publicId?: string }).publicId === "string"
+      ? (draft as { publicId: string }).publicId
+      : null;
+  const cookie = await readListEditCookie();
+  const editSecret =
+    publicId && cookie?.publicId === publicId ? cookie.secret : null;
+
+  const result = await saveOwnedListFromClientDraft(draft, {
+    profileId,
+    editSecret,
+  });
+  if ("error" in result) {
+    const fallbackHref = await ownedGotyHrefIfLocalDraftConflicts(
+      profileId,
+      draft,
+    );
+    if (fallbackHref) {
+      redirect(fallbackHref);
+    }
+    return { error: result.error };
+  }
+
+  const votesRaw = String(formData.get("categoryVotesJson") ?? "").trim();
+  if (votesRaw && result.list.listType === "goty") {
+    let parsedVotes: unknown;
+    try {
+      parsedVotes = JSON.parse(votesRaw);
+    } catch {
+      return { error: "Could not save category picks." };
+    }
+    const votes = replaceCategoryVotesSchema.safeParse(parsedVotes);
+    if (!votes.success) {
+      return { error: "Only one game per category." };
+    }
+    const written = await replaceCategoryVotesForList(
+      result.list.id,
+      votes.data,
+    );
+    if ("error" in written) return { error: written.error };
+    await syncLiveAggregateForOwnedList(result.list);
+  }
+
+  await clearListDraftCookie();
+  await clearListEditCookie();
+
+  const share = await getListShareTarget(result.list);
+  revalidatePath(share.path);
+  revalidatePath(`/create/goty`);
+  revalidatePath(`/create/custom`);
+  revalidatePath(`/game-of-the-year`);
+  if (result.list.year != null) {
+    revalidatePath(`/game-of-the-year/${result.list.year}`);
+  }
+  revalidatePath("/");
+
+  if (intent === "share") {
+    redirect(share.path);
+  }
+
+  return {
+    intent: "save",
+    publicId: result.list.publicId,
+    sharePath: share.path,
+  };
+}
+
+export async function deleteOwnedListAction(formData: FormData) {
+  const publicId = String(formData.get("publicId") ?? "").trim();
+  const returnPath = String(formData.get("returnPath") ?? "").trim() || "/create";
+  if (!publicId) {
+    redirect(
+      `${returnPath}${returnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent("List not found.")}`,
+    );
+  }
+
+  const profileId = await currentProfileId();
+  if (!profileId) {
+    redirect(`/auth/sign-in?next=${encodeURIComponent(returnPath)}`);
+  }
+
+  const result = await deleteOwnedList(publicId, profileId);
+  if ("error" in result) {
+    redirect(
+      `${returnPath}${returnPath.includes("?") ? "&" : "?"}error=${encodeURIComponent(result.error)}`,
+    );
+  }
+
+  revalidatePath("/");
+  revalidatePath("/game-of-the-year");
+  if (result.year != null) {
+    revalidatePath(`/game-of-the-year/${result.year}`);
+  }
+  revalidatePath(profileHref(result.username, { tab: "lists" }));
+  redirect(profileHref(result.username, { tab: "lists" }));
+}

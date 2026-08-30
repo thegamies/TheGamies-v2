@@ -9,6 +9,7 @@ Day-to-day rules for The Gamies v2. Product and design live elsewhere; this doc 
 3. Preview before merging to `develop`; production only via `main`.
 4. Test the risk, not the theater.
 5. Do not invent product decisions while coding — see `docs/decisions.md`.
+6. **User-facing copy only** in the product UI — no `pnpm`/CLI commands, env var names, or developer setup text in pages (including empty states). Ops details belong in `docs/`. See `.cursor/rules/user-facing-copy.mdc`.
 
 ## Version control
 
@@ -50,7 +51,7 @@ Keep feature branches short-lived. Prefer many small PRs over long-lived feature
 |---|---|---|---|
 | Local | Developer machine | `next dev` (Node); `pnpm preview:cf` for Workers parity | Neon dev branch or local connection string |
 | Preview | PR into `develop` | **Vercel preview and Cloudflare Workers preview** | Shared Neon database branch for that PR |
-| Staging | Push to `develop` | Both hosts (Vercel + Worker `thegamies-v2-develop`) | Neon staging via `STAGING_DATABASE_URL` (optional) |
+| Staging | Push to `develop` | Both hosts (Vercel + Worker `thegamies-v2-develop`); IGDB webhooks Worker when paths change | Neon staging via `STAGING_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
 | Production | Merge to `main` | Both hosts (production) | Neon production branch |
 
 Rules:
@@ -59,6 +60,23 @@ Rules:
 - Never run exploratory migrations against production.
 - `.env.example` documents required variables; real secrets stay in host dashboards / GitHub Actions / local env only.
 - Dual-host setup details: [deployment.md](./deployment.md).
+
+## Request cost (compute · egress · scale)
+
+Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`.
+
+Before choosing freeze/cache/**search**/list storage, walk the request:
+
+1. **DB egress** — Bytes from Neon to the app per page view. Avoid pulling an entire table, roster, or freeze blob to serve a page.
+2. **Compute** — Parse/serialize and memory on Vercel **and** Cloudflare Workers for that payload.
+3. **Scale** — Behavior at 10× members, ballots, games, or traffic.
+
+**Do:** SQL `LIMIT`/`OFFSET` (or keyset); small default views; **search in the database** with a hit cap; client gets only what it renders.  
+**Don’t:** unbounded `SELECT`; client `filter`/`includes` over a full dump billed as “search”; fat `jsonb` snapshots on the hot path; revalidate the whole community after a one-row write.
+
+**Never load an unbounded list** on public boards, voter lists, **or** host/admin/settings. “We’ll scroll / search in the UI” still pulls every row—that is a filter, not a search.
+
+Live lock and edition results freeze into **tables**, not one giant payload.
 
 ## Deployment
 
@@ -95,7 +113,9 @@ We optimize for **risk coverage**, not percentage theater — but “no tests”
 
 ### Integration tests
 
-**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, RLS/permission assumptions, catalog upsert/enrich, admin-protected sync routes.
+**Required for:** paths that touch Postgres or auth in a meaningful way — e.g. ballot submit, result reads, catalog upsert/enrich, admin-protected sync routes, profile ownership helpers.
+
+Until Postgres **RLS** is adopted (open: Auth JWT → DB role), permission tests target **app-layer** session checks and ownership helpers — not SQL policies. When RLS lands, add integration coverage for those policies.
 
 Run against a Neon branch or ephemeral test database — never against production.
 
@@ -130,7 +150,54 @@ Use Playwright screenshots compared to approved references under `design-referen
 - `test:integration` (when present)
 - `test:visual` (when present)
 
+CI treats ESLint **errors** as failures (warnings alone do not). Watch for `react-hooks/set-state-in-effect`: do not sync props into state with `useEffect(() => setX(prop))`. Prefer deriving from props, adjusting state during render when the prop identity changes, clearing related state in event handlers, or remounting with a `key`.
+
+Category Reveal stress-test (dev only): on edition Results, open **Debug** on the board row for **Repeat** and **Cap** (local `next dev` only). Cap limits games per derived rank; Repeat clones each derived rank. No URL params; no-op in production.
+
 Catalog / IGDB sync unit coverage lives under `packages/igdb/src/*.test.ts` and `src/lib/admin-sync-schema.test.ts`. Integration tests against Neon remain a follow-up.
+
+## App Router layouts and request data
+
+Shared chrome and per-request auth must not create **server waterfalls** with page data.
+
+### Site header
+
+- Render **`SiteHeader` once in `src/app/layout.tsx`** (root layout).
+- **Do not** import or render `SiteHeader` in individual `page.tsx` files or nested feature layouts (`create/`, etc.).
+- Layout and page Server Components fetch **in parallel**; putting the header only in the page (and `await`ing page data first) serializes auth behind the page query.
+
+### Route progress
+
+- Render **`NavigationProgress` once in `src/app/layout.tsx`**. Keep the root layout a Server Component — the loader is already a client component.
+- `<Link>` clicks start the accent hairline automatically.
+- For `router.push` / `replace`, import `useRouter` from `@/lib/useRouter` (wraps `nextjs-toploader/app`), not `next/navigation`. Otherwise the bar will not start.
+- Keep `usePathname` / `useSearchParams` on `next/navigation`. `router.refresh()` does not need the wrapped hook.
+
+### Per-request memoization (`cache`)
+
+Use React `cache()` helpers in `src/lib/auth/session.ts`:
+
+| Helper | Role |
+|---|---|
+| `getRequestSessionUser` | Neon Auth session user (once per request) |
+| `getRequestProfileByAuthUserId` | Profile row for that auth id (once per request) |
+
+`SiteHeader` and any page that needs the same session/profile (e.g. `/account`) should call these helpers so layout + page share one auth/profile round-trip.
+
+Do **not** put `cache()` around DB clients or auth *factory* setup in a way that permanently caches `null` across requests when env loads late (see `getAuthOrNull` comments). `cache()` here is **per React request**, not process-lifetime.
+
+### Page data
+
+- Keep route-specific data fetching in the **page** (or a dedicated loader), not the root layout.
+- Prefer **one Neon round-trip** for a board when HTTP latency dominates (see standings bundle in `docs/features/live-aggregate.md`).
+- Optional later: wrap heavy page sections in `<Suspense>` so the layout shell can stream first.
+
+### Checklist for new pages
+
+1. No `<SiteHeader />` in the page.
+2. Session/profile via `getRequestSessionUser` / `getRequestProfileByAuthUserId` when needed.
+3. Page-only data fetches stay in the page module.
+4. Avoid `await`ing page data before starting independent work that could live in layout (header already does).
 
 ## Day-to-day workflow
 

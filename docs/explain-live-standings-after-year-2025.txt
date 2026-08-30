@@ -1,0 +1,434 @@
+label=after
+year=2025
+goty_total=499
+total_pages=10
+page_size=50
+
+===== page1 page=1 =====
+Nested Loop Left Join  (cost=6207.20..6208.27 rows=1 width=97) (actual time=72.341..72.358 rows=1.00 loops=1)
+  Buffers: shared hit=1207 read=162 dirtied=86
+  InitPlan 1
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=4.193..4.194 rows=1.00 loops=1)
+          Buffers: shared hit=164 read=5 dirtied=1
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores  (cost=0.28..25.01 rows=499 width=0) (actual time=2.907..4.150 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 247
+                Index Searches: 1
+                Buffers: shared hit=164 read=5 dirtied=1
+  InitPlan 2
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.217..0.218 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_1  (cost=0.28..25.01 rows=499 width=0) (actual time=0.033..0.183 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 3
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.743..0.744 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_2  (cost=0.28..25.01 rows=499 width=0) (actual time=0.016..0.707 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 6
+    ->  Aggregate  (cost=41.08..41.09 rows=1 width=4) (actual time=0.225..0.229 rows=1.00 loops=1)
+          Buffers: shared hit=175
+          InitPlan 5
+            ->  Limit  (cost=29.02..29.07 rows=1 width=20) (actual time=0.210..0.213 rows=1.00 loops=1)
+                  Buffers: shared hit=172
+                  InitPlan 4
+                    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.179..0.180 rows=1.00 loops=1)
+                          Buffers: shared hit=167
+                          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_3  (cost=0.28..25.01 rows=499 width=0) (actual time=0.033..0.146 rows=499.00 loops=1)
+                                Index Cond: (year = 2025)
+                                Heap Fetches: 243
+                                Index Searches: 1
+                                Buffers: shared hit=167
+                  ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores s0  (cost=0.28..25.01 rows=499 width=20) (actual time=0.027..0.027 rows=1.00 loops=1)
+                        Index Cond: (year = 2025)
+                        Heap Fetches: 1
+                        Index Searches: 1
+                        Buffers: shared hit=5
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores hs  (cost=0.28..11.60 rows=166 width=0) (actual time=0.224..0.224 rows=0.00 loops=1)
+                Index Cond: ((year = 2025) AND (score > (InitPlan 5).col1))
+                Heap Fetches: 0
+                Index Searches: 1
+                Buffers: shared hit=175
+  InitPlan 9
+    ->  Aggregate  (cost=729.93..729.94 rows=1 width=32) (actual time=65.474..65.478 rows=1.00 loops=1)
+          Buffers: shared hit=526 read=155 dirtied=84
+          ->  Sort  (cost=729.55..729.68 rows=50 width=148) (actual time=65.246..65.253 rows=50.00 loops=1)
+                Sort Key: p.place
+                Sort Method: quicksort  Memory: 33kB
+                Buffers: shared hit=526 read=155 dirtied=84
+                ->  Subquery Scan on p  (cost=393.85..728.14 rows=50 width=148) (actual time=0.804..65.180 rows=50.00 loops=1)
+                      Buffers: shared hit=526 read=155 dirtied=84
+                      ->  Limit  (cost=393.85..727.64 rows=50 width=120) (actual time=0.790..65.090 rows=50.00 loops=1)
+                            Buffers: shared hit=526 read=155 dirtied=84
+                            InitPlan 7
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.593..0.594 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_4  (cost=0.28..25.01 rows=499 width=0) (actual time=0.159..0.556 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            InitPlan 8
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.145..0.145 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_5  (cost=0.28..25.01 rows=499 width=0) (actual time=0.014..0.112 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            ->  WindowAgg  (cost=7.52..3338.79 rows=499 width=120) (actual time=0.642..64.918 rows=50.00 loops=1)
+                                  Window: w1 AS (ORDER BY s.score, s.game_id ROWS UNBOUNDED PRECEDING)
+                                  Storage: Memory  Maximum Storage: 17kB
+                                  Buffers: shared hit=359 read=155 dirtied=84
+                                  ->  Nested Loop Left Join  (cost=0.85..3317.58 rows=499 width=116) (actual time=0.032..63.961 rows=50.00 loops=1)
+                                        Buffers: shared hit=192 read=155 dirtied=84
+                                        ->  Nested Loop  (cost=0.56..3126.01 rows=499 width=113) (actual time=0.022..33.910 rows=50.00 loops=1)
+                                              Buffers: shared hit=121 read=76 dirtied=40
+                                              ->  Index Scan using live_goty_scores_year_score_idx on live_goty_scores s  (cost=0.28..88.57 rows=499 width=64) (actual time=0.010..0.157 rows=50.00 loops=1)
+                                                    Index Cond: (year = 2025)
+                                                    Index Searches: 1
+                                                    Buffers: shared hit=47 dirtied=4
+                                              ->  Index Scan using games_pkey on games g  (cost=0.29..6.09 rows=1 width=65) (actual time=0.672..0.672 rows=1.00 loops=50)
+                                                    Index Cond: (id = s.game_id)
+                                                    Index Searches: 50
+                                                    Buffers: shared hit=74 read=76 dirtied=36
+                                        ->  Index Scan using covers_igdb_id_unique on covers c  (cost=0.29..0.38 rows=1 width=11) (actual time=0.598..0.598 rows=1.00 loops=50)
+                                              Index Cond: (igdb_id = g.cover_igdb_id)
+                                              Index Searches: 50
+                                              Buffers: shared hit=71 read=79 dirtied=44
+  InitPlan 10
+    ->  Aggregate  (cost=5357.35..5357.36 rows=1 width=32) (actual time=0.700..0.702 rows=1.00 loops=1)
+          Buffers: shared hit=8 read=1
+          ->  Sort  (cost=5354.99..5355.78 rows=315 width=172) (actual time=0.676..0.678 rows=5.00 loops=1)
+                Sort Key: ac.sort_order, ac.label, ((row_number() OVER w1)::integer)
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=8 read=1
+                ->  Nested Loop Left Join  (cost=16.87..5341.92 rows=315 width=172) (actual time=0.634..0.661 rows=5.00 loops=1)
+                      Buffers: shared hit=8 read=1
+                      ->  Seq Scan on award_categories ac  (cost=0.00..16.30 rows=315 width=100) (actual time=0.015..0.018 rows=5.00 loops=1)
+                            Filter: active
+                            Buffers: shared hit=1
+                      ->  Limit  (cost=16.87..16.90 rows=1 width=72) (actual time=0.127..0.127 rows=0.00 loops=5)
+                            Buffers: shared hit=7 read=1
+                            ->  WindowAgg  (cost=16.87..16.90 rows=1 width=72) (actual time=0.127..0.127 rows=0.00 loops=5)
+                                  Window: w1 AS (ORDER BY s_1.vote_count, s_1.game_id ROWS UNBOUNDED PRECEDING)
+                                  Buffers: shared hit=7 read=1
+                                  ->  Sort  (cost=16.87..16.88 rows=1 width=68) (actual time=0.126..0.126 rows=0.00 loops=5)
+                                        Sort Key: s_1.vote_count DESC, s_1.game_id
+                                        Sort Method: quicksort  Memory: 25kB
+                                        Buffers: shared hit=7 read=1
+                                        ->  Nested Loop Left Join  (cost=0.73..16.86 rows=1 width=68) (actual time=0.112..0.112 rows=0.00 loops=5)
+                                              Buffers: shared hit=4 read=1
+                                              ->  Nested Loop  (cost=0.44..16.48 rows=1 width=65) (actual time=0.112..0.112 rows=0.00 loops=5)
+                                                    Buffers: shared hit=4 read=1
+                                                    ->  Index Scan using live_category_scores_year_category_id_game_id_pk on live_category_scores s_1  (cost=0.15..8.17 rows=1 width=20) (actual time=0.111..0.111 rows=0.00 loops=5)
+                                                          Index Cond: ((year = 2025) AND (category_id = ac.id))
+                                                          Index Searches: 5
+                                                          Buffers: shared hit=4 read=1
+                                                    ->  Index Scan using games_pkey on games g_1  (cost=0.29..8.31 rows=1 width=61) (never executed)
+                                                          Index Cond: (id = s_1.game_id)
+                                                          Index Searches: 0
+                                              ->  Index Scan using covers_igdb_id_unique on covers cov  (cost=0.29..0.38 rows=1 width=11) (never executed)
+                                                    Index Cond: (igdb_id = g_1.cover_igdb_id)
+                                                    Index Searches: 0
+  ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.001..0.001 rows=1.00 loops=1)
+  ->  Seq Scan on live_goty_year_stats ys  (cost=0.00..1.02 rows=1 width=17) (actual time=0.728..0.729 rows=1.00 loops=1)
+        Filter: (year = 2025)
+        Rows Removed by Filter: 2
+        Buffers: shared read=1 dirtied=1
+Planning:
+  Buffers: shared hit=147 read=5 dirtied=3
+Planning Time: 13.015 ms
+Execution Time: 72.790 ms
+
+===== middle page=5 =====
+Nested Loop Left Join  (cost=6207.20..6208.27 rows=1 width=97) (actual time=190.645..190.662 rows=1.00 loops=1)
+  Buffers: shared hit=2452 read=413 dirtied=241
+  InitPlan 1
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.318..0.319 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores  (cost=0.28..25.01 rows=499 width=0) (actual time=0.016..0.281 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 2
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.192..0.193 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_1  (cost=0.28..25.01 rows=499 width=0) (actual time=0.011..0.158 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 3
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.185..0.186 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_2  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.152 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 6
+    ->  Aggregate  (cost=41.08..41.09 rows=1 width=4) (actual time=0.310..0.314 rows=1.00 loops=1)
+          Buffers: shared hit=317
+          InitPlan 5
+            ->  Limit  (cost=29.02..29.07 rows=1 width=20) (actual time=0.248..0.250 rows=1.00 loops=1)
+                  Buffers: shared hit=243
+                  InitPlan 4
+                    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.183..0.184 rows=1.00 loops=1)
+                          Buffers: shared hit=167
+                          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_3  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.150 rows=499.00 loops=1)
+                                Index Cond: (year = 2025)
+                                Heap Fetches: 243
+                                Index Searches: 1
+                                Buffers: shared hit=167
+                  ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores s0  (cost=0.28..25.01 rows=499 width=20) (actual time=0.011..0.051 rows=201.00 loops=1)
+                        Index Cond: (year = 2025)
+                        Heap Fetches: 105
+                        Index Searches: 1
+                        Buffers: shared hit=76
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores hs  (cost=0.28..11.60 rows=166 width=0) (actual time=0.259..0.295 rows=196.00 loops=1)
+                Index Cond: ((year = 2025) AND (score > (InitPlan 5).col1))
+                Heap Fetches: 102
+                Index Searches: 1
+                Buffers: shared hit=317
+  InitPlan 9
+    ->  Aggregate  (cost=729.93..729.94 rows=1 width=32) (actual time=189.517..189.521 rows=1.00 loops=1)
+          Buffers: shared hit=1627 read=413 dirtied=241
+          ->  Sort  (cost=729.55..729.68 rows=50 width=148) (actual time=189.283..189.289 rows=50.00 loops=1)
+                Sort Key: p.place
+                Sort Method: quicksort  Memory: 33kB
+                Buffers: shared hit=1627 read=413 dirtied=241
+                ->  Subquery Scan on p  (cost=393.85..728.14 rows=50 width=148) (actual time=147.596..189.235 rows=50.00 loops=1)
+                      Buffers: shared hit=1627 read=413 dirtied=241
+                      ->  Limit  (cost=393.85..727.64 rows=50 width=120) (actual time=147.561..189.143 rows=50.00 loops=1)
+                            Buffers: shared hit=1627 read=413 dirtied=241
+                            InitPlan 7
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.189..0.190 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_4  (cost=0.28..25.01 rows=499 width=0) (actual time=0.007..0.156 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            InitPlan 8
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.187..0.188 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_5  (cost=0.28..25.01 rows=499 width=0) (actual time=0.007..0.154 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            ->  WindowAgg  (cost=7.52..3338.79 rows=499 width=120) (actual time=0.222..188.904 rows=250.00 loops=1)
+                                  Window: w1 AS (ORDER BY s.score, s.game_id ROWS UNBOUNDED PRECEDING)
+                                  Storage: Memory  Maximum Storage: 17kB
+                                  Buffers: shared hit=1460 read=413 dirtied=241
+                                  ->  Nested Loop Left Join  (cost=0.85..3317.58 rows=499 width=116) (actual time=0.023..187.481 rows=250.00 loops=1)
+                                        Buffers: shared hit=1293 read=413 dirtied=241
+                                        ->  Nested Loop  (cost=0.56..3126.01 rows=499 width=113) (actual time=0.017..110.717 rows=250.00 loops=1)
+                                              Buffers: shared hit=723 read=233 dirtied=117
+                                              ->  Index Scan using live_goty_scores_year_score_idx on live_goty_scores s  (cost=0.28..88.57 rows=499 width=64) (actual time=0.007..0.492 rows=250.00 loops=1)
+                                                    Index Cond: (year = 2025)
+                                                    Index Searches: 1
+                                                    Buffers: shared hit=206
+                                              ->  Index Scan using games_pkey on games g  (cost=0.29..6.09 rows=1 width=65) (actual time=0.439..0.439 rows=1.00 loops=250)
+                                                    Index Cond: (id = s.game_id)
+                                                    Index Searches: 250
+                                                    Buffers: shared hit=517 read=233 dirtied=117
+                                        ->  Index Scan using covers_igdb_id_unique on covers c  (cost=0.29..0.38 rows=1 width=11) (actual time=0.305..0.305 rows=1.00 loops=250)
+                                              Index Cond: (igdb_id = g.cover_igdb_id)
+                                              Index Searches: 250
+                                              Buffers: shared hit=570 read=180 dirtied=124
+  InitPlan 10
+    ->  Aggregate  (cost=5357.35..5357.36 rows=1 width=32) (actual time=0.082..0.084 rows=1.00 loops=1)
+          Buffers: shared hit=6
+          ->  Sort  (cost=5354.99..5355.78 rows=315 width=172) (actual time=0.067..0.069 rows=5.00 loops=1)
+                Sort Key: ac.sort_order, ac.label, ((row_number() OVER w1)::integer)
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=6
+                ->  Nested Loop Left Join  (cost=16.87..5341.92 rows=315 width=172) (actual time=0.046..0.059 rows=5.00 loops=1)
+                      Buffers: shared hit=6
+                      ->  Seq Scan on award_categories ac  (cost=0.00..16.30 rows=315 width=100) (actual time=0.013..0.014 rows=5.00 loops=1)
+                            Filter: active
+                            Buffers: shared hit=1
+                      ->  Limit  (cost=16.87..16.90 rows=1 width=72) (actual time=0.008..0.008 rows=0.00 loops=5)
+                            Buffers: shared hit=5
+                            ->  WindowAgg  (cost=16.87..16.90 rows=1 width=72) (actual time=0.007..0.008 rows=0.00 loops=5)
+                                  Window: w1 AS (ORDER BY s_1.vote_count, s_1.game_id ROWS UNBOUNDED PRECEDING)
+                                  Buffers: shared hit=5
+                                  ->  Sort  (cost=16.87..16.88 rows=1 width=68) (actual time=0.007..0.007 rows=0.00 loops=5)
+                                        Sort Key: s_1.vote_count DESC, s_1.game_id
+                                        Sort Method: quicksort  Memory: 25kB
+                                        Buffers: shared hit=5
+                                        ->  Nested Loop Left Join  (cost=0.73..16.86 rows=1 width=68) (actual time=0.003..0.003 rows=0.00 loops=5)
+                                              Buffers: shared hit=5
+                                              ->  Nested Loop  (cost=0.44..16.48 rows=1 width=65) (actual time=0.003..0.003 rows=0.00 loops=5)
+                                                    Buffers: shared hit=5
+                                                    ->  Index Scan using live_category_scores_year_category_id_game_id_pk on live_category_scores s_1  (cost=0.15..8.17 rows=1 width=20) (actual time=0.002..0.002 rows=0.00 loops=5)
+                                                          Index Cond: ((year = 2025) AND (category_id = ac.id))
+                                                          Index Searches: 5
+                                                          Buffers: shared hit=5
+                                                    ->  Index Scan using games_pkey on games g_1  (cost=0.29..8.31 rows=1 width=61) (never executed)
+                                                          Index Cond: (id = s_1.game_id)
+                                                          Index Searches: 0
+                                              ->  Index Scan using covers_igdb_id_unique on covers cov  (cost=0.29..0.38 rows=1 width=11) (never executed)
+                                                    Index Cond: (igdb_id = g_1.cover_igdb_id)
+                                                    Index Searches: 0
+  ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.001..0.002 rows=1.00 loops=1)
+  ->  Seq Scan on live_goty_year_stats ys  (cost=0.00..1.02 rows=1 width=17) (actual time=0.015..0.017 rows=1.00 loops=1)
+        Filter: (year = 2025)
+        Rows Removed by Filter: 2
+        Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=24
+Planning Time: 5.612 ms
+Execution Time: 190.831 ms
+
+===== last page=10 =====
+Nested Loop Left Join  (cost=6207.20..6208.27 rows=1 width=97) (actual time=138.316..138.332 rows=1.00 loops=1)
+  Buffers: shared hit=4443 read=259 dirtied=182
+  InitPlan 1
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.169..0.170 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores  (cost=0.28..25.01 rows=499 width=0) (actual time=0.016..0.134 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 2
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.235..0.236 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_1  (cost=0.28..25.01 rows=499 width=0) (actual time=0.007..0.201 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 3
+    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.238..0.238 rows=1.00 loops=1)
+          Buffers: shared hit=167
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_2  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.197 rows=499.00 loops=1)
+                Index Cond: (year = 2025)
+                Heap Fetches: 243
+                Index Searches: 1
+                Buffers: shared hit=167
+  InitPlan 6
+    ->  Aggregate  (cost=41.08..41.09 rows=1 width=4) (actual time=0.603..0.606 rows=1.00 loops=1)
+          Buffers: shared hit=465
+          InitPlan 5
+            ->  Limit  (cost=29.02..29.07 rows=1 width=20) (actual time=0.384..0.387 rows=1.00 loops=1)
+                  Buffers: shared hit=316
+                  InitPlan 4
+                    ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.191..0.192 rows=1.00 loops=1)
+                          Buffers: shared hit=167
+                          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_3  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.158 rows=499.00 loops=1)
+                                Index Cond: (year = 2025)
+                                Heap Fetches: 243
+                                Index Searches: 1
+                                Buffers: shared hit=167
+                  ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores s0  (cost=0.28..25.01 rows=499 width=20) (actual time=0.011..0.169 rows=451.00 loops=1)
+                        Index Cond: (year = 2025)
+                        Heap Fetches: 218
+                        Index Searches: 1
+                        Buffers: shared hit=149
+          ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores hs  (cost=0.28..11.60 rows=166 width=0) (actual time=0.401..0.572 rows=450.00 loops=1)
+                Index Cond: ((year = 2025) AND (score > (InitPlan 5).col1))
+                Heap Fetches: 218
+                Index Searches: 1
+                Buffers: shared hit=465
+  InitPlan 9
+    ->  Aggregate  (cost=729.93..729.94 rows=1 width=32) (actual time=136.922..136.926 rows=1.00 loops=1)
+          Buffers: shared hit=3470 read=259 dirtied=182
+          ->  Sort  (cost=729.55..729.68 rows=50 width=148) (actual time=136.725..136.732 rows=49.00 loops=1)
+                Sort Key: p.place
+                Sort Method: quicksort  Memory: 32kB
+                Buffers: shared hit=3470 read=259 dirtied=182
+                ->  Subquery Scan on p  (cost=393.85..728.14 rows=50 width=148) (actual time=117.464..136.692 rows=49.00 loops=1)
+                      Buffers: shared hit=3470 read=259 dirtied=182
+                      ->  Limit  (cost=393.85..727.64 rows=50 width=120) (actual time=117.430..136.616 rows=49.00 loops=1)
+                            Buffers: shared hit=3470 read=259 dirtied=182
+                            InitPlan 7
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.213..0.213 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_4  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.179 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            InitPlan 8
+                              ->  Aggregate  (cost=26.25..26.27 rows=1 width=4) (actual time=0.239..0.240 rows=1.00 loops=1)
+                                    Buffers: shared hit=167
+                                    ->  Index Only Scan using live_goty_scores_year_score_idx on live_goty_scores live_goty_scores_5  (cost=0.28..25.01 rows=499 width=0) (actual time=0.008..0.206 rows=499.00 loops=1)
+                                          Index Cond: (year = 2025)
+                                          Heap Fetches: 243
+                                          Index Searches: 1
+                                          Buffers: shared hit=167
+                            ->  WindowAgg  (cost=7.52..3338.79 rows=499 width=120) (actual time=0.458..136.318 rows=499.00 loops=1)
+                                  Window: w1 AS (ORDER BY s.score, s.game_id ROWS UNBOUNDED PRECEDING)
+                                  Storage: Memory  Maximum Storage: 17kB
+                                  Buffers: shared hit=3303 read=259 dirtied=182
+                                  ->  Nested Loop Left Join  (cost=0.85..3317.58 rows=499 width=116) (actual time=0.233..134.817 rows=499.00 loops=1)
+                                        Buffers: shared hit=3136 read=259 dirtied=182
+                                        ->  Nested Loop  (cost=0.56..3126.01 rows=499 width=113) (actual time=0.225..83.961 rows=499.00 loops=1)
+                                              Buffers: shared hit=1741 read=157 dirtied=99
+                                              ->  Index Scan using live_goty_scores_year_score_idx on live_goty_scores s  (cost=0.28..88.57 rows=499 width=64) (actual time=0.213..0.717 rows=499.00 loops=1)
+                                                    Index Cond: (year = 2025)
+                                                    Index Searches: 1
+                                                    Buffers: shared hit=401
+                                              ->  Index Scan using games_pkey on games g  (cost=0.29..6.09 rows=1 width=65) (actual time=0.166..0.166 rows=1.00 loops=499)
+                                                    Index Cond: (id = s.game_id)
+                                                    Index Searches: 499
+                                                    Buffers: shared hit=1340 read=157 dirtied=99
+                                        ->  Index Scan using covers_igdb_id_unique on covers c  (cost=0.29..0.38 rows=1 width=11) (actual time=0.101..0.101 rows=1.00 loops=499)
+                                              Index Cond: (igdb_id = g.cover_igdb_id)
+                                              Index Searches: 499
+                                              Buffers: shared hit=1395 read=102 dirtied=83
+  InitPlan 10
+    ->  Aggregate  (cost=5357.35..5357.36 rows=1 width=32) (actual time=0.109..0.111 rows=1.00 loops=1)
+          Buffers: shared hit=6
+          ->  Sort  (cost=5354.99..5355.78 rows=315 width=172) (actual time=0.094..0.096 rows=5.00 loops=1)
+                Sort Key: ac.sort_order, ac.label, ((row_number() OVER w1)::integer)
+                Sort Method: quicksort  Memory: 25kB
+                Buffers: shared hit=6
+                ->  Nested Loop Left Join  (cost=16.87..5341.92 rows=315 width=172) (actual time=0.071..0.084 rows=5.00 loops=1)
+                      Buffers: shared hit=6
+                      ->  Seq Scan on award_categories ac  (cost=0.00..16.30 rows=315 width=100) (actual time=0.014..0.015 rows=5.00 loops=1)
+                            Filter: active
+                            Buffers: shared hit=1
+                      ->  Limit  (cost=16.87..16.90 rows=1 width=72) (actual time=0.013..0.013 rows=0.00 loops=5)
+                            Buffers: shared hit=5
+                            ->  WindowAgg  (cost=16.87..16.90 rows=1 width=72) (actual time=0.012..0.013 rows=0.00 loops=5)
+                                  Window: w1 AS (ORDER BY s_1.vote_count, s_1.game_id ROWS UNBOUNDED PRECEDING)
+                                  Buffers: shared hit=5
+                                  ->  Sort  (cost=16.87..16.88 rows=1 width=68) (actual time=0.012..0.012 rows=0.00 loops=5)
+                                        Sort Key: s_1.vote_count DESC, s_1.game_id
+                                        Sort Method: quicksort  Memory: 25kB
+                                        Buffers: shared hit=5
+                                        ->  Nested Loop Left Join  (cost=0.73..16.86 rows=1 width=68) (actual time=0.008..0.008 rows=0.00 loops=5)
+                                              Buffers: shared hit=5
+                                              ->  Nested Loop  (cost=0.44..16.48 rows=1 width=65) (actual time=0.008..0.008 rows=0.00 loops=5)
+                                                    Buffers: shared hit=5
+                                                    ->  Index Scan using live_category_scores_year_category_id_game_id_pk on live_category_scores s_1  (cost=0.15..8.17 rows=1 width=20) (actual time=0.007..0.007 rows=0.00 loops=5)
+                                                          Index Cond: ((year = 2025) AND (category_id = ac.id))
+                                                          Index Searches: 5
+                                                          Buffers: shared hit=5
+                                                    ->  Index Scan using games_pkey on games g_1  (cost=0.29..8.31 rows=1 width=61) (never executed)
+                                                          Index Cond: (id = s_1.game_id)
+                                                          Index Searches: 0
+                                              ->  Index Scan using covers_igdb_id_unique on covers cov  (cost=0.29..0.38 rows=1 width=11) (never executed)
+                                                    Index Cond: (igdb_id = g_1.cover_igdb_id)
+                                                    Index Searches: 0
+  ->  Result  (cost=0.00..0.01 rows=1 width=0) (actual time=0.001..0.001 rows=1.00 loops=1)
+  ->  Seq Scan on live_goty_year_stats ys  (cost=0.00..1.02 rows=1 width=17) (actual time=0.013..0.015 rows=1.00 loops=1)
+        Filter: (year = 2025)
+        Rows Removed by Filter: 2
+        Buffers: shared hit=1
+Planning:
+  Buffers: shared hit=24
+Planning Time: 4.412 ms
+Execution Time: 138.554 ms

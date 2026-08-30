@@ -72,4 +72,193 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm deploy:cf
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          NEON_AUTH_BASE_URL: ${{ secrets.PRODUCTION_NEON_AUTH_BASE_URL }}
+          NEON_AUTH_COOKIE_SECRET: ${{ secrets.PRODUCTION_NEON_AUTH_COOKIE_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+          IGDB_WEBHOOKS_WORKER_URL: ${{ secrets.PRODUCTION_IGDB_WEBHOOKS_WORKER_URL }}
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_AVATAR_BUCKET: ${{ secrets.PRODUCTION_R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.PRODUCTION_AVATAR_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
+          NEXT_PUBLIC_APP_URL: ${{ secrets.PRODUCTION_CF_APP_URL }}
+          AUTH_EMAIL_FROM: ${{ secrets.AUTH_EMAIL_FROM }}
+        run: |
+          WORKER="thegamies-v2"
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::warning::PRODUCTION_DATABASE_URL empty — Worker will not get a production DATABASE_URL from this deploy."
+          fi
+          if [ -z "$NEON_AUTH_BASE_URL" ]; then
+            echo "::warning::PRODUCTION_NEON_AUTH_BASE_URL empty — set GitHub secret PRODUCTION_NEON_AUTH_BASE_URL"
+          fi
+          if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
+            echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set PRODUCTION_NEON_AUTH_COOKIE_SECRET (or NEON_AUTH_COOKIE_SECRET)"
+          fi
+          if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
+            echo "::warning::PRODUCTION_CF_APP_URL empty — set GitHub secret PRODUCTION_CF_APP_URL"
+          fi
+          if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
+            echo "::warning::PRODUCTION_IGDB_WEBHOOKS_WORKER_URL empty — not falling back to staging webhook URL"
+          fi
+          if [ -z "$R2_AVATAR_BUCKET" ]; then
+            echo "::warning::PRODUCTION_R2_AVATAR_BUCKET empty — production uploads need a dedicated bucket (not STAGING_R2_AVATAR_BUCKET)"
+          fi
+          if [ -z "$AVATAR_PUBLIC_BASE_URL" ]; then
+            echo "::warning::PRODUCTION_AVATAR_PUBLIC_BASE_URL empty — set the production CDN/public base for uploads"
+          fi
+
+          : > .dev.vars
+          echo "NEXTJS_ENV=production" >> .dev.vars
+          node <<'NODE'
+          const fs = require("fs");
+          const keys = [
+            "DATABASE_URL",
+            "NEON_AUTH_BASE_URL",
+            "NEON_AUTH_COOKIE_SECRET",
+            "ADMIN_SYNC_SECRET",
+            "CRON_SECRET",
+            "IGDB_CLIENT_ID",
+            "IGDB_CLIENT_SECRET",
+            "IGDB_WEBHOOKS_WORKER_URL",
+            "R2_ACCOUNT_ID",
+            "R2_ACCESS_KEY_ID",
+            "R2_SECRET_ACCESS_KEY",
+            "R2_AVATAR_BUCKET",
+            "AVATAR_PUBLIC_BASE_URL",
+            "NEXT_PUBLIC_GA_MEASUREMENT_ID",
+            "NEXT_PUBLIC_APP_URL",
+            "AUTH_EMAIL_FROM",
+          ];
+          const secrets = {};
+          const lines = ["NEXTJS_ENV=production"];
+          for (const key of keys) {
+            const val = process.env[key];
+            if (!val) continue;
+            secrets[key] = val;
+            lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
+          }
+          fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/wrangler-secrets.json",
+            JSON.stringify(secrets),
+          );
+          const names = Object.keys(secrets);
+          console.log(
+            names.length
+              ? `Prepared ${names.length} secrets: ${names.join(", ")}`
+              : "WARNING: no production app secrets set in GitHub Actions",
+          );
+          NODE
+
+          pnpm deploy:cf
+
+          if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
+            pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER"
+          else
+            echo "Skipping wrangler secret bulk (no secrets to upload)."
+          fi
+
+          echo "### Cloudflare production" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Worker: \`$WORKER\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Secrets: GitHub Actions → wrangler secret bulk (never STAGING_*)" >> "$GITHUB_STEP_SUMMARY"
+
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      igdb_webhooks: ${{ steps.filter.outputs.igdb_webhooks }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            igdb_webhooks:
+              - 'workers/igdb-webhooks/**'
+              - 'packages/igdb/**'
+              - 'packages/db/**'
+              - 'pnpm-lock.yaml'
+
+  igdb_webhooks:
+    needs: changes
+    if: needs.changes.outputs.igdb_webhooks == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ] || [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare secrets missing; skipping production IGDB webhooks Worker deploy."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          IGDB_WEBHOOK_SECRET: ${{ secrets.IGDB_WEBHOOK_SECRET }}
+          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
+          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const secrets = {};
+          const keys = [
+            "DATABASE_URL",
+            "ADMIN_SYNC_SECRET",
+            "IGDB_WEBHOOK_SECRET",
+            "IGDB_CLIENT_ID",
+            "IGDB_CLIENT_SECRET",
+            "CLOUDFLARE_API_TOKEN",
+          ];
+          for (const key of keys) {
+            const val = process.env[key];
+            if (!val) continue;
+            secrets[key] = val;
+          }
+          fs.writeFileSync(
+            process.env.RUNNER_TEMP + "/igdb-webhooks-secrets.json",
+            JSON.stringify(secrets),
+          );
+          const names = Object.keys(secrets);
+          console.log(
+            names.length
+              ? `Prepared ${names.length} IGDB webhook secrets: ${names.join(", ")}`
+              : "No IGDB webhook secrets to bulk (code deploy only)",
+          );
+          NODE
+
+          pnpm deploy:igdb-webhooks:production
+
+          # secret bulk publishes a second version. Code deploy keeps existing
+          # secrets. Set SYNC_IGDB_WEBHOOK_SECRETS=true on the job env to rotate.
+          if [ "${SYNC_IGDB_WEBHOOK_SECRETS:-}" = "true" ] && [ -n "$DATABASE_URL" ] && [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
+            pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env production
+          else
+            echo "Skipping wrangler secret bulk (existing Worker secrets are kept)."
+          fi
+
+          echo "### IGDB webhooks production" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Worker: \`thegamies-igdb-webhooks\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Deploy: \`pnpm deploy:igdb-webhooks:production\`" >> "$GITHUB_STEP_SUMMARY"

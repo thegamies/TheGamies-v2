@@ -1,13 +1,16 @@
 type RankMarkerProps = {
   rank: number | string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "hero";
   className?: string;
 };
 
 const sizeClass = {
   sm: "text-sm min-w-6",
   md: "text-xl min-w-8",
-  lg: "text-4xl min-w-12",
+  /** Scales down on narrow viewports so podium ranks fit a 360px layout. */
+  lg: "text-2xl min-w-8 sm:text-4xl sm:min-w-12",
+  /** Magazine numeral — game-detail GOTY masthead. */
+  hero: "text-6xl min-w-12 sm:text-8xl sm:min-w-16",
 };
 
 export function RankMarker({

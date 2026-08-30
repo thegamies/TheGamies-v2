@@ -1,0 +1,21 @@
+{
+  "name": "@thegamies/igdb-webhooks-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --env develop",
+    "deploy": "wrangler deploy --env develop",
+    "deploy:develop": "wrangler deploy --env develop",
+    "deploy:production": "wrangler deploy --env production",
+    "types": "wrangler types"
+  },
+  "dependencies": {
+    "@thegamies/db": "workspace:*",
+    "@thegamies/igdb": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "wrangler": "^4.0.0"
+  }
+}

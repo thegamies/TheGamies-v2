@@ -1,9 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "main": ".open-next/worker.js",
+  "main": "cloudflare-worker.ts",
   "name": "thegamies-v2",
   "compatibility_date": "2026-08-10",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -16,5 +19,16 @@
   ],
   "images": {
     "binding": "IMAGES"
-  }
+  },
+  "send_email": [
+    {
+      "name": "EMAIL"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "CRON_SETTINGS",
+      "id": "9956d865bf3d4a8e92c84157db2da062"
+    }
+  ]
 }

@@ -1,19 +1,36 @@
-import { cookies } from "next/headers";
+import { cache } from "react";
+import { notFound } from "next/navigation";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
+import { countSiteOperators } from "@/lib/site-ops/service";
 
 export function adminSecretConfigured(): boolean {
   return Boolean(process.env.ADMIN_SYNC_SECRET);
 }
 
-export async function isAdminAuthorized(
-  request?: Request,
-): Promise<boolean> {
-  const secret = process.env.ADMIN_SYNC_SECRET;
-  if (!secret) return false;
+export const getRequestSiteAdminProfile = cache(async () => {
+  const user = await getRequestSessionUser();
+  if (!user?.id) return null;
+  const profile = await getRequestProfileByAuthUserId(user.id);
+  if (!profile?.isSiteAdmin) return null;
+  return profile;
+});
 
-  const header = request?.headers.get("x-admin-sync-secret");
-  if (header && header === secret) return true;
+export async function isAdminAuthorized(): Promise<boolean> {
+  return (await getRequestSiteAdminProfile()) != null;
+}
 
-  const cookieStore = await cookies();
-  const cookie = cookieStore.get("admin_sync_secret")?.value;
-  return cookie === secret;
+export async function requireSiteAdminPage(): Promise<void> {
+  if (!(await isAdminAuthorized())) notFound();
+}
+
+export async function canClaimFirstSiteAdmin(): Promise<boolean> {
+  if (!adminSecretConfigured()) return false;
+  const user = await getRequestSessionUser();
+  if (!user?.id) return false;
+  const profile = await getRequestProfileByAuthUserId(user.id);
+  if (!profile || profile.isSiteAdmin) return false;
+  return (await countSiteOperators()) === 0;
 }

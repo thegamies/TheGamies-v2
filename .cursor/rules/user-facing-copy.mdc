@@ -1,0 +1,30 @@
+---
+description: Keep UI copy user-facing; no CLI, env vars, or ops jargon in product surfaces
+alwaysApply: true
+---
+
+# User-facing copy only
+
+Never put developer/ops-facing text in product UI (pages users or operators see as part of the site).
+
+## Do not show in UI
+
+- Shell commands (`pnpm …`, `doppler …`, `wrangler …`, `git …`)
+- Env var names (`DATABASE_URL`, `ADMIN_SYNC_SECRET`, …)
+- Internal file paths, package names, host/plan internals (`maxDuration`, Hobby vs Pro) unless the audience is explicitly an engineering doc
+- “Run X from CLI” / “see docs/…” instructions meant for developers
+
+## Where that content belongs
+
+- `docs/` (e.g. `docs/igdb-sync.md`, `docs/engineering.md`)
+- `README.md`, `AGENTS.md`, CLI `--help`, code comments
+- PR descriptions and commit messages
+
+## UI empty/error states
+
+Speak like a publication, not a setup guide:
+
+- Good: “No games in the catalog yet.”
+- Bad: “Run sync from Admin Sync or `pnpm sync:igdb:secrets import --year 2026`.”
+
+Admin/ops screens may describe *what the control does* in plain language. Still no CLI commands or env var names in the rendered UI.

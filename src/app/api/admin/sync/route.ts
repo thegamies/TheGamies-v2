@@ -17,7 +17,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 export async function POST(request: Request) {
-  if (!(await isAdminAuthorized(request))) {
+  if (!(await isAdminAuthorized())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!(await isAdminAuthorized(request))) {
+  if (!(await isAdminAuthorized())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const db = createDb();

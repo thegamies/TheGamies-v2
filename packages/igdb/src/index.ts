@@ -1,6 +1,8 @@
 export {
   hasIgdbCreds,
   coverUrlFromImageId,
+  wideImageUrlFromImageId,
+  youtubePosterUrl,
   igdbImage,
   computePopularity,
   isAdultGame,
@@ -14,6 +16,11 @@ export {
 export { evaluateBackfillResume } from "./backfill-resume";
 export { INSERT_CHUNK, insertChunked } from "./chunk";
 export {
+  gameLinksChecksum,
+  igdbIdsNeedingLinkRewrite,
+  upsertGamesWithLinks,
+} from "./upsert-games";
+export {
   ALL_ENRICH_ENTITIES,
   getBackfillResumeInfo,
   MAX_PAGES_PER_RUN,
@@ -25,3 +32,101 @@ export {
   type SyncChunkResult,
 } from "./sync";
 export { listRecentSyncRuns } from "./sync-runs";
+export {
+  applyWebhook,
+  applyGameCreateUpdates,
+  parseDeleteIgdbId,
+  assertIgdbGame,
+  assertIgdbCover,
+} from "./webhook-apply";
+export {
+  formatIgdbWebhookSecret,
+  parseIgdbWebhookSecret,
+  verifyIgdbWebhookSecret,
+  resolveWebhookRouting,
+  tryExtractWebhookIgdbId,
+  WEBHOOK_ENTITIES,
+  WEBHOOK_METHODS,
+  WEBHOOK_ENTITY_LIST,
+  WEBHOOK_METHOD_LIST,
+  type WebhookEntity,
+  type WebhookMethod,
+  type IgdbWebhookEnvelope,
+} from "./webhook-routing";
+export {
+  DEFAULT_WEBHOOK_DRAIN_SETTINGS,
+  WEBHOOK_SETTINGS_KV_KEY,
+  WEBHOOK_DRAIN_LOCK_KV_KEY,
+  WORKER_DRAIN_BATCH_CEILING,
+  QUEUE_CONSUMER_MAX_BATCH_SIZE,
+  QUEUE_CONSUMER_MAX_CONCURRENCY,
+  MAX_DRAIN_HOPS,
+  DRAIN_BATCHES_PER_INVOCATION,
+  DRAIN_HOP_HEADER,
+  DRAIN_CONTINUE_HEADER,
+  WEBHOOK_LOG_CLEANUP_CRON,
+  clampDrainSettings,
+  clampDeliveryMode,
+  clampWindowMinutes,
+  clampLogRetentionHours,
+  isWebhookLogAutoCleanupEnabled,
+  splitLogRetentionHours,
+  combineLogRetentionParts,
+  desiredQueueOpen,
+  currentIntervalStartAt,
+  drainedThisWindow,
+  clampProcessingMode,
+  parseDrainLock,
+  isDrainLocked,
+  shouldRunDrain,
+  drainBatchSize,
+  drainVisibilityTimeoutMs,
+  drainLockUntilIso,
+  parseDrainHop,
+  parseDrainContinue,
+  shouldChainDrain,
+  isDrainPullExhausted,
+  parseQueueProducerMetrics,
+  planAutoQueueDelivery,
+  shouldPauseAutoAfterBatch,
+  parseQueuePullBacklogCount,
+  type WebhookDrainSettings,
+  type WebhookDrainLock,
+  type WebhookProcessingMode,
+  type WebhookDeliveryMode,
+} from "./webhook-settings";
+export {
+  listWebhookEvents,
+  processWebhookEnvelope,
+  processWebhookBatch,
+  collapseGameOpsByIgdbId,
+  reprocessWebhookEvent,
+  truncateWebhookEvents,
+  formatDbError,
+  clampWebhookEventSort,
+  type WebhookEventStatus,
+  type WebhookEventSort,
+  type WebhookEventRow,
+  type WebhookBatchItem,
+  type WebhookBatchItemResult,
+  type GameOpCollapse,
+} from "./webhook-events";
+export {
+  fetchWebhookRegistrationOverview,
+  registerIgdbWebhookSlot,
+  registerMissingIgdbWebhooks,
+  normalizeWebhookRegistrations,
+  supportedWebhookTypes,
+  webhookTypeLabel,
+  type WebhookRegistrationOverview,
+  type WebhookSlotView,
+  type WebhookOrphan,
+  type RegisterWebhookSlotsResult,
+} from "./webhooks-catalog";
+export {
+  listIgdbWebhooks,
+  deleteIgdbWebhook,
+  testIgdbWebhook,
+  type IgdbWebhookRegistration,
+} from "./webhooks-api";
+export { timingSafeEqualString, timingSafeStartsWith } from "./timing-safe";

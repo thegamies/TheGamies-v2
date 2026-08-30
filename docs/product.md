@@ -2,30 +2,37 @@
 
 The Gamies is a consumer gaming platform centered on personal Game of the Year lists, custom lists, game discovery, and community-run awards.
 
-The long-term differentiator: creators, podcasts, Discord communities, Twitch streamers, publications, and other groups can run their own awards. Each **edition** can combine audience ballots with ballots from designated hosts called **Voices**. Separately, **live rankings** continuously aggregate signed-in users’ lists.
+The long-term differentiator: creators, podcasts, Discord communities, Twitch streamers, publications, and other groups can run their own awards. Each **edition** can combine audience ballots with ballots from designated **Hosts**. Separately, **live rankings** continuously aggregate signed-in users’ lists.
 
 ## Principles
 
 1. Game artwork and rankings are the primary visual material.
 2. Public pages are editorial and content-led; administration is separate.
 3. Rankings should be understandable at a glance but support deep exploration.
-4. Community, Voice, and Combined results stay distinct concepts on **edition** results.
+4. Community, Host, and Combined results stay distinct concepts on **edition** results.
 5. **Editions** and **live rankings** are separate systems — do not mix their data or freeze rules.
-6. Public game, profile, list, community, and results pages must be crawlable and shareable.
+6. Public game, profile, list, and results pages must be crawlable and shareable. Communities default to **private** (invite join); **public** communities allow open join and appear on profiles. Live/edition/members interiors stay members-only.
 7. Mobile is a first-class layout, not a compressed desktop page.
 8. Interface stays restrained; personality comes from composition, typography, artwork, and rank treatment.
 
 ---
 
-## Two ranking systems (do not conflate)
+## Three ranking systems (do not conflate)
+
+### Video Game Awards Pick’em (external show)
+
+- Site-wide prediction game for the external Game Awards show (not this site’s own awards). Public UI uses **Video Game Awards Pick’em**.
+- Admin builds the year slate (categories + nominees), then **Go live** / **On** / **Promote**.
+- Picks lock at **show start**. Admin calls winners live; leaderboards update per award.
+- Communities may opt in: separate pick sheets, same official winners.
 
 ### Editions (year awards ceremony)
 
 - Community runs an end-of-year **edition** (GOTY year).
-- Members (and Voices) submit **ballots**: GOTY ranking + categories.
+- Members (and Hosts) submit **ballots**: GOTY ranking + categories.
 - Results stay **hidden** until the edition closes.
-- Published results are a **frozen snapshot** — they never recalculate.
-- Public results show Combined / Community / Voices, plus **current users / voters** exploration.
+- Published **Community** results are a frozen snapshot. The **Hosts** board can rebuild if that year’s Host list changes after close.
+- Public results show Combined / Community / Hosts, plus **current users / voters** exploration.
 
 ### Live rankings (ongoing board)
 
@@ -42,15 +49,17 @@ The long-term differentiator: creators, podcasts, Discord communities, Twitch st
 ```text
 Site
   ├─ Live GOTY aggregate (signed-in lists; admin-lockable)
+  ├─ Video Game Awards Pick’em (official slate; show-start lock; live winner calls)
   ├─ Games browse + game detail
   ├─ Users + lists (GOTY + custom; anonymous create with soft sign-in prompt)
   └─ Communities
         ├─ Live rankings (optional on/off; admin-lockable)
-        └─ Editions (year)
-              ├─ Ballots hidden until close
-              ├─ Frozen results (Combined / Community / Voices)
-              ├─ GOTY + categories
-              └─ Voter / current-user exploration
+        ├─ Editions (year)
+        │     ├─ Ballots hidden until close
+        │     ├─ Frozen results (Combined / Community / Hosts)
+        │     ├─ GOTY + categories
+        │     └─ Voter / current-user exploration
+        └─ Video Game Awards Pick’em (optional; same official slate, own sheets)
 ```
 
 ---
@@ -59,7 +68,7 @@ Site
 
 ### Catalog
 - Games browse with filters and sorting (parity intent with prior TheGamies app)
-- Game detail with the same information classes as the prior build (cover, title, dates, platforms, genres, companies, playtime, etc. as catalog supports)
+- Game detail with the same information classes as the prior build (cover, title, dates, platforms, genres, companies, playtime, videos, artwork, screenshots, etc. as catalog supports)
 
 ### Lists
 - **GOTY list** per year: up to **100** ranked games
@@ -71,8 +80,10 @@ Site
 - **Editorial list view** for sharing (static editorial composition from the `goty` proto; video/Remotion deferred)
 
 ### Users
-- Auth profiles (username, display, bio, avatar, basic visibility)
-- User pages with the same information intent as the prior app (lists, social counts, communities as applicable)
+- Auth profiles (username, display, bio, avatar upload, **banner**, social links, basic visibility)
+- Change **username** (30-day cooldown), **display name**, and **password** on `/account`; **forgot password** on sign-in
+- User pages with lists, communities, avatar, banner, and social profiles (X, YouTube, Twitch, Bluesky handles; website as a full URL)
+- Community identity with optional avatar, banner, and the same social link platforms
 - Anonymous list authors remain public via list URL until/unless claimed by sign-in
 
 ### Site aggregate
@@ -85,7 +96,7 @@ Site
 - Optional **live rankings** toggle
 - **Editions** per GOTY year: ballot window → hidden → frozen results
 - Edition GOTY + **categories**
-- **Voices** in v1: Combined / Community / Voices results
+- **Hosts** in v1: Combined / Community / Hosts results (public name; code stays Voice / `?mode=voices`)
 - Show **current users / voters** on edition results (ballot exploration / who’s in)
 
 ### Categories
@@ -102,6 +113,7 @@ Site
 - GraphQL / microservices
 - Real-time recalculation of **frozen edition** results
 - Heavy admin tools embedded in public community pages
+- Video Game Awards Pick’em is **later than v1 launch** (not a go-live blocker)
 
 ---
 
@@ -110,7 +122,7 @@ Site
 1. **Anonymous / casual** — land → build GOTY or custom list → see editorial view → soft prompt to save account.  
 2. **Discovery** — browse games → game page → add to list.  
 3. **Aggregate** — signed-in lists feed live site GOTY board (lockable).  
-4. **Community ceremony** — join community → submit edition ballot (+ categories) → wait for reveal → explore frozen Combined/Community/Voices + voters.  
+4. **Community ceremony** — join (invite or public Join) → submit edition ballot (+ categories) → wait for reveal → explore frozen Combined/Community/Hosts + voters.  
 5. **Community live** — if enabled, see always-updating community board from members’ lists.
 
 ---
@@ -121,7 +133,7 @@ Site
 2. Lists (GOTY + custom) + anonymous create + sign-in prompt + editorial list view  
 3. User pages + auth  
 4. Site live aggregate (+ lock)  
-5. Communities + live toggle + editions (ballots, Voices, frozen results, categories, voters)  
+5. Communities + live toggle + editions (ballots, Hosts, frozen results, categories, voters)  
 6. IGDB worker hardening / sync ops as needed for catalog depth  
 
-Scoring curve details for “full list degrading scores” and exact Combined Voice weight remain open — see [decisions.md](./decisions.md).
+Scoring curve details for “full list degrading scores” and exact Combined Host weight remain open — see [decisions.md](./decisions.md).

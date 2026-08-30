@@ -1,0 +1,302 @@
+/** @vitest-environment jsdom */
+
+import type { ReactNode } from "react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { searchGamesForList } from "@/lib/lists/search-games-client";
+import { ListDragHandle } from "./ListDragHandle";
+import { GridListBuilder } from "./GridListBuilder";
+import { ListEditor } from "./ListEditor";
+
+vi.mock("next/link", () => ({
+  default: ({
+    children,
+    href,
+  }: {
+    children: ReactNode;
+    href: string;
+  }) => <a href={href}>{children}</a>,
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/create/goty",
+}));
+
+vi.mock("@/lib/useRouter", () => ({
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+}));
+
+vi.mock("@/app/create/actions", () => ({
+  completeListAuthIntentAction: vi.fn(),
+  saveOwnedListAction: vi.fn(),
+  shareListAction: vi.fn(),
+  syncSharedListAction: vi.fn(),
+  hydrateDraftGamesAction: vi.fn(),
+  deleteOwnedListAction: vi.fn(),
+}));
+
+vi.mock("@/lib/lists/search-games-client", () => ({
+  searchGamesForList: vi.fn(),
+}));
+
+vi.mock("@/hooks/useUnsavedChangesGuard", () => ({
+  useUnsavedChangesGuard: () => ({
+    allowLeave: vi.fn(),
+    dialog: null,
+  }),
+}));
+
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+
+vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+
+afterEach(() => {
+  cleanup();
+  window.history.replaceState({}, "", "/");
+});
+
+describe("ListDragHandle", () => {
+  it("exposes a hold-to-move control", () => {
+    render(
+      <ListDragHandle
+        attributes={{} as never}
+        listeners={undefined}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Hold to move" }),
+    ).toBeTruthy();
+  });
+});
+
+describe("GridListBuilder titles", () => {
+  it("uses standings display type for game titles", () => {
+    render(
+      <GridListBuilder
+        items={[{ id: "g1", title: "Hades II", coverUrl: null }]}
+        slotCount={2}
+        onReorder={() => {}}
+        onRemove={() => {}}
+        onPickEmpty={() => {}}
+      />,
+    );
+    const title = screen.getByTitle("Hades II");
+    expect(title.className).toContain("font-display");
+    expect(title.className).toContain("text-ink");
+  });
+});
+
+describe("ListEditor chrome", () => {
+  it("shows GOTY as body ink without a Title field", () => {
+    render(
+      <ListEditor
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+    expect(screen.getByText("2026 Game of the Year")).toBeTruthy();
+    expect(screen.queryByLabelText("Title")).toBeNull();
+  });
+
+  it("keeps toolbar Save when signed in", () => {
+    render(
+      <ListEditor
+        signedIn
+        listType="custom"
+        initialTitle="Favorites"
+        initialYear={null}
+        initialItems={[]}
+      />,
+    );
+    const saves = screen.getAllByRole("button", { name: "Save" });
+    expect(saves.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByLabelText("Title")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Done" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Default view" })).toBeTruthy();
+  });
+
+  it("places delete on the title row", () => {
+    render(
+      <ListEditor
+        signedIn
+        publicId="list-1"
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+    const heading = screen.getByText("2026 Game of the Year");
+    const del = screen.getByRole("button", { name: "Delete list" });
+    expect(heading.parentElement).toBe(del.parentElement?.parentElement);
+  });
+
+  it("keeps search text after adding a game from results", async () => {
+    vi.mocked(searchGamesForList).mockResolvedValue([
+      {
+        id: "g1",
+        igdbId: 1,
+        slug: "hades-ii",
+        title: "Hades II",
+        year: 2026,
+        coverUrl: null,
+      },
+    ]);
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+    const input = screen.getByRole("textbox", { name: "Search games" });
+    fireEvent.change(input, { target: { value: "hades" } });
+    await waitFor(() => {
+      expect(screen.getByTitle("Hades II")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByTitle("Hades II"));
+    expect(input).toHaveProperty("value", "hades");
+  });
+
+  it("opens on Categories when initialView is categories", () => {
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+        initialView="categories"
+        awardCategories={[
+          {
+            id: "best-debut",
+            label: "Best Debut",
+            description: null,
+          },
+        ]}
+      />,
+    );
+    expect(
+      screen.getByRole("tab", { name: "Categories" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Award picks")).toBeTruthy();
+    expect(
+      screen.queryByRole("textbox", { name: "Search games" }),
+    ).toBeNull();
+  });
+
+  it("updates the create URL when switching GOTY and Categories tabs", () => {
+    window.history.replaceState({}, "", "/create/goty?id=abc");
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+        awardCategories={[
+          {
+            id: "best-debut",
+            label: "Best Debut",
+            description: null,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Categories" }));
+    expect(
+      screen.getByRole("tab", { name: "Categories" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?id=abc&view=categories");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Game of the Year" }));
+    expect(
+      screen.getByRole("tab", { name: "Game of the Year" }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?id=abc");
+  });
+
+  it("hides GOTY size on Grid and List, and keeps games when shrinking Poster", () => {
+    const items = [
+      {
+        gameId: "g1",
+        igdbId: 1,
+        slug: "one",
+        title: "Game One",
+        year: 2026,
+        coverUrl: null,
+        rank: 1,
+        blurb: "",
+      },
+      {
+        gameId: "g2",
+        igdbId: 2,
+        slug: "two",
+        title: "Game Two",
+        year: 2026,
+        coverUrl: null,
+        rank: 2,
+        blurb: "",
+      },
+      {
+        gameId: "g3",
+        igdbId: 3,
+        slug: "three",
+        title: "Game Three",
+        year: 2026,
+        coverUrl: null,
+        rank: 3,
+        blurb: "",
+      },
+    ];
+    render(
+      <ListEditor
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={items}
+        initialSlotCount={3}
+        initialListFormat="grid"
+      />,
+    );
+    expect(screen.queryByLabelText("List size: 3. Tap to pick.")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.queryByLabelText("List size: 3. Tap to pick.")).toBeNull();
+    expect(screen.getAllByText("Game Three").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Poster" }));
+    expect(screen.getByLabelText("List size: 3. Tap to pick.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Fewer slots" }));
+    expect(screen.queryByText("Shrink list?")).toBeNull();
+    expect(screen.getByText("1 game hidden")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getAllByText("Game Three").length).toBeGreaterThan(0);
+  });
+
+  it("keeps Size on custom List and Grid", () => {
+    render(
+      <ListEditor
+        listType="custom"
+        initialTitle="Favorites"
+        initialYear={null}
+        initialItems={[]}
+        initialListFormat="grid"
+      />,
+    );
+    expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "List" }));
+    expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
+  });
+});

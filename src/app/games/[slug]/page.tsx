@@ -1,11 +1,32 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { SiteHeader } from "@/components/SiteHeader";
+import { GameCategoryWins } from "@/components/games/GameCategoryWins";
+import { GameGotyRankings } from "@/components/games/GameGotyRankings";
+import { GameImagesSection } from "@/components/games/GameImagesSection";
+import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
+import { GameSummary } from "@/components/games/GameSummary";
+import { GameVideosSection } from "@/components/games/GameVideosSection";
 import { GameCover } from "@/components/ui/GameCover";
-import { getGameBySlug } from "@/lib/catalog";
+import {
+  getGameArtworksForDetail,
+  getGameBySlug,
+  getGameScreenshotsForDetail,
+  getGameVideosForDetail,
+} from "@/lib/catalog";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { publicPageMetadata } from "@/lib/seo/site";
+import {
+  getGameDetailCategoryWins,
+  getGameDetailGotyRankings,
+  type GameCategoryWin,
+  type GameGotyRankings as GameGotyRankingsData,
+} from "@/lib/live-aggregate/game-rankings";
 
 type Params = Promise<{ slug: string }>;
+
+const COVER_WIDTH = 240;
+const COVER_HEIGHT = 320;
 
 export async function generateMetadata({
   params,
@@ -16,10 +37,12 @@ export async function generateMetadata({
   try {
     const game = await getGameBySlug(slug);
     if (!game) return { title: "Game" };
-    return {
+    return publicPageMetadata({
       title: game.title,
       description: game.summary?.slice(0, 160) ?? undefined,
-    };
+      path: `/games/${slug}`,
+      image: ogImagePath({ kind: "game", slug }),
+    });
   } catch {
     return { title: "Game" };
   }
@@ -29,6 +52,12 @@ function formatHours(seconds: number | null | undefined): string | null {
   if (seconds == null) return null;
   return `${(seconds / 3600).toFixed(1)}h`;
 }
+
+const TIME_TO_BEAT_LABELS = [
+  ["hastily", "Main story"],
+  ["normally", "Story + extras"],
+  ["completely", "Completionist"],
+] as const;
 
 export default async function GameDetailPage({ params }: { params: Params }) {
   const { slug } = await params;
@@ -40,13 +69,40 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   }
   if (!game) notFound();
 
+  let rankings: GameGotyRankingsData = { byYear: [], viaParent: null };
+  let categoryWins: GameCategoryWin[] = [];
+  let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
+  let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
+  let videos: Awaited<ReturnType<typeof getGameVideosForDetail>> = [];
+  try {
+    rankings = await getGameDetailGotyRankings(game);
+  } catch {
+    rankings = { byYear: [], viaParent: null };
+  }
+  try {
+    const awards = await getGameDetailCategoryWins(game);
+    categoryWins = awards.wins;
+  } catch {
+    categoryWins = [];
+  }
+  try {
+    [artworks, screenshots, videos] = await Promise.all([
+      getGameArtworksForDetail(game.id),
+      getGameScreenshotsForDetail(game.id),
+      getGameVideosForDetail(game.id),
+    ]);
+  } catch {
+    artworks = [];
+    screenshots = [];
+    videos = [];
+  }
+
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);
 
   return (
     <>
-      <SiteHeader />
-      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-10">
+      <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
         <p className="text-xs uppercase tracking-[0.2em] text-muted">
           <Link href="/games" className="hover:text-ink">
             Games
@@ -54,28 +110,35 @@ export default async function GameDetailPage({ params }: { params: Params }) {
           {game.year ? ` · ${game.year}` : null}
         </p>
 
-        <div className="mt-6 grid gap-10 md:grid-cols-[12rem_1fr] lg:grid-cols-[14rem_1fr]">
-          <div className="max-w-[14rem]">
+        <div className="mt-6 flex flex-col gap-8 sm:flex-row sm:items-start">
+          <div className="w-[240px] shrink-0">
             <GameCover
               title={game.title}
               imageUrl={game.coverUrl}
+              width={COVER_WIDTH}
+              height={COVER_HEIGHT}
               priority
             />
           </div>
-          <div>
-            <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
+
+          <div className="min-w-0 flex-1">
+            <h1 className="font-display text-5xl tracking-wide text-ink md:text-6xl">
               {game.title}
             </h1>
-            {game.gameType ? (
-              <p className="mt-2 text-sm text-muted">{game.gameType}</p>
-            ) : null}
-            {game.summary ? (
-              <p className="mt-6 max-w-2xl font-serif text-lg leading-relaxed text-ink/90">
-                {game.summary}
-              </p>
-            ) : null}
 
-            <dl className="mt-8 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
+            {game.summary ? <GameSummary text={game.summary} /> : null}
+
+            <GameGotyRankings
+              stats={rankings}
+              layout="broadcast-compact"
+              className="mt-8"
+            />
+          </div>
+        </div>
+
+        <GameCategoryWins wins={categoryWins} className="mt-10" />
+
+        <dl className="mt-10 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <dt className="text-muted">Released</dt>
                 <dd className="mt-1 text-ink">
@@ -124,22 +187,31 @@ export default async function GameDetailPage({ params }: { params: Params }) {
                 </div>
               ) : null}
               {game.timeToBeat ? (
-                <div>
+                <div className="sm:col-span-2 lg:col-span-3">
                   <dt className="text-muted">Time to beat</dt>
-                  <dd className="mt-1 text-ink">
-                    {[
-                      formatHours(game.timeToBeat.hastily),
-                      formatHours(game.timeToBeat.normally),
-                      formatHours(game.timeToBeat.completely),
-                    ]
-                      .filter(Boolean)
-                      .join(" / ") || "—"}
+                  <dd className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
+                    {TIME_TO_BEAT_LABELS.map(([key, label]) => {
+                      const hours = formatHours(game.timeToBeat?.[key]);
+                      if (!hours) return null;
+                      return (
+                        <div key={key}>
+                          <p className="tabular-nums text-ink">{hours}</p>
+                          <p className="mt-0.5 text-xs text-muted">{label}</p>
+                        </div>
+                      );
+                    })}
                   </dd>
                 </div>
               ) : null}
             </dl>
+
+        {videos.length || artworks.length || screenshots.length ? (
+          <div className="mt-14 space-y-10">
+            <GameVideosSection videos={videos} />
+            <GameImagesSection artworks={artworks} />
+            <GameScreenshotsSection screenshots={screenshots} />
           </div>
-        </div>
+        ) : null}
       </main>
     </>
   );

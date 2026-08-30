@@ -8,6 +8,328 @@
       "when": 1786395170101,
       "tag": "0000_modern_lockheed",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786417845234,
+      "tag": "0001_cool_thundra",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786460465551,
+      "tag": "0002_silly_adam_destine",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786462739876,
+      "tag": "0003_first_dormammu",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786470000000,
+      "tag": "0004_drop_list_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786477294552,
+      "tag": "0005_sweet_multiple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786480000000,
+      "tag": "0006_live_goty_scores_year_score_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786485000000,
+      "tag": "0007_communities",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786488000000,
+      "tag": "0008_community_live_scores_visible_from",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786491000000,
+      "tag": "0009_community_live_scores_visible_from",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786494000000,
+      "tag": "0010_community_live_lock",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786497000000,
+      "tag": "0011_community_editions",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1786500000000,
+      "tag": "0012_community_edition_ballots",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1786503000000,
+      "tag": "0013_community_live_lock_rows",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786506000000,
+      "tag": "0014_community_edition_voices_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1786509000000,
+      "tag": "0015_community_edition_rank_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1786512000000,
+      "tag": "0016_award_category_catalog",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1786515000000,
+      "tag": "0017_award_category_copy",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786752000000,
+      "tag": "0018_site_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786838400000,
+      "tag": "0019_site_rank_mode",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786924800000,
+      "tag": "0020_list_rank_style",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787011200000,
+      "tag": "0021_list_format",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787097600000,
+      "tag": "0022_list_format_default_grid",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1787184000000,
+      "tag": "0023_community_edition_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787270400000,
+      "tag": "0024_edition_freeze_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787356800000,
+      "tag": "0025_edition_rank_mode_default_dense",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787443200000,
+      "tag": "0026_community_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787529600000,
+      "tag": "0027_edition_schedule_timestamptz",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1787616000000,
+      "tag": "0028_public_board_min_lists",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787702400000,
+      "tag": "0029_profile_social_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1787788800000,
+      "tag": "0030_public_board_min_category_votes",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787875200000,
+      "tag": "0031_standing_fill_min_visible",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787961600000,
+      "tag": "0032_standing_fill_min_visible_2_2",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1788048000000,
+      "tag": "0033_profile_deleted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1788134400000,
+      "tag": "0034_ceremony_profile_restrict",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1788220800000,
+      "tag": "0035_profile_username_changed_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1788307200000,
+      "tag": "0036_igdb_webhook_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1788393600000,
+      "tag": "0037_profile_community_banners",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788480000000,
+      "tag": "0038_community_social_bans",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788566400000,
+      "tag": "0039_community_deletion_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788652800000,
+      "tag": "0040_community_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788739200000,
+      "tag": "0041_tga_pickem",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788825600000,
+      "tag": "0042_community_hosts",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1788912000000,
+      "tag": "0043_profile_is_site_admin",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1788998400000,
+      "tag": "0044_game_media",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1789084800000,
+      "tag": "0045_award_category_reorder",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1789171200000,
+      "tag": "0046_game_links_checksum",
+      "breakpoints": true
     }
   ]
 }
