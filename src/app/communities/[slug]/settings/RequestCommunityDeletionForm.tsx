@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { requestCommunityDeletionAction } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
@@ -25,13 +25,7 @@ export function RequestCommunityDeletionForm({
   const matches = communityDeletionRequestConfirmMatches(name, typed);
   const requestPending =
     pendingRequest != null || (state != null && "ok" in state && state.ok);
-
-  useEffect(() => {
-    if (state && "ok" in state && state.ok) {
-      setOpen(false);
-      setTyped("");
-    }
-  }, [state]);
+  const dialogOpen = open && !requestPending;
 
   function closeDialog() {
     if (pending) return;
@@ -70,7 +64,7 @@ export function RequestCommunityDeletionForm({
       )}
 
       <Dialog
-        open={open}
+        open={dialogOpen}
         title="Request deletion"
         tone="danger"
         onClose={closeDialog}

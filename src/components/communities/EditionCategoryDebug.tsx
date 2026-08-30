@@ -100,10 +100,7 @@ export function EditionCategoryDebugPopover() {
   );
 
   useLayoutEffect(() => {
-    if (!open) {
-      setPanelPos(null);
-      return;
-    }
+    if (!open) return;
     function place() {
       const trigger = rootRef.current;
       const panel = panelRef.current;
