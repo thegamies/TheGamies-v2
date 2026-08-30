@@ -4,7 +4,7 @@ CI reads **repository secrets** only. There are no required GitHub **Actions var
 
 **Where:** repo → **Settings** → **Secrets and variables** → **Actions** → **Repository secrets**.
 
-Copy values in by hand when they change (CI does not read Doppler). After you add or edit a secret, re-run the matching workflow so hosts pick it up (`secret bulk` on Cloudflare; `--env` on Vercel staging).
+Copy values in by hand when they change (CI does not read Doppler). After you add or edit a secret, re-run the matching workflow so Workers pick it up (`secret bulk` on Cloudflare).
 
 Related: [secrets.md](./secrets.md) (Doppler + how CI pushes to hosts), [deployment.md](./deployment.md), [setup-checklist.md](./setup-checklist.md).
 
@@ -16,9 +16,6 @@ Without these, host jobs skip:
 |---|---|
 | `CLOUDFLARE_API_TOKEN` | All Cloudflare Worker deploys |
 | `CLOUDFLARE_ACCOUNT_ID` | All Cloudflare Worker deploys |
-| `VERCEL_TOKEN` | All Vercel deploys |
-| `VERCEL_ORG_ID` | All Vercel deploys |
-| `VERCEL_PROJECT_ID` | All Vercel deploys |
 
 ## Required for PR / branch previews
 
@@ -33,13 +30,11 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 
 | Secret | Becomes on the host | Notes |
 |---|---|---|
-| `STAGING_DATABASE_URL` | `DATABASE_URL` | Required. Staging migrate + both hosts + IGDB webhooks develop |
+| `STAGING_DATABASE_URL` | `DATABASE_URL` | Required. Staging migrate + app Worker + IGDB webhooks develop |
 | `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Alias: `NEON_AUTH_BASE_URL` if the staging name is unset |
 | `NEON_AUTH_COOKIE_SECRET` | same | 32+ chars. Staging + previews |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging public origin |
-| `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging. Or set `VERCEL_STAGING_ALIAS` |
-| `VERCEL_STAGING_ALIAS` | hostname | Optional stable Vercel alias |
-| `CRON_SECRET` | same | Edition freeze Cron (Vercel + Cloudflare). Shared with production |
+| `CRON_SECRET` | same | Edition freeze Cron (Cloudflare Worker). Shared with production |
 | `ADMIN_SYNC_SECRET` | same | Site-operator claim + IGDB Worker proxy |
 | `IGDB_CLIENT_ID` | same | Twitch / IGDB |
 | `IGDB_CLIENT_SECRET` | same | Twitch / IGDB |
@@ -77,8 +72,6 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional |
 | `AUTH_EMAIL_FROM` | same | Optional |
 
-**Vercel Production** does **not** get these from GitHub. Set Production env on the Vercel project (CI uses `vercel pull --environment=production`), including the production R2 bucket + public base.
-
 ## Same value, two GitHub names (staging vs production)
 
 | On the host | Staging GitHub secret | Production GitHub secret |
@@ -86,8 +79,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `DATABASE_URL` | `STAGING_DATABASE_URL` | `PRODUCTION_DATABASE_URL` |
 | `NEON_AUTH_BASE_URL` | `STAGING_NEON_AUTH_BASE_URL` (or `NEON_AUTH_BASE_URL`) | `PRODUCTION_NEON_AUTH_BASE_URL` |
 | `NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` (or `NEON_AUTH_COOKIE_SECRET`) |
-| `NEXT_PUBLIC_APP_URL` (Cloudflare) | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
-| `NEXT_PUBLIC_APP_URL` (Vercel) | `STAGING_VERCEL_APP_URL` / `VERCEL_STAGING_ALIAS` | Vercel dashboard (not GitHub) |
+| `NEXT_PUBLIC_APP_URL` | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
 | `IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` |
 | `R2_AVATAR_BUCKET` | `STAGING_R2_AVATAR_BUCKET` (or `R2_AVATAR_BUCKET`) | `PRODUCTION_R2_AVATAR_BUCKET` |
 | `AVATAR_PUBLIC_BASE_URL` | `STAGING_AVATAR_PUBLIC_BASE_URL` (or `AVATAR_PUBLIC_BASE_URL`) | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` |
@@ -104,6 +96,5 @@ These are already in wrangler / CI — do not add them as Actions secrets unless
 
 ## After you save secrets
 
-1. Staging: run **Staging dual deploy** (or push `develop`).
+1. Staging: run **Staging deploy** (or push `develop`).
 2. Production Cloudflare: push `main` (or the production workflow). Empty keys are skipped; existing Worker secrets for those keys stay.
-3. Production Vercel: update the Vercel project Production env, then deploy.

@@ -25,7 +25,7 @@ These v1 loops exist in the app today:
 - Site live GOTY + categories, public floor, reveal gate, admin refresh/rebuild
 - Private communities, invites, live rankings (on/off, reveal date, lock), events/editions (ballot → freeze → Reveal / Results / Comparison / Voters)
 - Auth emails via Cloudflare Worker, cookie banner + optional GA4, Terms / Privacy / Guidelines / About / Contact
-- Dual-host **staging + PR previews**, IGDB CLI + `/admin/sync`, queued IGDB webhooks Worker (code + staging/production envs designed)
+- Cloudflare **staging + PR previews**, IGDB CLI + `/admin/sync`, queued IGDB webhooks Worker (code + staging/production envs designed)
 
 Explicitly **out of v1** (leave them out): library/played status, native app, messaging, Remotion/video export, GraphQL, recalculating frozen edition results, Postgres RLS until Auth JWT → DB role is decided.
 
@@ -37,22 +37,22 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 
 ### 1. Production pipeline parity
 
-`.github/workflows/production.yml` deploys Vercel (`vercel pull --environment=production`) and Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it does **not**:
+`.github/workflows/production.yml` deploys Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it does **not**:
 
 - Run `pnpm db:migrate` against a production Neon URL
 - Point Neon Auth email webhooks at the production Worker
 - Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
 
-**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket. Confirm Vercel Production env vars independently — `vercel pull` only helps Vercel.
+**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket.
 
 ### 2. Canonical public origin
 
-Decide the live hostname (`thegamies.gg`) and which host answers it (Vercel, Cloudflare, or one canonical + the other as standby). Then:
+Decide the live hostname (`thegamies.gg`) on Cloudflare. Then:
 
 - DNS + TLS
 - Neon Auth **trusted domains** for that origin (and www if used)
-- `NEXT_PUBLIC_APP_URL` on **both** hosts
-- Redirect the unused host / `workers.dev` / `vercel.app` so cookies, Auth, and share links do not split
+- `NEXT_PUBLIC_APP_URL` on the production Worker
+- Redirect `workers.dev` so cookies, Auth, and share links do not split
 
 Email and OG URLs will be wrong until this is one origin.
 
@@ -75,11 +75,11 @@ Empty browse is a launch-killer.
 - Confirm covers resolve (host `AVATAR_PUBLIC_BASE_URL` from `PRODUCTION_AVATAR_PUBLIC_BASE_URL` is avatars; game art is IGDB CDN)
 - Use separate upload buckets: staging `STAGING_R2_AVATAR_BUCKET` + `STAGING_AVATAR_PUBLIC_BASE_URL`; production `PRODUCTION_R2_AVATAR_BUCKET` + `PRODUCTION_AVATAR_PUBLIC_BASE_URL`
 
-### 5. Edition freeze on both hosts
+### 5. Edition freeze cron
 
-**Shipped:** Vercel Cron hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare Cron Trigger on the OpenNext Worker POSTs the same route via `WORKER_SELF_REFERENCE`. Staging CI injects `CRON_SECRET` onto Vercel and `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
+**Shipped:** Cloudflare Cron Trigger on the OpenNext Worker POSTs `/api/cron/edition-freeze` via `WORKER_SELF_REFERENCE`. Staging CI injects `CRON_SECRET` onto `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
 
-Still confirm `CRON_SECRET` exists in GitHub (and Vercel Production env, which uses `vercel pull`). Without it, Cloudflare’s handler no-ops and events can sit on “calculating” until a schedule write (`after()` kick) or a manual hit.
+Still confirm `CRON_SECRET` exists in GitHub. Without it, Cloudflare’s handler no-ops and events can sit on “calculating” until a schedule write (`after()` kick) or a manual hit.
 
 ### 6. Hide ops from the public product
 
@@ -87,7 +87,7 @@ Still confirm `CRON_SECRET` exists in GitHub (and Vercel Production env, which u
 
 Still open:
 
-- `/design-system` is only hidden from nav on Vercel production; the URL still works and has no `robots: noindex`
+- `/design-system` is hidden from nav on lasting staging/production; the URL still works and has no `robots: noindex`
 - Keep seed tools off the consumer path (or extra-confirm / disable when the app is production)
 
 ### 7. Share + crawl basics
@@ -139,7 +139,7 @@ Confirm these exist on **production** (and staging, where still missing):
 
 ### Observability
 
-- No Sentry / similar. Dual-host means you need **both** Vercel and Worker logs bookmarked, plus Neon + Email Sending delivery.
+- No Sentry / similar. Bookmark Worker logs, plus Neon + Email Sending delivery.
 - No `CHANGELOG.md` / `v0.x` tag yet ([engineering.md](./engineering.md) asked for this at milestones).
 
 ### Tests the engineering bar still wants
@@ -162,8 +162,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 ### Hosting plans
 
-- Vercel **Hobby** caps admin sync ~60s; Pro honors `maxDuration = 300`. Production sync should be CLI anyway.
-- Cloudflare **Workers paid** is assumed for size limits **and** Email Sending.
+- Cloudflare **Workers paid** is assumed for size limits **and** Email Sending. Production catalog sync should be CLI for large runs (Worker request duration caps apply).
 
 ---
 
@@ -187,16 +186,16 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Default favicon / apple-touch if the current `.ico` is a placeholder
 - README “Current status” still reads like a scaffold; retitle when production exists
 - `docs/setup-checklist.md` is still an unchecked wiring list — treat it as the **ops** companion to this doc
-- Dual-host preview check of Auth, list save, community ballot, freeze, and email on **staging** before promote
+- Preview check of Auth, list save, community ballot, freeze, and email on **staging** before promote
 
 ---
 
 ## Suggested order
 
-1. **Production workflow** — migrate, Auth webhook, Vercel Production env parity  
+1. **Production workflow** — migrate, Auth webhook, production secrets  
 2. **Domain + Auth + mail** — one origin, trusted domains, sending + inboxes  
 3. **Catalog** — backfill production, webhooks Worker live  
-4. Confirm `CRON_SECRET` is in GitHub (and Vercel Production) so freeze Cron authorizes on both hosts  
+4. Confirm `CRON_SECRET` is in GitHub so freeze Cron authorizes on the Worker  
 5. **Chrome cleanup** — design-system `noindex` / production 404; seed off production. Site operators are shipped.  
 6. **Share/SEO** — sitemap, robots, OG, error pages  
 7. **Games browse** — pagination (and filters if you want catalog parity)  

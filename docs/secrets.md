@@ -1,13 +1,13 @@
 # Secrets management
 
 **Local:** [Doppler](https://www.doppler.com/) (Developer free plan) via `pnpm dev:secrets`.  
-**Deployed hosts (Vercel / Cloudflare):** GitHub Actions secrets, pushed onto each deploy by CI. No Doppler service token required (Teams-only).
+**Deployed hosts (Cloudflare Workers):** GitHub Actions secrets, pushed onto each deploy by CI. No Doppler service token required (Teams-only).
 
-**CI does not read Doppler.** When app secrets change, **manually import / update them in GitHub Actions secrets**, then re-run the staging (or preview) deploy so hosts pick them up.
+**CI does not read Doppler.** When app secrets change, **manually import / update them in GitHub Actions secrets**, then re-run the staging (or preview) deploy so Workers pick them up.
 
 **Setup checklist (every secret name):** [github-secrets.md](./github-secrets.md).
 
-Deploy credentials (`VERCEL_*`, `CLOUDFLARE_*`, `NEON_*` API keys) also stay in GitHub Actions.
+Deploy credentials (`CLOUDFLARE_*`, `NEON_*` API keys) also stay in GitHub Actions.
 
 ## Doppler (local only)
 
@@ -63,18 +63,17 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 
 | GitHub secret | Becomes | Used by |
 |---|---|---|
-| `STAGING_DATABASE_URL` | `DATABASE_URL` | develop staging (both hosts) |
+| `STAGING_DATABASE_URL` | `DATABASE_URL` | develop staging |
 | `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging (alias: GitHub `NEON_AUTH_BASE_URL` also accepted) |
 | `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
-| `STAGING_VERCEL_APP_URL` | `NEXT_PUBLIC_APP_URL` | Vercel staging only (or use `VERCEL_STAGING_ALIAS`) |
-| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging only |
+| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging |
 | `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Production Cloudflare app Worker + IGDB webhooks Worker. Never `STAGING_DATABASE_URL` |
 | `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Cloudflare app Worker (production Neon Auth URL) |
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Production Cloudflare (alias: GitHub `NEON_AUTH_COOKIE_SECRET`) |
-| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production only |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |
-| `CRON_SECRET` | same | Vercel Cron + Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
+| `CRON_SECRET` | same | Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
 | `IGDB_WEBHOOK_SECRET` | same | Base secret for IGDB webhook slots (`{base}:{entity}:{method}`) — staging/production webhooks Worker `secret bulk` + local register |
@@ -96,8 +95,7 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 
 PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
 
-**Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). IGDB webhooks production bulk still requires `PRODUCTION_DATABASE_URL`. Empty keys are skipped; existing Worker secrets for those keys are left as-is.  
-**Vercel:** Staging CI passes `--env` on each deployment. Production Vercel still uses `vercel pull --environment=production` (set vars on the Vercel project).
+**Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). IGDB webhooks production bulk still requires `PRODUCTION_DATABASE_URL`. Empty keys are skipped; existing Worker secrets for those keys are left as-is.
 
 **Manual import (required):** Copy values into the GitHub secrets above when they change. Free-plan Doppler has no service-token CI path; do not rely on auto-sync for this deploy process.
 
@@ -106,9 +104,7 @@ PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static key
 | Secret | Purpose |
 |---|---|
 | `NEON_API_KEY`, `NEON_PROJECT_ID` | PR database branches |
-| `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` | Vercel deploys |
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | Workers deploys |
-| `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname |
 
 ## Rules
 
@@ -116,4 +112,4 @@ PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static key
 2. **Manually import** app secrets into GitHub when they change — CI never pulls Doppler.
 3. Production DB URL never used for local or PR previews.
 4. PR databases are ephemeral — CI-owned.
-5. After changing GitHub app secrets, re-run the matching deploy (**Staging dual deploy** or production on `main`) so Workers pick them up via `secret bulk`.
+5. After changing GitHub app secrets, re-run the matching deploy (**Staging deploy** or production on `main`) so Workers pick them up via `secret bulk`.

@@ -1,6 +1,6 @@
 # Auth email templates
 
-Branded transactional mail for Neon Auth, sent from the **Cloudflare Worker** (not Vercel). Neon cannot host HTML templates; when a webhook is subscribed, Neon skips its default mail and calls us instead.
+Branded transactional mail for Neon Auth, sent from the **Cloudflare Worker**. Neon cannot host HTML templates; when a webhook is subscribed, Neon skips its default mail and calls us instead.
 
 ## Templates (ported from the prior Gamies)
 
@@ -20,7 +20,7 @@ Copy and layout live in [`src/lib/email/templates.ts`](../src/lib/email/template
 3. The handler verifies the Ed25519 webhook signature against Auth JWKS.
 4. The Worker `EMAIL` binding (`send_email`) sends HTML + plain text.
 
-Vercel does not have that binding. Point the Neon webhook at the Worker URL only.
+Point the Neon webhook at the Worker URL only.
 
 ## Cloudflare
 

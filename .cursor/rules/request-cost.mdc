@@ -10,7 +10,7 @@ Before freezing data, caching, **searching**, or serving lists, ask how the **ho
 ## Check every read path
 
 1. **DB egress** — Does one page view pull a whole blob / full table / full roster when it only needs a page?
-2. **Compute** — Parse/serialize cost on Vercel and Cloudflare Workers for that payload size.
+2. **Compute** — Parse/serialize cost on Cloudflare Workers for that payload size.
 3. **Scaling** — What happens at 10× members/voters/games/traffic? Same pattern still cheap?
 
 ## Prefer

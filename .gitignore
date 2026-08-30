@@ -23,7 +23,6 @@ coverage/
 !.env.example
 
 # Hosting / misc
-.vercel/
 .open-next/
 .wrangler/
 .dev.vars
@@ -39,7 +38,6 @@ yarn-error.log*
 # Local-only reference checkouts (not part of this repo)
 /references/**
 !/references/.gitkeep
-.vercel
 
 # Playwright
 /test-results/

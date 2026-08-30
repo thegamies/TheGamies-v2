@@ -24,7 +24,6 @@
     "deploy:igdb-webhooks:develop": "pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler deploy --env develop",
     "deploy:igdb-webhooks:production": "pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler deploy --env production",
     "upload:cf": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
-    "deploy:vercel": "vercel deploy --yes",
     "deploy:branch": "bash scripts/branch-deploy.sh",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "secrets": "doppler secrets"
@@ -64,7 +63,6 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.3",
     "typescript": "^5",
-    "vercel": "^48.0.0",
     "vitest": "^4.1.10",
     "wrangler": "^4.0.0"
   },

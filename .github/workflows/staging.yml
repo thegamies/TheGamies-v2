@@ -1,4 +1,4 @@
-name: Staging dual deploy
+name: Staging Cloudflare deploy
 
 on:
   push:
@@ -71,108 +71,6 @@ jobs:
               - 'packages/igdb/**'
               - 'packages/db/**'
               - 'pnpm-lock.yaml'
-
-  vercel:
-    needs: migrate
-    runs-on: ubuntu-latest
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-      skipped: ${{ steps.guard.outputs.skipped }}
-    steps:
-      - id: guard
-        run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "Vercel secrets missing; skipping staging Vercel deploy."
-          else
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/checkout@v4
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.6.3
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - if: steps.guard.outputs.skipped == 'false'
-        run: pnpm install --frozen-lockfile
-      - if: steps.guard.outputs.skipped == 'false'
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-          NEON_AUTH_BASE_URL: ${{ secrets.STAGING_NEON_AUTH_BASE_URL || secrets.NEON_AUTH_BASE_URL }}
-          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
-          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
-          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
-          IGDB_WEBHOOKS_WORKER_URL: ${{ secrets.IGDB_WEBHOOKS_WORKER_URL }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_AVATAR_BUCKET: ${{ secrets.STAGING_R2_AVATAR_BUCKET || secrets.R2_AVATAR_BUCKET }}
-          AVATAR_PUBLIC_BASE_URL: ${{ secrets.STAGING_AVATAR_PUBLIC_BASE_URL || secrets.AVATAR_PUBLIC_BASE_URL }}
-          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
-          STAGING_VERCEL_APP_URL: ${{ secrets.STAGING_VERCEL_APP_URL }}
-          VERCEL_STAGING_ALIAS: ${{ secrets.VERCEL_STAGING_ALIAS }}
-        run: |
-          mkdir -p .vercel
-          printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
-          pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
-
-          if [ -z "$NEON_AUTH_BASE_URL" ]; then
-            echo "::warning::NEON_AUTH_BASE_URL empty — set GitHub secret STAGING_NEON_AUTH_BASE_URL (or NEON_AUTH_BASE_URL)"
-          fi
-          if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
-            echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set GitHub secret NEON_AUTH_COOKIE_SECRET"
-          fi
-
-          # Host-specific public URL (dual deploy ? not a shared STAGING_APP_URL)
-          if [ -n "$STAGING_VERCEL_APP_URL" ]; then
-            NEXT_PUBLIC_APP_URL="$STAGING_VERCEL_APP_URL"
-          elif [ -n "$VERCEL_STAGING_ALIAS" ]; then
-            NEXT_PUBLIC_APP_URL="https://${VERCEL_STAGING_ALIAS}"
-          else
-            NEXT_PUBLIC_APP_URL=""
-          fi
-
-          if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
-            IGDB_WEBHOOKS_WORKER_URL="https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev"
-          fi
-
-          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET CRON_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET IGDB_WEBHOOKS_WORKER_URL R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
-            val="${!key}"
-            if [ -n "$val" ]; then
-              ARGS+=(--env "${key}=${val}")
-            fi
-          done
-          if [ -n "$NEXT_PUBLIC_APP_URL" ]; then
-            ARGS+=(--env "NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}")
-          fi
-          DEPLOY_OUT=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr)
-          URL=$(echo "$DEPLOY_OUT" | grep -oE 'https://[^ ]+\.vercel\.app' | tail -n1)
-          if [ -z "$URL" ]; then
-            URL=$(echo "$DEPLOY_OUT" | tail -n1)
-          fi
-          if [ -n "$VERCEL_STAGING_ALIAS" ] && [ -n "$URL" ]; then
-            pnpm exec vercel alias set "$URL" "$VERCEL_STAGING_ALIAS" --token="$VERCEL_TOKEN" --scope "$VERCEL_ORG_ID" || true
-            echo "Aliased to $VERCEL_STAGING_ALIAS"
-          fi
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "### Vercel staging" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Deployment: $URL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Secrets: GitHub Actions ? deployment env" >> "$GITHUB_STEP_SUMMARY"
-          if [ -n "$VERCEL_STAGING_ALIAS" ]; then
-            echo "- Alias: https://$VERCEL_STAGING_ALIAS" >> "$GITHUB_STEP_SUMMARY"
-          fi
 
   cloudflare:
     needs: migrate
@@ -306,7 +204,7 @@ jobs:
           echo "### Cloudflare staging" >> "$GITHUB_STEP_SUMMARY"
           echo "- Worker: \`$WORKER\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- URL: $URL" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Secrets: GitHub Actions ? wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Secrets: GitHub Actions → wrangler secret bulk" >> "$GITHUB_STEP_SUMMARY"
 
   igdb_webhooks:
     needs: [migrate, changes]
@@ -423,7 +321,7 @@ jobs:
           esac
 
   summary:
-    needs: [migrate, vercel, cloudflare, igdb_webhooks, auth_email]
+    needs: [migrate, cloudflare, igdb_webhooks, auth_email]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -431,8 +329,6 @@ jobs:
         env:
           MIGRATE_SKIPPED: ${{ needs.migrate.outputs.skipped }}
           MIGRATE_RESULT: ${{ needs.migrate.result }}
-          VERCEL_URL: ${{ needs.vercel.outputs.url }}
-          VERCEL_SKIPPED: ${{ needs.vercel.outputs.skipped }}
           CF_URL: ${{ needs.cloudflare.outputs.url }}
           CF_SKIPPED: ${{ needs.cloudflare.outputs.skipped }}
           IGDB_RESULT: ${{ needs.igdb_webhooks.result }}
@@ -449,11 +345,6 @@ jobs:
               echo "| Migrate | applied | \`pnpm db:migrate\` on staging Neon |"
             else
               echo "| Migrate | $MIGRATE_RESULT | |"
-            fi
-            if [ "$VERCEL_SKIPPED" = "true" ]; then
-              echo "| Vercel | skipped | |"
-            else
-              echo "| Vercel | deployed | $VERCEL_URL |"
             fi
             if [ "$CF_SKIPPED" = "true" ]; then
               echo "| Cloudflare | skipped | |"
@@ -472,6 +363,5 @@ jobs:
             echo ""
             echo "Stable Cloudflare worker: \`thegamies-v2-develop\`."
             echo "App secrets from GitHub: \`STAGING_DATABASE_URL\`, \`STAGING_NEON_AUTH_BASE_URL\`, \`NEON_AUTH_COOKIE_SECRET\`, \`ADMIN_SYNC_SECRET\`, \`CRON_SECRET\`, \`IGDB_CLIENT_ID\`, \`IGDB_CLIENT_SECRET\`, \`IGDB_WEBHOOKS_WORKER_URL\`."
-            echo "Per-host public URL: \`STAGING_VERCEL_APP_URL\` (or \`VERCEL_STAGING_ALIAS\`) and \`STAGING_CF_APP_URL\`."
-            echo "Optional: \`VERCEL_STAGING_ALIAS\`."
+            echo "Public URL: \`STAGING_CF_APP_URL\`."
           } >> "$GITHUB_STEP_SUMMARY"

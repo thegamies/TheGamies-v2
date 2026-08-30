@@ -1,4 +1,4 @@
-name: Production dual deploy
+name: Production Cloudflare deploy
 
 on:
   push:
@@ -9,41 +9,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  vercel:
-    runs-on: ubuntu-latest
-    steps:
-      - id: guard
-        run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "Vercel secrets missing; skipping production Vercel deploy."
-          else
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/checkout@v4
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.6.3
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - if: steps.guard.outputs.skipped == 'false'
-        run: pnpm install --frozen-lockfile
-      - if: steps.guard.outputs.skipped == 'false'
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: |
-          mkdir -p .vercel
-          printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
-          pnpm exec vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-          pnpm exec vercel deploy --prod --yes --token="$VERCEL_TOKEN"
-
   cloudflare:
     runs-on: ubuntu-latest
     steps:

@@ -14,7 +14,7 @@ Internal catalog: [`/design-system`](/design-system)
 
 Shows tokens, type, **person identity**, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **promo banner**, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
 
-**Dev nav:** The account menu (and signed-out mobile drawer) includes a **Design system** link in local development and Vercel preview. Hidden on production (`VERCEL_ENV=production`). Other hosts can opt in with `SHOW_DESIGN_SYSTEM=1`.
+**Dev nav:** The account menu (and signed-out mobile drawer) includes a **Design system** link in local development and PR / branch Worker previews (`*.workers.dev`). Hidden on lasting staging and production (including `thegamies.gg` and `thegamies-v2-develop`). `SHOW_DESIGN_SYSTEM=1` does **not** override lasting hosts.
 
 ## No one-offs
 

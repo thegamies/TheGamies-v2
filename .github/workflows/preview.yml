@@ -1,4 +1,4 @@
-name: Dual host previews
+name: Cloudflare previews
 
 on:
   pull_request:
@@ -81,83 +81,6 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
         run: pnpm db:migrate
-
-  vercel:
-    if: github.event.action != 'closed'
-    needs: [neon, migrate]
-    runs-on: ubuntu-latest
-    outputs:
-      url: ${{ steps.deploy.outputs.url }}
-      skipped: ${{ steps.guard.outputs.skipped }}
-    steps:
-      - id: guard
-        run: |
-          if [ -z "${{ secrets.VERCEL_TOKEN }}" ] || [ -z "${{ secrets.VERCEL_ORG_ID }}" ] || [ -z "${{ secrets.VERCEL_PROJECT_ID }}" ]; then
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-            echo "Vercel secrets missing; skipping Vercel preview."
-          else
-            echo "skipped=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/checkout@v4
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.6.3
-      - if: steps.guard.outputs.skipped == 'false'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-      - if: steps.guard.outputs.skipped == 'false'
-        run: pnpm install --frozen-lockfile
-      - if: steps.guard.outputs.skipped == 'false' && needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
-        id: db
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-        run: |
-          chmod +x scripts/ci/neon-database-url.sh
-          URL=$(scripts/ci/neon-database-url.sh "$BRANCH_ID")
-          echo "::add-mask::$URL"
-          echo "database_url=$URL" >> "$GITHUB_OUTPUT"
-      - if: steps.guard.outputs.skipped == 'false'
-        id: deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
-          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
-          ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
-          IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
-          IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_AVATAR_BUCKET: ${{ secrets.STAGING_R2_AVATAR_BUCKET || secrets.R2_AVATAR_BUCKET }}
-          AVATAR_PUBLIC_BASE_URL: ${{ secrets.STAGING_AVATAR_PUBLIC_BASE_URL || secrets.AVATAR_PUBLIC_BASE_URL }}
-          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
-        run: |
-          if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
-            echo "DATABASE_URL is empty for Neon preview branch; refusing to deploy." >&2
-            exit 1
-          fi
-          mkdir -p .vercel
-          printf '%s\n' "{\"orgId\":\"${VERCEL_ORG_ID}\",\"projectId\":\"${VERCEL_PROJECT_ID}\"}" > .vercel/project.json
-          pnpm exec vercel pull --yes --environment=preview --token="$VERCEL_TOKEN"
-          ARGS=(deploy --yes --token="$VERCEL_TOKEN")
-          for key in DATABASE_URL NEON_AUTH_BASE_URL NEON_AUTH_COOKIE_SECRET ADMIN_SYNC_SECRET IGDB_CLIENT_ID IGDB_CLIENT_SECRET R2_ACCOUNT_ID R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_AVATAR_BUCKET AVATAR_PUBLIC_BASE_URL NEXT_PUBLIC_GA_MEASUREMENT_ID; do
-            val="${!key}"
-            if [ -n "$val" ]; then
-              ARGS+=(--env "${key}=${val}")
-            fi
-          done
-          URL=$(pnpm exec vercel "${ARGS[@]}" | tee /dev/stderr | tail -n1)
-          echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "Vercel preview: $URL"
 
   cloudflare:
     if: github.event.action != 'closed'
@@ -277,7 +200,7 @@ jobs:
 
   auth_domains:
     if: github.event.action != 'closed'
-    needs: [neon, vercel, cloudflare]
+    needs: [neon, cloudflare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -287,16 +210,13 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-          VERCEL_URL: ${{ needs.vercel.outputs.url }}
           CF_URL: ${{ needs.cloudflare.outputs.url }}
         run: |
           chmod +x scripts/ci/register-neon-auth-domains.sh
           ARGS=("$BRANCH_ID")
-          for raw in "$VERCEL_URL" "$CF_URL"; do
-            case "$raw" in
-              https://*|http://*) ARGS+=("$raw") ;;
-            esac
-          done
+          case "$CF_URL" in
+            https://*|http://*) ARGS+=("$CF_URL") ;;
+          esac
           if [ "${#ARGS[@]}" -gt 1 ]; then
             scripts/ci/register-neon-auth-domains.sh "${ARGS[@]}"
           else
@@ -322,7 +242,7 @@ jobs:
 
   comment:
     if: github.event.action != 'closed'
-    needs: [neon, migrate, vercel, cloudflare, auth_domains]
+    needs: [neon, migrate, cloudflare, auth_domains]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -333,21 +253,18 @@ jobs:
           script: |
             const neonSkipped = '${{ needs.neon.outputs.skipped }}' === 'true';
             const migrateSkipped = '${{ needs.migrate.outputs.skipped }}' === 'true';
-            const vercelSkipped = '${{ needs.vercel.outputs.skipped }}' === 'true';
             const cfSkipped = '${{ needs.cloudflare.outputs.skipped }}' === 'true';
-            const vercelUrl = '${{ needs.vercel.outputs.url }}' || '(not deployed)';
             const cfUrl = '${{ needs.cloudflare.outputs.url }}' || '(not deployed)';
             const body = [
-              '## Dual-host previews',
+              '## Cloudflare preview',
               '',
               `| Host | Status | URL |`,
               `| --- | --- | --- |`,
               `| Neon branch | ${neonSkipped ? 'skipped (secrets)' : 'ready'} | \`preview/pr-${{ github.event.pull_request.number }}\` |`,
               `| Migrate | ${migrateSkipped ? 'skipped' : 'applied'} | catalog schema |`,
-              `| Vercel | ${vercelSkipped ? 'skipped (secrets)' : 'deployed'} | ${vercelUrl} |`,
               `| Cloudflare | ${cfSkipped ? 'skipped (secrets)' : 'deployed'} | ${cfUrl} |`,
               '',
-              'Neon Auth: each preview DB branch gets its own Auth URL (`NEON_AUTH_BASE_URL`). CI registers the Vercel + Cloudflare origins as trusted domains on that branch, and points Auth email webhooks at the Cloudflare Worker so branded reset mail stays on that preview.',
+              'Neon Auth: each preview DB branch gets its own Auth URL (`NEON_AUTH_BASE_URL`). CI registers the Cloudflare origin as a trusted domain on that branch, and points Auth email webhooks at the Cloudflare Worker so branded reset mail stays on that preview.',
               '',
               '_Configure secrets listed in `docs/deployment.md` to enable deploys._',
             ].join('\n');
@@ -356,8 +273,9 @@ jobs:
               repo: context.repo.repo,
               issue_number: context.issue.number,
             });
-            const marker = '## Dual-host previews';
-            const existing = comments.find(c => c.user?.type === 'Bot' && c.body?.includes(marker));
+            const marker = '## Cloudflare preview';
+            const legacyMarker = '## Dual-host previews';
+            const existing = comments.find(c => c.user?.type === 'Bot' && (c.body?.includes(marker) || c.body?.includes(legacyMarker)));
             if (existing) {
               await github.rest.issues.updateComment({
                 owner: context.repo.owner,

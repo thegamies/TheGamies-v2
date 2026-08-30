@@ -18,14 +18,7 @@ describe("skipEmailVerification", () => {
     expect(
       skipEmailVerification({
         NODE_ENV: "development",
-        VERCEL_ENV: "preview",
-      }),
-    ).toBe(false);
-    expect(
-      skipEmailVerification({
-        NODE_ENV: "development",
-        VERCEL: "1",
-        NEXT_PUBLIC_APP_URL: "https://thegamies-v2-pr-12.vercel.app",
+        CF_PAGES: "1",
       }),
     ).toBe(false);
     expect(

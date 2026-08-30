@@ -8,11 +8,18 @@ import {
 } from "./site-nav";
 
 describe("showDesignSystemNav", () => {
-  it("hides on Vercel production", () => {
+  it("hides on lasting production and staging hosts", () => {
     expect(
       showDesignSystemNav({
-        vercelEnv: "production",
         nodeEnv: "production",
+        appUrl: "https://thegamies.gg",
+        showDesignSystem: "1",
+      }),
+    ).toBe(false);
+    expect(
+      showDesignSystemNav({
+        nodeEnv: "production",
+        appUrl: "https://thegamies-v2-develop.ecdm981.workers.dev",
         showDesignSystem: "1",
       }),
     ).toBe(false);
@@ -26,25 +33,23 @@ describe("showDesignSystemNav", () => {
     ).toBe(true);
   });
 
-  it("shows on Vercel preview", () => {
+  it("shows on PR preview Workers", () => {
     expect(
       showDesignSystemNav({
-        vercelEnv: "preview",
         nodeEnv: "production",
+        appUrl: "https://thegamies-v2-pr-12.ecdm981.workers.dev",
       }),
     ).toBe(true);
   });
 
-  it("requires opt-in outside preview and development", () => {
+  it("requires opt-in when app URL is unknown", () => {
     expect(
       showDesignSystemNav({
-        vercelEnv: undefined,
         nodeEnv: "production",
       }),
     ).toBe(false);
     expect(
       showDesignSystemNav({
-        vercelEnv: undefined,
         nodeEnv: "production",
         showDesignSystem: "1",
       }),
