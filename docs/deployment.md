@@ -33,7 +33,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 | `.github/workflows/preview.yml` | Neon branch + Cloudflare PR preview |
 | `.github/workflows/branch-deploy.yml` | On-demand Cloudflare deploy for any git ref |
 | `.github/workflows/staging.yml` | Push to `develop` → lasting staging Worker |
-| `.github/workflows/production.yml` | Push to `main` → production Worker |
+| `.github/workflows/production.yml` | Push to `main` → production Worker; also **Actions → Production Cloudflare deploy → Run workflow** (pick `main`) |
 
 ## Cloudflare notes
 
@@ -185,16 +185,18 @@ You do **not** need one Neon Auth project per preview host. One Neon project, ma
 ## Production flow (`main`)
 
 ```text
-Push / merge to main
+Push / merge to main  —or—  Actions → Production Cloudflare deploy → Run workflow (branch: main)
   → migrate: pnpm db:migrate against PRODUCTION_DATABASE_URL (required; fails if missing)
   → cloudflare: deploy Worker thegamies-v2
        (.dev.vars for build + wrangler secret bulk for runtime; never STAGING_*)
   → igdb-webhooks: wrangler deploy thegamies-igdb-webhooks when paths change
+       (or when workflow_dispatch checks force_igdb_webhooks;
+        secret bulk only if sync_igdb_webhook_secrets)
 ```
 
-1. Promote `develop` → `main` via PR.
+1. Promote `develop` → `main` via PR — or re-run production from Actions on `main` after changing GitHub secrets (e.g. Auth URL).
 2. CI migrates production Neon, then deploys `thegamies-v2`. Empty `PRODUCTION_DATABASE_URL` fails the workflow (no silent skip).
-3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change (after migrate).
+3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change (after migrate), or when manual run enables force deploy.
 4. Neon production branch only — never point `PRODUCTION_DATABASE_URL` at the develop branch.
 
 ## Environment variables

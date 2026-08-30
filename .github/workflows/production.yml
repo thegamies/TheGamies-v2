@@ -3,6 +3,16 @@ name: Production Cloudflare deploy
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_igdb_webhooks:
+        description: Deploy IGDB webhooks Worker even if paths did not change
+        type: boolean
+        default: false
+      sync_igdb_webhook_secrets:
+        description: Also secret-bulk the production webhooks Worker (creates a second deploy)
+        type: boolean
+        default: false
 
 concurrency:
   group: production-deploy
@@ -187,7 +197,10 @@ jobs:
 
   igdb_webhooks:
     needs: [migrate, changes]
-    if: needs.changes.outputs.igdb_webhooks == 'true'
+    if: >
+      needs.changes.outputs.igdb_webhooks == 'true' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.event.inputs.force_igdb_webhooks == 'true')
     runs-on: ubuntu-latest
     steps:
       - id: guard
@@ -256,8 +269,8 @@ jobs:
           pnpm deploy:igdb-webhooks:production
 
           # secret bulk publishes a second version. Code deploy keeps existing
-          # secrets. Set SYNC_IGDB_WEBHOOK_SECRETS=true on the job env to rotate.
-          if [ "${SYNC_IGDB_WEBHOOK_SECRETS:-}" = "true" ] && [ -n "$DATABASE_URL" ] && [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
+          # secrets. Opt in via workflow_dispatch sync_igdb_webhook_secrets.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ github.event.inputs.sync_igdb_webhook_secrets }}" = "true" ] && [ -n "$DATABASE_URL" ] && [ -s "$RUNNER_TEMP/igdb-webhooks-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/igdb-webhooks-secrets.json")" != "{}" ]; then
             pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler secret bulk "$RUNNER_TEMP/igdb-webhooks-secrets.json" --env production
           else
             echo "Skipping wrangler secret bulk (existing Worker secrets are kept)."
