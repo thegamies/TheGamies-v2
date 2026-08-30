@@ -102,8 +102,10 @@ Configure on the repo:
 | `R2_ACCOUNT_ID` | Cloudflare account for avatar R2 |
 | `R2_ACCESS_KEY_ID` | R2 access key |
 | `R2_SECRET_ACCESS_KEY` | R2 secret key |
-| `R2_AVATAR_BUCKET` | Avatar bucket (same as the prior Gamies) |
-| `AVATAR_PUBLIC_BASE_URL` | Public base URL for avatar objects |
+| `R2_AVATAR_BUCKET` / `STAGING_R2_AVATAR_BUCKET` | Staging / preview upload bucket (prefer `STAGING_*`) |
+| `AVATAR_PUBLIC_BASE_URL` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview public base (prefer `STAGING_*`) |
+| `PRODUCTION_R2_AVATAR_BUCKET` | Production upload bucket (host env `R2_AVATAR_BUCKET`) |
+| `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production public base (host env `AVATAR_PUBLIC_BASE_URL`) |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public; both hosts). Unset = no gtag |
 | `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname; also used as public URL if `STAGING_VERCEL_APP_URL` unset |
 

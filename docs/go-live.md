@@ -43,7 +43,7 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 - Point Neon Auth email webhooks at the production Worker
 - Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
 
-**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, and shared keys (`CRON_SECRET`, R2, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*`. Confirm Vercel Production env vars independently — `vercel pull` only helps Vercel.
+**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket. Confirm Vercel Production env vars independently — `vercel pull` only helps Vercel.
 
 ### 2. Canonical public origin
 
@@ -72,7 +72,8 @@ Empty browse is a launch-killer.
 
 - Backfill + enrich the production catalog (CLI; admin HTTP will time out on large enrich)
 - Deploy **production** IGDB webhooks Worker + queue + KV (CI deploys code when webhook paths change; first-time Queue/KV + `PRODUCTION_DATABASE_URL` bulk still need to exist); set `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` on GitHub so the production app Worker gets it; register slots from `/admin/webhooks` on production only
-- Confirm covers resolve (`AVATAR_PUBLIC_BASE_URL` is avatars; game art is IGDB CDN)
+- Confirm covers resolve (host `AVATAR_PUBLIC_BASE_URL` from `PRODUCTION_AVATAR_PUBLIC_BASE_URL` is avatars; game art is IGDB CDN)
+- Use separate upload buckets: staging `STAGING_R2_AVATAR_BUCKET` + `STAGING_AVATAR_PUBLIC_BASE_URL`; production `PRODUCTION_R2_AVATAR_BUCKET` + `PRODUCTION_AVATAR_PUBLIC_BASE_URL`
 
 ### 5. Edition freeze on both hosts
 
@@ -110,7 +111,8 @@ Confirm these exist on **production** (and staging, where still missing):
 | `CRON_SECRET` | Freeze cron |
 | `IGDB_WEBHOOKS_WORKER_URL` + `IGDB_WEBHOOK_SECRET` | Catalog freshness |
 | `NEON_API_KEY` + `NEON_PROJECT_ID` on the **app** | Account deletion can reuse email |
-| `R2_*` + `AVATAR_PUBLIC_BASE_URL` | Avatars / community art |
+| `R2_*` account/keys + `STAGING_R2_AVATAR_BUCKET` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview uploads |
+| `PRODUCTION_R2_AVATAR_BUCKET` + `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production uploads (separate bucket) |
 | `AUTH_EMAIL_FROM` | From-address if not the default |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Only if you want analytics on day one |
 | `ADMIN_SYNC_SECRET` | Ops; rotate if it ever leaked in a screenshot |

@@ -83,8 +83,8 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
-          AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          R2_AVATAR_BUCKET: ${{ secrets.PRODUCTION_R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.PRODUCTION_AVATAR_PUBLIC_BASE_URL }}
           NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
           NEXT_PUBLIC_APP_URL: ${{ secrets.PRODUCTION_CF_APP_URL }}
           AUTH_EMAIL_FROM: ${{ secrets.AUTH_EMAIL_FROM }}
@@ -104,6 +104,12 @@ jobs:
           fi
           if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
             echo "::warning::PRODUCTION_IGDB_WEBHOOKS_WORKER_URL empty — not falling back to staging webhook URL"
+          fi
+          if [ -z "$R2_AVATAR_BUCKET" ]; then
+            echo "::warning::PRODUCTION_R2_AVATAR_BUCKET empty — production uploads need a dedicated bucket (not STAGING_R2_AVATAR_BUCKET)"
+          fi
+          if [ -z "$AVATAR_PUBLIC_BASE_URL" ]; then
+            echo "::warning::PRODUCTION_AVATAR_PUBLIC_BASE_URL empty — set the production CDN/public base for uploads"
           fi
 
           : > .dev.vars

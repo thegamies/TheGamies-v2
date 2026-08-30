@@ -62,7 +62,7 @@ Work top to bottom.
 ## 4. GitHub (app secrets for deploys)
 
 - [ ] Add deploy credentials: `NEON_*`, `VERCEL_*`, `CLOUDFLARE_*`
-- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `CRON_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `IGDB_WEBHOOK_SECRET`, plus avatar R2 keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_AVATAR_BUCKET`, `AVATAR_PUBLIC_BASE_URL`), plus `NEXT_PUBLIC_GA_MEASUREMENT_ID` when Analytics should run, plus optional `AUTH_EMAIL_FROM` for branded Auth mail
+- [ ] **Manually import** app secrets into GitHub (from Doppler `dev` or your notes): `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `CRON_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, `IGDB_WEBHOOK_SECRET`, plus R2 account/keys (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`), staging upload location (`STAGING_R2_AVATAR_BUCKET`, `STAGING_AVATAR_PUBLIC_BASE_URL`), production upload location (`PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`), plus `NEXT_PUBLIC_GA_MEASUREMENT_ID` when Analytics should run, plus optional `AUTH_EMAIL_FROM` for branded Auth mail
 - [ ] Production Cloudflare (never reuse `STAGING_*`): `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` (optional `PRODUCTION_NEON_AUTH_COOKIE_SECRET`)
 - [ ] Optional per-host public URLs: `STAGING_CF_APP_URL`, `STAGING_VERCEL_APP_URL` (or `VERCEL_STAGING_ALIAS`)
 - [ ] Re-run **Staging dual deploy** on `develop` after importing or changing secrets

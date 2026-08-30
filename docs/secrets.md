@@ -81,11 +81,15 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `IGDB_WEBHOOKS_WORKER_URL` | same | Staging app → develop webhook Worker. Staging CI injects onto the app (defaults to `https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev` if unset) |
 | `IGDB_WEBHOOK_QUEUE_ID` | Worker var (per env) | Queue UUID for pause/resume (`igdb-webhooks-develop` vs `igdb-webhooks`) |
 | `CLOUDFLARE_API_TOKEN` | Worker secret | Queues Edit token used by the webhook Worker to pull/ack (may reuse deploy token if scoped) |
-| `R2_ACCOUNT_ID` | same | avatar uploads (Cloudflare R2) |
-| `R2_ACCESS_KEY_ID` | same | avatar uploads |
+| `R2_ACCOUNT_ID` | same | avatar uploads (Cloudflare R2; shared account is fine) |
+| `R2_ACCESS_KEY_ID` | same | avatar uploads (token must reach both staging and production buckets) |
 | `R2_SECRET_ACCESS_KEY` | same | avatar uploads |
-| `R2_AVATAR_BUCKET` | same | avatar bucket (same name as the prior Gamies) |
-| `AVATAR_PUBLIC_BASE_URL` | same | public CDN base for `avatars/{id}/avatar.jpg` |
+| `R2_AVATAR_BUCKET` | same | Legacy alias for `STAGING_R2_AVATAR_BUCKET` |
+| `AVATAR_PUBLIC_BASE_URL` | same | Legacy alias for `STAGING_AVATAR_PUBLIC_BASE_URL` |
+| `STAGING_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | **staging / preview** upload bucket |
+| `STAGING_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | **staging / preview** public CDN base |
+| `PRODUCTION_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | **production** upload bucket (separate from staging) |
+| `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | **production** public CDN base |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | GA4 measurement id (public; inlined at build). Unset = no analytics |
 | `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From address (default `The Gamies <noreply@thegamies.gg>`) |
 | `NEON_API_KEY`, `NEON_PROJECT_ID` | same | Optional on the app: close Auth directory users (Console → Auth → Users). Also used in CI for PR branches. |

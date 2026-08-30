@@ -185,8 +185,8 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
-          AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          R2_AVATAR_BUCKET: ${{ secrets.STAGING_R2_AVATAR_BUCKET || secrets.R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.STAGING_AVATAR_PUBLIC_BASE_URL || secrets.AVATAR_PUBLIC_BASE_URL }}
           NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
         run: |
           if [ "${{ needs.neon.outputs.skipped }}" != "true" ] && [ -z "$DATABASE_URL" ]; then
@@ -263,8 +263,8 @@ jobs:
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_AVATAR_BUCKET: ${{ secrets.R2_AVATAR_BUCKET }}
-          AVATAR_PUBLIC_BASE_URL: ${{ secrets.AVATAR_PUBLIC_BASE_URL }}
+          R2_AVATAR_BUCKET: ${{ secrets.STAGING_R2_AVATAR_BUCKET || secrets.R2_AVATAR_BUCKET }}
+          AVATAR_PUBLIC_BASE_URL: ${{ secrets.STAGING_AVATAR_PUBLIC_BASE_URL || secrets.AVATAR_PUBLIC_BASE_URL }}
           NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ secrets.NEXT_PUBLIC_GA_MEASUREMENT_ID }}
           AUTH_EMAIL_FROM: ${{ secrets.AUTH_EMAIL_FROM }}
           WORKER: ${{ needs.prepare.outputs.worker }}

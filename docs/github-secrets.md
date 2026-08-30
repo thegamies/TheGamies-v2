@@ -27,7 +27,7 @@ Without these, host jobs skip:
 | `NEON_API_KEY` | Create/delete PR Neon branches; Auth domain registration |
 | `NEON_PROJECT_ID` | Same |
 
-Also needed on preview deploys if you want those features to work: `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, R2 set (below). Preview `DATABASE_URL` / Auth URL come from the Neon branch CI creates — do not put production DB URLs here.
+Also needed on preview deploys if you want those features to work: `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, staging R2 bucket/base (`STAGING_R2_AVATAR_BUCKET`, `STAGING_AVATAR_PUBLIC_BASE_URL`) plus shared R2 account/keys. Preview `DATABASE_URL` / Auth URL come from the Neon branch CI creates — do not put production DB URLs here.
 
 ## Staging (`develop`)
 
@@ -45,11 +45,11 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `IGDB_CLIENT_SECRET` | same | Twitch / IGDB |
 | `IGDB_WEBHOOK_SECRET` | same | Webhook slot base (`{base}:{entity}:{method}`) |
 | `IGDB_WEBHOOKS_WORKER_URL` | same | Staging app → develop webhook Worker. Optional; CI defaults to `https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev` |
-| `R2_ACCOUNT_ID` | same | Avatar uploads |
-| `R2_ACCESS_KEY_ID` | same | Avatar uploads |
+| `R2_ACCOUNT_ID` | same | Avatar uploads (account can be shared with production) |
+| `R2_ACCESS_KEY_ID` | same | Avatar uploads (token must reach the staging bucket) |
 | `R2_SECRET_ACCESS_KEY` | same | Avatar uploads |
-| `R2_AVATAR_BUCKET` | same | Avatar bucket name |
-| `AVATAR_PUBLIC_BASE_URL` | same | Public CDN base for avatars |
+| `STAGING_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | Staging / preview upload bucket. Alias: `R2_AVATAR_BUCKET` if unset |
+| `STAGING_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | Staging / preview public CDN base. Alias: `AVATAR_PUBLIC_BASE_URL` if unset |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional. Unset = no analytics |
 | `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From |
 
@@ -69,15 +69,15 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `IGDB_CLIENT_ID` | same | Shared |
 | `IGDB_CLIENT_SECRET` | same | Shared |
 | `IGDB_WEBHOOK_SECRET` | same | Shared base; slot URLs differ per env |
-| `R2_ACCOUNT_ID` | same | Shared (same bucket unless you split later) |
-| `R2_ACCESS_KEY_ID` | same | Shared |
+| `R2_ACCOUNT_ID` | same | Shared account id (same Cloudflare account is fine) |
+| `R2_ACCESS_KEY_ID` | same | Shared (token must reach the **production** bucket) |
 | `R2_SECRET_ACCESS_KEY` | same | Shared |
-| `R2_AVATAR_BUCKET` | same | Shared |
-| `AVATAR_PUBLIC_BASE_URL` | same | Shared |
+| `PRODUCTION_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | **Production-only** upload bucket. Never the staging bucket |
+| `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | **Production-only** public CDN base |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional |
 | `AUTH_EMAIL_FROM` | same | Optional |
 
-**Vercel Production** does **not** get these from GitHub. Set Production env on the Vercel project (CI uses `vercel pull --environment=production`).
+**Vercel Production** does **not** get these from GitHub. Set Production env on the Vercel project (CI uses `vercel pull --environment=production`), including the production R2 bucket + public base.
 
 ## Same value, two GitHub names (staging vs production)
 
@@ -89,8 +89,10 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `NEXT_PUBLIC_APP_URL` (Cloudflare) | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
 | `NEXT_PUBLIC_APP_URL` (Vercel) | `STAGING_VERCEL_APP_URL` / `VERCEL_STAGING_ALIAS` | Vercel dashboard (not GitHub) |
 | `IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` |
+| `R2_AVATAR_BUCKET` | `STAGING_R2_AVATAR_BUCKET` (or `R2_AVATAR_BUCKET`) | `PRODUCTION_R2_AVATAR_BUCKET` |
+| `AVATAR_PUBLIC_BASE_URL` | `STAGING_AVATAR_PUBLIC_BASE_URL` (or `AVATAR_PUBLIC_BASE_URL`) | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` |
 
-Shared names (`CRON_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_*`, R2, GA, `AUTH_EMAIL_FROM`) are one GitHub secret used by both lasting environments.
+Shared names (`CRON_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_*`, R2 account/keys, GA, `AUTH_EMAIL_FROM`) are one GitHub secret used by both lasting environments. **Upload bucket and public base are not shared.**
 
 ## Not GitHub secrets
 
