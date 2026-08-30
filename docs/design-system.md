@@ -12,7 +12,7 @@ Visual cues were mined from the local `goty` prototype (`references/visual-proto
 
 Internal catalog: [`/design-system`](/design-system)
 
-Shows tokens, type, **person identity**, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
+Shows tokens, type, **person identity**, controls (buttons, radios, year / date / time pickers, dialog), **navigation levels**, section rules, standing cards, **rank / votes / title layout settings**, horizontal scroll, covers, rank markers, **promo banner**, **ballot** (chapter header, overlay search, category picks), skeletons, and empty/loading/error patterns as they are approved.
 
 **Dev nav:** The account menu (and signed-out mobile drawer) includes a **Design system** link in local development and Vercel preview. Hidden on production (`VERCEL_ENV=production`). Other hosts can opt in with `SHOW_DESIGN_SYSTEM=1`.
 
@@ -151,7 +151,7 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 
 ## Bespoke identity components
 
-Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, `CookieConsentBanner`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`, `UserAvatar` / `PersonIdentity`.
+Shipped: `GameCover`, `RankMarker`, `Button`, `Radio` / `RadioOption`, `YearPicker` / `DatePicker` / `TimePicker` / `DateTimePicker`, `Select`, `Dialog`, skeleton family, `SectionRule`, `HorizontalScroll`, `FitDisplayTitle`, `navLevels`, `YearSelect`, `NavigationProgress`, `StandingGameCard` / `WinnerPodium`, `RankedStandingBillboard`, `BallotRankGrid`, `CommunityHeader` / `CommunityNav`, `CommunityEventsOverview`, `PromoBanner`, `EditionSectionHeader`, `EditionRevealView`, `EditionGotyHighlights` / `EditionCategoriesHighlights`, `LiveStandingsBoard` / `LiveCategoriesPanel`, `BallotChapterHeader`, `GameSearchField`, `CategoryPickCard` / `CategoryVoteHeading`, `CategoryVotesEditor`, `PinnedSaveBar`, `CookieConsentBanner`, list `ShareMenuDialog` / `SaveSignInDialog` / `ShareLinkSignInDialog`, `UserAvatar` / `PersonIdentity`.
 
 ## People
 
@@ -229,6 +229,7 @@ Skeletons use `--panel` / `--line`, hard edges, and a light pulse — not shimme
 - Horizontal strips (GOTY / category Comparison, category Ranked): hide scrollbars; edge fade when more content; desktop drag-to-pan (click still works — drag starts after a short move). Arrow controls optional (`showArrowControls`, off by default). Touch/trackpad native scroll. Do not remap vertical wheel to horizontal. Comparison strips keep headers with each chapter’s table. GOTY Ranked must fit 360 without sideways scroll.
 - Homepage / all-years GOTY strips: card width is `min(--standing-fill-card-max`, visible-count size). `--standing-fill-min-visible` (temporary admin setting, decimals allowed) keeps at least that many covers in view and peeks the next; a wide screen still fits five.
 - Homepage **Big Picture** hero: cover marquees sit under a transparent site nav; tagline + Browse games / Communities overlay the bottom of the wall. Covers from IGDB catalog **popularity** for the current and previous year (same sort as `/games`). Soft side/bottom fade into paper (no hard rule); pauses under `prefers-reduced-motion`.
+- Homepage TGA band and community Events list use shared `PromoBanner`: heavy title, orange brush, status + CTA, outlined year watermark. Stays a banner on mobile (meta bar, stacked year), not a stacked card. Copy comes from `tgaPromoCopy` / `editionPromoCopy`.
 
 ## Fixtures that mocks must cover
 

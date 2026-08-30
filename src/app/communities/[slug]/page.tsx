@@ -26,7 +26,7 @@ import {
   isCommunityPublic,
 } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { getCommunityTgaPromoYear } from "@/lib/tga-pickem/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
 import { MembershipActions } from "./MembershipActions";
@@ -105,9 +105,11 @@ export default async function CommunityHomePage({
       ? featuredEdition.status
       : (overviewEditions[0]?.status ?? null);
   const showCreateEvent = canManage && editions.length === 0;
-  const tgaEnabled =
-    isMember &&
-    (await communityTgaNavVisible(community.id).catch(() => false));
+  const tgaPromo = isMember
+    ? await getCommunityTgaPromoYear(community.id).catch(() => null)
+    : null;
+  const tgaEnabled = Boolean(tgaPromo);
+  const showOverviewPromos = overviewEditions.length > 0 || Boolean(tgaPromo);
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -124,6 +126,7 @@ export default async function CommunityHomePage({
         }
         communityId={community.id}
         tgaEnabled={tgaEnabled}
+        tgaYear={tgaPromo?.year ?? null}
         active="overview"
         invitePath={
           isMember
@@ -162,40 +165,42 @@ export default async function CommunityHomePage({
         </section>
       ) : (
         <>
-          {overviewEditions.length > 0 ? (
+          {showOverviewPromos || showCreateEvent ? (
             <div className="mt-10">
-              <CommunityEventsOverview
-                slug={community.slug}
-                editions={overviewEditions}
-              />
+              {showOverviewPromos ? (
+                <CommunityEventsOverview
+                  slug={community.slug}
+                  editions={overviewEditions}
+                  tga={tgaPromo}
+                />
+              ) : null}
+              {showCreateEvent ? (
+                <section className={showOverviewPromos ? "mt-10" : ""}>
+                  <h2 className="font-display text-3xl tracking-wide text-ink">
+                    {EDITION_PUBLIC_LABEL}
+                  </h2>
+                  <p className="mt-4 max-w-xl text-sm text-muted">
+                    Create an event to open a yearly awards vote.
+                  </p>
+                  <p className="mt-6">
+                    <Link
+                      href={communityCreateEventHref(community.slug)}
+                      className="inline-flex items-center justify-center rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold tracking-wide text-ink transition-[color,border-color] duration-[var(--motion-fast)] hover:border-accent"
+                    >
+                      Create event
+                    </Link>
+                  </p>
+                </section>
+              ) : null}
             </div>
-          ) : showCreateEvent ? (
-            <section className="mt-10">
-              <h2 className="font-display text-3xl tracking-wide text-ink">
-                {EDITION_PUBLIC_LABEL}
-              </h2>
-              <p className="mt-4 max-w-xl text-sm text-muted">
-                Create an event to open a yearly awards vote.
-              </p>
-              <p className="mt-6">
-                <Link
-                  href={communityCreateEventHref(community.slug)}
-                  className="inline-flex items-center justify-center rounded-[var(--radius-control)] border border-line px-4 py-2 text-sm font-semibold tracking-wide text-ink transition-[color,border-color] duration-[var(--motion-fast)] hover:border-accent"
-                >
-                  Create event
-                </Link>
-              </p>
-            </section>
           ) : null}
 
-          {overviewEditions.length > 0 || showCreateEvent ? (
+          {showOverviewPromos || showCreateEvent ? (
             <SectionRule className="mt-10 mb-8" />
           ) : null}
 
           <section
-            className={
-              overviewEditions.length > 0 || showCreateEvent ? "" : "mt-10"
-            }
+            className={showOverviewPromos || showCreateEvent ? "" : "mt-10"}
           >
             <h2 className="font-display text-3xl tracking-wide text-ink">
               About

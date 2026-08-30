@@ -7,7 +7,10 @@ import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
 import { GameGotyRankingsFixture } from "@/app/design-system/GameGotyRankingsFixture";
 import { GameMediaFixture } from "@/app/design-system/GameMediaFixture";
 import { StandingCardLayoutFixture } from "@/app/design-system/StandingCardLayoutFixture";
+import { CommunityEventsOverview } from "@/components/communities/CommunityEventsOverview";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { PromoBanner } from "@/components/promo/PromoBanner";
+import { tgaPromoCopyForStatus } from "@/lib/tga-pickem/promo";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionYearSelect } from "@/components/communities/EditionYearSelect";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
@@ -417,6 +420,50 @@ export default function DesignSystemPage() {
             />
             <MastheadResultsFixture />
           </div>
+        </div>
+      </Section>
+
+      <Section title="Promo banner">
+        <p className="mb-6 max-w-2xl text-sm text-muted">
+          Shared home Pick’em band and community Events promo. Status copy
+          changes; the year stays a watermark. Mobile keeps a banner, not a
+          stacked card.
+        </p>
+        <div className="grid gap-3">
+          <PromoBanner
+            kind="tga"
+            year={2025}
+            href="/the-game-awards/2025"
+            {...tgaPromoCopyForStatus("locked")}
+          />
+          <PromoBanner
+            kind="tga"
+            year={2026}
+            href="/the-game-awards/2026"
+            {...tgaPromoCopyForStatus("open", {
+              enabled: true,
+              showStartsAt: new Date("2026-12-11T01:00:00.000Z"),
+            })}
+          />
+          <CommunityEventsOverview
+            slug="example"
+            tga={{
+              year: 2025,
+              enabled: true,
+              showStartsAt: new Date("2025-12-11T01:00:00.000Z"),
+            }}
+            editions={[
+              {
+                year: 2026,
+                status: "open",
+                closesAt: new Date("2026-12-15T18:00:00.000Z"),
+              },
+              {
+                year: 2025,
+                status: "published",
+              },
+            ]}
+          />
         </div>
       </Section>
 

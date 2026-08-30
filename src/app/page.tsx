@@ -18,9 +18,10 @@ import {
 } from "@/lib/site-settings/service";
 import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
 import { publicPageMetadata, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
+import { PromoBanner } from "@/components/promo/PromoBanner";
+import { tgaPromoCopy } from "@/lib/tga-pickem/promo";
 import { getPromotedTgaYear } from "@/lib/tga-pickem/service";
-import { picksAreOpen } from "@/lib/tga-pickem/status";
-import Link from "next/link";
+import type { TgaYearSchedule } from "@/lib/tga-pickem/status";
 
 export const metadata = {
   ...publicPageMetadata({
@@ -57,7 +58,7 @@ export default async function HomePage() {
   }> = [];
   let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   let bigPictureGames: HomeBigPictureGame[] = [];
-  let tgaBand: { year: number; open: boolean } | null = null;
+  let tgaBand: (TgaYearSchedule & { year: number }) | null = null;
 
   try {
     const settings = await getSiteSettings();
@@ -76,7 +77,12 @@ export default async function HomePage() {
         getPromotedTgaYear().catch(() => null),
       ]);
     if (promotedTga) {
-      tgaBand = { year: promotedTga.year, open: picksAreOpen(promotedTga) };
+      tgaBand = {
+        year: promotedTga.year,
+        enabled: promotedTga.enabled,
+        opensAt: promotedTga.opensAt,
+        showStartsAt: promotedTga.showStartsAt,
+      };
     }
     bigPictureGames = popular;
     const winnersByYear = new Map(
@@ -109,7 +115,12 @@ export default async function HomePage() {
   if (!tgaBand) {
     const promotedTga = await getPromotedTgaYear().catch(() => null);
     if (promotedTga) {
-      tgaBand = { year: promotedTga.year, open: picksAreOpen(promotedTga) };
+      tgaBand = {
+        year: promotedTga.year,
+        enabled: promotedTga.enabled,
+        opensAt: promotedTga.opensAt,
+        showStartsAt: promotedTga.showStartsAt,
+      };
     }
   }
 
@@ -117,24 +128,13 @@ export default async function HomePage() {
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] pb-6 pt-0 sm:pb-8">
       <HomeBigPictureBanner games={bigPictureGames} />
       {tgaBand ? (
-        <section className="border-b border-line py-8">
-          <p className="text-xs uppercase tracking-[0.2em] text-muted">
-            Video Game Awards Pick’em
-          </p>
-          <h2 className="mt-2 font-display text-4xl tracking-wide text-ink">
-            {tgaBand.year}
-          </h2>
-          <p className="mt-2 max-w-xl text-muted">
-            {tgaBand.open
-              ? "Picks are open. Call every category before the show starts."
-              : "Follow the live board as the show calls winners."}
-          </p>
-          <Link
+        <section className="border-b border-line py-6 sm:py-8">
+          <PromoBanner
+            kind="tga"
+            year={tgaBand.year}
             href={`/the-game-awards/${tgaBand.year}`}
-            className="mt-4 inline-block text-sm font-semibold text-accent hover:opacity-80"
-          >
-            Open Video Game Awards Pick’em
-          </Link>
+            {...tgaPromoCopy(tgaBand)}
+          />
         </section>
       ) : null}
 

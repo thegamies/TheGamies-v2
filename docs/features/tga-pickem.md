@@ -18,7 +18,7 @@ Status is **computed** when the year is **On** (`draft` → `scheduled` → `ope
 |---|---|
 | **On / Off** | Public game hidden when Off. Data stays. |
 | **Go live** | Turns On and sets picks-open to now. Requires a complete slate. Does not Promote. |
-| **Promote** | Primary nav + homepage band. One year at a time. Requires On + complete slate. |
+| **Promote** | Primary nav + homepage `PromoBanner`. One year at a time. Requires On + complete slate. Copy follows year status: coming soon / picks open / live results. |
 
 On but not promoted: URL works (soft launch / archive).
 
@@ -32,7 +32,7 @@ On but not promoted: URL works (soft launch / archive).
 - **Load 2025 winners** calls the official 2025 winners on the current slate and scores existing sheets.
 - **Copy categories** copies labels, descriptions, order, and kind only.
 
-Picks lock at **show start**. Admin calls winners in the show room. Each call patches score rows for that category (SQL), then leaderboards page those rows. The public and community ballots mark the winner plus Correct / Incorrect on your pick after picks lock. While picks are open, called winners stay hidden. Your ballot shows the viewer’s score and rank (one score-row lookup). World Premieres official count is a separate tie-break (absolute difference).
+Picks lock at **show start**. Admin calls winners in the show room. Each call patches score rows for that category (SQL), then leaderboards page those rows. The public and community ballots mark the winner plus Correct / Incorrect on your pick after picks lock. While picks are open, called winners stay hidden and Standings does not show places or points. Your ballot shows the viewer’s score and rank after lock (one score-row lookup). World Premieres official count is a separate tie-break (absolute difference).
 
 ## Scoring
 

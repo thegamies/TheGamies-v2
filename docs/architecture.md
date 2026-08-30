@@ -51,6 +51,7 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 - Search: server endpoint or Postgres function
 - Social cards: generated Open Graph images
 - Ranking pages: read from precomputed aggregate tables (not live recalculation of everything)
+- Site operators: `/admin` is a tool grid. `/admin/database` lists table, index, and toast sizes (catalog stats only — not row dumps)
 - Do not use `export const runtime = "edge"` — unsupported with OpenNext Cloudflare
 
 ## Environments

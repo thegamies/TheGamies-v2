@@ -47,12 +47,12 @@ export function picksAreOpen(
   return computeTgaStatus(year, now) === "open";
 }
 
-/** Official calls stay hidden while people can still change picks. */
+/** Official calls and scored standings only after the show starts. */
 export function revealTgaWinners(
   year: TgaYearSchedule,
   now: Date = new Date(),
 ): boolean {
-  return !picksAreOpen(year, now);
+  return computeTgaStatus(year, now) === "locked";
 }
 
 export function publicYearVisible(year: { enabled: boolean }): boolean {

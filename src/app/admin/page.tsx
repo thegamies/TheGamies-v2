@@ -15,6 +15,11 @@ const ADMIN_LINKS = [
     description: "Make or remove people who can use these tools.",
   },
   {
+    href: "/admin/database",
+    title: "Database size",
+    description: "Table, index, and toast sizes for the live database.",
+  },
+  {
     href: "/admin/sync",
     title: "Catalog sync",
     description: "Import and enrich the game catalog.",
@@ -72,17 +77,17 @@ export default async function AdminIndexPage() {
           <p className="mt-3 max-w-2xl text-muted">
             Site operations tools.
           </p>
-          <ul className="mt-10 max-w-xl divide-y divide-line border-y border-line">
+          <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {ADMIN_LINKS.map((item) => (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className="block py-5 transition-colors hover:text-accent"
+                  className="block h-full border border-line px-5 py-5 transition-colors hover:border-accent"
                 >
                   <span className="font-display text-2xl tracking-wide text-ink">
                     {item.title}
                   </span>
-                  <p className="mt-1 text-sm text-muted">{item.description}</p>
+                  <p className="mt-2 text-sm text-muted">{item.description}</p>
                 </Link>
               </li>
             ))}

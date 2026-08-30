@@ -4,6 +4,7 @@ import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import { TGA_STANDINGS_OPEN_COPY } from "@/lib/tga-pickem/labels";
 import { publicPageMetadata } from "@/lib/seo/site";
 import {
   getSiteViewerStanding,
@@ -16,7 +17,7 @@ import {
   maskTgaBallotWinners,
 } from "@/lib/tga-pickem/service";
 import { getSiteSheet } from "@/lib/tga-pickem/sheets";
-import { picksAreOpen, tgaStatusLabel } from "@/lib/tga-pickem/status";
+import { picksAreOpen, revealTgaWinners, tgaStatusLabel } from "@/lib/tga-pickem/status";
 import {
   parseTgaSheetUsername,
   parseTgaYearView,
@@ -70,6 +71,7 @@ export default async function TgaYearPage({
   const page = Number(first(sp.page) ?? 1);
   const path = `/the-game-awards/${year}`;
   const open = picksAreOpen(slate);
+  const reveal = revealTgaWinners(slate);
   const years = await listTgaYears().then((rows) =>
     rows.filter((row) => row.enabled),
   );
@@ -108,19 +110,21 @@ export default async function TgaYearPage({
           year={year}
           path={path}
           page={page}
+          reveal={reveal}
           sheetHref={
-            open
-              ? undefined
-              : (username) => tgaYearHref(path, { view: "sheet", username })
+            reveal
+              ? (username) => tgaYearHref(path, { view: "sheet", username })
+              : undefined
           }
         />
-      ) : view === "sheet" && sheetUsername && !open ? (
+      ) : view === "sheet" && sheetUsername && reveal ? (
         <TgaSiteSheet year={year} path={path} username={sheetUsername} />
       ) : (
         <TgaBallot
           year={year}
           profileId={profile?.id ?? null}
           open={open}
+          reveal={reveal}
         />
       )}
     </main>
@@ -131,26 +135,28 @@ async function TgaBallot({
   year,
   profileId,
   open,
+  reveal,
 }: {
   year: number;
   profileId: string | null;
   open: boolean;
+  reveal: boolean;
 }) {
   const [ballot, sheet, standing] = await Promise.all([
     listTgaBallot(year),
     profileId
       ? getSiteSheet(profileId, year)
       : Promise.resolve({ picks: {}, worldPremieresGuess: null }),
-    profileId && !open
+    profileId && reveal
       ? getSiteViewerStanding(year, profileId)
       : Promise.resolve(null),
   ]);
 
   return (
     <section className="mt-2">
-      {profileId && !open ? <TgaBallotScore standing={standing} /> : null}
+      {profileId && reveal ? <TgaBallotScore standing={standing} /> : null}
       <TgaBallotForm
-        categories={open ? maskTgaBallotWinners(ballot) : ballot}
+        categories={reveal ? ballot : maskTgaBallotWinners(ballot)}
         initialPicks={sheet.picks}
         initialGuess={sheet.worldPremieresGuess}
         locked={!open}
@@ -167,13 +173,26 @@ async function TgaStandings({
   year,
   path,
   page,
+  reveal,
   sheetHref,
 }: {
   year: number;
   path: string;
   page: number;
+  reveal: boolean;
   sheetHref?: (username: string) => string;
 }) {
+  if (!reveal) {
+    return (
+      <TgaLeaderboard
+        rows={[]}
+        page={1}
+        totalPages={1}
+        pageHref={(next) => tgaYearHref(path, { view: "standings", page: next })}
+        emptyCopy={TGA_STANDINGS_OPEN_COPY}
+      />
+    );
+  }
   const board = await listSiteLeaderboard(
     year,
     Number.isInteger(page) ? page : 1,

@@ -75,6 +75,9 @@ describe("visibility helpers", () => {
       opensAt: new Date("2026-12-01T00:00:00.000Z"),
       showStartsAt: new Date("2026-12-11T00:00:00.000Z"),
     };
+    expect(revealTgaWinners(year, new Date("2026-11-01T00:00:00.000Z"))).toBe(
+      false,
+    );
     expect(revealTgaWinners(year, new Date("2026-12-05T00:00:00.000Z"))).toBe(
       false,
     );

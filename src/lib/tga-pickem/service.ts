@@ -12,6 +12,8 @@ import {
 } from "@thegamies/db";
 import { YEAR_PICKER_MAX, YEAR_PICKER_MIN } from "@/lib/ui/calendar-year";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
+import { pickCommunityTgaPromoYear } from "@/lib/tga-pickem/promo";
+import type { TgaYearSchedule } from "@/lib/tga-pickem/status";
 import { seedCategoryRows, TGA_2025_CATEGORIES } from "./category-seed";
 import {
   nomineeSearchTitles,
@@ -877,6 +879,39 @@ export async function setCommunityTgaOptIn(
       );
   }
   return { ok: true };
+}
+
+export type CommunityTgaPromoYear = TgaYearSchedule & { year: number };
+
+/** Opted-in enabled year for overview promo + nav. Promoted first, else newest. */
+export async function getCommunityTgaPromoYear(
+  communityId: string,
+  db: Db = getDb(),
+): Promise<CommunityTgaPromoYear | null> {
+  const rows = await db
+    .select({
+      year: tgaYears.year,
+      enabled: tgaYears.enabled,
+      opensAt: tgaYears.opensAt,
+      showStartsAt: tgaYears.showStartsAt,
+      promoted: tgaYears.promoted,
+    })
+    .from(tgaCommunityYears)
+    .innerJoin(tgaYears, eq(tgaYears.year, tgaCommunityYears.year))
+    .where(
+      and(
+        eq(tgaCommunityYears.communityId, communityId),
+        eq(tgaYears.enabled, true),
+      ),
+    );
+  const picked = pickCommunityTgaPromoYear(rows);
+  if (!picked) return null;
+  return {
+    year: picked.year,
+    enabled: picked.enabled,
+    opensAt: picked.opensAt,
+    showStartsAt: picked.showStartsAt,
+  };
 }
 
 export async function communityTgaNavVisible(

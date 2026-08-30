@@ -30,7 +30,8 @@ import {
 } from "@/lib/tga-pickem/service";
 import { listTgaCommunityHostRoster } from "@/lib/tga-pickem/community-hosts";
 import { getCommunitySheet } from "@/lib/tga-pickem/sheets";
-import { picksAreOpen, tgaStatusLabel } from "@/lib/tga-pickem/status";
+import { TGA_STANDINGS_OPEN_COPY } from "@/lib/tga-pickem/labels";
+import { picksAreOpen, revealTgaWinners, tgaStatusLabel } from "@/lib/tga-pickem/status";
 import {
   parseTgaBoardMode,
   parseTgaSheetUsername,
@@ -95,18 +96,19 @@ export default async function CommunityTgaYearPage({
   const page = Number(pageRaw ?? 1);
   const path = `/communities/${slug}/the-game-awards/${year}`;
   const open = picksAreOpen(slate);
+  const reveal = revealTgaWinners(slate);
   const [featured, tgaNav] = await Promise.all([
     getFeaturedEditionForCommunity(community.id).catch(() => null),
     communityTgaNavVisible(community.id).catch(() => true),
   ]);
   const sheetOwner =
-    view === "sheet" && sheetUsername && !open
+    view === "sheet" && sheetUsername && reveal
       ? await getProfileByUsername(sheetUsername)
       : null;
-  if (view === "sheet" && !open && !sheetOwner) notFound();
+  if (view === "sheet" && reveal && !sheetOwner) notFound();
   const [ballot, board, sheet, standing, yearHosts] = await Promise.all([
     view === "ballot" || view === "sheet" ? listTgaBallot(year) : Promise.resolve([]),
-    view === "standings"
+    view === "standings" && reveal
       ? listCommunityLeaderboard(
           community.id,
           year,
@@ -119,7 +121,7 @@ export default async function CommunityTgaYearPage({
       : view === "sheet" && sheetOwner
         ? getCommunitySheet(community.id, sheetOwner.id, year)
         : Promise.resolve({ picks: {}, worldPremieresGuess: null }),
-    view === "ballot" && !open
+    view === "ballot" && reveal
       ? getCommunityViewerStanding(community.id, year, profile.id)
       : Promise.resolve(null),
     view === "settings"
@@ -164,6 +166,16 @@ export default async function CommunityTgaYearPage({
             year={year}
             members={yearHosts}
           />
+        ) : view === "standings" && !reveal ? (
+          <TgaLeaderboard
+            rows={[]}
+            page={1}
+            totalPages={1}
+            pageHref={(next) =>
+              tgaYearHref(path, { view: "standings", page: next })
+            }
+            emptyCopy={TGA_STANDINGS_OPEN_COPY}
+          />
         ) : view === "standings" && board ? (
           <>
             <TgaBoardToggle path={path} mode={boardMode} />
@@ -178,10 +190,8 @@ export default async function CommunityTgaYearPage({
                   page: next,
                 })
               }
-              sheetHref={
-                open
-                  ? undefined
-                  : (username) => tgaYearHref(path, { view: "sheet", username })
+              sheetHref={(username) =>
+                tgaYearHref(path, { view: "sheet", username })
               }
               emptyCopy={
                 boardMode === "voices"
@@ -190,7 +200,7 @@ export default async function CommunityTgaYearPage({
               }
             />
           </>
-        ) : view === "sheet" && sheetOwner && !open ? (
+        ) : view === "sheet" && sheetOwner && reveal ? (
           <TgaPublicSheet
             displayName={sheetOwner.displayName}
             username={sheetOwner.username}
@@ -202,12 +212,10 @@ export default async function CommunityTgaYearPage({
           />
         ) : (
           <>
-            {!open ? (
-              <TgaBallotScore standing={standing} />
-            ) : null}
+            {reveal ? <TgaBallotScore standing={standing} /> : null}
             <TgaBallotForm
               categories={
-                open ? maskTgaBallotWinners(ballot) : ballot
+                reveal ? ballot : maskTgaBallotWinners(ballot)
               }
               initialPicks={sheet.picks}
               initialGuess={sheet.worldPremieresGuess}
