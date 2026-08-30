@@ -9,10 +9,13 @@ import { assertIgdbGame, assertIgdbCover, assertIgdbArtwork } from "./webhook-ap
 import {
   clampDrainSettings,
   clampDeliveryMode,
+  clampLogRetentionHours,
+  combineLogRetentionParts,
   desiredQueueOpen,
   drainBatchSize,
   drainVisibilityTimeoutMs,
   isDrainLocked,
+  isWebhookLogAutoCleanupEnabled,
   parseDrainContinue,
   parseDrainHop,
   parseDrainLock,
@@ -23,6 +26,7 @@ import {
   shouldPauseAutoAfterBatch,
   shouldRunDrain,
   isDrainPullExhausted,
+  splitLogRetentionHours,
   WORKER_DRAIN_BATCH_CEILING,
 } from "./webhook-settings";
 import { timingSafeEqualString } from "./timing-safe";
@@ -154,7 +158,18 @@ describe("drain settings", () => {
       lastDrainAt: null,
       forceOpenUntil: null,
       drainPending: false,
+      logRetentionHours: 7 * 24,
+      lastLogCleanupAt: null,
     });
+  });
+
+  it("clamps log retention and gates hourly truncate", () => {
+    expect(clampLogRetentionHours(-1)).toBe(0);
+    expect(clampLogRetentionHours(99 * 24)).toBe(90 * 24);
+    expect(combineLogRetentionParts(2, 5)).toBe(53);
+    expect(splitLogRetentionHours(53)).toEqual({ days: 2, hours: 5 });
+    expect(isWebhookLogAutoCleanupEnabled(0)).toBe(false);
+    expect(isWebhookLogAutoCleanupEnabled(1)).toBe(true);
   });
 
   it("accepts live processing mode", () => {

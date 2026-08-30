@@ -23,6 +23,7 @@ const applyGames = vi.mocked(applyGameCreateUpdates);
 type UpdatePatch = {
   status?: string;
   error?: string | null;
+  payload?: unknown;
 };
 
 function createMockDb(options: {
@@ -153,6 +154,7 @@ describe("processWebhookEnvelope", () => {
     expect(inserts).toHaveLength(0);
     expect(apply).toHaveBeenCalledTimes(1);
     expect(updates.at(-1)?.status).toBe("processed");
+    expect(updates.at(-1)?.payload).toBeNull();
   });
 
   it("returns processed when apply succeeds even if status write fails", async () => {
@@ -293,5 +295,21 @@ describe("reprocessWebhookEvent", () => {
       status: "processed",
     });
     expect(apply).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("truncateWebhookEvents", () => {
+  it("runs truncate on the event log table", async () => {
+    const { truncateWebhookEvents } = await import("./webhook-events");
+    const statements: unknown[] = [];
+    const db = {
+      execute: async (query: unknown) => {
+        statements.push(query);
+        return { rows: [] };
+      },
+    } as unknown as Db;
+
+    await truncateWebhookEvents(db);
+    expect(statements).toHaveLength(1);
   });
 });

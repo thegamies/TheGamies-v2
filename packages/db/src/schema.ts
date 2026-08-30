@@ -283,7 +283,7 @@ export const syncRuns = pgTable("sync_runs", {
   finishedAt: timestamp("finished_at", { mode: "date" }),
 });
 
-/** IGDB webhook deliveries — written during queue drain, not on ingress. */
+/** IGDB webhook deliveries — log rows; payload cleared after successful apply. */
 export const igdbWebhookEvents = pgTable(
   "igdb_webhook_events",
   {

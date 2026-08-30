@@ -16,6 +16,8 @@ type DrainSettings = {
   maxMessagesPerDrain: number;
   paused: boolean;
   lastDrainAt: string | null;
+  logRetentionHours: number;
+  lastLogCleanupAt: string | null;
 };
 
 type WebhookSlot = {
@@ -57,6 +59,9 @@ function formatTime(value: string | Date | null | undefined): string {
   return new Date(value).toLocaleString();
 }
 
+/** Non-zero KV value enables hourly truncate; keep a stable default when on. */
+const HOURLY_LOG_CLEAR_ON = 7 * 24;
+
 export function AdminWebhooksClient() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -71,6 +76,7 @@ export function AdminWebhooksClient() {
   const [deliveryMode, setDeliveryMode] = useState<"auto" | "open" | "closed">(
     "auto",
   );
+  const [hourlyLogClear, setHourlyLogClear] = useState(true);
 
   const [overview, setOverview] = useState<RegistrationOverview | null>(null);
   const [events, setEvents] = useState<WebhookEvent[]>([]);
@@ -94,6 +100,7 @@ export function AdminWebhooksClient() {
     setProcessingMode(json.settings.processingMode ?? "queued");
     setIntervalMinutes(String(json.settings.intervalMinutes));
     setDeliveryMode(json.settings.deliveryMode ?? (json.settings.paused ? "closed" : "auto"));
+    setHourlyLogClear((json.settings.logRetentionHours ?? HOURLY_LOG_CLEAR_ON) > 0);
   }, []);
 
   const loadRegistrations = useCallback(async () => {
@@ -165,6 +172,7 @@ export function AdminWebhooksClient() {
           processingMode,
           intervalMinutes: Number(intervalMinutes),
           deliveryMode,
+          logRetentionHours: hourlyLogClear ? HOURLY_LOG_CLEAR_ON : 0,
         }),
       });
       const json = (await res.json().catch(() => null)) as {
@@ -186,6 +194,7 @@ export function AdminWebhooksClient() {
         json.settings.deliveryMode ??
           (json.settings.paused ? "closed" : "auto"),
       );
+      setHourlyLogClear((json.settings.logRetentionHours ?? HOURLY_LOG_CLEAR_ON) > 0);
       setMessage("Processing settings saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save settings.");
@@ -216,6 +225,37 @@ export function AdminWebhooksClient() {
       await refreshAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open delivery.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cleanupOldLogs() {
+    setBusy(true);
+    setMessage(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/webhooks/events/cleanup", {
+        method: "POST",
+      });
+      const json = (await res.json().catch(() => null)) as {
+        skipped?: boolean;
+        reason?: string;
+        truncated?: boolean;
+        error?: string;
+      } | null;
+      if (!res.ok) {
+        throw new Error(json?.error ?? "Could not clear event logs.");
+      }
+      if (json?.skipped) {
+        throw new Error("Could not clear event logs.");
+      }
+      setMessage("Event log cleared.");
+      await refreshAll();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not clear event logs.",
+      );
     } finally {
       setBusy(false);
     }
@@ -510,6 +550,33 @@ export function AdminWebhooksClient() {
           <p className="text-xs text-muted">
             Last opened: {formatTime(settings?.lastDrainAt)}
           </p>
+
+          <fieldset className="space-y-3 border-t border-line pt-4">
+            <legend className="text-sm text-muted">Event log cleanup</legend>
+            <p className="text-sm text-muted">
+              Clears every event log row. Failed deliveries you still need to
+              reprocess should be handled before a clear.
+            </p>
+            <label className="flex items-start gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={hourlyLogClear}
+                onChange={(e) => setHourlyLogClear(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-semibold">Clear hourly</span>
+                <span className="mt-0.5 block text-muted">
+                  Empty the event log once an hour. Turn off to keep rows until
+                  you clear them manually.
+                </span>
+              </span>
+            </label>
+            <p className="text-xs text-muted">
+              Last cleared: {formatTime(settings?.lastLogCleanupAt)}
+            </p>
+          </fieldset>
+
           <div className="flex flex-wrap gap-3">
             <Button type="submit" disabled={busy}>
               Save settings
@@ -521,6 +588,14 @@ export function AdminWebhooksClient() {
               onClick={() => void drainNow()}
             >
               Open delivery now
+            </Button>
+            <Button
+              type="button"
+              variant="bordered"
+              disabled={busy}
+              onClick={() => void cleanupOldLogs()}
+            >
+              Clear event logs
             </Button>
           </div>
         </form>

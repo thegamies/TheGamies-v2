@@ -91,7 +91,7 @@ Register IGDB slots only from that env’s `/admin/webhooks` so callbacks stay o
 
 ## Logs (develop)
 
-Workers Logs is on for `thegamies-igdb-webhooks-develop` only (not production). Cron writes a JSON line with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"`.
+Workers Logs is on for `thegamies-igdb-webhooks-develop` only (not production). Cron writes a JSON line with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"` (minute) or `"event":"log-cleanup"` (hourly).
 
 Dashboard: Workers & Pages → `thegamies-igdb-webhooks-develop` → Logs.
 
@@ -113,5 +113,8 @@ The Worker `queue()` handler applies each batch (`max_concurrency: 10`, `max_bat
 
 Saving settings PATCHes `delivery_paused` immediately. `POST /internal/drain` resumes delivery (409 if Closed) and marks the queue as still draining. In Auto, that stays open until cron sees fewer than 25 messages waiting.
 
-`Failed query: <sql>` on a failed event is usually a dropped Neon HTTP call. The event log stores the underlying cause when present. Reprocess works for pending and failed.
+## Event log cleanup
 
+A separate **hourly** cron (`0 * * * *`) **truncates** `igdb_webhook_events` when auto cleanup is enabled (KV `logRetentionHours` > 0). Minute cron never opens Neon for this. Admin **Clear event logs** always truncates. `POST /admin/events/cleanup` on the Worker.
+
+`Failed query: <sql>` on a failed event is usually a dropped Neon HTTP call. The event log stores the underlying cause when present. Successful apply clears `payload`; Reprocess works for pending and failed until the table is truncated.

@@ -38,6 +38,10 @@ export async function writeDrainSettings(
       input.drainPending !== undefined
         ? input.drainPending
         : current.drainPending,
+    lastLogCleanupAt:
+      input.lastLogCleanupAt !== undefined
+        ? input.lastLogCleanupAt
+        : current.lastLogCleanupAt,
   });
   await kv.put(WEBHOOK_SETTINGS_KV_KEY, JSON.stringify(next));
   return next;

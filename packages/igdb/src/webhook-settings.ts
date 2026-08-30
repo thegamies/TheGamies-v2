@@ -18,6 +18,13 @@ export type WebhookDrainSettings = {
   forceOpenUntil: string | null;
   /** Queue still has work; Auto stays open until the backlog is empty. */
   drainPending: boolean;
+  /**
+   * When > 0, hourly cron truncates `igdb_webhook_events`. `0` disables
+   * automatic truncate (manual clear still works).
+   */
+  logRetentionHours: number;
+  /** Last successful log truncate (cron or admin). */
+  lastLogCleanupAt: string | null;
 };
 
 export type WebhookDrainLock = {
@@ -34,7 +41,46 @@ export const DEFAULT_WEBHOOK_DRAIN_SETTINGS: WebhookDrainSettings = {
   lastDrainAt: null,
   forceOpenUntil: null,
   drainPending: false,
+  /** Non-zero enables hourly truncate (value is the on/off gate, not an age cutoff). */
+  logRetentionHours: 7 * 24,
+  lastLogCleanupAt: null,
 };
+
+export const WEBHOOK_LOG_CLEANUP_CRON = "0 * * * *";
+
+export function clampLogRetentionHours(value: unknown): number {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) {
+    return DEFAULT_WEBHOOK_DRAIN_SETTINGS.logRetentionHours;
+  }
+  return Math.min(90 * 24, Math.max(0, Math.floor(raw)));
+}
+
+/** True when hourly truncate should run (any positive retention setting). */
+export function isWebhookLogAutoCleanupEnabled(
+  retentionHours: number,
+): boolean {
+  return clampLogRetentionHours(retentionHours) > 0;
+}
+
+export function splitLogRetentionHours(totalHours: number): {
+  days: number;
+  hours: number;
+} {
+  const n = clampLogRetentionHours(totalHours);
+  return { days: Math.floor(n / 24), hours: n % 24 };
+}
+
+export function combineLogRetentionParts(
+  days: unknown,
+  hours: unknown,
+): number {
+  const d = Number(days);
+  const h = Number(hours);
+  const dayPart = Number.isFinite(d) ? Math.max(0, Math.floor(d)) : 0;
+  const hourPart = Number.isFinite(h) ? Math.max(0, Math.floor(h)) : 0;
+  return clampLogRetentionHours(dayPart * 24 + hourPart);
+}
 
 export const WEBHOOK_SETTINGS_KV_KEY = "drain";
 export const WEBHOOK_DRAIN_LOCK_KV_KEY = "drain-lock";
@@ -182,6 +228,12 @@ export function clampDrainSettings(
         ? input.forceOpenUntil
         : null,
     drainPending: Boolean(input.drainPending),
+    logRetentionHours: clampLogRetentionHours(input.logRetentionHours),
+    lastLogCleanupAt:
+      typeof input.lastLogCleanupAt === "string" ||
+      input.lastLogCleanupAt === null
+        ? input.lastLogCleanupAt
+        : null,
   };
 }
 

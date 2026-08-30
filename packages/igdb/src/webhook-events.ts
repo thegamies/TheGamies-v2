@@ -128,6 +128,7 @@ async function markEvent(
     status: WebhookEventStatus;
     error: string | null;
     processedAt: Date;
+    payload?: null;
   },
 ): Promise<void> {
   await db
@@ -140,6 +141,7 @@ async function markProcessed(db: Db, eventId: string): Promise<void> {
   const patch = {
     status: "processed" as const,
     error: null,
+    payload: null,
     processedAt: new Date(),
   };
   try {
@@ -219,6 +221,7 @@ async function markProcessedMany(db: Db, eventIds: string[]): Promise<void> {
   const patch = {
     status: "processed" as const,
     error: null,
+    payload: null,
     processedAt: new Date(),
   };
   try {
@@ -557,4 +560,11 @@ export async function reprocessWebhookEvent(
 
   await markProcessed(db, eventId);
   return { status: "processed" };
+}
+
+/**
+ * Empty `igdb_webhook_events`. Faster and cheaper on Neon than batched DELETE.
+ */
+export async function truncateWebhookEvents(db: Db): Promise<void> {
+  await db.execute(sql`truncate table igdb_webhook_events`);
 }

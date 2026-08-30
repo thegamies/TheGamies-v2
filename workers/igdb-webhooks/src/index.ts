@@ -2,6 +2,7 @@ import {
   deleteIgdbWebhook,
   fetchWebhookRegistrationOverview,
   clampWebhookEventSort,
+  isWebhookLogAutoCleanupEnabled,
   listWebhookEvents,
   planAutoQueueDelivery,
   processWebhookBatch,
@@ -12,8 +13,10 @@ import {
   resolveWebhookRouting,
   testIgdbWebhook,
   tryExtractWebhookIgdbId,
+  truncateWebhookEvents,
   verifyIgdbWebhookSecret,
   WEBHOOK_ENTITIES,
+  WEBHOOK_LOG_CLEANUP_CRON,
   WEBHOOK_METHODS,
   type IgdbWebhookEnvelope,
   type WebhookEntity,
@@ -55,6 +58,38 @@ async function syncQueueDelivery(
   }
   await setQueueDeliveryPaused(env, !plan.open);
   return { open: plan.open, backlogCount };
+}
+
+type LogCleanupResult =
+  | {
+      skipped: true;
+      reason: "retention_disabled" | "no_database";
+    }
+  | {
+      skipped: false;
+      truncated: true;
+      lastLogCleanupAt: string;
+    };
+
+async function cleanupOldWebhookLogs(
+  env: Env,
+  options: { requireAutoEnabled: boolean },
+): Promise<LogCleanupResult> {
+  if (options.requireAutoEnabled) {
+    const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
+    if (!isWebhookLogAutoCleanupEnabled(settings.logRetentionHours)) {
+      return { skipped: true, reason: "retention_disabled" };
+    }
+  }
+  if (!env.DATABASE_URL) {
+    return { skipped: true, reason: "no_database" };
+  }
+  bindProcessEnv(env);
+  const db = createDb(env.DATABASE_URL);
+  await truncateWebhookEvents(db);
+  const lastLogCleanupAt = new Date().toISOString();
+  await writeDrainSettings(env.IGDB_WEBHOOK_SETTINGS, { lastLogCleanupAt });
+  return { skipped: false, truncated: true, lastLogCleanupAt };
 }
 
 function callbackUrl(env: Env, request: Request): string {
@@ -189,6 +224,10 @@ async function handleAdminSettings(
           : undefined,
       paused: typeof body.paused === "boolean" ? body.paused : undefined,
       forceOpenUntil: body.deliveryMode === "closed" ? null : undefined,
+      logRetentionHours:
+        typeof body.logRetentionHours === "number"
+          ? body.logRetentionHours
+          : undefined,
     });
     try {
       await syncQueueDelivery(env);
@@ -214,6 +253,20 @@ async function handleAdminEvents(
   bindProcessEnv(env);
 
   const parts = url.pathname.split("/").filter(Boolean);
+  // /admin/events/cleanup
+  if (
+    parts.length === 3 &&
+    parts[0] === "admin" &&
+    parts[1] === "events" &&
+    parts[2] === "cleanup" &&
+    request.method === "POST"
+  ) {
+    const result = await cleanupOldWebhookLogs(env, {
+      requireAutoEnabled: false,
+    });
+    return json(result);
+  }
+
   // /admin/events/:id/reprocess
   if (
     parts.length === 4 &&
@@ -405,11 +458,25 @@ export default {
   },
 
   async scheduled(
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: Env,
     _ctx: ExecutionContext,
   ): Promise<void> {
     try {
+      if (controller.cron === WEBHOOK_LOG_CLEANUP_CRON) {
+        const result = await cleanupOldWebhookLogs(env, {
+          requireAutoEnabled: true,
+        });
+        console.log(
+          JSON.stringify({
+            msg: "igdb-webhooks",
+            event: "log-cleanup",
+            ...result,
+          }),
+        );
+        return;
+      }
+
       const { open, backlogCount } = await syncQueueDelivery(env);
       console.log(
         JSON.stringify({

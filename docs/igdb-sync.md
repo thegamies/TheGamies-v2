@@ -39,12 +39,14 @@ IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel
 
 1. IGDB `POST`s to `{worker}/igdb` with `X-Secret`.
 2. Worker verifies the secret, builds an envelope, **enqueues** to Cloudflare Queue, returns **200** (keeps the subscription alive). Ingress never opens Neon (except **Live** mode).
-3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 10`, batch 25) applies the batch on a fresh isolate: game create/updates share one catalog upsert (last write per IGDB id). Cron every minute reads Cloudflare queue backlog and **pauses or resumes** delivery (Auto while 25+ wait, sticky Open, or Closed). Saving settings syncs that immediately.
-4. Ops configure mode, delivery, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`). After this media work, re-register so **Artworks, Screenshots, Game videos, and Image types** slots exist (staging then production). Do not register deprecated Artwork Types.
+3. A **Worker queue consumer** (`queue()` handler, `max_concurrency: 10`, batch 25) applies the batch on a fresh isolate: game create/updates share one catalog upsert (last write per IGDB id). Cron every minute reads Cloudflare queue backlog and **pauses or resumes** delivery (Auto while 25+ wait, sticky Open, or Closed). Saving settings syncs that immediately. A separate **hourly** cron **truncates** `igdb_webhook_events` when auto cleanup is on (`0` disables). Ops can **Clear event logs** from `/admin/webhooks`.
+4. Ops configure mode, delivery, event-log cleanup, and registrations on `/admin/webhooks` (site operators; the app proxies to the Worker with `ADMIN_SYNC_SECRET`). After this media work, re-register so **Artworks, Screenshots, Game videos, and Image types** slots exist (staging then production). Do not register deprecated Artwork Types.
 
 A queue can have only one consumer type. This Worker is the consumer — do not also attach HTTP pull.
 
-**Staging logs:** Workers Logs is enabled for `thegamies-igdb-webhooks-develop` (`wrangler tail --env develop`, or the Worker’s Logs tab). Cron emits JSON with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"`. Production stays off until we want the volume.
+**Event log:** each delivery inserts a row with the IGDB body. After a **successful** apply, `payload` is cleared (metadata + status remain). Failed/pending rows keep the body for Reprocess. Hourly/manual cleanup truncates the table.
+
+**Staging logs:** Workers Logs is enabled for `thegamies-igdb-webhooks-develop` (`wrangler tail --env develop`, or the Worker’s Logs tab). Cron emits JSON with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"` (minute) or `"event":"log-cleanup"` (hourly). Production stays off until we want the volume.
 
 **Cadence / mode:** default **Queued** + **Auto** — each `intervalMinutes` cycle, open while at least 25 messages wait; pause once fewer than 25 remain, and do not reopen until the next cycle (even if the backlog grows). **Open** keeps applying; cron will not pause. **Closed** holds messages; cron will not resume; ingress still enqueues. **Open delivery now** resumes the queue this cycle. **Live** applies on ingress unless delivery is Closed (then new events go to the queue). A `Failed query: <sql>` in the event log is almost always a dropped Neon HTTP call, not a bad game row.
 
