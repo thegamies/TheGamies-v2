@@ -32,8 +32,16 @@ const sourceSerif = Source_Serif_4({
 
 export async function generateMetadata(): Promise<Metadata> {
   const origin = await resolvePublicOrigin();
+  let metadataBase: URL | undefined;
+  if (origin) {
+    try {
+      metadataBase = new URL(origin);
+    } catch {
+      metadataBase = undefined;
+    }
+  }
   return {
-    metadataBase: origin ? new URL(origin) : undefined,
+    metadataBase,
     title: {
       default: SITE_NAME,
       template: `%s · ${SITE_NAME}`,

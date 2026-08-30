@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalHost } from "./origin";
+import { isLocalHost, normalizeOrigin } from "./origin";
 
 describe("isLocalHost", () => {
   it("treats loopback as local", () => {
@@ -11,5 +11,24 @@ describe("isLocalHost", () => {
   it("treats public hosts as not local", () => {
     expect(isLocalHost("https://thegamies.gg")).toBe(false);
     expect(isLocalHost("thegamies-v2.example.workers.dev")).toBe(false);
+  });
+});
+
+describe("normalizeOrigin", () => {
+  it("adds https for bare hostnames", () => {
+    expect(normalizeOrigin("thegamies.gg")).toBe("https://thegamies.gg");
+    expect(normalizeOrigin("thegamies.gg/")).toBe("https://thegamies.gg");
+  });
+
+  it("preserves http for loopback", () => {
+    expect(normalizeOrigin("http://localhost:3000")).toBe(
+      "http://localhost:3000",
+    );
+  });
+
+  it("returns empty for blank or invalid input", () => {
+    expect(normalizeOrigin("")).toBe("");
+    expect(normalizeOrigin("   ")).toBe("");
+    expect(normalizeOrigin("not a url ::")).toBe("");
   });
 });
