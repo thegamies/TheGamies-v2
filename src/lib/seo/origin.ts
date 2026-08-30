@@ -14,8 +14,25 @@ export function isLocalHost(hostOrOrigin: string): boolean {
   return host === "localhost" || host === "127.0.0.1" || host === "[::1]";
 }
 
+/**
+ * Normalize a configured or request origin into `https://host` (or http for
+ * loopback). Bare hostnames get https. Invalid values become "".
+ */
+export function normalizeOrigin(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, "");
+  if (!trimmed) return "";
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return "";
+  }
+}
+
 export function envAppOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "") ?? "";
+  return normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL ?? "");
 }
 
 /** Prefer a public configured origin; fall back to the request host (preview). */
@@ -31,7 +48,7 @@ export async function resolvePublicOrigin(): Promise<string> {
     const proto =
       h.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
       (isLocalHost(host) ? "http" : "https");
-    return `${proto}://${host}`.replace(/\/$/, "");
+    return normalizeOrigin(`${proto}://${host}`) || configured;
   } catch {
     return configured;
   }

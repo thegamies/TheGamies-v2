@@ -65,8 +65,16 @@ jobs:
             echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set PRODUCTION_NEON_AUTH_COOKIE_SECRET (or NEON_AUTH_COOKIE_SECRET)"
           fi
           if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
-            echo "::warning::PRODUCTION_CF_APP_URL empty — set GitHub secret PRODUCTION_CF_APP_URL"
+            echo "::error::PRODUCTION_CF_APP_URL empty — set GitHub secret PRODUCTION_CF_APP_URL (https://… origin). OpenNext build needs it for metadataBase."
+            exit 1
           fi
+          case "$NEXT_PUBLIC_APP_URL" in
+            http://*|https://*) ;;
+            *)
+              echo "::error::PRODUCTION_CF_APP_URL must be an absolute URL (got: $NEXT_PUBLIC_APP_URL)"
+              exit 1
+              ;;
+          esac
           if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
             echo "::warning::PRODUCTION_IGDB_WEBHOOKS_WORKER_URL empty — not falling back to staging webhook URL"
           fi

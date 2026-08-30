@@ -129,6 +129,17 @@ jobs:
           if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
             echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set GitHub secret NEON_AUTH_COOKIE_SECRET"
           fi
+          if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
+            echo "::error::STAGING_CF_APP_URL empty — set GitHub secret STAGING_CF_APP_URL (https://… origin). OpenNext build needs it for metadataBase."
+            exit 1
+          fi
+          case "$NEXT_PUBLIC_APP_URL" in
+            http://*|https://*) ;;
+            *)
+              echo "::error::STAGING_CF_APP_URL must be an absolute URL (got: $NEXT_PUBLIC_APP_URL)"
+              exit 1
+              ;;
+          esac
           if [ -z "$IGDB_WEBHOOKS_WORKER_URL" ]; then
             IGDB_WEBHOOKS_WORKER_URL="https://thegamies-igdb-webhooks-develop.ecdm981.workers.dev"
             export IGDB_WEBHOOKS_WORKER_URL
