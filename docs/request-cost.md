@@ -9,7 +9,7 @@ Cursor rule: `.cursor/rules/request-cost.mdc`. Short form also in [engineering.m
 Before you load, freeze, cache, or search, ask how the **hot path** behaves—not only what the UI shows.
 
 1. **DB egress** — Bytes from Neon to the app per request. Does this view pull a whole table, roster, or blob to render a page?
-2. **Compute** — Parse/serialize and memory on Vercel **and** Cloudflare Workers for that payload.
+2. **Compute** — Parse/serialize and memory on Cloudflare Workers for that payload.
 3. **Scale** — At 10× members, voters, games, or traffic, is the same pattern still cheap?
 
 If the answer is “load everything, then slice,” the design is wrong.

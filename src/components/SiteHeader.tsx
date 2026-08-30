@@ -25,9 +25,9 @@ export async function SiteHeader() {
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
   const includeDesignSystem = showDesignSystemNav({
-    vercelEnv: process.env.VERCEL_ENV,
     nodeEnv: process.env.NODE_ENV,
     showDesignSystem: process.env.SHOW_DESIGN_SYSTEM,
+    appUrl: process.env.NEXT_PUBLIC_APP_URL,
   });
   const includeAdmin = profile?.isSiteAdmin === true;
   const tgaHref = await getPromotedTgaHref().catch(() => null);

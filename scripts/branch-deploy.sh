@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Trigger a manual dual-host branch deploy (or destroy) via GitHub Actions.
+# Trigger a manual Cloudflare branch deploy (or destroy) via GitHub Actions.
 #
 # Usage:
 #   pnpm deploy:branch

@@ -4,7 +4,6 @@ function isLoopbackHost(hostname: string): boolean {
 }
 
 function isHostedDeploy(env: Record<string, string | undefined>): boolean {
-  if (env.VERCEL || env.VERCEL_ENV || env.VERCEL_URL) return true;
   if (env.CF_PAGES || env.CF_PAGES_URL) return true;
   const appUrl = env.NEXT_PUBLIC_APP_URL?.trim();
   if (!appUrl) return false;
@@ -12,7 +11,6 @@ function isHostedDeploy(env: Record<string, string | undefined>): boolean {
     const hostname = new URL(appUrl).hostname.toLowerCase();
     if (isLoopbackHost(hostname)) return false;
     return (
-      hostname.endsWith(".vercel.app") ||
       hostname.endsWith(".workers.dev") ||
       hostname === "thegamies.gg" ||
       hostname.endsWith(".thegamies.gg")

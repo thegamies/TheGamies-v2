@@ -50,16 +50,16 @@ Keep feature branches short-lived. Prefer many small PRs over long-lived feature
 | Env | Trigger | App | Data |
 |---|---|---|---|
 | Local | Developer machine | `next dev` (Node); `pnpm preview:cf` for Workers parity | Neon dev branch or local connection string |
-| Preview | PR into `develop` | **Vercel preview and Cloudflare Workers preview** | Shared Neon database branch for that PR |
-| Staging | Push to `develop` | Both hosts (Vercel + Worker `thegamies-v2-develop`); IGDB webhooks Worker when paths change | Neon staging via `STAGING_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
-| Production | Merge to `main` | Both hosts (production) | Neon production branch |
+| Preview | PR into `develop` | Cloudflare Workers preview (one URL) | Shared Neon database branch for that PR |
+| Staging | Push to `develop` | Worker `thegamies-v2-develop`; IGDB webhooks Worker when paths change | Neon staging via `STAGING_DATABASE_URL`; CI runs `pnpm db:migrate` before deploy |
+| Production | Merge to `main` | Worker `thegamies-v2` | Neon production branch |
 
 Rules:
 
 - Never point a preview deploy at the production database.
 - Never run exploratory migrations against production.
 - `.env.example` documents required variables; real secrets stay in host dashboards / GitHub Actions / local env only.
-- Dual-host setup details: [deployment.md](./deployment.md).
+- Deploy details: [deployment.md](./deployment.md).
 
 ## Request cost (compute · egress · scale)
 
@@ -68,7 +68,7 @@ Every hot read path should be cheap under growth—not only correct for a small 
 Before choosing freeze/cache/**search**/list storage, walk the request:
 
 1. **DB egress** — Bytes from Neon to the app per page view. Avoid pulling an entire table, roster, or freeze blob to serve a page.
-2. **Compute** — Parse/serialize and memory on Vercel **and** Cloudflare Workers for that payload.
+2. **Compute** — Parse/serialize and memory on Cloudflare Workers for that payload.
 3. **Scale** — Behavior at 10× members, ballots, games, or traffic.
 
 **Do:** SQL `LIMIT`/`OFFSET` (or keyset); small default views; **search in the database** with a hit cap; client gets only what it renders.  
@@ -82,10 +82,10 @@ Live lock and edition results freeze into **tables**, not one giant payload.
 
 1. Branch from `develop` → open PR **into `develop`**.
 2. CI runs lint/typecheck/build.
-3. Preview workflow creates a Neon branch and deploys **both** Vercel and Cloudflare previews (when secrets are configured).
-4. Human checks **both** preview URLs for user-facing work when both are live.
-5. Squash merge to `develop` → **staging** deploy on both hosts.
-6. When ready to ship: PR **`develop` → `main`** → **production** on both hosts.
+3. Preview workflow creates a Neon branch and deploys a Cloudflare Worker preview (when secrets are configured).
+4. Human checks the preview URL for user-facing work when it is live.
+5. Squash merge to `develop` → **staging** Worker deploy.
+6. When ready to ship: PR **`develop` → `main`** → **production** Worker.
 
 ### Migrations
 
@@ -230,7 +230,7 @@ GitHub Actions on each PR:
 5. Integration tests when the job has a Neon branch / test DB  
 6. Visual tests when screenshots are in scope for that PR (may be path-filtered later)
 
-Vercel handles app build/deploy separately; CI is the quality gate, Vercel is the host.
+CI is the quality gate; GitHub Actions deploys the Cloudflare Worker.
 
 ## Tooling defaults (until changed in decisions)
 
@@ -239,8 +239,8 @@ Vercel handles app build/deploy separately; CI is the quality gate, Vercel is th
 | Package manager | `pnpm` |
 | Node | Active LTS |
 | PR merge | Squash |
-| Hosts | Vercel **and** Cloudflare Workers (OpenNext); dual PR previews |
-| DB branches | Neon (one branch per PR, shared by both hosts) |
+| Host | Cloudflare Workers (OpenNext); one PR preview URL |
+| DB branches | Neon (one branch per PR) |
 
 If we change a default, log it in `docs/decisions.md`.
 

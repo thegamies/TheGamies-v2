@@ -1,13 +1,13 @@
 # Deployment
 
-Dual-host deployment: **Vercel** and **Cloudflare Workers (OpenNext)**. Both are first-class. Neon is the shared database/auth layer.
+Hosting: **Cloudflare Workers (OpenNext)** only. Neon is the shared database/auth layer.
 
 ## Principles
 
 1. One Next.js codebase; host adapters stay thin.
-2. Every PR into `develop` gets **both** preview URLs when CI secrets are configured.
-3. Every push to `develop` deploys a lasting **staging** site on both hosts.
-4. One **Neon branch per PR**, parented from Neon **`develop`** (not production); both previews use that connection string.
+2. Every PR into `develop` gets a **Cloudflare Worker preview** (one URL) when CI secrets are configured.
+3. Every push to `develop` deploys a lasting **staging** Worker.
+4. One **Neon branch per PR**, parented from Neon **`develop`** (not production); the preview Worker uses that connection string.
 5. Never point previews/staging at the production database.
 
 ## Local commands
@@ -15,9 +15,8 @@ Dual-host deployment: **Vercel** and **Cloudflare Workers (OpenNext)**. Both are
 ```bash
 pnpm install
 pnpm dev              # Node Next.js (default local)
-pnpm build            # next build (used by both hosts)
+pnpm build            # next build
 pnpm preview:cf       # OpenNext build + Wrangler local preview
-pnpm deploy:vercel    # requires Vercel CLI login + linked project
 pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 ```
 
@@ -25,22 +24,21 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 | File | Role |
 |---|---|
-| `vercel.json` | Vercel build/framework hints; `git.deploymentEnabled: false` so only GitHub Actions deploys; cron for edition freeze |
 | `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets, Cron Trigger (`* * * * *`) |
 | `cloudflare-worker.ts` | OpenNext custom worker: `fetch` plus `scheduled` → edition freeze |
 | `workers/igdb-webhooks/wrangler.jsonc` | Dedicated IGDB webhook Worker (Queue producer + consumer, KV delivery gate, cron pause/resume) |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
 | `public/_headers` | Long-cache headers for `/_next/static/*` |
 | `.github/workflows/ci.yml` | Lint, typecheck, build on PR/push |
-| `.github/workflows/preview.yml` | Neon branch + Vercel + Cloudflare PR previews |
-| `.github/workflows/branch-deploy.yml` | On-demand dual-host deploy for any git ref |
-| `.github/workflows/staging.yml` | Push to `develop` → lasting staging on both hosts |
-| `.github/workflows/production.yml` | Push to `main` → production on both hosts |
+| `.github/workflows/preview.yml` | Neon branch + Cloudflare PR preview |
+| `.github/workflows/branch-deploy.yml` | On-demand Cloudflare deploy for any git ref |
+| `.github/workflows/staging.yml` | Push to `develop` → lasting staging Worker |
+| `.github/workflows/production.yml` | Push to `main` → production Worker |
 
 ## Cloudflare notes
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
-- **Edition freeze cron:** Vercel hits `/api/cron/edition-freeze` every minute (`vercel.json`). Cloudflare uses a Worker Cron Trigger on the same schedule (`wrangler.jsonc` + `cloudflare-worker.ts`). The `scheduled` handler checks Workers KV `CRON_SETTINGS` (pause all CF jobs from `/admin/scheduled`), then calls the freeze route in-process via `WORKER_SELF_REFERENCE` with `Authorization: Bearer $CRON_SECRET`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
+- **Edition freeze cron:** Cloudflare Worker Cron Trigger (`wrangler.jsonc` + `cloudflare-worker.ts`). The `scheduled` handler checks Workers KV `CRON_SETTINGS` (pause all CF jobs from `/admin/scheduled`), then calls the freeze route in-process via `WORKER_SELF_REFERENCE` with `Authorization: Bearer $CRON_SECRET`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
 - **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Staging/production CI deploys it **only when relevant paths change** (`workers/igdb-webhooks/**`, `packages/igdb/**`, `packages/db/**`, `pnpm-lock.yaml`). Manual `workflow_dispatch` on staging also deploys it by default. Manual CLI: `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Code deploys keep existing Worker secrets. Staging `secret bulk` only if dispatch checks `sync_igdb_webhook_secrets` (bulk publishes a second version). Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 
@@ -52,14 +50,6 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 2. Enable Neon Auth when ready (not required for static scaffold).
 3. Create API key; note **project id**.
 4. Production branch = default; previews create ephemeral branches in CI.
-
-### Vercel
-
-1. Import `thegamies/TheGamies-v2`.
-2. Set root to repo root; framework Next.js; install `pnpm install`; build `pnpm build`.
-3. Production branch: `main`. Preview branches: all (especially PRs into `develop`).
-4. Create a Vercel token for CI; note **org id** and **project id** (`vercel link` locally).
-5. Optional: Neon Vercel integration — CI still creates an explicit shared branch so Cloudflare can use the same DB.
 
 ### Cloudflare
 
@@ -78,22 +68,18 @@ Configure on the repo:
 |---|---|
 | `NEON_API_KEY` | Create/delete PR database branches |
 | `NEON_PROJECT_ID` | Neon project |
-| `VERCEL_TOKEN` | Preview + production deploys |
-| `VERCEL_ORG_ID` | Vercel team/org |
-| `VERCEL_PROJECT_ID` | Vercel project |
 | `CLOUDFLARE_API_TOKEN` | Workers deploy |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
 | `STAGING_DATABASE_URL` | Neon URL for `develop` staging (`DATABASE_URL`) |
 | `STAGING_NEON_AUTH_BASE_URL` | Auth URL for develop staging |
 | `NEON_AUTH_COOKIE_SECRET` | Neon Auth cookie signing (32+ chars; staging + previews) |
-| `STAGING_VERCEL_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Vercel staging |
 | `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
 | `PRODUCTION_DATABASE_URL` | Production Neon URL (`DATABASE_URL` on `thegamies-v2` and IGDB webhooks production). Never `STAGING_DATABASE_URL` |
 | `PRODUCTION_NEON_AUTH_BASE_URL` | Production Neon Auth URL |
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | Optional. Production cookie secret (else `NEON_AUTH_COOKIE_SECRET`) |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` for Cloudflare production |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | Production app → production IGDB webhook Worker origin |
-| `CRON_SECRET` | Edition freeze cron (Vercel Cron + Cloudflare `scheduled` handler) |
+| `CRON_SECRET` | Edition freeze cron (Cloudflare `scheduled` handler) |
 | `IGDB_WEBHOOKS_WORKER_URL` | Staging app → IGDB webhooks Worker origin (defaults to the develop `workers.dev` URL if unset) |
 | `IGDB_WEBHOOK_SECRET` | Base secret for IGDB webhook slots (Worker `secret bulk`) |
 | `ADMIN_SYNC_SECRET` | First site-operator claim + IGDB webhooks Worker proxy (staging + PR previews) |
@@ -106,12 +92,11 @@ Configure on the repo:
 | `AVATAR_PUBLIC_BASE_URL` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview public base (prefer `STAGING_*`) |
 | `PRODUCTION_R2_AVATAR_BUCKET` | Production upload bucket (host env `R2_AVATAR_BUCKET`) |
 | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production public base (host env `AVATAR_PUBLIC_BASE_URL`) |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public; both hosts). Unset = no gtag |
-| `VERCEL_STAGING_ALIAS` | Optional stable Vercel hostname; also used as public URL if `STAGING_VERCEL_APP_URL` unset |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public). Unset = no gtag |
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.
 
-App secrets are stored in **GitHub** (manually imported) and pushed onto Vercel/Cloudflare by CI — see [secrets.md](./secrets.md). Doppler remains for local `pnpm dev:secrets` only.
+App secrets are stored in **GitHub** (manually imported) and pushed onto Cloudflare by CI — see [secrets.md](./secrets.md). Doppler remains for local `pnpm dev:secrets` only.
 
 ## Staging flow (`develop`)
 
@@ -119,7 +104,6 @@ App secrets are stored in **GitHub** (manually imported) and pushed onto Vercel/
 Push / merge to develop (or workflow_dispatch)
   → ci: lint + typecheck + build
   → migrate: pnpm db:migrate against STAGING_DATABASE_URL
-  → staging: deploy Vercel with GitHub app secrets as --env
   → staging: deploy Cloudflare worker thegamies-v2-develop
        (.dev.vars for build + wrangler secret bulk for runtime / dashboard)
   → igdb-webhooks: wrangler deploy thegamies-igdb-webhooks-develop when paths change
@@ -127,10 +111,9 @@ Push / merge to develop (or workflow_dispatch)
         secret bulk only if sync_igdb_webhook_secrets)
 ```
 
-Migrations run before both host deploys. If `STAGING_DATABASE_URL` is missing, migrate is skipped (hosts still deploy if their secrets are set).
+Migrations run before the Worker deploy. If `STAGING_DATABASE_URL` is missing, migrate is skipped (Worker still deploys if Cloudflare secrets are set).
 
 Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers.dev`).
-Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`.
 
 ## PR preview flow
 
@@ -138,17 +121,18 @@ Vercel gets a new deployment URL each time unless you set `VERCEL_STAGING_ALIAS`
 PR opened/updated
   → ci: lint + typecheck + build
   → neon: create branch preview/pr-<n> from Neon `develop` (unique Auth URL via get_auth_url)
-  → migrate / vercel / cloudflare: each job re-fetches DATABASE_URL via Neon API + branch_id
+  → migrate / cloudflare: each job re-fetches DATABASE_URL via Neon API + branch_id
        (create-branch-action’s db_url cannot cross jobs — GitHub strips secret-bearing outputs)
-  → register Vercel + Cloudflare origins as Neon Auth trusted domains on that branch
-  → comment both URLs on the PR
+  → register the Cloudflare origin as a Neon Auth trusted domain on that branch
+  → comment the Worker URL on the PR
   → on PR close: delete Neon branch + optional CF preview worker
 ```
 
 Helper: `scripts/ci/neon-database-url.sh <branch_id>` (pooled URI by default).
+
 ## Manual branch deploy (on demand)
 
-Same dual-host stack as PR previews, but you choose when it runs.
+Same Cloudflare + Neon stack as PR previews, but you choose when it runs.
 
 ```bash
 # Deploy the current branch (slug derived from the branch name)
@@ -169,23 +153,22 @@ Resources:
 |---|---|
 | Neon branch | `preview/manual-<slug>` |
 | Cloudflare Worker | `thegamies-v2-manual-<slug>` |
-| Vercel | Preview deployment URL for that commit |
 
-Destroy removes the Neon branch and CF worker. Vercel preview deployments are left alone (they expire on Vercel’s schedule).
+Destroy removes the Neon branch and CF worker.
 
 ## Neon Auth URLs and domains
 
 Two different “URLs” matter:
 
-1. **Auth API URL (`NEON_AUTH_BASE_URL`)** — each Neon **database branch** gets its own Auth endpoint when Auth is enabled. CI reads it from `create-branch-action` (`get_auth_url: true`) and injects it into Vercel/Cloudflare. Tokens from one branch are not valid on another.
-2. **App origins (trusted domains)** — the hosts where the Next app runs (`*.vercel.app`, `*.workers.dev`, staging, production). Neon Auth will only redirect / accept CSRF origins that are allowlisted **on that Auth branch**.
+1. **Auth API URL (`NEON_AUTH_BASE_URL`)** — each Neon **database branch** gets its own Auth endpoint when Auth is enabled. CI reads it from `create-branch-action` (`get_auth_url: true`) and injects it into the Worker. Tokens from one branch are not valid on another.
+2. **App origins (trusted domains)** — the hosts where the Next app runs (`*.workers.dev`, staging, production). Neon Auth will only redirect / accept CSRF origins that are allowlisted **on that Auth branch**.
 
 What CI does for previews and manual deploys:
 
 - Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `auth_url` + `branch_id`
 - Downstream jobs resolve `DATABASE_URL` with `scripts/ci/neon-database-url.sh` (job outputs cannot carry the masked `db_url`)
-- Deploys both hosts with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
-- POSTs each deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
+- Deploys the Cloudflare Worker with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
+- POSTs the deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
 - PUTs Auth **email webhooks** on that branch to the **Cloudflare** origin `/api/webhooks/neon-auth-email` (`scripts/ci/register-neon-auth-email-webhook.sh`). Staging does the same for Neon branch `develop` → worker `thegamies-v2-develop`.
 
 Each Neon Auth branch has its own webhook URL. A preview Worker never receives production reset mail, and production never sends through a PR worker. Local personal branches: run the same script (or set the webhook in Console) against your Worker/`wrangler` preview URL.
@@ -194,7 +177,7 @@ The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_UR
 
 What you still configure by hand for lasting environments:
 
-- Staging / production App URLs in Neon Console → Auth → Configuration → Domains (exact origins), or wildcards such as `https://*.vercel.app` / `https://*.workers.dev` if you want a broader preview allowlist
+- Staging / production App URLs in Neon Console → Auth → Configuration → Domains (exact origins), or a wildcard such as `https://*.workers.dev` if you want a broader preview allowlist
 - `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing
 
 You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
@@ -202,10 +185,9 @@ You do **not** need one Neon Auth project per preview host. One Neon project, ma
 ## Production flow
 
 1. Promote `develop` → `main` via PR.
-2. Vercel production deploy from `main`.
-3. Cloudflare production deploy of worker `thegamies-v2` (CI on `main` or `pnpm deploy:cf`). CI writes `.dev.vars` from production GitHub secrets and `wrangler secret bulk` onto that Worker (never `STAGING_*`).
-4. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change.
-5. Neon production branch only.
+2. Cloudflare production deploy of worker `thegamies-v2` (CI on `main` or `pnpm deploy:cf`). CI writes `.dev.vars` from production GitHub secrets and `wrangler secret bulk` onto that Worker (never `STAGING_*`).
+3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change.
+4. Neon production branch only.
 
 ## Environment variables
 
@@ -215,9 +197,9 @@ Runtime keys (also listed in `.env.example`):
 
 - `DATABASE_URL`
 - `NEON_AUTH_BASE_URL` (when Auth is enabled)
-- `NEXT_PUBLIC_APP_URL` (host-specific per deployment)
+- `NEXT_PUBLIC_APP_URL` (per deployment)
 
-Do not commit `.env`, `.dev.vars`, or `.vercel`.
+Do not commit `.env` or `.dev.vars`.
 
 Local with Doppler:
 

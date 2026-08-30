@@ -27,15 +27,32 @@ export const SITE_CREATE_HREF = "/create";
 export const siteCreateLinkClass =
   "inline-flex shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-accent px-4 py-2 text-sm font-semibold tracking-wide text-accent transition-opacity hover:opacity-90";
 
-/** Local + preview only — never on Vercel production. Opt-in elsewhere via SHOW_DESIGN_SYSTEM=1. */
+/** Local + PR Worker previews. Lasting staging/production stay hidden (even with SHOW_DESIGN_SYSTEM=1). */
 export function showDesignSystemNav(env: {
-  vercelEnv?: string;
   nodeEnv?: string;
   showDesignSystem?: string;
+  /** Public app origin; used to detect lasting Cloudflare hosts. */
+  appUrl?: string;
 }): boolean {
-  if (env.vercelEnv === "production") return false;
   if (env.nodeEnv === "development") return true;
-  if (env.vercelEnv === "preview") return true;
+  const appUrl = env.appUrl?.trim();
+  if (appUrl) {
+    try {
+      const hostname = new URL(appUrl).hostname.toLowerCase();
+      if (
+        hostname === "thegamies.gg" ||
+        hostname.endsWith(".thegamies.gg") ||
+        hostname.includes("thegamies-v2-develop") ||
+        hostname === "thegamies-v2.ecdm981.workers.dev"
+      ) {
+        return false;
+      }
+      // PR / branch Workers.
+      if (hostname.endsWith(".workers.dev")) return true;
+    } catch {
+      // fall through
+    }
+  }
   return env.showDesignSystem === "1";
 }
 

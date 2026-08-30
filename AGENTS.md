@@ -16,7 +16,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 
 - Next.js App Router + TypeScript
 - Tailwind CSS + project-owned design tokens
-- Hosting: Vercel **and** Cloudflare Workers (OpenNext) — portable app, dual PR previews
+- Hosting: Cloudflare Workers (OpenNext)
 - Database + Auth: Neon (Postgres + Neon Auth)
 - Game catalog: IGDB via a separate ingestion worker
 - Validation: Zod
@@ -39,7 +39,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` (includes App Router layout + `cache()` rules) |
 | Request cost (lists, search, scale) | `docs/request-cost.md` |
-| Deployment (dual host) | `docs/deployment.md` |
+| Deployment | `docs/deployment.md` |
 | Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | GitHub Actions secrets (setup list) | `docs/github-secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
@@ -60,7 +60,7 @@ Full rules: `docs/engineering.md`. Short form:
 3. Branch from `develop` → implement one approved step → PR into `develop` → preview → squash merge. Promote `develop` → `main` for production.
 4. Do not invent answers to open decisions in `docs/decisions.md`.
 5. **Features ship with tests** in the same PR: unit for domain logic, integration for DB/auth paths, visual for ballot/results UI. See `docs/engineering.md`.
-6. **Request cost:** before freeze/list/cache/**search** designs, check DB egress, compute (Vercel + Workers), and 10× scale — SQL-paginated rows; search in the database, never dump a full list for the client to filter. See `docs/request-cost.md`.
+6. **Request cost:** before freeze/list/cache/**search** designs, check DB egress, compute (Workers), and 10× scale — SQL-paginated rows; search in the database, never dump a full list for the client to filter. See `docs/request-cost.md`.
 7. After finishing a task or substantive reply, always propose **What’s next**.
 
 ## Verification

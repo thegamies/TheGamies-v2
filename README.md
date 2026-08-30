@@ -6,12 +6,12 @@ This repository is the clean rebuild. The previous monorepo (`thegamies/TheGamie
 
 ## Current status
 
-Next.js App Router with Editorial Standings tokens, catalog browse/detail, IGDB sync (CLI + `/admin/sync`), and **dual-host deploy** (Vercel + Cloudflare Workers via OpenNext). Neon is the shared DB.
+Next.js App Router with Editorial Standings tokens, catalog browse/detail, IGDB sync (CLI + `/admin/sync`), and **Cloudflare Workers** deploy (OpenNext). Neon is the shared DB.
 
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind
-- Hosts: Vercel **and** Cloudflare Workers (OpenNext)
+- Host: Cloudflare Workers (OpenNext)
 - Neon (Postgres + Auth)
 - Drizzle + `@thegamies/db` / `@thegamies/igdb` packages
 

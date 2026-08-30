@@ -1,3 +1,3 @@
-﻿# Dual-host preview check
+﻿# Preview check
 
-Opened to verify Neon + Vercel + Cloudflare preview wiring.
+Opened to verify Neon + Cloudflare preview wiring.

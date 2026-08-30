@@ -33,7 +33,7 @@ Entity stubbing (fake `[stub]` names) is not used.
 
 ## Webhooks (Cloudflare Queue)
 
-IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not Vercel and not the OpenNext app Worker. Staging and production each have their own Worker, queue, and KV (see [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md)).
+IGDB deliveries hit a **dedicated Worker** (`workers/igdb-webhooks`), not the OpenNext app Worker. Staging and production each have their own Worker, queue, and KV (see [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md)).
 
 **Flow:**
 
@@ -79,9 +79,9 @@ Or `pnpm sync:igdb:secrets …`.
 
 `/admin/sync` — site operators only. Use **Continue year** to resume a truncated/failed year backfill; **Backfill year (from start)** forces `afterId: 0`. Check **Enrich all years** to omit the year filter (full catalog). Browser never talks to IGDB directly.
 
-### Hosted timeouts (Vercel / Cloudflare)
+### Hosted timeouts (Cloudflare)
 
-`POST /api/admin/sync` sets `maxDuration = 300` (honored on Vercel Pro; **Hobby is still ~60s**). Cloudflare Workers also cap request duration.
+`POST /api/admin/sync` can run for a long enrich. Cloudflare Workers cap request duration — prefer the CLI for large backfills.
 
 - **Backfill / incremental** already run in page chunks (`maxPages`) so you can Continue.
 - **Enrich all** in the admin UI fires **one entity per HTTP request** so each step gets its own budget. If a step times out, re-run — enrich only fetches missing lookups.
@@ -106,7 +106,7 @@ Shared `dev` keeps the shared Neon URL. Personal override only changes your mach
 
 ## PR previews
 
-`preview.yml` creates `preview/pr-<n>`, runs `pnpm db:migrate` on that URL, then deploys both hosts.
+`preview.yml` creates `preview/pr-<n>`, runs `pnpm db:migrate` on that URL, then deploys the Cloudflare preview Worker.
 
 ## Packages
 
