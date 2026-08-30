@@ -37,13 +37,12 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 
 ### 1. Production pipeline parity
 
-`.github/workflows/production.yml` deploys Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it does **not**:
+`.github/workflows/production.yml` runs `pnpm db:migrate` against `PRODUCTION_DATABASE_URL` (required — deploy fails if missing), then Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it still does **not**:
 
-- Run `pnpm db:migrate` against a production Neon URL
 - Point Neon Auth email webhooks at the production Worker
 - Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
 
-**Shipped:** production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket.
+**Shipped:** migrate on `main` + production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket.
 
 ### 2. Canonical public origin
 
@@ -192,7 +191,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 ## Suggested order
 
-1. **Production workflow** — migrate, Auth webhook, production secrets  
+1. **Production workflow** — Auth webhook + confirm `PRODUCTION_DATABASE_URL` is the production Neon branch (migrate already runs on `main`)
 2. **Domain + Auth + mail** — one origin, trusted domains, sending + inboxes  
 3. **Catalog** — backfill production, webhooks Worker live  
 4. Confirm `CRON_SECRET` is in GitHub so freeze Cron authorizes on the Worker  

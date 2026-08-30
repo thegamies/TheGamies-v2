@@ -9,7 +9,33 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - id: guard
+        run: |
+          if [ -z "${{ secrets.PRODUCTION_DATABASE_URL }}" ]; then
+            echo "::error::PRODUCTION_DATABASE_URL missing — set the production Neon URL (never STAGING_DATABASE_URL). Refusing to deploy without migrate."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: pnpm db:migrate
+      - run: |
+          echo "### Migrate (production)" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Applied \`pnpm db:migrate\` against \`PRODUCTION_DATABASE_URL\`." >> "$GITHUB_STEP_SUMMARY"
+
   cloudflare:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - id: guard
@@ -56,7 +82,8 @@ jobs:
         run: |
           WORKER="thegamies-v2"
           if [ -z "$DATABASE_URL" ]; then
-            echo "::warning::PRODUCTION_DATABASE_URL empty — Worker will not get a production DATABASE_URL from this deploy."
+            echo "::error::PRODUCTION_DATABASE_URL empty — Worker will not get a production DATABASE_URL from this deploy."
+            exit 1
           fi
           if [ -z "$NEON_AUTH_BASE_URL" ]; then
             echo "::warning::PRODUCTION_NEON_AUTH_BASE_URL empty — set GitHub secret PRODUCTION_NEON_AUTH_BASE_URL"
@@ -159,7 +186,7 @@ jobs:
               - 'pnpm-lock.yaml'
 
   igdb_webhooks:
-    needs: changes
+    needs: [migrate, changes]
     if: needs.changes.outputs.igdb_webhooks == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -194,6 +221,10 @@ jobs:
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
         run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::PRODUCTION_DATABASE_URL empty — refusing IGDB webhooks deploy without production DATABASE_URL."
+            exit 1
+          fi
           node <<'NODE'
           const fs = require("fs");
           const secrets = {};

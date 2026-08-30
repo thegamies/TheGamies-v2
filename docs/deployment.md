@@ -182,12 +182,20 @@ What you still configure by hand for lasting environments:
 
 You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
 
-## Production flow
+## Production flow (`main`)
+
+```text
+Push / merge to main
+  → migrate: pnpm db:migrate against PRODUCTION_DATABASE_URL (required; fails if missing)
+  → cloudflare: deploy Worker thegamies-v2
+       (.dev.vars for build + wrangler secret bulk for runtime; never STAGING_*)
+  → igdb-webhooks: wrangler deploy thegamies-igdb-webhooks when paths change
+```
 
 1. Promote `develop` → `main` via PR.
-2. Cloudflare production deploy of worker `thegamies-v2` (CI on `main` or `pnpm deploy:cf`). CI writes `.dev.vars` from production GitHub secrets and `wrangler secret bulk` onto that Worker (never `STAGING_*`).
-3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change.
-4. Neon production branch only.
+2. CI migrates production Neon, then deploys `thegamies-v2`. Empty `PRODUCTION_DATABASE_URL` fails the workflow (no silent skip).
+3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change (after migrate).
+4. Neon production branch only — never point `PRODUCTION_DATABASE_URL` at the develop branch.
 
 ## Environment variables
 
