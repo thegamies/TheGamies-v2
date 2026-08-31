@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export function PinnedSaveBar({
   children,
   message = "Unsaved changes",
-  className = "fixed inset-x-0 bottom-0 z-40",
+  className = "fixed inset-x-0 bottom-[var(--site-ad-bar,0px)] z-40",
 }: {
   children: ReactNode;
   message?: ReactNode;

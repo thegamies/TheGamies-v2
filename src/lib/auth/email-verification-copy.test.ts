@@ -14,6 +14,21 @@ describe("isUnverifiedEmailError", () => {
     ).toBe(true);
     expect(isUnverifiedEmailError({ message: "Wrong password" })).toBe(false);
   });
+
+  it("matches JSON-wrapped verification errors", () => {
+    expect(
+      isUnverifiedEmailError({
+        message:
+          '{"message":"Email verification required","code":"EMAIL_NOT_VERIFIED"}',
+      }),
+    ).toBe(true);
+    expect(
+      isUnverifiedEmailError({
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        message: "Please confirm your email",
+      }),
+    ).toBe(true);
+  });
 });
 
 describe("publicAuthErrorMessage", () => {

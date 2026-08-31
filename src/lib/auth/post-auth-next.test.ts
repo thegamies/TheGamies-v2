@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   clearPostAuthNext,
+  parsePostAuthNextCookie,
   POST_AUTH_NEXT_COOKIE,
   readPostAuthNext,
   rememberPostAuthNext,
@@ -22,5 +23,10 @@ describe("post-auth next cookie", () => {
   it("rejects open redirects", () => {
     rememberPostAuthNext("https://evil.example");
     expect(readPostAuthNext()).toBeNull();
+  });
+
+  it("parses a stored cookie value on the server", () => {
+    expect(parsePostAuthNextCookie("%2Fcreate%2Fgoty")).toBe("/create/goty");
+    expect(parsePostAuthNextCookie("https://evil.example")).toBeNull();
   });
 });

@@ -68,15 +68,25 @@ export function isUnverifiedEmailError(error: {
   message?: string;
   code?: string;
 } | null | undefined): boolean {
-  if (!error) return false;
-  const code = error.code?.toUpperCase() ?? "";
-  if (code.includes("EMAIL_NOT_VERIFIED") || code.includes("UNVERIFIED")) {
+  const parsed = parsedAuthClientError(error);
+  if (!parsed) return false;
+  const code = parsed.code?.toUpperCase() ?? "";
+  if (
+    code.includes("EMAIL_NOT_VERIFIED") ||
+    code.includes("EMAIL_VERIFICATION") ||
+    code.includes("VERIFICATION_REQUIRED") ||
+    code.includes("UNVERIFIED")
+  ) {
     return true;
   }
-  const message = error.message?.toLowerCase() ?? "";
+  const message = parsed.message?.toLowerCase() ?? "";
   return (
     message.includes("not verified") ||
+    message.includes("unverified") ||
     message.includes("verify your email") ||
-    message.includes("email verification")
+    message.includes("verify your account") ||
+    message.includes("confirm your email") ||
+    message.includes("email verification") ||
+    message.includes("verification required")
   );
 }

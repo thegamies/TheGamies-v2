@@ -44,7 +44,7 @@ export function CookieConsentBanner({ preview = false }: { preview?: boolean }) 
       className={
         preview
           ? cardClass
-          : `fixed z-40 ${cardClass} right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,env(safe-area-inset-bottom))]`
+          : `fixed z-40 ${cardClass} right-[max(1rem,env(safe-area-inset-right))] bottom-[max(1rem,calc(var(--site-ad-bar,0px)+1rem+env(safe-area-inset-bottom)))]`
       }
     >
       <p className="text-sm text-muted">

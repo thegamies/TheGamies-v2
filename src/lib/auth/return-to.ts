@@ -50,6 +50,9 @@ export function buildAbsoluteAppUrl(origin: string, path: string): string | null
 /** In-app path Neon should trust for password reset (relative = valid redirect). */
 export const PASSWORD_RESET_PATH = "/auth/reset-password";
 
+/** After Google OAuth: finish username, or continue if the profile already exists. */
+export const GOOGLE_COMPLETE_PROFILE_PATH = "/auth/complete-profile";
+
 /** In-app path Neon should trust after confirm-email (relative = valid redirect). */
 export function emailConfirmedCallbackPath(next: string): string {
   const dest = safeNextPath(next) ?? "/account";

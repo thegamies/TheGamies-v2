@@ -44,7 +44,7 @@ describe("expireAuthCookies", () => {
     expect(setCookie.mock.calls[0]?.[1]).toBe("");
     expect(setCookie.mock.calls[0]?.[2]).toMatchObject({
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "lax",
       path: "/",
       maxAge: 0,
     });

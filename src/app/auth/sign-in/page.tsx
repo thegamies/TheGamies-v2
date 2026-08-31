@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState, type FormEvent } from "react";
+import { ContinueWithGoogle } from "@/components/auth/ContinueWithGoogle";
 import { Button } from "@/components/ui/Button";
+import {
+  googleOAuthReturnMessage,
+} from "@/lib/auth/google-sign-in-client";
 import { PASSWORD_RESET_UPDATED } from "@/lib/auth/password";
 import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
 import { buildSignUpHref } from "@/lib/auth/return-to";
@@ -17,7 +21,9 @@ function SignInForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "";
   const intent = parseListAuthIntent(searchParams.get("intent"));
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    googleOAuthReturnMessage(searchParams.get("error")),
+  );
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -50,7 +56,7 @@ function SignInForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-10 space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
       <label className="block text-sm text-muted">
         Email
         <input
@@ -121,9 +127,12 @@ export default function SignInPage() {
         <ResetNotice />
       </Suspense>
 
-      <Suspense fallback={null}>
-        <SignInForm />
-      </Suspense>
+      <div className="mt-10 space-y-4">
+        <ContinueWithGoogle />
+        <Suspense fallback={null}>
+          <SignInForm />
+        </Suspense>
+      </div>
 
       <p className="mt-6 text-sm text-muted">
         New here?{" "}

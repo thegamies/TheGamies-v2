@@ -3,7 +3,7 @@ import Link from "next/link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { PRIVACY_EMAIL, PRIVACY_MAILTO } from "@/lib/site";
 
-const EFFECTIVE_DATE = "August 19, 2026";
+const EFFECTIVE_DATE = "August 31, 2026";
 
 import { publicPageMetadata } from "@/lib/seo/site";
 
@@ -60,7 +60,7 @@ export default function PrivacyPage() {
         of a business transaction such as a merger or acquisition.
       </p>
       <p>We do not sell your personal information.</p>
-      <h2 id="cookies">Cookies and Analytics</h2>
+      <h2 id="cookies">Cookies, Analytics, and Ads</h2>
       <p>
         We use essential cookies to keep you signed in, remember your
         preferences, and help secure The Gamies. Those stay on even if you
@@ -70,8 +70,14 @@ export default function PrivacyPage() {
         We use Google Analytics to collect aggregated usage information. That
         usage data is collected in a cookieless form even if you have not
         accepted analytics cookies. If you accept, additional analytics cookies
-        help us understand return visits more accurately. We do not use
-        advertising cookies.
+        help us understand return visits more accurately.
+      </p>
+      <p>
+        We use Google AdSense to show ads on The Gamies. If you accept
+        non-essential cookies, advertising cookies may be used to show more
+        relevant ads. If you reject, ads may still appear in a less
+        personalized form. Google may collect information as described in
+        Google&apos;s advertising policies.
       </p>
       <p>
         You can Accept or Reject non-essential cookies in the prompt on The

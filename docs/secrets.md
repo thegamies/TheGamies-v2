@@ -91,6 +91,9 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `PRODUCTION_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | **production** upload bucket (separate from staging) |
 | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | **production** public CDN base |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | GA4 measurement id (public; inlined at build). Unset = no analytics |
+| `NEXT_PUBLIC_ADSENSE_CLIENT` | same | Optional. Unset = site AdSense publisher `ca-pub-9835884276920090`. `off` disables |
+| `NEXT_PUBLIC_ADSENSE_BANNER_SLOT` | same | Optional. Unset = site Display unit `2718908461`. `off` hides the banner |
+| `NEXT_PUBLIC_ADSENSE_TEST` | same | Optional. `on` / `off`. Unset = test ads in `next dev` only |
 | `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From address (default `The Gamies <noreply@thegamies.gg>`) |
 | `NEON_API_KEY`, `NEON_PROJECT_ID` | same | Optional on the app: close Auth directory users (Console → Auth → Users). Also used in CI for PR branches. |
 

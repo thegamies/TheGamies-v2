@@ -7,6 +7,7 @@ import {
   buildSignUpHref,
   buildVerifyEmailHref,
   emailConfirmedCallbackPath,
+  GOOGLE_COMPLETE_PROFILE_PATH,
   PASSWORD_RESET_PATH,
   resolvePostAuthRedirect,
   returnPathFromLocation,
@@ -83,6 +84,10 @@ describe("buildSignInHref / buildSignUpHref", () => {
 
   it("exposes the relative password-reset path", () => {
     expect(PASSWORD_RESET_PATH).toBe("/auth/reset-password");
+  });
+
+  it("exposes the Google complete-profile path", () => {
+    expect(GOOGLE_COMPLETE_PROFILE_PATH).toBe("/auth/complete-profile");
   });
 });
 

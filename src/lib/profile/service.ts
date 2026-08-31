@@ -5,8 +5,10 @@ import {
   USERNAME_NOT_AVAILABLE,
   canChangeUsername,
   displayNameSchema,
+  firstAvailableUsername,
   normalizeUsername,
   parseOwnedUsername,
+  suggestUsernameFromIdentity,
 } from "@/lib/profile/username";
 import {
   mergeSocialLinks,
@@ -55,6 +57,16 @@ export async function getProfileByUsername(
   return rows[0] ?? null;
 }
 
+export async function suggestAvailableUsername(
+  identity: { name?: string | null; email?: string | null },
+  db: Db = getDb(),
+): Promise<string> {
+  const base = suggestUsernameFromIdentity(identity);
+  return firstAvailableUsername(base, (username) =>
+    usernameTaken(username, undefined, db),
+  );
+}
+
 export async function usernameTaken(
   username: string,
   exceptAuthUserId?: string,
@@ -78,6 +90,7 @@ export async function ensureProfileForAuthUser(input: {
   authUserId: string;
   username: string;
   displayName: string;
+  avatarUrl?: string | null;
 }): Promise<{ profile: Profile; created: boolean } | { error: string }> {
   const usernameParsed = parseOwnedUsername(input.username);
   if ("error" in usernameParsed) {
@@ -104,6 +117,7 @@ export async function ensureProfileForAuthUser(input: {
       authUserId: input.authUserId,
       username: usernameParsed.username,
       displayName: displayParsed.data,
+      avatarUrl: input.avatarUrl?.trim() || null,
       visibility: "public",
     })
     .returning();

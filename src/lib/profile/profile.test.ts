@@ -4,12 +4,16 @@ import {
   USERNAME_FORMAT_MESSAGE,
   USERNAME_NOT_AVAILABLE,
   canChangeUsername,
+  firstAvailableUsername,
   isReservedUsername,
   isValidUsername,
   nextUsernameChangeAllowedAt,
   normalizeUsername,
   parseOwnedUsername,
+  suggestDisplayNameFromIdentity,
+  suggestUsernameFromIdentity,
   usernameSchema,
+  usernameWithNumericSuffix,
 } from "./username";
 import { ownsProfile } from "./ownership";
 import { safeNextPath } from "@/lib/auth/safe-next";
@@ -42,6 +46,42 @@ describe("username", () => {
       error: USERNAME_FORMAT_MESSAGE,
     });
     expect(parseOwnedUsername("Ada_99")).toEqual({ username: "ada_99" });
+  });
+
+  it("suggests a handle from Google name or email", () => {
+    expect(
+      suggestUsernameFromIdentity({ name: "Ada Lovelace", email: "ada@x.com" }),
+    ).toBe("ada_lovelace");
+    expect(
+      suggestUsernameFromIdentity({ name: null, email: "PlayerOne@x.com" }),
+    ).toBe("playerone");
+    expect(suggestUsernameFromIdentity({ name: "Admin" })).toBe("player");
+  });
+
+  it("suggests a display name from Google name or email", () => {
+    expect(
+      suggestDisplayNameFromIdentity({
+        name: "Ada Lovelace",
+        email: "ada@x.com",
+      }),
+    ).toBe("Ada Lovelace");
+    expect(
+      suggestDisplayNameFromIdentity({ name: "  ", email: "PlayerOne@x.com" }),
+    ).toBe("PlayerOne");
+    expect(suggestDisplayNameFromIdentity({})).toBe("Player");
+  });
+
+  it("appends a number when the Google handle is taken", async () => {
+    expect(usernameWithNumericSuffix("ada_lovelace", 0)).toBe("ada_lovelace");
+    expect(usernameWithNumericSuffix("ada_lovelace", 1)).toBe("ada_lovelace2");
+    expect(usernameWithNumericSuffix("a".repeat(24), 1).length).toBe(24);
+
+    const taken = new Set(["ada_lovelace", "ada_lovelace2"]);
+    await expect(
+      firstAvailableUsername("ada_lovelace", async (username) =>
+        taken.has(username),
+      ),
+    ).resolves.toBe("ada_lovelace3");
   });
 
   it("allows a rename when cooldown is null or elapsed", () => {

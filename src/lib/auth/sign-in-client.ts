@@ -45,7 +45,15 @@ export async function signInOnThisOrigin(input: {
   await clearStaleAuthCookies();
 
   const client = authClient as SignInEmailClient;
-  const { error } = await client.signIn.email({ email, password });
+  let error: { message?: string; code?: string } | null | undefined;
+  try {
+    ({ error } = await client.signIn.email({ email, password }));
+  } catch (thrown) {
+    error =
+      thrown && typeof thrown === "object"
+        ? (thrown as { message?: string; code?: string })
+        : { message: thrown instanceof Error ? thrown.message : String(thrown) };
+  }
 
   if (error && isUnverifiedEmailError(error)) {
     const marked = await markVerifiedForLocalDev(email);

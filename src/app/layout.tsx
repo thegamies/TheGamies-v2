@@ -1,11 +1,14 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
+import { GoogleAdSense } from "@/components/ads/GoogleAdSense";
+import { SiteAdBanner } from "@/components/ads/SiteAdBanner";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
 import { AppProviders } from "@/components/AppProviders";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { getAdsenseBannerSlot, getAdsenseClientId } from "@/lib/ads/adsense";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { resolvePublicOrigin } from "@/lib/seo/origin";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
@@ -40,6 +43,7 @@ export async function generateMetadata(): Promise<Metadata> {
       metadataBase = undefined;
     }
   }
+  const adsenseClient = getAdsenseClientId();
   return {
     metadataBase,
     title: {
@@ -47,6 +51,9 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${SITE_NAME}`,
     },
     description: SITE_DESCRIPTION,
+    ...(adsenseClient
+      ? { other: { "google-adsense-account": adsenseClient } }
+      : {}),
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
@@ -76,20 +83,25 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const showSiteAd = Boolean(getAdsenseClientId() && getAdsenseBannerSlot());
   return (
     <html
       lang="en"
-      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable} min-h-full`}
+      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable}${showSiteAd ? " has-site-ad" : ""}`}
       // Cursor / remote preview injects attributes on <html>; ignore those.
       suppressHydrationWarning
     >
-      <body className="flex min-h-full flex-col bg-paper font-sans text-ink antialiased">
+      <body className="bg-paper font-sans text-ink antialiased">
         <NavigationProgress />
         <AppProviders>
-          <SiteHeader />
-          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
-          <SiteFooter />
+          <div className="site-shell">
+            <SiteHeader />
+            <div className="site-main">{children}</div>
+            <SiteFooter />
+            <SiteAdBanner />
+          </div>
           <GoogleAnalytics />
+          <GoogleAdSense />
           <CookieConsentBanner />
         </AppProviders>
       </body>
