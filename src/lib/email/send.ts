@@ -46,7 +46,11 @@ export function buildAuthEmail(
     const neonAuthBaseUrl = opts?.neonAuthBaseUrl?.trim();
     if (!appOrigin || !neonAuthBaseUrl) return href;
     if (linkType === "forget-password") {
-      return resetPasswordPageHref(href, { appOrigin, neonAuthBaseUrl });
+      return resetPasswordPageHref(href, {
+        appOrigin,
+        neonAuthBaseUrl,
+        token: data.token,
+      });
     }
     if (linkType === "email-verification") {
       return confirmationPageHref(href, { appOrigin, neonAuthBaseUrl });

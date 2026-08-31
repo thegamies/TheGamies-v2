@@ -58,4 +58,12 @@ describe("resetPasswordPageHref", () => {
     expect(url.pathname).toBe("/auth/reset-password");
     expect(url.searchParams.get("token")).toBe("abc");
   });
+
+  it("reads the token from the Neon path", () => {
+    const href = resetPasswordPageHref(
+      "https://ep-test.neon.tech/neondb/auth/reset-password/KFsLY2b9lHmTgsviFkbrS7gR?callbackURL=https%3A%2F%2Fthegamies-v2-develop.ecdm981.workers.dev%2Fauth%2Freset-password",
+      { appOrigin: app, neonAuthBaseUrl: neon },
+    );
+    expect(href).toBe(`${app}/auth/reset-password?token=KFsLY2b9lHmTgsviFkbrS7gR`);
+  });
 });
