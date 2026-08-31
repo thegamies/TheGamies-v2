@@ -1,6 +1,5 @@
-import { and, desc, eq, sql } from "drizzle-orm";
-import type { Db } from "@thegamies/db";
-import { syncRuns } from "@thegamies/db/schema";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { syncRuns, type Db } from "@thegamies/db";
 
 export async function startSyncRun(
   db: Db,
@@ -25,12 +24,18 @@ export async function updateSyncRun(
     rowsProcessed?: number;
     pages?: number;
     lastIgdbId?: number | null;
+    scope?: Record<string, unknown> | null;
   },
 ): Promise<void> {
   await db
     .update(syncRuns)
     .set({
-      ...patch,
+      ...(patch.rowsProcessed !== undefined
+        ? { rowsProcessed: patch.rowsProcessed }
+        : {}),
+      ...(patch.pages !== undefined ? { pages: patch.pages } : {}),
+      ...(patch.lastIgdbId !== undefined ? { lastIgdbId: patch.lastIgdbId } : {}),
+      ...(patch.scope !== undefined ? { scope: patch.scope } : {}),
       updatedAt: sql`now()`,
     })
     .where(eq(syncRuns.id, id));
@@ -63,14 +68,34 @@ export async function finishSyncRun(
     .where(eq(syncRuns.id, id));
 }
 
+export async function getLatestSyncRun(db: Db, kind: string) {
+  const [row] = await db
+    .select()
+    .from(syncRuns)
+    .where(eq(syncRuns.kind, kind))
+    .orderBy(desc(syncRuns.startedAt))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getLastSuccessfulSyncDate(
   db: Db,
   kind = "incremental",
 ): Promise<Date | null> {
+  return getLastSuccessfulSyncDateByKinds(db, [kind]);
+}
+
+export async function getLastSuccessfulSyncDateByKinds(
+  db: Db,
+  kinds: string[],
+): Promise<Date | null> {
+  if (kinds.length === 0) return null;
   const [row] = await db
     .select({ startedAt: syncRuns.startedAt })
     .from(syncRuns)
-    .where(and(eq(syncRuns.status, "success"), eq(syncRuns.kind, kind)))
+    .where(
+      and(eq(syncRuns.status, "success"), inArray(syncRuns.kind, kinds)),
+    )
     .orderBy(desc(syncRuns.startedAt))
     .limit(1);
   return row?.startedAt ?? null;

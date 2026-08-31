@@ -42,7 +42,7 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 - Point Neon Auth email webhooks at the production Worker
 - Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
 
-**Shipped:** migrate on `main` + production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*` or the staging upload bucket.
+**Shipped:** migrate on `main` + production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_IGDB_WEBHOOK_SECRET`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*`, staging `IGDB_WEBHOOK_SECRET`, or the staging upload bucket.
 
 ### 2. Canonical public origin
 
@@ -108,7 +108,8 @@ Confirm these exist on **production** (and staging, where still missing):
 | Secret | Why |
 |---|---|
 | `CRON_SECRET` | Freeze cron |
-| `IGDB_WEBHOOKS_WORKER_URL` + `IGDB_WEBHOOK_SECRET` | Catalog freshness |
+| `IGDB_WEBHOOKS_WORKER_URL` + `IGDB_WEBHOOK_SECRET` | Staging catalog freshness |
+| `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` + `PRODUCTION_IGDB_WEBHOOK_SECRET` | Production catalog freshness (separate slot secret) |
 | `NEON_API_KEY` + `NEON_PROJECT_ID` on the **app** | Account deletion can reuse email |
 | `R2_*` account/keys + `STAGING_R2_AVATAR_BUCKET` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview uploads |
 | `PRODUCTION_R2_AVATAR_BUCKET` + `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production uploads (separate bucket) |

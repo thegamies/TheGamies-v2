@@ -79,9 +79,10 @@ Configure on the repo:
 | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | Optional. Production cookie secret (else `NEON_AUTH_COOKIE_SECRET`) |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` for Cloudflare production |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | Production app → production IGDB webhook Worker origin |
+| `PRODUCTION_IGDB_WEBHOOK_SECRET` | Production webhook slot base (host `IGDB_WEBHOOK_SECRET`). Never the staging secret |
 | `CRON_SECRET` | Edition freeze cron (Cloudflare `scheduled` handler) |
 | `IGDB_WEBHOOKS_WORKER_URL` | Staging app → IGDB webhooks Worker origin (defaults to the develop `workers.dev` URL if unset) |
-| `IGDB_WEBHOOK_SECRET` | Base secret for IGDB webhook slots (Worker `secret bulk`) |
+| `IGDB_WEBHOOK_SECRET` | Staging webhook slot base (develop Worker `secret bulk`) |
 | `ADMIN_SYNC_SECRET` | First site-operator claim + IGDB webhooks Worker proxy (staging + PR previews) |
 | `IGDB_CLIENT_ID` | IGDB / Twitch client id |
 | `IGDB_CLIENT_SECRET` | IGDB / Twitch client secret |

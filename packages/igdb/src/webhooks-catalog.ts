@@ -133,14 +133,35 @@ function resolveRegistrationSlot(
   return null;
 }
 
+/** Same callback host + path, ignoring trailing slashes and query/hash. */
+export function webhookCallbackUrlsMatch(left: string, right: string): boolean {
+  const normalize = (raw: string): string | null => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    try {
+      const url = new URL(trimmed);
+      const path = url.pathname.replace(/\/+$/, "") || "/";
+      return `${url.protocol}//${url.host.toLowerCase()}${path}`;
+    } catch {
+      return trimmed.replace(/\/+$/, "").toLowerCase();
+    }
+  };
+  const a = normalize(left);
+  const b = normalize(right);
+  return a != null && b != null && a === b;
+}
+
 export function normalizeWebhookRegistrations(
   registrations: IgdbWebhookRegistration[],
   baseSecret: string,
   callbackUrl: string,
 ): WebhookRegistrationOverview {
+  const ours = registrations.filter((row) =>
+    webhookCallbackUrlsMatch(row.url, callbackUrl),
+  );
   const slotMap = new Map<string, IgdbWebhookRegistration[]>();
 
-  for (const registration of registrations) {
+  for (const registration of ours) {
     const slot = resolveRegistrationSlot(registration, baseSecret);
     if (!slot) continue;
 
@@ -152,14 +173,14 @@ export function normalizeWebhookRegistrations(
 
   const orphans: WebhookOrphan[] = [];
 
-  for (const registration of registrations) {
+  for (const registration of ours) {
     const slot = resolveRegistrationSlot(registration, baseSecret);
     if (!slot) {
       orphans.push({
         id: registration.id,
         url: registration.url,
         active: registration.active,
-        reason: "Unrecognized secret. Delete and re-register with a typed secret",
+        reason: "This environment does not recognize this registration's secret.",
       });
       continue;
     }

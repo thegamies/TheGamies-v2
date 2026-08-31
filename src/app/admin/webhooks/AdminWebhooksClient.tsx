@@ -610,8 +610,8 @@ export function AdminWebhooksClient() {
               IGDB registrations
             </h2>
             <p className="mt-1 max-w-2xl text-sm text-muted">
-              Callbacks point at the Cloudflare webhook worker. Register only
-              against the environment that should receive live catalog traffic.
+              Callbacks point at this environment&apos;s webhook worker. Slots for
+              another environment are omitted, even when IGDB lists them.
             </p>
             {overview ? (
               <p className="mt-2 text-xs text-muted">

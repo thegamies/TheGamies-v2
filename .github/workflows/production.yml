@@ -230,13 +230,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
-          IGDB_WEBHOOK_SECRET: ${{ secrets.IGDB_WEBHOOK_SECRET }}
+          IGDB_WEBHOOK_SECRET: ${{ secrets.PRODUCTION_IGDB_WEBHOOK_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
         run: |
           if [ -z "$DATABASE_URL" ]; then
             echo "::error::PRODUCTION_DATABASE_URL empty — refusing IGDB webhooks deploy without production DATABASE_URL."
             exit 1
+          fi
+          if [ -z "$IGDB_WEBHOOK_SECRET" ]; then
+            echo "::warning::PRODUCTION_IGDB_WEBHOOK_SECRET empty — not falling back to staging IGDB_WEBHOOK_SECRET"
           fi
           node <<'NODE'
           const fs = require("fs");

@@ -98,7 +98,9 @@ export async function igdbQuery<T>(endpoint: string, body: string): Promise<T> {
       body,
     });
 
-    if (res.status === 429 && attempt < 5) {
+    const retryable =
+      res.status === 429 || (res.status >= 500 && res.status <= 504);
+    if (retryable && attempt < 5) {
       await sleep(500 * (attempt + 1));
       continue;
     }
@@ -234,7 +236,7 @@ export function mapIgdbGame(
   };
 }
 
-const GAME_FIELDS =
+export const GAME_FIELDS =
   "fields id, name, slug, summary, first_release_date, updated_at, cover, " +
   "platforms, genres, themes, keywords, involved_companies, game_type, " +
   "parent_game, version_parent, total_rating, total_rating_count, follows, hypes, " +
@@ -246,19 +248,62 @@ export function yearUnixRange(year: number): { start: number; end: number } {
   return { start, end };
 }
 
+export function buildEntityPageQuery(options: {
+  fields: string;
+  afterId: number;
+  limit: number;
+  sinceUnix?: number;
+  extraWhere?: string;
+}): string {
+  const trimmed = options.fields.trim().replace(/;+$/, "");
+  const fields = /^fields\s/i.test(trimmed) ? trimmed : `fields ${trimmed}`;
+  let where = `id > ${options.afterId}`;
+  if (options.sinceUnix != null) {
+    where += ` & updated_at >= ${options.sinceUnix}`;
+  }
+  if (options.extraWhere) {
+    where += ` & ${options.extraWhere}`;
+  }
+  return `${fields}; where ${where}; sort id asc; limit ${options.limit};`;
+}
+
+export async function fetchEntityPage<T extends { id: number }>(options: {
+  endpoint: string;
+  fields: string;
+  afterId: number;
+  limit?: number;
+  sinceUnix?: number;
+  extraWhere?: string;
+}): Promise<T[]> {
+  const limit = options.limit ?? 500;
+  const body = buildEntityPageQuery({
+    fields: options.fields,
+    afterId: options.afterId,
+    limit,
+    sinceUnix: options.sinceUnix,
+    extraWhere: options.extraWhere,
+  });
+  return igdbQuery<T[]>(options.endpoint, body);
+}
+
 export async function fetchGamesPage(options: {
   afterId: number;
   limit?: number;
   year?: number;
 }): Promise<IgdbGame[]> {
   const limit = options.limit ?? 500;
-  let where = `where id > ${options.afterId}`;
+  let extraWhere: string | undefined;
   if (options.year != null) {
     const { start, end } = yearUnixRange(options.year);
-    where += ` & first_release_date >= ${start} & first_release_date < ${end}`;
+    extraWhere = `first_release_date >= ${start} & first_release_date < ${end}`;
   }
-  const body = `${GAME_FIELDS} ${where}; sort id asc; limit ${limit};`;
-  return igdbQuery<IgdbGame[]>("games", body);
+  return fetchEntityPage<IgdbGame>({
+    endpoint: "games",
+    fields: GAME_FIELDS,
+    afterId: options.afterId,
+    limit,
+    extraWhere,
+  });
 }
 
 export async function fetchUpdatedGamesPage(
@@ -266,10 +311,13 @@ export async function fetchUpdatedGamesPage(
   afterId: number,
   limit = 500,
 ): Promise<IgdbGame[]> {
-  const body =
-    `${GAME_FIELDS} where updated_at >= ${sinceUnix} & id > ${afterId}; ` +
-    `sort id asc; limit ${limit};`;
-  return igdbQuery<IgdbGame[]>("games", body);
+  return fetchEntityPage<IgdbGame>({
+    endpoint: "games",
+    fields: GAME_FIELDS,
+    afterId,
+    limit,
+    sinceUnix,
+  });
 }
 
 export async function fetchByIds<T extends { id: number }>(

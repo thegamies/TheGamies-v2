@@ -62,6 +62,24 @@ describe("adminSyncBodySchema", () => {
     ).toThrow();
   });
 
+  it("accepts catalog and updated walks", () => {
+    expect(
+      adminSyncBodySchema.parse({
+        action: "catalog",
+        entity: "games",
+        reset: true,
+        afterId: 0,
+      }).action,
+    ).toBe("catalog");
+    expect(
+      adminSyncBodySchema.parse({
+        action: "updated",
+        entity: "all",
+        sinceUnix: 1_700_000_000,
+      }).sinceUnix,
+    ).toBe(1_700_000_000);
+  });
+
   it("requires positive maxPages when set", () => {
     expect(() =>
       adminSyncBodySchema.parse({

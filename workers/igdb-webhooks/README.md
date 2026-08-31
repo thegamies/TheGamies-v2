@@ -58,7 +58,9 @@ npx wrangler secret put IGDB_CLIENT_SECRET --env production
 npx wrangler secret put CLOUDFLARE_API_TOKEN --env production
 ```
 
-Use the matching Neon branch URL for each env’s `DATABASE_URL`. Prefer different `IGDB_WEBHOOK_SECRET` values so a staging slot secret cannot authenticate against production.
+Use the matching Neon branch URL for each env’s `DATABASE_URL`. Staging and production **must** use different `IGDB_WEBHOOK_SECRET` values so a staging slot secret cannot authenticate against production. Production CI maps GitHub `PRODUCTION_IGDB_WEBHOOK_SECRET` onto the Worker’s `IGDB_WEBHOOK_SECRET`.
+
+Admin `/admin/webhooks` lists only IGDB slots whose callback URL matches this Worker. The other environment’s registrations are omitted, so a different base does not show as unrecognized or unregistered.
 
 ## Deploy
 
