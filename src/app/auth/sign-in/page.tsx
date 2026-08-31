@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useActionState, useEffect } from "react";
+import { Suspense, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { PASSWORD_RESET_UPDATED } from "@/lib/auth/password";
 import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
 import { buildSignUpHref } from "@/lib/auth/return-to";
+import { signInOnThisOrigin } from "@/lib/auth/sign-in-client";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
-import { signInWithEmail } from "./actions";
 
 const fieldClass =
   "mt-1 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent";
@@ -17,16 +17,40 @@ function SignInForm() {
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "";
   const intent = parseListAuthIntent(searchParams.get("intent"));
-  const [state, formAction, pending] = useActionState(signInWithEmail, null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
 
   useEffect(() => {
     rememberPostAuthNext(next || null);
   }, [next]);
 
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    setPending(true);
+    setError(null);
+    try {
+      const result = await signInOnThisOrigin({
+        email: String(data.get("email") ?? ""),
+        password: String(data.get("password") ?? ""),
+        next,
+        intent,
+      });
+      if ("error" in result) {
+        setError(result.error);
+        return;
+      }
+      window.location.assign(result.href);
+    } catch {
+      setError("Could not sign in.");
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
-    <form action={formAction} className="mt-10 space-y-4">
-      {next ? <input type="hidden" name="next" value={next} /> : null}
-      {intent ? <input type="hidden" name="intent" value={intent} /> : null}
+    <form onSubmit={onSubmit} className="mt-10 space-y-4">
       <label className="block text-sm text-muted">
         Email
         <input
@@ -52,9 +76,7 @@ function SignInForm() {
           Forgot password?
         </Link>
       </p>
-      {state?.error ? (
-        <p className="text-sm text-accent">{state.error}</p>
-      ) : null}
+      {error ? <p className="text-sm text-accent">{error}</p> : null}
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Signing in…" : "Sign in"}
       </Button>

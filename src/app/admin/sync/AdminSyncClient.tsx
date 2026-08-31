@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  SESSION_KEEPALIVE_INTERVAL_MS,
+  refreshSessionCookie,
+} from "@/lib/auth/session-keepalive";
 
 type SyncRun = {
   id: string;
@@ -197,6 +201,7 @@ export function AdminSyncClient({
     setBusy(true);
     setMessage(null);
     try {
+      await refreshSessionCookie();
       const json = await postSync(body);
       setMessage(JSON.stringify(json, null, 2));
       await loadStatus();
@@ -216,8 +221,14 @@ export function AdminSyncClient({
     const sinceUnix =
       action === "updated" ? dateToUnix(sinceDate) : undefined;
     try {
+      await refreshSessionCookie();
+      let lastPing = Date.now();
       let first = true;
       for (;;) {
+        if (Date.now() - lastPing >= SESSION_KEEPALIVE_INTERVAL_MS) {
+          await refreshSessionCookie();
+          lastPing = Date.now();
+        }
         const label = ENTITY_LABELS[walkEntity] ?? walkEntity;
         setMessage(`Walking ${label}…`);
         const json = (await postSync({
@@ -260,7 +271,13 @@ export function AdminSyncClient({
     const scope = enrichScope();
     const label = allYears ? "all years" : `year ${year}`;
     try {
+      await refreshSessionCookie();
+      let lastPing = Date.now();
       for (const entity of ENRICH_STEPS) {
+        if (Date.now() - lastPing >= SESSION_KEEPALIVE_INTERVAL_MS) {
+          await refreshSessionCookie();
+          lastPing = Date.now();
+        }
         setMessage(`Enriching ${entity} (${label})…`);
         out[entity] = await postSync({
           action: "enrich",

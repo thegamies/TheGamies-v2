@@ -3,22 +3,21 @@ import { ACCOUNT_DELETE_FAILED } from "@/lib/auth/account-delete-copy";
 import { auth } from "@/lib/auth/server";
 import {
   authSessionCookieNamesFromHeader,
+  expireAuthCookies,
   originMatchesRequestHost,
 } from "@/lib/auth/session-cookies";
 import { closeOwnAccount } from "@/lib/profile/close-own-account";
 
-function expireAuthCookies(request: Request, response: NextResponse): void {
-  for (const name of authSessionCookieNamesFromHeader(
-    request.headers.get("cookie"),
-  )) {
-    response.cookies.set(name, "", {
-      httpOnly: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-      secure: name.startsWith("__Secure-") || name.startsWith("__Host-"),
-    });
-  }
+function expireRequestAuthCookies(
+  request: Request,
+  response: NextResponse,
+): void {
+  expireAuthCookies(
+    authSessionCookieNamesFromHeader(request.headers.get("cookie")),
+    (name, value, options) => {
+      response.cookies.set(name, value, options);
+    },
+  );
 }
 
 /**
@@ -55,6 +54,6 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true });
-  expireAuthCookies(request, response);
+  expireRequestAuthCookies(request, response);
   return response;
 }

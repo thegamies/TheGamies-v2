@@ -21,6 +21,39 @@ export function authSessionCookieNamesFromHeader(
   return names;
 }
 
+/** Options that overwrite Neon Auth cookies so the browser drops them. */
+export function expireAuthCookieOptions(name: string): {
+  httpOnly: true;
+  sameSite: "strict";
+  path: "/";
+  maxAge: 0;
+  secure: boolean;
+} {
+  return {
+    httpOnly: true,
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+    secure:
+      name.startsWith("__Secure-") ||
+      name.startsWith("__Host-") ||
+      process.env.NODE_ENV === "production",
+  };
+}
+
+export function expireAuthCookies(
+  names: string[],
+  setCookie: (
+    name: string,
+    value: string,
+    options: ReturnType<typeof expireAuthCookieOptions>,
+  ) => void,
+): void {
+  for (const name of names) {
+    setCookie(name, "", expireAuthCookieOptions(name));
+  }
+}
+
 function requestHost(request: Request): string {
   const forwarded = request.headers
     .get("x-forwarded-host")

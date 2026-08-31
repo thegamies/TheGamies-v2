@@ -2,12 +2,19 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { SessionKeepAlive } from "@/components/SessionKeepAlive";
 
 /**
  * On `/`, sit over the Big Picture hero (transparent fade).
  * Elsewhere, normal bordered bar on paper.
  */
-export function SiteHeaderChrome({ children }: { children: ReactNode }) {
+export function SiteHeaderChrome({
+  children,
+  signedIn = false,
+}: {
+  children: ReactNode;
+  signedIn?: boolean;
+}) {
   const pathname = usePathname();
   const home = pathname === "/";
 
@@ -19,6 +26,7 @@ export function SiteHeaderChrome({ children }: { children: ReactNode }) {
           : "relative z-50 bg-paper"
       }
     >
+      {signedIn ? <SessionKeepAlive /> : null}
       {children}
     </header>
   );
