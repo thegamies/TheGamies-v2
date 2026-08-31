@@ -310,24 +310,25 @@ jobs:
     if: needs.cloudflare.outputs.skipped != 'true'
     steps:
       - uses: actions/checkout@v4
-      - name: Point develop Auth email webhooks at staging Worker
+      - name: Register staging Auth domain and email webhook
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           CF_URL: ${{ secrets.STAGING_CF_APP_URL || needs.cloudflare.outputs.url }}
         run: |
           if [ -z "$NEON_API_KEY" ] || [ -z "$NEON_PROJECT_ID" ]; then
-            echo "Neon API secrets missing; skip Auth email webhook."
+            echo "Neon API secrets missing; skip Auth domain and email webhook."
             exit 0
           fi
-          chmod +x scripts/ci/neon-branch-id.sh scripts/ci/register-neon-auth-email-webhook.sh
+          chmod +x scripts/ci/neon-branch-id.sh scripts/ci/register-neon-auth-email-webhook.sh scripts/ci/register-neon-auth-domains.sh
           BRANCH_ID=$(scripts/ci/neon-branch-id.sh develop)
           case "$CF_URL" in
             https://*)
+              scripts/ci/register-neon-auth-domains.sh "$BRANCH_ID" "$CF_URL"
               scripts/ci/register-neon-auth-email-webhook.sh "$BRANCH_ID" "$CF_URL"
               ;;
             *)
-              echo "No Cloudflare https URL; skipping Auth email webhook."
+              echo "No Cloudflare https URL; skipping Auth domain and email webhook."
               ;;
           esac
 

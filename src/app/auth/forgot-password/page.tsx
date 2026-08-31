@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import {
-  PASSWORD_RESET_SENT,
-} from "@/lib/auth/password";
+import { PASSWORD_RESET_SENT } from "@/lib/auth/password";
+import { PASSWORD_RESET_PATH } from "@/lib/auth/return-to";
 import { requestPasswordResetEmail } from "@/lib/auth/password-reset-client";
 
 const fieldClass =
@@ -22,7 +21,7 @@ export function ForgotPasswordForm() {
     try {
       await requestPasswordResetEmail({
         email,
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: PASSWORD_RESET_PATH,
       });
     } finally {
       setSent(true);

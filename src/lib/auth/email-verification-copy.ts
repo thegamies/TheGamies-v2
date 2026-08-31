@@ -12,6 +12,58 @@ export const VERIFY_EMAIL_RESENT =
 export const VERIFY_EMAIL_SEND_FAILED =
   "Could not send another confirmation email. Try again.";
 
+type AuthClientError = {
+  message?: string;
+  code?: string;
+} | null | undefined;
+
+function parsedAuthClientError(error: AuthClientError): {
+  message?: string;
+  code?: string;
+} | null {
+  if (!error) return null;
+  const raw = error.message?.trim() ?? "";
+  if (raw.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(raw) as { message?: string; code?: string };
+      return {
+        message: parsed.message ?? error.message,
+        code: parsed.code ?? error.code,
+      };
+    } catch {
+      return error;
+    }
+  }
+  return error;
+}
+
+/** Product copy for Auth API failures — never dump JSON or origin-check codes. */
+export function publicAuthErrorMessage(
+  error: AuthClientError,
+  fallback: string,
+): string {
+  const parsed = parsedAuthClientError(error);
+  const code = parsed?.code?.toUpperCase() ?? "";
+  if (
+    code.includes("INVALID_REDIRECT") ||
+    code.includes("INVALID_CALLBACK") ||
+    code.includes("INVALID_ORIGIN")
+  ) {
+    return fallback;
+  }
+  const message = parsed?.message?.trim() ?? "";
+  if (!message || message.startsWith("{")) return fallback;
+  const lower = message.toLowerCase();
+  if (
+    lower.includes("invalid redirect") ||
+    lower.includes("invalid callback") ||
+    lower.includes("invalid origin")
+  ) {
+    return fallback;
+  }
+  return message;
+}
+
 export function isUnverifiedEmailError(error: {
   message?: string;
   code?: string;

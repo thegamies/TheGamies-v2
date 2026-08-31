@@ -1,6 +1,6 @@
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
-import { rewriteNeonAuthEmailHref, confirmationPageHref } from "./auth-link";
+import { rewriteNeonAuthEmailHref, confirmationPageHref, resetPasswordPageHref } from "./auth-link";
 import {
   confirmationText,
   emailChangeText,
@@ -42,10 +42,12 @@ export function buildAuthEmail(
   const expiresAt = data.expires_at;
 
   function hrefForMagicLink(linkType: string | undefined, href: string): string {
-    if (linkType === "forget-password") return href;
     const appOrigin = opts?.appOrigin?.trim();
     const neonAuthBaseUrl = opts?.neonAuthBaseUrl?.trim();
     if (!appOrigin || !neonAuthBaseUrl) return href;
+    if (linkType === "forget-password") {
+      return resetPasswordPageHref(href, { appOrigin, neonAuthBaseUrl });
+    }
     if (linkType === "email-verification") {
       return confirmationPageHref(href, { appOrigin, neonAuthBaseUrl });
     }

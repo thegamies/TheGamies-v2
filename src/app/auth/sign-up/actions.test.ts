@@ -8,10 +8,6 @@ const redirect = vi.fn((url: string) => {
   throw new Error(`REDIRECT:${url}`);
 });
 
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ origin: "http://localhost:3000" }),
-}));
-
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => redirect(url),
 }));
@@ -84,7 +80,26 @@ describe("signUpWithEmail", () => {
       needsVerification: true,
       email: "ada@example.com",
     });
+    expect(signUpEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: "/auth/confirmed?next=%2Faccount",
+      }),
+    );
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not show Neon redirect JSON on the form", async () => {
+    signUpEmail.mockResolvedValue({
+      data: null,
+      error: {
+        code: "INVALID_REDIRECT_URL",
+        message: '{"message":"Invalid redirectURL","code":"INVALID_REDIRECT_URL"}',
+      },
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).resolves.toEqual({
+      error: "Could not create account.",
+    });
   });
 
   it("skips confirm-email when Neon already issued a session", async () => {

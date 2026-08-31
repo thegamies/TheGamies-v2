@@ -89,6 +89,28 @@ describe("auth emails", () => {
     expect(message?.html).not.toContain("ep-test.neon.tech");
   });
 
+  it("puts the password-reset token on the app reset page", () => {
+    const message = buildAuthEmail(
+      {
+        event_type: "send.magic_link",
+        user: { email: "ada@example.com" },
+        event_data: {
+          link_type: "forget-password",
+          link_url:
+            "https://ep-test.neon.tech/neondb/auth/reset-password?token=abc&redirectTo=%2Fauth%2Freset-password",
+        },
+      },
+      {
+        appOrigin: "https://thegamies-v2-pr-12.example.workers.dev",
+        neonAuthBaseUrl: "https://ep-test.neon.tech/neondb/auth/",
+      },
+    );
+    expect(message?.html).toContain(
+      "https://thegamies-v2-pr-12.example.workers.dev/auth/reset-password?token=abc",
+    );
+    expect(message?.html).not.toContain("ep-test.neon.tech");
+  });
+
   it("skips leftover email-verification OTP events", () => {
     expect(
       buildAuthEmail({

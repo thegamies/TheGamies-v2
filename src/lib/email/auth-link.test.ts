@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { confirmationPageHref, rewriteNeonAuthEmailHref } from "./auth-link";
+import { confirmationPageHref, resetPasswordPageHref, rewriteNeonAuthEmailHref } from "./auth-link";
 
 const neon = "https://ep-test.neon.tech/neondb/auth/";
 const app = "https://thegamies-v2-pr-12.example.workers.dev";
@@ -44,5 +44,18 @@ describe("confirmationPageHref", () => {
     expect(url.pathname).toBe("/auth/confirmed");
     expect(url.searchParams.get("token")).toBe("abc");
     expect(url.searchParams.get("next")).toBe("/create/goty");
+  });
+});
+
+describe("resetPasswordPageHref", () => {
+  it("sends reset-password clicks to the app with the token still unused", () => {
+    const href = resetPasswordPageHref(
+      "https://ep-test.neon.tech/neondb/auth/reset-password?token=abc&redirectTo=%2Fauth%2Freset-password",
+      { appOrigin: app, neonAuthBaseUrl: neon },
+    );
+    const url = new URL(href);
+    expect(url.origin).toBe(app);
+    expect(url.pathname).toBe("/auth/reset-password");
+    expect(url.searchParams.get("token")).toBe("abc");
   });
 });

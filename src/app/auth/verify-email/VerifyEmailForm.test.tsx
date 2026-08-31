@@ -38,8 +38,7 @@ describe("VerifyEmailForm", () => {
     expect(await screen.findByText(VERIFY_EMAIL_RESENT)).toBeTruthy();
     expect(sendVerificationLink).toHaveBeenCalledWith({
       email: "ada@example.com",
-      callbackURL:
-        "https://thegamies.gg/auth/confirmed?next=%2Fcreate%2Fgoty",
+      callbackURL: "/auth/confirmed?next=%2Fcreate%2Fgoty",
     });
   });
 
@@ -52,8 +51,7 @@ describe("VerifyEmailForm", () => {
     await vi.waitFor(() => {
       expect(sendVerificationLink).toHaveBeenCalledWith({
         email: "ada@example.com",
-        callbackURL:
-          "https://thegamies.gg/auth/confirmed?next=%2Faccount",
+        callbackURL: "/auth/confirmed?next=%2Faccount",
       });
     });
     expect(screen.getByText(VERIFY_EMAIL_SENT)).toBeTruthy();

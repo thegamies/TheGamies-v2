@@ -1,4 +1,5 @@
 import { safeNextPath } from "@/lib/auth/safe-next";
+import { PASSWORD_RESET_PATH } from "@/lib/auth/return-to";
 
 /**
  * Neon Auth email links hit the hosted Auth origin. Clicking those cannot set
@@ -58,6 +59,26 @@ export function confirmationPageHref(
   const next = nextFromCallback(link.searchParams.get("callbackURL"), input.appOrigin);
   const appOrigin = input.appOrigin.replace(/\/$/, "");
   return `${appOrigin}/auth/confirmed?token=${encodeURIComponent(token)}&next=${encodeURIComponent(next)}`;
+}
+
+/**
+ * Reset-password clicks should land on the app with the token still unused.
+ */
+export function resetPasswordPageHref(
+  href: string,
+  input: { appOrigin: string; neonAuthBaseUrl: string },
+): string {
+  const rewritten = rewriteNeonAuthEmailHref(href, input);
+  let link: URL;
+  try {
+    link = new URL(rewritten);
+  } catch {
+    return rewritten;
+  }
+  const token = link.searchParams.get("token");
+  if (!token) return rewritten;
+  const appOrigin = input.appOrigin.replace(/\/$/, "");
+  return `${appOrigin}${PASSWORD_RESET_PATH}?token=${encodeURIComponent(token)}`;
 }
 
 function nextFromCallback(

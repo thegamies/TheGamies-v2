@@ -47,16 +47,21 @@ export function buildAbsoluteAppUrl(origin: string, path: string): string | null
   return `${base}${safePath}`;
 }
 
+/** In-app path Neon should trust for password reset (relative = valid redirect). */
+export const PASSWORD_RESET_PATH = "/auth/reset-password";
+
+/** In-app path Neon should trust after confirm-email (relative = valid redirect). */
+export function emailConfirmedCallbackPath(next: string): string {
+  const dest = safeNextPath(next) ?? "/account";
+  return `/auth/confirmed?next=${encodeURIComponent(dest)}`;
+}
+
 /** Where Neon should send the browser after the confirm-email click. */
 export function buildEmailConfirmedCallbackUrl(
   origin: string,
   next: string,
 ): string | null {
-  const dest = safeNextPath(next) ?? "/account";
-  return buildAbsoluteAppUrl(
-    origin,
-    `/auth/confirmed?next=${encodeURIComponent(dest)}`,
-  );
+  return buildAbsoluteAppUrl(origin, emailConfirmedCallbackPath(next));
 }
 
 function buildAuthHref(

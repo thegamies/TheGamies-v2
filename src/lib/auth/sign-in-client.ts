@@ -5,7 +5,10 @@ import {
   clearStaleAuthCookies,
   markVerifiedForLocalDev,
 } from "@/app/auth/sign-in/actions";
-import { isUnverifiedEmailError } from "./email-verification-copy";
+import {
+  isUnverifiedEmailError,
+  publicAuthErrorMessage,
+} from "./email-verification-copy";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import {
   buildVerifyEmailHref,
@@ -60,7 +63,7 @@ export async function signInOnThisOrigin(input: {
   }
 
   if (error) {
-    return { error: error.message || "Could not sign in." };
+    return { error: publicAuthErrorMessage(error, "Could not sign in.") };
   }
 
   return { href: next };
