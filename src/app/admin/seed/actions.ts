@@ -20,9 +20,14 @@ export async function seedStandingsAction(input: {
   year: number;
   startIndex: number;
   count: number;
-  listSize: number;
-  ratingBias: number;
-  poolSize: number;
+  minGamesPerList: number;
+  maxGamesPerList: number;
+  minRank: number;
+  maxRank: number;
+  distribution: "weighted" | "uniform";
+  topN: number | null;
+  weightPower: number;
+  includeCategories: boolean;
   reseed: boolean;
   rebuild: boolean;
 }): Promise<

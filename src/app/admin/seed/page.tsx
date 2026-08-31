@@ -38,7 +38,7 @@ export default async function AdminSeedPage() {
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
         Generate synthetic voters and Game of the Year lists to exercise live
-        standings locally or on staging.
+        standings locally or on staging. Category votes are optional.
       </p>
       <div className="mt-10">
         <AdminSeedClient initialYear={year} initialStats={initialStats} />
