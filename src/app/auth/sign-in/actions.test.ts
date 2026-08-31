@@ -1,22 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const signInEmail = vi.fn();
 const skipEmailVerification = vi.fn(() => false);
 const markNeonAuthEmailVerified = vi.fn();
-const redirect = vi.fn((url: string) => {
-  throw new Error(`REDIRECT:${url}`);
-});
+const cookieSet = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  redirect: (url: string) => redirect(url),
-}));
-
-vi.mock("@/lib/auth/server", () => ({
-  auth: {
-    signIn: {
-      email: (...args: unknown[]) => signInEmail(...args),
-    },
-  },
+vi.mock("next/headers", () => ({
+  headers: async () =>
+    new Headers({
+      cookie: "better-auth.session_token=stale; tg_list_edit=keep",
+    }),
+  cookies: async () => ({
+    set: (...args: unknown[]) => cookieSet(...args),
+  }),
 }));
 
 vi.mock("@/lib/auth/skip-email-verification", () => ({
@@ -28,88 +23,47 @@ vi.mock("@/lib/auth/mark-email-verified", () => ({
     markNeonAuthEmailVerified(...args),
 }));
 
-import { signInWithEmail } from "./actions";
+import {
+  clearStaleAuthCookies,
+  markVerifiedForLocalDev,
+} from "./actions";
 
-function form(fields: Record<string, string>): FormData {
-  const data = new FormData();
-  for (const [key, value] of Object.entries(fields)) {
-    data.set(key, value);
-  }
-  return data;
-}
-
-describe("signInWithEmail", () => {
+describe("clearStaleAuthCookies", () => {
   beforeEach(() => {
-    signInEmail.mockReset();
+    cookieSet.mockReset();
+  });
+
+  it("expires Auth cookies and leaves app cookies", async () => {
+    await clearStaleAuthCookies();
+    expect(cookieSet).toHaveBeenCalledTimes(1);
+    expect(cookieSet.mock.calls[0]?.[0]).toBe("better-auth.session_token");
+    expect(cookieSet.mock.calls[0]?.[1]).toBe("");
+    expect(cookieSet.mock.calls[0]?.[2]).toMatchObject({ maxAge: 0 });
+  });
+});
+
+describe("markVerifiedForLocalDev", () => {
+  beforeEach(() => {
     skipEmailVerification.mockReset();
     skipEmailVerification.mockReturnValue(false);
     markNeonAuthEmailVerified.mockReset();
-    redirect.mockClear();
   });
 
-  it("sends unverified accounts to the confirm-email screen", async () => {
-    signInEmail.mockResolvedValue({
-      error: {
-        code: "EMAIL_NOT_VERIFIED",
-        message: "Email verification required",
-      },
-    });
-
-    await expect(
-      signInWithEmail(
-        null,
-        form({
-          email: "ada@example.com",
-          password: "secret",
-          next: "/create/goty",
-        }),
-      ),
-    ).rejects.toThrow(/REDIRECT:\/auth\/verify-email/);
-
-    expect(redirect).toHaveBeenCalledWith(
-      "/auth/verify-email?next=%2Fcreate%2Fgoty&email=ada%40example.com",
+  it("is a no-op on hosted deploys", async () => {
+    await expect(markVerifiedForLocalDev("ada@example.com")).resolves.toBe(
+      false,
     );
+    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
   });
 
-  it("marks the address verified and retries locally", async () => {
+  it("marks the address verified locally", async () => {
     skipEmailVerification.mockReturnValue(true);
-    signInEmail
-      .mockResolvedValueOnce({
-        error: {
-          code: "EMAIL_NOT_VERIFIED",
-          message: "Email verification required",
-        },
-      })
-      .mockResolvedValueOnce({ error: null });
     markNeonAuthEmailVerified.mockResolvedValueOnce(true);
-
-    await expect(
-      signInWithEmail(
-        null,
-        form({
-          email: "ada@example.com",
-          password: "secret",
-          next: "/account",
-        }),
-      ),
-    ).rejects.toThrow(/REDIRECT:\/account/);
+    await expect(markVerifiedForLocalDev("ada@example.com")).resolves.toBe(
+      true,
+    );
     expect(markNeonAuthEmailVerified).toHaveBeenCalledWith({
       email: "ada@example.com",
     });
-    expect(signInEmail).toHaveBeenCalledTimes(2);
-  });
-
-  it("returns other sign-in errors on the form", async () => {
-    signInEmail.mockResolvedValue({
-      error: { message: "Wrong password" },
-    });
-
-    await expect(
-      signInWithEmail(
-        null,
-        form({ email: "ada@example.com", password: "nope" }),
-      ),
-    ).resolves.toEqual({ error: "Wrong password" });
-    expect(redirect).not.toHaveBeenCalled();
   });
 });

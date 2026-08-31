@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   authSessionCookieNamesFromHeader,
+  expireAuthCookies,
   isAuthSessionCookieName,
   originMatchesRequestHost,
 } from "./session-cookies";
@@ -12,6 +13,7 @@ describe("isAuthSessionCookieName", () => {
       isAuthSessionCookieName("__Secure-better-auth.session_token"),
     ).toBe(true);
     expect(isAuthSessionCookieName("neon-auth.session_token")).toBe(true);
+    expect(isAuthSessionCookieName("better-auth.session_data")).toBe(true);
   });
 
   it("leaves app cookies alone", () => {
@@ -27,6 +29,25 @@ describe("authSessionCookieNamesFromHeader", () => {
         "tg_list_edit=a.b; better-auth.session_token=abc; other=1",
       ),
     ).toEqual(["better-auth.session_token"]);
+  });
+});
+
+describe("expireAuthCookies", () => {
+  it("overwrites Auth cookies so the browser drops them", () => {
+    const setCookie = vi.fn();
+    expireAuthCookies(
+      ["better-auth.session_token", "better-auth.session_data"],
+      setCookie,
+    );
+    expect(setCookie).toHaveBeenCalledTimes(2);
+    expect(setCookie.mock.calls[0]?.[0]).toBe("better-auth.session_token");
+    expect(setCookie.mock.calls[0]?.[1]).toBe("");
+    expect(setCookie.mock.calls[0]?.[2]).toMatchObject({
+      httpOnly: true,
+      sameSite: "strict",
+      path: "/",
+      maxAge: 0,
+    });
   });
 });
 

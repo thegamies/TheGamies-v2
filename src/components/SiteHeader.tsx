@@ -51,7 +51,7 @@ export async function SiteHeader() {
     : { status: "anonymous" };
 
   return (
-    <SiteHeaderChrome>
+    <SiteHeaderChrome signedIn={account.status === "authenticated"}>
       <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-2">
         <SiteBrand />
         <nav
