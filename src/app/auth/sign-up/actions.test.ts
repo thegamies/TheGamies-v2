@@ -16,11 +16,14 @@ vi.mock("next/navigation", () => ({
   redirect: (url: string) => redirect(url),
 }));
 
+const getSession = vi.fn();
+
 vi.mock("@/lib/auth/server", () => ({
   auth: {
     signUp: {
       email: (...args: unknown[]) => signUpEmail(...args),
     },
+    getSession: (...args: unknown[]) => getSession(...args),
   },
 }));
 
@@ -59,6 +62,8 @@ const fields = {
 describe("signUpWithEmail", () => {
   beforeEach(() => {
     signUpEmail.mockReset();
+    getSession.mockReset();
+    getSession.mockResolvedValue({ data: null });
     ensureProfileForAuthUser.mockReset();
     skipEmailVerification.mockReset();
     skipEmailVerification.mockReturnValue(false);
@@ -80,6 +85,37 @@ describe("signUpWithEmail", () => {
       email: "ada@example.com",
     });
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("skips confirm-email when Neon already issued a session", async () => {
+    signUpEmail.mockResolvedValue({
+      data: {
+        user: { id: "user-1", emailVerified: false },
+        session: { id: "sess-1" },
+      },
+      error: null,
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
+      /REDIRECT:\/account/,
+    );
+    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it("skips confirm-email when the new account already has a session cookie", async () => {
+    signUpEmail.mockResolvedValue({
+      data: { user: { id: "user-1", emailVerified: false } },
+      error: null,
+    });
+    getSession.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
+      /REDIRECT:\/account/,
+    );
+    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
   });
 
   it("skips confirm-email in local development", async () => {

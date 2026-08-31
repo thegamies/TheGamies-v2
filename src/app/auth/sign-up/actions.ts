@@ -8,9 +8,22 @@ import {
   buildEmailConfirmedCallbackUrl,
   resolvePostAuthRedirect,
 } from "@/lib/auth/return-to";
+import {
+  shouldPromptConfirmEmail,
+  signUpHasSession,
+} from "@/lib/auth/confirm-email-prompt";
 import { skipEmailVerification } from "@/lib/auth/skip-email-verification";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { validatePassword } from "@/lib/auth/password";
+
+async function currentAuthSessionExists(): Promise<boolean> {
+  try {
+    const { data: session } = await auth.getSession();
+    return Boolean(session?.user?.id);
+  } catch {
+    return false;
+  }
+}
 
 export type SignUpState =
   | { error: string }
@@ -80,6 +93,13 @@ export async function signUpWithEmail(
   }
 
   if (data?.user?.emailVerified === false) {
+    const hasSession =
+      signUpHasSession(data) || (await currentAuthSessionExists());
+    if (
+      !shouldPromptConfirmEmail({ emailVerified: false, hasSession })
+    ) {
+      redirect(next);
+    }
     if (skipEmailVerification()) {
       const marked = await markNeonAuthEmailVerified({
         authUserId: userId,

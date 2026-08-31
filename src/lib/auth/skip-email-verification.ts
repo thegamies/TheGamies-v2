@@ -22,7 +22,8 @@ function isHostedDeploy(env: Record<string, string | undefined>): boolean {
 
 /**
  * Skip confirm-email only on local `next dev` (Node cannot send Auth mail).
- * Pull-request previews, develop/staging, and production still require it.
+ * Hosted deploys follow Neon: if confirm-email is off, sign-up already has a
+ * session and the confirm screen is skipped without this helper.
  */
 export function skipEmailVerification(
   env: Record<string, string | undefined> = process.env,
