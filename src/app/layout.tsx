@@ -91,6 +91,9 @@ export default function RootLayout({
       // Cursor / remote preview injects attributes on <html>; ignore those.
       suppressHydrationWarning
     >
+      <head>
+        <GoogleAdSense />
+      </head>
       <body className="bg-paper font-sans text-ink antialiased">
         <NavigationProgress />
         <AppProviders>
@@ -101,7 +104,6 @@ export default function RootLayout({
             <SiteAdBanner />
           </div>
           <GoogleAnalytics />
-          <GoogleAdSense />
           <CookieConsentBanner />
         </AppProviders>
       </body>
