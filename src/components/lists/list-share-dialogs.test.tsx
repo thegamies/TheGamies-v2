@@ -81,6 +81,7 @@ describe("SaveSignInDialog", () => {
       expect.stringContaining("/auth/sign-in?"),
     );
     expect(link.getAttribute("href")).toContain("intent=save");
+    expect(link).toHaveAttribute("rel", "nofollow");
     expect(link.getAttribute("href")).toContain(
       encodeURIComponent("/create/goty?year=2026&intent=save"),
     );
@@ -91,6 +92,7 @@ describe("SaveSignInDialog", () => {
     });
     expect(createLink.getAttribute("href")).toContain("/auth/sign-up?");
     expect(createLink.getAttribute("href")).toContain("intent=save");
+    expect(createLink).toHaveAttribute("rel", "nofollow");
   });
 });
 
@@ -106,6 +108,7 @@ describe("ShareLinkSignInDialog", () => {
 
     const link = screen.getByRole("link", { name: /Sign in & share/i });
     expect(link.getAttribute("href")).toContain("intent=share");
+    expect(link).toHaveAttribute("rel", "nofollow");
     expect(link.getAttribute("href")).toContain(
       encodeURIComponent("/create/custom?title=Favs&intent=share"),
     );

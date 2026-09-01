@@ -160,7 +160,7 @@ export function TgaBallotForm({
     <div className="mt-10 space-y-12">
       {signInHref ? (
         <p className="max-w-xl text-muted">
-          <Link href={signInHref} className="font-semibold text-accent">
+          <Link href={signInHref} className="font-semibold text-accent" rel="nofollow">
             Sign in
           </Link>{" "}
           to make your picks.

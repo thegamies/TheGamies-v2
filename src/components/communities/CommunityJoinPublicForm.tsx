@@ -22,7 +22,10 @@ export function CommunityJoinPublicForm({
   if (!signedIn) {
     return (
       <div className="mt-6">
-        <Link href={`/auth/sign-in?next=/communities/${encodeURIComponent(slug)}`}>
+        <Link
+          href={`/auth/sign-in?next=/communities/${encodeURIComponent(slug)}`}
+          rel="nofollow"
+        >
           <Button type="button" variant="accent-bordered">
             Sign in to join
           </Button>

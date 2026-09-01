@@ -10,6 +10,19 @@ export const SITE_AD_BAR_PX = 90;
 /** Google’s certified seller id for AdSense `ads.txt`. */
 export const ADSENSE_CERTIFIED_SELLER_ID = "f08c47fec0942fa0";
 
+/** Middleware stamps the request path so ads can stay off `/auth` and `/account`. */
+export const REQUEST_PATHNAME_HEADER = "x-pathname";
+
+/** No ads on sign-in / account HTML (AdSense crawler follows those links). */
+export function adsenseAllowedOnPath(
+  pathname: string | null | undefined,
+): boolean {
+  const path = (pathname ?? "/").split("?")[0] || "/";
+  if (path === "/auth" || path.startsWith("/auth/")) return false;
+  if (path === "/account" || path.startsWith("/account/")) return false;
+  return true;
+}
+
 const CLIENT_PATTERN = /^ca-pub-\d+$/;
 const SLOT_PATTERN = /^\d{8,12}$/;
 

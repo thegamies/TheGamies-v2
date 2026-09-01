@@ -21,10 +21,10 @@ export function ShareLinkSignInDialog({
         Sign in to save and publish your list so people can revisit it.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
-        <Link href={buildListSignInHref(returnPath, "share")}>
+        <Link href={buildListSignInHref(returnPath, "share")} rel="nofollow">
           <Button type="button">Sign in &amp; share</Button>
         </Link>
-        <Link href={buildSignUpHref({ next: returnPath, intent: "share" })}>
+        <Link href={buildSignUpHref({ next: returnPath, intent: "share" })} rel="nofollow">
           <Button type="button" variant="bordered">
             Create account &amp; share
           </Button>

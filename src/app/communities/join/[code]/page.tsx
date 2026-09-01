@@ -65,7 +65,7 @@ export default async function CommunityJoinPage({
             </p>
           ) : (
             <p className="mt-6">
-              <Link href={`/auth/sign-in?next=${encodeURIComponent(next)}`}>
+              <Link href={`/auth/sign-in?next=${encodeURIComponent(next)}`} rel="nofollow">
                 <Button type="button">Sign in to join</Button>
               </Link>
             </p>

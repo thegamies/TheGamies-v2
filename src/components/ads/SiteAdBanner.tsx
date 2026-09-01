@@ -1,27 +1,38 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 import {
+  adsenseAllowedOnPath,
+  adsenseTestAds,
   getAdsenseBannerSlot,
   getAdsenseClientId,
-  adsenseTestAds,
 } from "@/lib/ads/adsense";
 import { queueAdsenseFill } from "@/lib/ads/queueAdsenseFill";
 
 export function SiteAdBanner() {
+  const pathname = usePathname();
   const client = getAdsenseClientId();
   const slot = getAdsenseBannerSlot();
   const testAds = adsenseTestAds();
   const insRef = useRef<HTMLModElement>(null);
+  const show = Boolean(client && slot && adsenseAllowedOnPath(pathname));
 
   useEffect(() => {
-    if (!client || !slot) return;
+    document.documentElement.classList.toggle("has-site-ad", show);
+    return () => {
+      document.documentElement.classList.remove("has-site-ad");
+    };
+  }, [show]);
+
+  useEffect(() => {
+    if (!show) return;
     const ins = insRef.current;
     if (!ins) return;
     queueAdsenseFill(ins);
-  }, [client, slot]);
+  }, [show, client, slot]);
 
-  if (!client || !slot) return null;
+  if (!show) return null;
 
   return (
     <>

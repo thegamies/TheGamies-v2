@@ -8,6 +8,7 @@ import { SignInLink } from "@/components/auth/SignInLink";
 import { SiteCreateLink } from "@/components/SiteCreateLink";
 import { Button } from "@/components/ui/Button";
 import { UserAvatar } from "@/components/profile/UserAvatar";
+import { AUTH_ENTRY_REL } from "@/lib/auth/return-to";
 import type { SiteNavAccount, SiteNavLink } from "@/lib/site-nav";
 
 type SiteMobileNavProps = {
@@ -149,6 +150,7 @@ export function SiteMobileNav({
                     fallback={
                       <Link
                         href="/auth/sign-in"
+                        rel={AUTH_ENTRY_REL}
                         className="border-b border-line py-4 text-base font-semibold tracking-wide text-muted transition-colors hover:text-ink"
                         onClick={close}
                       >

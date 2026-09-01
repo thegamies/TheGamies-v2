@@ -3,6 +3,7 @@ import {
   ADSENSE_BANNER_SLOT,
   ADSENSE_CLIENT_ID,
   adsTxtBody,
+  adsenseAllowedOnPath,
   adsenseTestAds,
   getAdsenseBannerSlot,
   getAdsenseClientId,
@@ -85,6 +86,23 @@ describe("adsenseTestAds", () => {
 
   it("without an override, follows this process NODE_ENV", () => {
     expect(adsenseTestAds()).toBe(process.env.NODE_ENV === "development");
+  });
+});
+
+describe("adsenseAllowedOnPath", () => {
+  it("allows public pages and fails open without a path", () => {
+    expect(adsenseAllowedOnPath("/")).toBe(true);
+    expect(adsenseAllowedOnPath("/games/mass-effect")).toBe(true);
+    expect(adsenseAllowedOnPath(null)).toBe(true);
+    expect(adsenseAllowedOnPath(undefined)).toBe(true);
+  });
+
+  it("blocks auth and account", () => {
+    expect(adsenseAllowedOnPath("/auth")).toBe(false);
+    expect(adsenseAllowedOnPath("/auth/sign-in")).toBe(false);
+    expect(adsenseAllowedOnPath("/auth/sign-in?next=/games/x")).toBe(false);
+    expect(adsenseAllowedOnPath("/account")).toBe(false);
+    expect(adsenseAllowedOnPath("/account/settings")).toBe(false);
   });
 });
 

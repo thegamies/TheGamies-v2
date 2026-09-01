@@ -12,4 +12,8 @@ describe("GoogleAdSense", () => {
     expect(html).toContain(" async");
     expect(html.toLowerCase()).toContain("crossorigin=\"anonymous\"");
   });
+
+  it("omits the snippet when ads are not allowed on the page", () => {
+    expect(renderToStaticMarkup(<GoogleAdSense enabled={false} />)).toBe("");
+  });
 });
