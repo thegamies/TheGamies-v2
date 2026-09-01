@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
 import { GoogleAdSense } from "@/components/ads/GoogleAdSense";
 import { SiteAdBanner } from "@/components/ads/SiteAdBanner";
+import { GtagConsentHead } from "@/components/analytics/GtagConsentHead";
 import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
 import { AppProviders } from "@/components/AppProviders";
@@ -92,6 +93,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <GtagConsentHead />
         <GoogleAdSense />
       </head>
       <body className="bg-paper font-sans text-ink antialiased">

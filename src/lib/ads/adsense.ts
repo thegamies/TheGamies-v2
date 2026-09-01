@@ -39,9 +39,13 @@ export function getAdsenseClientId(
   return parseAdsenseClientId(raw);
 }
 
+/** `pub-…` form used by ads.txt and Funding Choices. */
+export function adsensePublisherId(clientId: string): string {
+  return clientId.replace(/^ca-/, "");
+}
+
 export function adsTxtBody(clientId = ADSENSE_CLIENT_ID): string {
-  const publisher = clientId.replace(/^ca-/, "");
-  return `google.com, ${publisher}, DIRECT, ${ADSENSE_CERTIFIED_SELLER_ID}\n`;
+  return `google.com, ${adsensePublisherId(clientId)}, DIRECT, ${ADSENSE_CERTIFIED_SELLER_ID}\n`;
 }
 
 /**

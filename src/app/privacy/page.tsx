@@ -80,6 +80,12 @@ export default function PrivacyPage() {
         Google&apos;s advertising policies.
       </p>
       <p>
+        Visitors in the European Economic Area, the United Kingdom, and
+        Switzerland also see Google&apos;s consent message for ads. That
+        message is required for personalized advertising in those regions. You
+        can change that ads choice later from Ad privacy in the site footer.
+      </p>
+      <p>
         You can Accept or Reject non-essential cookies in the prompt on The
         Gamies. You can also control cookies through your browser settings,
         although some features may not function properly if essential cookies

@@ -22,6 +22,13 @@ describe("gtag bootstrap", () => {
     expect(script).toContain("denied");
     expect(script).toContain("thegamies_cookie_consent");
     expect(script).toContain("accepted");
+    expect(script).toContain("wait_for_update:500");
+  });
+
+  it("waits longer when Funding Choices must apply first", () => {
+    expect(
+      gtagConsentBootstrapScript({ waitForUpdateMs: 2000 }),
+    ).toContain("wait_for_update:2000");
   });
 
   it("configures without an automatic first page view", () => {
