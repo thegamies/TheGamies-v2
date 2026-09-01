@@ -6,6 +6,9 @@ import {
   buildSignInHref,
   buildSignUpHref,
   buildVerifyEmailHref,
+  emailConfirmedCallbackPath,
+  GOOGLE_COMPLETE_PROFILE_PATH,
+  PASSWORD_RESET_PATH,
   resolvePostAuthRedirect,
   returnPathFromLocation,
 } from "./return-to";
@@ -71,6 +74,20 @@ describe("buildSignInHref / buildSignUpHref", () => {
     ).toBe(
       "https://thegamies-v2.example.workers.dev/auth/confirmed?next=%2Fcreate%2Fgoty",
     );
+  });
+
+  it("builds a relative confirm-email callback path", () => {
+    expect(emailConfirmedCallbackPath("/create/goty")).toBe(
+      "/auth/confirmed?next=%2Fcreate%2Fgoty",
+    );
+  });
+
+  it("exposes the relative password-reset path", () => {
+    expect(PASSWORD_RESET_PATH).toBe("/auth/reset-password");
+  });
+
+  it("exposes the Google complete-profile path", () => {
+    expect(GOOGLE_COMPLETE_PROFILE_PATH).toBe("/auth/complete-profile");
   });
 });
 

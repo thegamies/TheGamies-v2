@@ -9,7 +9,7 @@ import {
 } from "@/lib/auth/email-verification-copy";
 import { readPostAuthNext } from "@/lib/auth/post-auth-next";
 import {
-  buildEmailConfirmedCallbackUrl,
+  emailConfirmedCallbackPath,
   resolvePostAuthRedirect,
 } from "@/lib/auth/return-to";
 import { sendVerificationLink } from "@/lib/auth/verify-email-client";
@@ -27,10 +27,8 @@ type Props = {
 };
 
 function callbackURL(next: string | null | undefined, intent: string | null | undefined) {
-  const dest = resolvePostAuthRedirect(next ?? readPostAuthNext(), intent);
-  return (
-    buildEmailConfirmedCallbackUrl(window.location.origin, dest) ??
-    `${window.location.origin}/auth/confirmed`
+  return emailConfirmedCallbackPath(
+    resolvePostAuthRedirect(next ?? readPostAuthNext(), intent),
   );
 }
 

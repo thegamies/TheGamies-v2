@@ -19,13 +19,21 @@ describe("parseCookieConsent", () => {
 });
 
 describe("consentUpdatePayload", () => {
-  it("never grants ads storage", () => {
+  it("grants analytics and ads storage when accepted", () => {
     expect(consentUpdatePayload(true)).toEqual({
       analytics_storage: "granted",
+      ad_storage: "granted",
+      ad_personalization: "granted",
+      ad_user_data: "granted",
+    });
+  });
+
+  it("denies analytics and ads storage when rejected", () => {
+    expect(consentUpdatePayload(false)).toEqual({
+      analytics_storage: "denied",
       ad_storage: "denied",
       ad_personalization: "denied",
       ad_user_data: "denied",
     });
-    expect(consentUpdatePayload(false).analytics_storage).toBe("denied");
   });
 });

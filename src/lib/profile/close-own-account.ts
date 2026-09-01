@@ -2,6 +2,8 @@ import {
   deleteAuthenticatedUser,
   verifyAccountPassword,
 } from "@/lib/auth/delete-user";
+import { ACCOUNT_DELETE_NEEDS_PASSWORD } from "@/lib/auth/account-delete-copy";
+import { hasPasswordCredential } from "@/lib/auth/has-password-credential";
 import {
   deleteUserAvatarObjects,
   deleteUserBannerObjects,
@@ -26,6 +28,9 @@ export async function closeOwnAccount(input: {
   email?: string | null;
   password: string;
 }): Promise<CloseOwnAccountResult> {
+  if (!(await hasPasswordCredential(input.authUserId))) {
+    return { error: ACCOUNT_DELETE_NEEDS_PASSWORD };
+  }
   const password = input.password;
   if (!password) {
     return { error: "Enter your password to delete your account." };

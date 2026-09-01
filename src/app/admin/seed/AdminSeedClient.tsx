@@ -15,11 +15,20 @@ const COUNT_PRESETS = [10, 50, 100, 250, 500, 1000] as const;
 const BATCH_SIZE = 50;
 
 type Stats = { profiles: number; lists: number; maxIndex: number };
+type Distribution = "weighted" | "uniform";
 
 type Props = {
   initialYear: number;
   initialStats: Stats | null;
 };
+
+function parseTopN(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed === "0") return null;
+  const n = Number(trimmed);
+  if (!Number.isFinite(n)) return null;
+  return Math.floor(n);
+}
 
 export function AdminSeedClient({
   initialYear,
@@ -27,9 +36,14 @@ export function AdminSeedClient({
 }: Props) {
   const [year, setYear] = useState(initialYear);
   const [count, setCount] = useState(50);
-  const [listSize, setListSize] = useState(10);
-  const [ratingBias, setRatingBias] = useState(40);
-  const [poolSize, setPoolSize] = useState(500);
+  const [minGames, setMinGames] = useState(1);
+  const [maxGames, setMaxGames] = useState(10);
+  const [minRank, setMinRank] = useState(1);
+  const [maxRank, setMaxRank] = useState(10);
+  const [distribution, setDistribution] = useState<Distribution>("weighted");
+  const [topN, setTopN] = useState("50");
+  const [weightPower, setWeightPower] = useState(1);
+  const [includeCategories, setIncludeCategories] = useState(false);
   const [reseed, setReseed] = useState(true);
   const [stats, setStats] = useState<Stats | null>(initialStats);
   const [message, setMessage] = useState<string | null>(null);
@@ -57,12 +71,22 @@ export function AdminSeedClient({
       year,
       startIndex: opts.startIndex,
       count: opts.count,
-      listSize,
-      ratingBias,
-      poolSize,
+      minGamesPerList: minGames,
+      maxGamesPerList: maxGames,
+      minRank,
+      maxRank,
+      distribution,
+      topN: parseTopN(topN),
+      weightPower,
+      includeCategories,
       reseed,
       rebuild: opts.rebuild,
     });
+  }
+
+  function categorySummary(votes: number, categoryCount: number): string {
+    if (!includeCategories) return "GOTY only";
+    return `${votes} category votes across ${categoryCount} categories`;
   }
 
   async function seedOnce() {
@@ -137,7 +161,7 @@ export function AdminSeedClient({
         startIndex = result.nextIndex;
         remaining = nextRemaining;
         setMessage(
-          `Progress: seeded through voter ${result.endIndex}… (${createdLists + updatedLists} lists, ${categoryVotes} category votes so far)`,
+          `Progress: seeded through voter ${result.endIndex}… (${createdLists + updatedLists} lists, ${categorySummary(categoryVotes, categoryCount)} so far)`,
         );
         if (result.nextIndex > 1000) break;
       }
@@ -150,8 +174,8 @@ export function AdminSeedClient({
         }
         setMessage(
           stoppedEarly
-            ? `Stopped. Through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categoryVotes} category votes across ${categoryCount} categories. Pool ${gamePoolSize}.`
-            : `Done through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categoryVotes} category votes across ${categoryCount} categories. Pool ${gamePoolSize} games (bias ${ratingBias}).`,
+            ? `Stopped. Through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categorySummary(categoryVotes, categoryCount)}. Pool ${gamePoolSize}.`
+            : `Done through voter ${lastEnd}: +${createdProfiles} profiles, ${createdLists} new / ${updatedLists} updated lists, ${skipped} skipped. ${categorySummary(categoryVotes, categoryCount)}. Pool ${gamePoolSize} games.`,
         );
       }
       await refreshStats();
@@ -191,7 +215,7 @@ export function AdminSeedClient({
         categoryVotes += result.categoryVotes;
         startIndex = result.nextIndex;
         setMessage(
-          `Running… through voter ${result.endIndex} (+${totalLists} lists, ${categoryVotes} category votes). Click Stop to finish.`,
+          `Running… through voter ${result.endIndex} (+${totalLists} lists, ${categorySummary(categoryVotes, categoryCount)}). Click Stop to finish.`,
         );
         await refreshStats();
       }
@@ -200,8 +224,8 @@ export function AdminSeedClient({
         await rebuildSeedYearAction({ year });
         setMessage(
           stopRef.current
-            ? `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categoryVotes} category votes (${categoryCount} categories).`
-            : `Filled through ${Math.min(1000, startIndex - 1)}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categoryVotes} category votes (${categoryCount} categories).`,
+            ? `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categorySummary(categoryVotes, categoryCount)}.`
+            : `Filled through ${Math.min(1000, startIndex - 1)}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categorySummary(categoryVotes, categoryCount)}.`,
         );
       }
       await refreshStats();
@@ -215,9 +239,9 @@ export function AdminSeedClient({
   return (
     <div className="max-w-xl space-y-6">
       <p className="text-sm text-muted">
-        Synthetic voters, GOTY lists, and category votes for standings QA. They
-        cannot sign in. Runs in batches of {BATCH_SIZE}; up to 1000 voters.
-        Syncs the award catalog before each batch.
+        Synthetic voters and Game of the Year lists for standings QA. They
+        cannot sign in. Picks weight the year pool by critic count × rating.
+        Runs in batches of {BATCH_SIZE}; up to 1000 voters.
       </p>
 
       {stats ? (
@@ -239,14 +263,67 @@ export function AdminSeedClient({
           />
         </label>
         <label className="block text-sm text-muted">
-          Games per list
+          Distribution
+          <select
+            className={`${fieldInputClass} mt-1`}
+            value={distribution}
+            onChange={(e) =>
+              setDistribution(e.target.value as Distribution)
+            }
+            disabled={busy}
+          >
+            <option value="weighted">Weighted (critic count × rating)</option>
+            <option value="uniform">Uniform</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm text-muted">
+          Min games per list
           <input
             type="number"
             min={1}
-            max={10}
+            max={100}
             className={`${fieldInputClass} mt-1`}
-            value={listSize}
-            onChange={(e) => setListSize(Number(e.target.value))}
+            value={minGames}
+            onChange={(e) => setMinGames(Number(e.target.value))}
+            disabled={busy}
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Max games per list
+          <input
+            type="number"
+            min={1}
+            max={100}
+            className={`${fieldInputClass} mt-1`}
+            value={maxGames}
+            onChange={(e) => setMaxGames(Number(e.target.value))}
+            disabled={busy}
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Min rank
+          <input
+            type="number"
+            min={1}
+            max={100}
+            className={`${fieldInputClass} mt-1`}
+            value={minRank}
+            onChange={(e) => setMinRank(Number(e.target.value))}
+            disabled={busy}
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Max rank
+          <input
+            type="number"
+            min={1}
+            max={100}
+            className={`${fieldInputClass} mt-1`}
+            value={maxRank}
+            onChange={(e) => setMaxRank(Number(e.target.value))}
             disabled={busy}
           />
         </label>
@@ -282,32 +359,47 @@ export function AdminSeedClient({
         />
       </div>
 
-      <label className="block text-sm text-muted">
-        Rating bias ({ratingBias}): negative = prefer lower-rated, 0 = even,
-        positive = prefer highly rated
-        <input
-          type="range"
-          min={-100}
-          max={100}
-          step={5}
-          className="mt-2 w-full"
-          value={ratingBias}
-          onChange={(e) => setRatingBias(Number(e.target.value))}
-          disabled={busy}
-        />
-      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm text-muted">
+          Top N pool (blank = no limit)
+          <input
+            type="number"
+            min={0}
+            className={`${fieldInputClass} mt-1`}
+            value={topN}
+            onChange={(e) => setTopN(e.target.value)}
+            disabled={busy}
+            placeholder="No limit"
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Weight power ({weightPower})
+          <input
+            type="number"
+            min={0.1}
+            max={5}
+            step={0.1}
+            className={`${fieldInputClass} mt-1`}
+            value={weightPower}
+            onChange={(e) => setWeightPower(Number(e.target.value))}
+            disabled={busy}
+          />
+        </label>
+      </div>
+      <p className="text-sm text-muted">
+        Pool is the top N year games by critic-count × rating. Higher power
+        concentrates picks on the most-rated titles. Ranks beyond 10 still
+        appear on lists but do not score standings.
+      </p>
 
-      <label className="block text-sm text-muted">
-        Candidate game pool size (top by popularity, then rating)
+      <label className="flex items-center gap-2 text-sm text-ink">
         <input
-          type="number"
-          min={50}
-          max={2000}
-          className={`${fieldInputClass} mt-1`}
-          value={poolSize}
-          onChange={(e) => setPoolSize(Number(e.target.value))}
+          type="checkbox"
+          checked={includeCategories}
+          onChange={(e) => setIncludeCategories(e.target.checked)}
           disabled={busy}
         />
+        Include category votes (from each list’s GOTY ranks)
       </label>
 
       <label className="flex items-center gap-2 text-sm text-ink">
@@ -410,8 +502,10 @@ export function AdminSeedClient({
           href={`/game-of-the-year/${year}`}
         >
           {year} standings
-        </a>{" "}
-        (switch to Categories to confirm award votes).
+        </a>
+        {includeCategories
+          ? " (switch to Categories to confirm award votes)."
+          : "."}
       </p>
     </div>
   );

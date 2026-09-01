@@ -94,6 +94,7 @@ Configure on the repo:
 | `PRODUCTION_R2_AVATAR_BUCKET` | Production upload bucket (host env `R2_AVATAR_BUCKET`) |
 | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production public base (host env `AVATAR_PUBLIC_BASE_URL`) |
 | `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public). Unset = no gtag |
+| `NEXT_PUBLIC_ADSENSE_CLIENT` | Optional. Unset = site AdSense publisher. `off` disables |
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.
 
@@ -176,10 +177,7 @@ Each Neon Auth branch has its own webhook URL. A preview Worker never receives p
 
 The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_URL` should point at). Rename in Neon or change `parent_branch` in the workflows if yours differs.
 
-What you still configure by hand for lasting environments:
-
-- Staging / production App URLs in Neon Console → Auth → Configuration → Domains (exact origins), or a wildcard such as `https://*.workers.dev` if you want a broader preview allowlist
-- `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing
+Staging CI also POSTs `STAGING_CF_APP_URL` as a trusted domain on Neon branch `develop`. Production App URLs still go in Neon Console → Auth → Configuration → Domains (exact origins), or a wildcard such as `https://*.workers.dev` if you want a broader preview allowlist. `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing.
 
 You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
 

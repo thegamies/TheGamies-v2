@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, like, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
 import {
   createDb,
   games,
@@ -19,6 +19,15 @@ import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
 import { insertInChunks } from "@/lib/db/insert-chunks";
+import {
+  applySeedWeightPower,
+  igdbPickWeight,
+  normalizeSeedSampling,
+  sampleSeedList,
+  SEED_POOL_HARD_CAP,
+  shuffle,
+  type SeedDistribution,
+} from "@/lib/live-aggregate/seed-sampling";
 
 export const SEED_AUTH_PREFIX = "seed:standings:";
 export const SEED_USERNAME_PREFIX = "seedvoter";
@@ -42,6 +51,7 @@ export function seedUsername(index: number): string {
 type PoolGame = {
   id: string;
   rating: number | null;
+  ratingCount: number | null;
   popularity: number;
 };
 
@@ -125,14 +135,35 @@ export function buildSeedCategoryVotes(
   return votes;
 }
 
-function shuffle<T>(items: T[]): T[] {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j]!, copy[i]!];
-  }
-  return copy;
+function eligibleSeedGamesWhere(
+  year: number,
+  today: Date,
+  opts: { allowNullReleaseDate: boolean },
+) {
+  const release =
+    opts.allowNullReleaseDate
+      ? or(
+          isNull(games.firstReleaseDate),
+          sql`${games.firstReleaseDate} <= ${today}`,
+        )
+      : and(
+          sql`${games.firstReleaseDate} is not null`,
+          sql`${games.firstReleaseDate} <= ${today}`,
+        );
+  return and(
+    eq(games.year, year),
+    eq(games.isAdult, false),
+    isNull(games.versionParentIgdbId),
+    release,
+  );
 }
+
+const seedGameSelect = {
+  id: games.id,
+  rating: games.rating,
+  ratingCount: games.ratingCount,
+  popularity: games.popularity,
+};
 
 export async function loadSeedGamePool(
   year: number,
@@ -144,22 +175,39 @@ export async function loadSeedGamePool(
   const limit = Math.min(2000, Math.max(50, Math.floor(poolSize)));
 
   return db
-    .select({
-      id: games.id,
-      rating: games.rating,
-      popularity: games.popularity,
-    })
+    .select(seedGameSelect)
     .from(games)
-    .where(
-      and(
-        eq(games.year, year),
-        eq(games.isAdult, false),
-        isNull(games.versionParentIgdbId),
-        sql`${games.firstReleaseDate} is not null`,
-        sql`${games.firstReleaseDate} <= ${today}`,
-      ),
-    )
+    .where(eligibleSeedGamesWhere(year, today, { allowNullReleaseDate: false }))
     .orderBy(desc(games.popularity), desc(games.rating))
+    .limit(limit);
+}
+
+const igdbRawPickWeightSql = sql`
+  ln(1 + greatest(coalesce(${games.ratingCount}, 0), 0)::double precision)
+  * (coalesce(${games.rating}, 75)::double precision / 100.0)
+`;
+
+/**
+ * Eligible year games, trimmed to top N by IGDB critic-count × rating.
+ * `topN` null/0 → hard cap (Worker-safe).
+ */
+export async function loadIgdbWeightedSeedPool(
+  year: number,
+  topN: number | null,
+  db: Db = getDb(),
+): Promise<PoolGame[]> {
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const limit =
+    topN == null
+      ? SEED_POOL_HARD_CAP
+      : Math.min(SEED_POOL_HARD_CAP, Math.max(1, Math.floor(topN)));
+
+  return db
+    .select(seedGameSelect)
+    .from(games)
+    .where(eligibleSeedGamesWhere(year, today, { allowNullReleaseDate: true }))
+    .orderBy(desc(igdbRawPickWeightSql), desc(games.ratingCount), games.id)
     .limit(limit);
 }
 
@@ -169,11 +217,19 @@ export type SeedStandingsInput = {
   startIndex?: number;
   /** How many voters in this batch (capped at SEED_MAX_BATCH). */
   count: number;
-  listSize?: number;
-  /** −100…100 rating bias for game picks. */
-  ratingBias?: number;
-  /** Size of candidate game pool (default 500). */
-  poolSize?: number;
+  /** Random list length lower bound (default 1). */
+  minGamesPerList?: number;
+  /** Random list length upper bound (default 10). */
+  maxGamesPerList?: number;
+  minRank?: number;
+  maxRank?: number;
+  distribution?: SeedDistribution;
+  /** Limit pool to top N by IGDB weight. Null/0 = no limit (hard-capped). */
+  topN?: number | null;
+  /** Weight sharpness 0.1–5 (default 1). */
+  weightPower?: number;
+  /** When true, also write category votes from each GOTY list. */
+  includeCategories?: boolean;
   /** When false, skip voters that already have a GOTY list for the year. */
   reseed?: boolean;
   /** Rebuild year score cache after this batch (default true). */
@@ -237,12 +293,17 @@ export async function seedStandingsVoters(
   const year = Math.floor(input.year);
   const startIndex = Math.max(1, Math.floor(input.startIndex ?? 1));
   const count = Math.floor(input.count);
-  const listSize = Math.min(10, Math.max(1, Math.floor(input.listSize ?? 10)));
-  const ratingBias = Math.max(
-    -100,
-    Math.min(100, Math.floor(input.ratingBias ?? 40)),
-  );
-  const poolSize = Math.min(2000, Math.max(50, Math.floor(input.poolSize ?? 500)));
+  const sampling = normalizeSeedSampling({
+    minGamesPerList: input.minGamesPerList ?? 1,
+    maxGamesPerList: input.maxGamesPerList ?? 10,
+    minRank: input.minRank ?? 1,
+    maxRank: input.maxRank ?? 10,
+    distribution: input.distribution ?? "weighted",
+    topN: input.topN,
+    weightPower: input.weightPower,
+  });
+  if ("error" in sampling) return sampling;
+  const includeCategories = input.includeCategories === true;
   const reseed = input.reseed !== false;
   const doRebuild = input.rebuild !== false;
 
@@ -264,10 +325,10 @@ export async function seedStandingsVoters(
     (_, i) => startIndex + i,
   );
 
-  const pool = await loadSeedGamePool(year, poolSize, db);
-  if (pool.length < listSize) {
+  const pool = await loadIgdbWeightedSeedPool(year, sampling.topN, db);
+  if (pool.length === 0) {
     return {
-      error: `Need at least ${listSize} released ${year} games in the catalog to seed lists.`,
+      error: `Need ${year} games in the catalog to seed lists.`,
     };
   }
 
@@ -394,13 +455,16 @@ export async function seedStandingsVoters(
   const listIds = allLists.map((l) => l.id);
   const updatedLists = allLists.length - listsToCreate.length;
 
-  await ensureAwardCategories(db);
-  const categories = await listActiveAwardCategories(db);
-  if (categories.length === 0) {
-    return {
-      error:
-        "No active award categories found after syncing the catalog. Check award category migrations.",
-    };
+  let categories: Array<{ id: string }> = [];
+  if (includeCategories) {
+    await ensureAwardCategories(db);
+    categories = await listActiveAwardCategories(db);
+    if (categories.length === 0) {
+      return {
+        error:
+          "No active award categories found after syncing the catalog. Check award category migrations.",
+      };
+    }
   }
 
   await db.delete(listItems).where(inArray(listItems.listId, listIds));
@@ -435,23 +499,27 @@ export async function seedStandingsVoters(
     gameId: string;
   }[] = [];
 
-  for (const list of allLists) {
-    const picks = weightedSample(pool, listSize, (game) =>
-      weightForRatedGame(game, ratingBias),
+  const weightOf = (game: PoolGame) =>
+    applySeedWeightPower(
+      igdbPickWeight(game.rating, game.ratingCount),
+      sampling.weightPower,
     );
-    for (let rank = 0; rank < picks.length; rank += 1) {
-      const game = picks[rank]!;
+
+  for (const list of allLists) {
+    const { picks, ranks } = sampleSeedList(pool, sampling, weightOf);
+    for (let i = 0; i < picks.length; i += 1) {
+      const game = picks[i]!;
       itemRows.push({
         listId: list.id,
         gameId: game.id,
-        rank: rank + 1,
+        rank: ranks[i]!,
         blurb: null,
       });
     }
     const scored = buildGotyContribRows(
       picks.map((game, index) => ({
         gameId: game.id,
-        rank: index + 1,
+        rank: ranks[index]!,
         isAdult: false,
       })),
     );
@@ -466,6 +534,7 @@ export async function seedStandingsVoters(
       });
     }
 
+    if (!includeCategories) continue;
     const catVotes = buildSeedCategoryVotes(categories, picks);
     for (const vote of catVotes) {
       categoryVoteRows.push({

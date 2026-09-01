@@ -7,6 +7,7 @@ const {
   deleteAuthenticatedUser,
   purgeAndTombstoneProfile,
   readR2AvatarConfigFromEnv,
+  hasPasswordCredential,
 } = vi.hoisted(() => ({
   getProfileByAuthUserId: vi.fn(),
   listLastHostCommunityNames: vi.fn(),
@@ -14,6 +15,7 @@ const {
   deleteAuthenticatedUser: vi.fn(),
   purgeAndTombstoneProfile: vi.fn(),
   readR2AvatarConfigFromEnv: vi.fn(),
+  hasPasswordCredential: vi.fn(),
 }));
 
 vi.mock("@/lib/profile/service", () => ({
@@ -28,6 +30,10 @@ vi.mock("@/lib/profile/delete-account-service", () => ({
 vi.mock("@/lib/auth/delete-user", () => ({
   verifyAccountPassword,
   deleteAuthenticatedUser,
+}));
+
+vi.mock("@/lib/auth/has-password-credential", () => ({
+  hasPasswordCredential,
 }));
 
 vi.mock("@/lib/profile/avatar-upload", () => ({
@@ -47,6 +53,8 @@ describe("closeOwnAccount", () => {
     purgeAndTombstoneProfile.mockReset();
     readR2AvatarConfigFromEnv.mockReset();
     readR2AvatarConfigFromEnv.mockReturnValue(null);
+    hasPasswordCredential.mockReset();
+    hasPasswordCredential.mockResolvedValue(true);
   });
 
   it("requires a password", async () => {
@@ -97,5 +105,21 @@ describe("closeOwnAccount", () => {
       email: "ada@example.com",
     });
     expect(purgeAndTombstoneProfile).toHaveBeenCalledWith("p1");
+  });
+
+  it("asks passwordless accounts to use Forgot password first", async () => {
+    hasPasswordCredential.mockResolvedValueOnce(false);
+    await expect(
+      closeOwnAccount({
+        authUserId: "user-1",
+        email: "ada@example.com",
+        password: "anything",
+      }),
+    ).resolves.toEqual({
+      error:
+        "This account does not have a password yet. Use Forgot password to set one, then come back here to delete your account.",
+    });
+    expect(verifyAccountPassword).not.toHaveBeenCalled();
+    expect(deleteAuthenticatedUser).not.toHaveBeenCalled();
   });
 });

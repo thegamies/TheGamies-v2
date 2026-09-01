@@ -19,17 +19,23 @@ export function rememberPostAuthNext(next: string | null | undefined): void {
   document.cookie = `${POST_AUTH_NEXT_COOKIE}=${encodeURIComponent(path)}; Path=/; Max-Age=${MAX_AGE_SECONDS}; SameSite=Lax${cookieSecureSuffix()}`;
 }
 
+export function parsePostAuthNextCookie(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw) return null;
+  try {
+    return safeNextPath(decodeURIComponent(raw));
+  } catch {
+    return safeNextPath(raw);
+  }
+}
+
 export function readPostAuthNext(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(
     new RegExp(`(?:^|; )${POST_AUTH_NEXT_COOKIE}=([^;]*)`),
   );
-  if (!match?.[1]) return null;
-  try {
-    return safeNextPath(decodeURIComponent(match[1]));
-  } catch {
-    return null;
-  }
+  return parsePostAuthNextCookie(match?.[1]);
 }
 
 export function clearPostAuthNext(): void {

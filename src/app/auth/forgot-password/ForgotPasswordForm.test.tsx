@@ -22,5 +22,9 @@ describe("ForgotPasswordForm", () => {
     });
     fireEvent.submit(screen.getByRole("button", { name: "Send reset link" }).closest("form")!);
     expect(await screen.findByText(PASSWORD_RESET_SENT)).toBeTruthy();
+    expect(requestPasswordResetEmail).toHaveBeenCalledWith({
+      email: "ada@example.com",
+      redirectTo: "/auth/reset-password",
+    });
   });
 });

@@ -1278,7 +1278,7 @@ export function ListEditor({
       )}
 
       {editorView === "goty" && panelOpen ? (
-        <aside className="fixed inset-x-0 top-0 bottom-14 z-40 flex flex-col bg-paper lg:hidden">
+        <aside className="fixed inset-x-0 top-0 z-40 flex flex-col bg-paper lg:hidden bottom-[calc(3.5rem+var(--site-ad-bar,0px))]">
           <div className="flex items-center justify-between border-b border-line px-3 py-3">
             <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-ink">
               Search games
@@ -1309,7 +1309,7 @@ export function ListEditor({
       ) : null}
 
       {editorView === "goty" ? (
-      <nav className="fixed inset-x-0 bottom-0 z-50 flex h-14 border-t border-line bg-panel lg:hidden">
+      <nav className="fixed inset-x-0 z-50 flex h-14 border-t border-line bg-panel lg:hidden bottom-[var(--site-ad-bar,0px)]">
         <button
           type="button"
           onClick={() => setPanelOpen((open) => !open)}
@@ -1402,7 +1402,9 @@ export function ListEditor({
       {signedIn && dirty ? (
         <PinnedSaveBar
           className={`fixed inset-x-0 z-40 ${
-            editorView === "goty" ? "bottom-14 lg:bottom-0" : "bottom-0"
+            editorView === "goty"
+              ? "bottom-[calc(3.5rem+var(--site-ad-bar,0px))] lg:bottom-[var(--site-ad-bar,0px)]"
+              : "bottom-[var(--site-ad-bar,0px)]"
           }`}
           message="Unsaved changes"
         >

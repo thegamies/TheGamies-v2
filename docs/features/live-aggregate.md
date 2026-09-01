@@ -59,7 +59,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 
 ## Categories
 
-- Site defs in `award_categories` (kept in sync from `AWARD_CATEGORY_DEFS` via `ensureAwardCategories`, including on `/admin/seed`; GOTY itself is the main board).
+- Site defs in `award_categories` (kept in sync from `AWARD_CATEGORY_DEFS` via `ensureAwardCategories`, including on `/admin/seed` when category votes are included; GOTY itself is the main board).
 - Groups (Premier, Major, Genre, …) for browsing standings and the ballot picker.
 - **Eligibility** per category: current year, current/active, active in year, upcoming, any year. Current/active and active-in-year currently treat prior-year *released* titles as eligible (no live-ops catalog flag yet). **Upcoming** is later years only — not the list year, even if still unreleased. Remake/DLC categories allow edition/version titles.
 - Owned GOTY lists and edition ballots: **one game per category**. Voters **add categories from a grouped list** instead of seeing every slot at once. Order follows `sort_order`.
@@ -76,7 +76,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - `/games/[slug]` — 240px cover on the left; title, description, site GOTY **rank** per public year (Broadcast compact), **site category #1s**, and credits to the right. Description clamps to four lines with Show more / Show less. Rank is always public. Votes, points, and the list-position chart follow the reveal gate. Query is this game’s score rows plus a higher-score count for place — not the full year board. Editions with no scores inherit the parent title’s standings. Suppressed years are omitted.
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
 - Year switching uses the shared `YearSelect` popover. Site GOTY (`/game-of-the-year` **All** and `/game-of-the-year/[year]`) lists years with a public GOTY board **or** at least one public category — not a rolling calendar window. Community Live still uses recent calendar years.
-- Admin `/admin/seed` writes GOTY lists **and** category votes (top-rank weighted so leaders separate); community edition seed uses the same category pick weights
+- Admin `/admin/seed` writes GOTY lists; **category votes are optional**. Community edition seed uses the same category pick weights when that checkbox is on.
 
 - `/admin` — ops index (sync, rankings, seed)
 - `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense) + **minimum lists before GOTY is public** + **minimum category votes before category boards are public**
@@ -101,16 +101,16 @@ GOTY years stay off the homepage, `/game-of-the-year`, year boards, and game-pag
 ## Ops: standings seed
 
 `/admin/seed` (site operators) creates synthetic profiles
-(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists
-**and** category votes (from each list’s ranked picks, top-rank weighted).
+(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
+**Include category votes** is off by default; when on, votes come from each
+list’s ranked picks (top-rank weighted).
 
-- Upserts the award catalog (`ensureAwardCategories`) before writing votes; errors if no active categories remain
 - Up to **1000** seed indices; UI batches of 50
 - **Reseed on** → Seed N rewrites voters `1…N`
 - **Reseed off** → Seed N appends N new voters after the current max index (does not re-target `1…N` and skip)
 - **Keep adding until stopped** also continues from max index
-- Game picks from a large year pool with **rating bias** (−100…100): positive favors highly rated, negative favors lower-rated, 0 is uniform
-- Category picks reuse the same GOTY shortlist with **top-rank weight** (shared with community edition seed) so #1/#2 pull away from flat ties
+- Game picks match the old GOTY load-test: eligible year games (not adult, not version-parent; null release date allowed), weight `ln(1 + rating_count) × (rating / 100)` (missing rating = 75), optional **top N** pool (UI default 50; blank/0 = no limit, Worker-capped at 10,000), **weight power** 0.1–5, **weighted** (`-ln(random()) / weight`) or **uniform**, random list length in **min–max games**, ranks from **min rank**
+- When **Include category votes** is on: upserts the award catalog (`ensureAwardCategories`) before writing votes; errors if no active categories remain. Category picks reuse the GOTY shortlist with **top-rank weight** (shared with community edition seed)
 - Category vote / contrib inserts are **chunked** (Neon HTTP-safe); the admin result reports category count + votes written
 - Year **rebuild** aggregates first, then replaces score rows in chunks (avoids wiping categories when a single large insert fails)
 - Ends with one year score rebuild (or after Stop). If rebuild fails after lists are written, the seed result says so — use Rankings → Rebuild.

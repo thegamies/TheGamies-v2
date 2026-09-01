@@ -78,10 +78,33 @@
   --radius-artwork: var(--radius-artwork);
 }
 
+html {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 body {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-archivo), system-ui, sans-serif;
+}
+
+.site-shell {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.site-main {
+  flex: 1 0 auto;
+}
+
+html.has-site-ad {
+  --site-ad-bar: 90px;
 }
 
 /*

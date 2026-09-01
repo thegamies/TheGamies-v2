@@ -5,7 +5,10 @@ import {
   clearStaleAuthCookies,
   markVerifiedForLocalDev,
 } from "@/app/auth/sign-in/actions";
-import { isUnverifiedEmailError } from "./email-verification-copy";
+import {
+  isUnverifiedEmailError,
+  publicAuthErrorMessage,
+} from "./email-verification-copy";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import {
   buildVerifyEmailHref,
@@ -42,7 +45,15 @@ export async function signInOnThisOrigin(input: {
   await clearStaleAuthCookies();
 
   const client = authClient as SignInEmailClient;
-  const { error } = await client.signIn.email({ email, password });
+  let error: { message?: string; code?: string } | null | undefined;
+  try {
+    ({ error } = await client.signIn.email({ email, password }));
+  } catch (thrown) {
+    error =
+      thrown && typeof thrown === "object"
+        ? (thrown as { message?: string; code?: string })
+        : { message: thrown instanceof Error ? thrown.message : String(thrown) };
+  }
 
   if (error && isUnverifiedEmailError(error)) {
     const marked = await markVerifiedForLocalDev(email);
@@ -60,7 +71,7 @@ export async function signInOnThisOrigin(input: {
   }
 
   if (error) {
-    return { error: error.message || "Could not sign in." };
+    return { error: publicAuthErrorMessage(error, "Could not sign in.") };
   }
 
   return { href: next };

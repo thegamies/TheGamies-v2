@@ -17,9 +17,9 @@ export function parseCookieConsent(value: string | null | undefined): CookieCons
 export function consentUpdatePayload(accepted: boolean) {
   return {
     analytics_storage: accepted ? "granted" : "denied",
-    ad_storage: "denied",
-    ad_personalization: "denied",
-    ad_user_data: "denied",
+    ad_storage: accepted ? "granted" : "denied",
+    ad_personalization: accepted ? "granted" : "denied",
+    ad_user_data: accepted ? "granted" : "denied",
   } as const;
 }
 

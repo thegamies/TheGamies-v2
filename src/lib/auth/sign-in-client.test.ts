@@ -63,6 +63,23 @@ describe("signInOnThisOrigin", () => {
     });
   });
 
+  it("sends JSON-wrapped unverified errors to the confirm-email screen", async () => {
+    signInEmail.mockResolvedValueOnce({
+      error: {
+        message:
+          '{"message":"Email verification required","code":"EMAIL_NOT_VERIFIED"}',
+      },
+    });
+    await expect(
+      signInOnThisOrigin({
+        email: "ada@example.com",
+        password: "secret",
+      }),
+    ).resolves.toEqual({
+      href: "/auth/verify-email?email=ada%40example.com",
+    });
+  });
+
   it("retries after local confirm-email skip", async () => {
     markVerifiedForLocalDev.mockResolvedValueOnce(true);
     signInEmail

@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { hasPasswordCredential } from "@/lib/auth/has-password-credential";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
-import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { AccountDeleteForm } from "./AccountDeleteForm";
 import { AccountPasswordForm } from "./AccountPasswordForm";
 import { AccountProfileForm } from "./AccountProfileForm";
@@ -23,28 +23,9 @@ export default async function AccountPage() {
     redirect("/auth/sign-in?next=/account");
   }
 
-  let profile = await getRequestProfileByAuthUserId(user.id);
+  const profile = await getRequestProfileByAuthUserId(user.id);
   if (!profile) {
-    const base =
-      user.name?.trim() ||
-      user.email?.split("@")[0] ||
-      `player${user.id.slice(0, 6)}`;
-    const username = base
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, "_")
-      .replace(/_+/g, "_")
-      .slice(0, 24)
-      .padEnd(3, "0");
-    const ensured = await ensureProfileForAuthUser({
-      authUserId: user.id,
-      username,
-      displayName: user.name?.trim() || username,
-    });
-    if ("error" in ensured) {
-      profile = null;
-    } else {
-      profile = ensured.profile;
-    }
+    redirect("/auth/complete-profile?next=/account");
   }
 
   return (
@@ -57,26 +38,20 @@ export default async function AccountPage() {
         This is how you appear across The Gamies.
       </p>
 
-      {!profile ? (
-        <p className="mt-8 text-accent">
-          Could not load your profile. Try signing out and back in.
-        </p>
-      ) : (
-        <>
-          <p className="mt-4 text-sm text-muted">
-            Public page:{" "}
-            <Link
-              href={`/u/${profile.username}`}
-              className="text-ink underline"
-            >
-              /u/{profile.username}
-            </Link>
-          </p>
-          <AccountProfileForm profile={profile} />
-          <AccountPasswordForm />
-          <AccountDeleteForm />
-        </>
-      )}
+      <p className="mt-4 text-sm text-muted">
+        Public page:{" "}
+        <Link
+          href={`/u/${profile.username}`}
+          className="text-ink underline"
+        >
+          /u/{profile.username}
+        </Link>
+      </p>
+      <AccountProfileForm profile={profile} />
+      <AccountPasswordForm />
+      <AccountDeleteForm
+        hasPassword={await hasPasswordCredential(user.id)}
+      />
     </main>
   );
 }

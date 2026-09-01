@@ -24,14 +24,14 @@ export function authSessionCookieNamesFromHeader(
 /** Options that overwrite Neon Auth cookies so the browser drops them. */
 export function expireAuthCookieOptions(name: string): {
   httpOnly: true;
-  sameSite: "strict";
+  sameSite: "lax";
   path: "/";
   maxAge: 0;
   secure: boolean;
 } {
   return {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
     secure:

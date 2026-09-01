@@ -8,19 +8,18 @@ const redirect = vi.fn((url: string) => {
   throw new Error(`REDIRECT:${url}`);
 });
 
-vi.mock("next/headers", () => ({
-  headers: async () => new Headers({ origin: "http://localhost:3000" }),
-}));
-
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => redirect(url),
 }));
+
+const getSession = vi.fn();
 
 vi.mock("@/lib/auth/server", () => ({
   auth: {
     signUp: {
       email: (...args: unknown[]) => signUpEmail(...args),
     },
+    getSession: (...args: unknown[]) => getSession(...args),
   },
 }));
 
@@ -59,6 +58,8 @@ const fields = {
 describe("signUpWithEmail", () => {
   beforeEach(() => {
     signUpEmail.mockReset();
+    getSession.mockReset();
+    getSession.mockResolvedValue({ data: null });
     ensureProfileForAuthUser.mockReset();
     skipEmailVerification.mockReset();
     skipEmailVerification.mockReturnValue(false);
@@ -79,7 +80,57 @@ describe("signUpWithEmail", () => {
       needsVerification: true,
       email: "ada@example.com",
     });
+    expect(signUpEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        callbackURL: "/auth/confirmed?next=%2Faccount",
+      }),
+    );
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not show Neon redirect JSON on the form", async () => {
+    signUpEmail.mockResolvedValue({
+      data: null,
+      error: {
+        code: "INVALID_REDIRECT_URL",
+        message: '{"message":"Invalid redirectURL","code":"INVALID_REDIRECT_URL"}',
+      },
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).resolves.toEqual({
+      error: "Could not create account.",
+    });
+  });
+
+  it("skips confirm-email when Neon already issued a session", async () => {
+    signUpEmail.mockResolvedValue({
+      data: {
+        user: { id: "user-1", emailVerified: false },
+        session: { id: "sess-1" },
+      },
+      error: null,
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
+      /REDIRECT:\/account/,
+    );
+    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
+    expect(getSession).not.toHaveBeenCalled();
+  });
+
+  it("skips confirm-email when the new account already has a session cookie", async () => {
+    signUpEmail.mockResolvedValue({
+      data: { user: { id: "user-1", emailVerified: false } },
+      error: null,
+    });
+    getSession.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+    });
+
+    await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
+      /REDIRECT:\/account/,
+    );
+    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
   });
 
   it("skips confirm-email in local development", async () => {

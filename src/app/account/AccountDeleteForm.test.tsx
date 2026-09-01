@@ -1,8 +1,24 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountDeleteForm } from "./AccountDeleteForm";
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    ...props
+  }: {
+    href: string;
+    children: React.ReactNode;
+  } & React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 afterEach(() => {
   cleanup();
@@ -12,7 +28,7 @@ afterEach(() => {
 
 describe("AccountDeleteForm", () => {
   it("opens a danger confirm dialog", () => {
-    render(<AccountDeleteForm />);
+    render(<AccountDeleteForm hasPassword />);
     expect(
       screen.getByRole("button", { name: "Delete account" }),
     ).toBeTruthy();
@@ -30,7 +46,7 @@ describe("AccountDeleteForm", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    render(<AccountDeleteForm />);
+    render(<AccountDeleteForm hasPassword />);
     fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "secret" },
@@ -63,7 +79,7 @@ describe("AccountDeleteForm", () => {
       }),
     );
 
-    render(<AccountDeleteForm />);
+    render(<AccountDeleteForm hasPassword />);
     fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "nope" },
@@ -75,5 +91,16 @@ describe("AccountDeleteForm", () => {
     );
     expect(assign).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "Delete account" })).toBeTruthy();
+  });
+
+  it("sends passwordless accounts to Forgot password", () => {
+    render(<AccountDeleteForm hasPassword={false} />);
+    expect(screen.getByText(/does not have a password yet/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete account" }));
+    const dialog = screen.getByRole("dialog", { name: "Delete account" });
+    expect(within(dialog).queryByLabelText("Password")).toBeNull();
+    expect(
+      within(dialog).getByRole("link", { name: "Forgot password" }),
+    ).toHaveAttribute("href", "/auth/forgot-password");
   });
 });

@@ -7,6 +7,7 @@ import { SiteFooter } from "./SiteFooter";
 describe("SiteFooter", () => {
   it("links to info pages, site socials, and IGDB", () => {
     render(<SiteFooter />);
+    expect(screen.getByRole("contentinfo").className).toContain("mt-auto");
     expect(screen.getByRole("link", { name: "About" }).getAttribute("href")).toBe(
       "/about",
     );

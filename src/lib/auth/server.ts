@@ -22,7 +22,11 @@ function createAuthOrNull(): NeonAuth | null {
   if (!env) return null;
   return createNeonAuth({
     baseUrl: env.baseUrl,
-    cookies: { secret: env.secret },
+    cookies: {
+      secret: env.secret,
+      // Lax so the OAuth challenge cookie is sent on the Google return hop.
+      sameSite: "lax",
+    },
   });
 }
 

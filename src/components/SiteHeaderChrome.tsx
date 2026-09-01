@@ -22,7 +22,7 @@ export function SiteHeaderChrome({
     <header
       className={
         home
-          ? "absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-paper/95 via-paper/70 to-transparent"
+          ? "absolute inset-x-0 top-0 z-50 bg-gradient-to-b from-paper/95 via-paper/70 to-transparent [&>div]:py-3 sm:[&>div]:py-4"
           : "relative z-50 bg-paper"
       }
     >
