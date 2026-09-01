@@ -1026,6 +1026,7 @@ export default async function CommunityEditionYearPage({
                   <p className="mt-6 max-w-xl text-muted">
                     <Link
                       href={signInHref}
+                      rel="nofollow"
                       className="text-accent hover:underline"
                     >
                       Sign in

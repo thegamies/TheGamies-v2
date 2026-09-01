@@ -61,7 +61,7 @@ export default async function CommunitiesPage({
             Finish your profile
           </Link>
         ) : (
-          <Link href="/auth/sign-in?next=/communities/new">
+          <Link href="/auth/sign-in?next=/communities/new" rel="nofollow">
             <Button type="button" variant="accent-bordered">
               Sign in to start one
             </Button>

@@ -4,7 +4,9 @@ import {
   ownedListSitemapPath,
   parseSitemapShardId,
   shouldIndexProfile,
+  SITEMAP_CATALOG_YEAR_COUNT,
   SITEMAP_GAMES_PER_YEAR,
+  sitemapCatalogYears,
   sitemapPageCount,
   sitemapShardsForCounts,
 } from "./sitemap-plan";
@@ -38,8 +40,18 @@ describe("sitemap shards", () => {
     expect(parseSitemapShardId("nope")).toBeNull();
   });
 
-  it("caps catalog games per year", () => {
+  it("caps catalog games per included year", () => {
     expect(SITEMAP_GAMES_PER_YEAR).toBe(100);
+    expect(SITEMAP_CATALOG_YEAR_COUNT).toBe(2);
+  });
+
+  it("lists this year and last year for catalog URLs", () => {
+    expect(sitemapCatalogYears(new Date("2026-09-01T12:00:00.000Z"))).toEqual([
+      2026, 2025,
+    ]);
+    expect(sitemapCatalogYears(new Date("2027-01-01T00:00:00.000Z"))).toEqual([
+      2027, 2026,
+    ]);
   });
 
   it("counts pages", () => {

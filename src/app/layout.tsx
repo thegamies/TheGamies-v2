@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
 import { GoogleAdSense } from "@/components/ads/GoogleAdSense";
 import { SiteAdBanner } from "@/components/ads/SiteAdBanner";
@@ -8,7 +9,12 @@ import { AppProviders } from "@/components/AppProviders";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import { getAdsenseBannerSlot, getAdsenseClientId } from "@/lib/ads/adsense";
+import {
+  adsenseAllowedOnPath,
+  getAdsenseBannerSlot,
+  getAdsenseClientId,
+  REQUEST_PATHNAME_HEADER,
+} from "@/lib/ads/adsense";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { resolvePublicOrigin } from "@/lib/seo/origin";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
@@ -44,6 +50,8 @@ export async function generateMetadata(): Promise<Metadata> {
     }
   }
   const adsenseClient = getAdsenseClientId();
+  const pathname = (await headers()).get(REQUEST_PATHNAME_HEADER);
+  const allowAds = adsenseAllowedOnPath(pathname);
   return {
     metadataBase,
     title: {
@@ -51,7 +59,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${SITE_NAME}`,
     },
     description: SITE_DESCRIPTION,
-    ...(adsenseClient
+    ...(adsenseClient && allowAds
       ? { other: { "google-adsense-account": adsenseClient } }
       : {}),
     openGraph: {
@@ -78,12 +86,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const showSiteAd = Boolean(getAdsenseClientId() && getAdsenseBannerSlot());
+  const pathname = (await headers()).get(REQUEST_PATHNAME_HEADER);
+  const allowAds = adsenseAllowedOnPath(pathname);
+  const showSiteAd = Boolean(
+    getAdsenseClientId() && getAdsenseBannerSlot() && allowAds,
+  );
   return (
     <html
       lang="en"
@@ -92,7 +104,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <GoogleAdSense />
+        <GoogleAdSense enabled={allowAds} />
       </head>
       <body className="bg-paper font-sans text-ink antialiased">
         <NavigationProgress />

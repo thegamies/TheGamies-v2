@@ -91,19 +91,18 @@ Point each app deploy’s `IGDB_WEBHOOKS_WORKER_URL` at the matching Worker orig
 
 Register IGDB slots only from that env’s `/admin/webhooks` so callbacks stay on the correct Worker/queue.
 
-## Logs (develop)
+## Logs and traces
 
-Workers Logs is on for `thegamies-igdb-webhooks-develop` only (not production). Cron writes a JSON line with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"` (minute) or `"event":"log-cleanup"` (hourly).
+Workers Logs, invocation logs, and traces are on for both `thegamies-igdb-webhooks-develop` and `thegamies-igdb-webhooks`. Cron writes a JSON line with `"msg":"igdb-webhooks"` and `"event":"delivery-sync"` (minute) or `"event":"log-cleanup"` (hourly).
 
-Dashboard: Workers & Pages → `thegamies-igdb-webhooks-develop` → Logs.
+Dashboard: Workers & Pages → the Worker → Observability.
 
 Or:
 
 ```bash
 pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler tail --env develop
+pnpm --filter @thegamies/igdb-webhooks-worker exec wrangler tail --env production
 ```
-
-Redeploy the develop Worker after changing this (`pnpm deploy:igdb-webhooks:develop`).
 
 ## Delivery
 

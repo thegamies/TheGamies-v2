@@ -7,6 +7,7 @@ import {
   SITEMAP_GAMES_PER_YEAR,
   SITEMAP_PAGE_SIZE,
   SITEMAP_STATIC_PATHS,
+  sitemapCatalogYears,
   type SitemapShard,
 } from "./sitemap-plan";
 
@@ -14,32 +15,38 @@ function getDb() {
   return createDb();
 }
 
-/** Top `SITEMAP_GAMES_PER_YEAR` slugs per release year, by IGDB popularity. */
-const popularGamesByYear = sql`
-  select slug
-  from (
-    select
-      slug,
-      row_number() over (
-        partition by year
-        order by popularity desc, slug asc
-      ) as rn
-    from games
-    where igdb_removed_at is null
-      and is_adult = false
-      and year is not null
-  ) ranked
-  where rn <= ${SITEMAP_GAMES_PER_YEAR}
-`;
+/** Top `SITEMAP_GAMES_PER_YEAR` slugs per included catalog year, by IGDB popularity. */
+function popularGamesSql(years: readonly number[]) {
+  if (years.length === 0) {
+    return sql`select slug from games where false`;
+  }
+  return sql`
+    select slug
+    from (
+      select
+        slug,
+        row_number() over (
+          partition by year
+          order by popularity desc, slug asc
+        ) as rn
+      from games
+      where igdb_removed_at is null
+        and is_adult = false
+        and year in (${sql.join(years.map((year) => sql`${year}`), sql`, `)})
+    ) ranked
+    where rn <= ${SITEMAP_GAMES_PER_YEAR}
+  `;
+}
 
 export async function getSitemapCounts(): Promise<{
   games: number;
   communities: number;
 }> {
   const db = getDb();
+  const popularGames = popularGamesSql(sitemapCatalogYears());
   const gamesResult = await db.execute(sql`
     select count(*)::int as value
-    from (${popularGamesByYear}) popular_games
+    from (${popularGames}) popular_games
   `);
   const [communityRow] = await db
     .select({ value: count() })
@@ -71,8 +78,9 @@ export async function sitemapUrlsForShard(
   const offset = shard.page * SITEMAP_PAGE_SIZE;
 
   if (shard.kind === "games") {
+    const popularGames = popularGamesSql(sitemapCatalogYears());
     const result = await db.execute(sql`
-      ${popularGamesByYear}
+      ${popularGames}
       order by slug
       limit ${SITEMAP_PAGE_SIZE}
       offset ${offset}

@@ -1098,7 +1098,7 @@ export function ListEditor({
         {saveNotice ? (
           <p className="w-full text-sm text-muted" role="status">
             {saveNotice}{" "}
-            <Link href={signInHref} className="text-accent underline">
+            <Link href={signInHref} rel="nofollow" className="text-accent underline">
               Sign in
             </Link>
           </p>
@@ -1583,7 +1583,7 @@ function NotesCard({
           </div>
         ) : (
           <p className="text-xs text-muted">
-            <Link href={signInHref} className="text-accent underline">
+            <Link href={signInHref} rel="nofollow" className="text-accent underline">
               Sign in
             </Link>{" "}
             to add notes.

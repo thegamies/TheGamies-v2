@@ -10,6 +10,7 @@ import { SiteBrand } from "@/components/SiteBrand";
 import { SiteCreateLink } from "@/components/SiteCreateLink";
 import { SiteHeaderChrome } from "@/components/SiteHeaderChrome";
 import { SiteMobileNav } from "@/components/SiteMobileNav";
+import { AUTH_ENTRY_REL } from "@/lib/auth/return-to";
 import {
   buildAccountMenuGroups,
   buildPrimarySiteNavLinks,
@@ -81,6 +82,7 @@ export async function SiteHeader() {
               fallback={
                 <Link
                   href="/auth/sign-in"
+                  rel={AUTH_ENTRY_REL}
                   className="font-semibold hover:text-ink"
                 >
                   Sign in

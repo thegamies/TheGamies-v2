@@ -72,6 +72,7 @@ export function SoftSavePrompt({
         ) : (
           <Link
             href={`/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}&intent=save`}
+            rel="nofollow"
           >
             <Button type="button">Sign in to save</Button>
           </Link>

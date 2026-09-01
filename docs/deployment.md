@@ -24,7 +24,7 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 
 | File | Role |
 |---|---|
-| `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets, Cron Trigger (`* * * * *`) |
+| `wrangler.jsonc` | Cloudflare Worker name, compatibility, assets, observability (logs + traces). Edition freeze Cron Trigger is temporarily `[]` |
 | `cloudflare-worker.ts` | OpenNext custom worker: `fetch` plus `scheduled` → edition freeze |
 | `workers/igdb-webhooks/wrangler.jsonc` | Dedicated IGDB webhook Worker (Queue producer + consumer, KV delivery gate, cron pause/resume) |
 | `open-next.config.ts` | OpenNext Cloudflare adapter config |
@@ -38,7 +38,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 ## Cloudflare notes
 
 - OpenNext Cloudflare builds are verified in **Linux CI**. On native Windows, OpenNext may fail creating symlinks (`EPERM`); use WSL or rely on GitHub Actions for `pnpm preview:cf` / `pnpm deploy:cf`.
-- **Edition freeze cron:** Cloudflare Worker Cron Trigger (`wrangler.jsonc` + `cloudflare-worker.ts`). The `scheduled` handler checks Workers KV `CRON_SETTINGS` (pause all CF jobs from `/admin/scheduled`), then calls the freeze route in-process via `WORKER_SELF_REFERENCE` with `Authorization: Bearer $CRON_SECRET`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
+- **Edition freeze cron:** Temporarily **disabled** (`triggers.crons: []` in `wrangler.jsonc` so deploy removes the every-minute trigger). The `scheduled` handler in `cloudflare-worker.ts` remains: KV `CRON_SETTINGS` (pause from `/admin/scheduled`), then freeze via `WORKER_SELF_REFERENCE` + `CRON_SECRET`. Restore with `["* * * * *"]`. If `CRON_SECRET` is unset (typical for PR previews), the handler returns without work. Staging CI binds the develop KV namespace; production uses the id in `wrangler.jsonc`. PR/manual Workers omit that KV so they cannot pause lasting envs.
+- **Observability:** App Worker and IGDB Workers persist logs, invocation logs, and traces (`observability` in wrangler, 100% sampling). Dashboard: Workers & Pages → the Worker → Observability.
 - **IGDB webhooks Worker:** separate from OpenNext. Create **two** queues up front (`igdb-webhooks-develop`, `igdb-webhooks`) plus a KV namespace per env. The Worker is the queue consumer (not HTTP pull). Staging/production CI deploys it **only when relevant paths change** (`workers/igdb-webhooks/**`, `packages/igdb/**`, `packages/db/**`, `pnpm-lock.yaml`). Manual `workflow_dispatch` on staging also deploys it by default. Manual CLI: `pnpm deploy:igdb-webhooks:develop` / `pnpm deploy:igdb-webhooks:production`. Code deploys keep existing Worker secrets. Staging `secret bulk` only if dispatch checks `sync_igdb_webhook_secrets` (bulk publishes a second version). Point each app’s `IGDB_WEBHOOKS_WORKER_URL` at that env’s Worker. Register IGDB slots from `/admin/webhooks` on staging/production only — not every PR preview. Details: [`workers/igdb-webhooks/README.md`](../workers/igdb-webhooks/README.md).
 - Local Node development remains `pnpm dev` and does not require OpenNext.
 

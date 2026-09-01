@@ -11,7 +11,16 @@ import {
   PASSWORD_RESET_PATH,
   resolvePostAuthRedirect,
   returnPathFromLocation,
+  withAuthEntryRel,
 } from "./return-to";
+
+describe("withAuthEntryRel", () => {
+  it("adds nofollow without duplicating", () => {
+    expect(withAuthEntryRel()).toBe("nofollow");
+    expect(withAuthEntryRel("nofollow")).toBe("nofollow");
+    expect(withAuthEntryRel("noopener")).toBe("noopener nofollow");
+  });
+});
 
 describe("safeNextPath", () => {
   it("allows relative paths only", () => {

@@ -152,7 +152,7 @@ export function CategoryVotesEditor({
           <p className="mt-2 max-w-xl text-sm text-muted">{lockMessage}</p>
           {lockHref ? (
             <div className="mt-4">
-              <Link href={lockHref}>
+              <Link href={lockHref} rel="nofollow">
                 <Button type="button">Sign in</Button>
               </Link>
             </div>

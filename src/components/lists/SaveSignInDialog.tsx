@@ -23,10 +23,10 @@ export function SaveSignInDialog({
         toward the community rankings.
       </p>
       <div className="mt-4 flex flex-wrap gap-3">
-        <Link href={buildListSignInHref(returnPath, "save")}>
+        <Link href={buildListSignInHref(returnPath, "save")} rel="nofollow">
           <Button type="button">Sign in &amp; save</Button>
         </Link>
-        <Link href={buildSignUpHref({ next: returnPath, intent: "save" })}>
+        <Link href={buildSignUpHref({ next: returnPath, intent: "save" })} rel="nofollow">
           <Button type="button" variant="bordered">
             Create account &amp; save
           </Button>

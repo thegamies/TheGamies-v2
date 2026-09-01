@@ -1,7 +1,10 @@
 export const SITEMAP_PAGE_SIZE = 5_000;
 
-/** Most popular catalog titles included per release year (IGDB popularity). */
+/** Most popular catalog titles included per sitemap year (IGDB popularity). */
 export const SITEMAP_GAMES_PER_YEAR = 100;
+
+/** How many recent catalog years get game URLs (this year + last year). */
+export const SITEMAP_CATALOG_YEAR_COUNT = 2;
 
 export const SITEMAP_STATIC_PATHS = [
   "/",
@@ -32,6 +35,15 @@ export type SitemapShard = {
   kind: SitemapKind;
   page: number;
 };
+
+/** Catalog years whose game pages go in the sitemap: this year and last year (UTC). */
+export function sitemapCatalogYears(now: Date = new Date()): number[] {
+  const year = now.getUTCFullYear();
+  return Array.from(
+    { length: SITEMAP_CATALOG_YEAR_COUNT },
+    (_, index) => year - index,
+  );
+}
 
 export function sitemapPageCount(total: number, pageSize = SITEMAP_PAGE_SIZE): number {
   if (total <= 0) return 0;

@@ -80,6 +80,9 @@ describe("SiteMobileNav", () => {
       "/auth/sign-in?next=%2Fgame-of-the-year%2F2026",
     );
     expect(
+      within(drawer).getByRole("link", { name: "Sign in" }),
+    ).toHaveAttribute("rel", "nofollow");
+    expect(
       within(drawer).getByRole("link", { name: "Design system" }),
     ).toHaveAttribute("href", "/design-system");
     expect(within(drawer).queryByRole("link", { name: "Admin" })).toBeNull();

@@ -6,6 +6,7 @@ import type { ComponentProps, ReactNode } from "react";
 import {
   buildSignInHref,
   returnPathFromLocation,
+  withAuthEntryRel,
 } from "@/lib/auth/return-to";
 
 type SignInLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
@@ -13,12 +14,16 @@ type SignInLinkProps = Omit<ComponentProps<typeof Link>, "href"> & {
 };
 
 /** Sign in that returns the user to the current page after auth. */
-export function SignInLink({ children = "Sign in", ...props }: SignInLinkProps) {
+export function SignInLink({
+  children = "Sign in",
+  rel,
+  ...props
+}: SignInLinkProps) {
   const pathname = usePathname() || "/";
   const searchParams = useSearchParams();
   const next = returnPathFromLocation(pathname, searchParams.toString());
   return (
-    <Link href={buildSignInHref({ next })} {...props}>
+    <Link href={buildSignInHref({ next })} rel={withAuthEntryRel(rel)} {...props}>
       {children}
     </Link>
   );

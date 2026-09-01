@@ -7,6 +7,15 @@ import { safeNextPath } from "@/lib/auth/safe-next";
 
 export type { ListAuthIntent };
 
+/** Keep crawlers (especially AdSense) off auth entry URLs. */
+export const AUTH_ENTRY_REL = "nofollow";
+
+export function withAuthEntryRel(rel?: string): string {
+  const tokens = new Set((rel ?? "").split(/\s+/).filter(Boolean));
+  tokens.add(AUTH_ENTRY_REL);
+  return [...tokens].join(" ");
+}
+
 /** Build `/auth/sign-in` with optional return path and list intent. */
 export function buildSignInHref(opts: {
   next?: string | null;
