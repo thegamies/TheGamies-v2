@@ -159,6 +159,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Confirm the copy with whoever owns legal (especially US 13+ / COPPA posture and cookie banner)
 - Mailboxes actually receive mail
 - Cookie banner + GA id: unset id → no gtag (good); banner still shows (intentional)
+- AdSense **European regulations** message published in Privacy & messaging for `thegamies.gg` (Funding Choices; privacy policy `https://thegamies.gg/privacy`; Consent Mode on). The site tag is in the app; the message itself is created in AdSense.
 
 ### Hosting plans
 

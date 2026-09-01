@@ -107,6 +107,11 @@ html.has-site-ad {
   --site-ad-bar: 90px;
 }
 
+/* AdSense may inject a tall iframe; keep the sticky bar at 90px. */
+.site-ad-bar iframe {
+  max-height: 90px !important;
+}
+
 /*
  * iOS Safari zooms focused fields under 16px. Keep form controls at 16px on
  * phone/tablet; desktop can stay denser via utility classes above this floor.

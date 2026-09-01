@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Script from "next/script";
 import { getGaMeasurementId } from "@/lib/analytics/measurement";
-import { gtagConfigScript, gtagConsentBootstrapScript } from "@/lib/analytics/gtag";
+import { gtagConfigScript } from "@/lib/analytics/gtag";
 import { AnalyticsListener } from "./AnalyticsListener";
 
 export function GoogleAnalytics() {
@@ -10,9 +10,6 @@ export function GoogleAnalytics() {
 
   return (
     <>
-      <script
-        dangerouslySetInnerHTML={{ __html: gtagConsentBootstrapScript() }}
-      />
       <Script
         src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`}
         strategy="afterInteractive"

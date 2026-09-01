@@ -11,7 +11,13 @@ declare global {
   }
 }
 
-export function gtagConsentBootstrapScript(): string {
+/** Time for Funding Choices to apply TCF before ads fire. */
+export const ADS_CONSENT_WAIT_MS = 2000;
+
+export function gtagConsentBootstrapScript(input?: {
+  waitForUpdateMs?: number;
+}): string {
+  const wait = input?.waitForUpdateMs ?? 500;
   const denied = JSON.stringify(CONSENT_DENIED);
   const granted = JSON.stringify(consentUpdatePayload(true));
   const key = JSON.stringify(COOKIE_CONSENT_STORAGE_KEY);
@@ -19,7 +25,7 @@ export function gtagConsentBootstrapScript(): string {
     "window.dataLayer = window.dataLayer || [];",
     "function gtag(){dataLayer.push(arguments);}",
     "window.gtag = gtag;",
-    `gtag("consent","default",Object.assign(${denied},{wait_for_update:500}));`,
+    `gtag("consent","default",Object.assign(${denied},{wait_for_update:${wait}}));`,
     "try {",
     `  if (localStorage.getItem(${key}) === "accepted") {`,
     `    gtag("consent","update",${granted});`,

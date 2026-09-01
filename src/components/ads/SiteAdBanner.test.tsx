@@ -56,8 +56,10 @@ describe("SiteAdBanner", () => {
     );
     expect(unit?.getAttribute("data-ad-slot")).toBe("1234567890");
     expect(unit?.getAttribute("data-ad-format")).toBe("horizontal");
+    expect(unit?.getAttribute("data-full-width-responsive")).toBe("false");
     expect(region.className).toContain("fixed");
     expect(region.className).toContain("h-[90px]");
+    expect(region.className).toContain("overflow-hidden");
     expect(region.className).toContain("bg-paper/50");
     expect(region.previousElementSibling?.getAttribute("aria-hidden")).toBe(
       "true",
