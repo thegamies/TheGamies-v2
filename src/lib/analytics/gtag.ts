@@ -36,7 +36,7 @@ export function gtagConsentBootstrapScript(input?: {
 
 export function gtagConfigScript(measurementId: string): string {
   const id = JSON.stringify(measurementId);
-  return `gtag("js",new Date());gtag("config",${id},{anonymize_ip:true,send_page_view:false});`;
+  return `gtag("js",new Date());gtag("config",${id},{anonymize_ip:true});`;
 }
 
 export function updateAnalyticsConsent(accepted: boolean): void {
