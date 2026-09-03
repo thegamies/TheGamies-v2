@@ -86,7 +86,7 @@ Settings and event management live on a separate administrative surface. Communi
 
 ### Required states
 
-1. Coming soon (`scheduled`) — Events tab shows open time + **On the ballot** preview (GOTY + categories)
+1. Coming soon (`scheduled`) — Events tab shows when voting opens. No ballot preview. Hosts still have Settings.
 2. Voting open (`open`) — members edit GOTY + site category picks
 3. User actively completing ballot (`open` + editor)
 4. User submitted ballot (saved; still editable while `open`)
@@ -112,7 +112,9 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Ops seed (admin)
 
-`/admin/communities` (site operators): create synthetic `seed:community:*` profiles, join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). No total seed-index cap. Each server request writes at most 50 members (bulk inserts); the admin UI loops larger counts and can keep appending until Stop. Frozen results rebuild once at the end of a run if that option is on. Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`). Community pick’em sheets are seeded on `/admin/the-game-awards/seed` (community slug; empty seed-member sheets only; community must already be opted in).
+`/admin/communities` (site operators): create synthetic `seed:community:*` profiles (`profiles.is_seed`), join a community by slug, optionally mark Hosts, write edition ballots (creates a scheduled-open edition window if missing). Hosts from the run use display names like `Seed Host 001` (members stay `Seed Member 007`). No total seed-index cap. Each server request writes at most 50 members (bulk inserts); the admin UI loops larger counts and can keep appending until Stop. Frozen results rebuild once at the end of a run if that option is on.
+
+**2025 reception demo:** optional seed path that does **not** write manufactured standings. It matches a 60-game weighted GOTY pool plus ten event categories (Story, Art Direction, Soundtrack, RPG, Action, Multiplayer, Indie, Family, Horror, Combat) against the catalog, then each seed account gets a taste profile and noisy weighted picks. Category votes use that category’s own pool (Best Combat favors Hades II, not Clair Obscur). Skip unmatched catalog titles. Aim for ~150 ballots so the long tail looks organic. Replaces the edition’s category set with those ten. Clear removes seed memberships/ballots/Hosts; optional profile delete. Separate from standings seed (`/admin/seed`). Community pick’em sheets are seeded on `/admin/the-game-awards/seed` (community slug; empty seed-member sheets only; community must already be opted in).
 
 ### Hosts (shipped)
 

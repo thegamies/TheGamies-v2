@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, like, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   createDb,
   games,
@@ -19,6 +19,11 @@ import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
 import { insertInChunks } from "@/lib/db/insert-chunks";
+import {
+  markProfilesAsSeed,
+  seedAccountsWithAuthPrefixWhere,
+  seedProfileCreateFields,
+} from "@/lib/seed-accounts";
 import {
   applySeedWeightPower,
   igdbPickWeight,
@@ -258,7 +263,7 @@ export async function getMaxSeedIndex(
   const rows = await db
     .select({ authUserId: profiles.authUserId })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_AUTH_PREFIX));
 
   let max = 0;
   for (const row of rows) {
@@ -375,6 +380,7 @@ export async function seedStandingsVoters(
           displayName: m.displayName,
           visibility: "public" as const,
           bio: "Synthetic standings seed account.",
+          ...seedProfileCreateFields(),
         })),
       )
       .returning();
@@ -385,6 +391,7 @@ export async function seedStandingsVoters(
 
   const profilesInOrder = wantedAuthIds.map((id) => byAuth.get(id)!);
   const profileIds = profilesInOrder.map((p) => p.id);
+  await markProfilesAsSeed(profileIds, db);
 
   const existingLists = await db
     .select()
@@ -627,7 +634,7 @@ export async function clearStandingsSeeds(
   const seedProfiles = await db
     .select()
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_AUTH_PREFIX));
 
   if (seedProfiles.length === 0) {
     return { deletedProfiles: 0, deletedLists: 0, years: [] };
@@ -707,12 +714,12 @@ export async function countStandingsSeeds(db: Db = getDb()): Promise<{
   const [profileCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_AUTH_PREFIX));
 
   const seedProfiles = await db
     .select({ id: profiles.id, authUserId: profiles.authUserId })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_AUTH_PREFIX));
 
   let maxIndex = 0;
   for (const row of seedProfiles) {

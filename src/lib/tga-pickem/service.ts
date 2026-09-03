@@ -5,6 +5,9 @@ import {
   games,
   tgaCategories,
   tgaCategoryNominees,
+  tgaCommunityPicks,
+  tgaCommunityScores,
+  tgaCommunitySheets,
   tgaCommunityYears,
   tgaNominees,
   tgaYears,
@@ -14,6 +17,7 @@ import { YEAR_PICKER_MAX, YEAR_PICKER_MIN } from "@/lib/ui/calendar-year";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 import { pickCommunityTgaPromoYear } from "@/lib/tga-pickem/promo";
 import type { TgaYearSchedule } from "@/lib/tga-pickem/status";
+import { attachTga2025OtherNomineeImages } from "./other-image-attach";
 import { seedCategoryRows, TGA_2025_CATEGORIES } from "./category-seed";
 import {
   nomineeSearchTitles,
@@ -25,6 +29,7 @@ import { nomineeMatchesWinner, TGA_2025_WINNERS } from "./winner-seed";
 import {
   computeTgaStatus,
   slateCompleteReason,
+  tgaDeleteConfirmMatches,
   type TgaNomineeCheck,
   type TgaStatus,
   validateTgaSchedule,
@@ -277,7 +282,10 @@ export async function setTgaPromoted(
 export async function load2025Categories(
   year: number,
   db: Db = getDb(),
-): Promise<{ ok: true } | { error: string }> {
+): Promise<
+  | { ok: true; attached: number; unmatched: string[]; imagesUploaded: number; imageErrors: string[] }
+  | { error: string }
+> {
   const current = await getTgaYear(year, db);
   if (!current) return { error: "Year not found." };
   const existing = await db
@@ -358,7 +366,13 @@ export async function load2025Nominees(
   year: number,
   db: Db = getDb(),
 ): Promise<
-  | { ok: true; attached: number; unmatched: string[] }
+  | {
+      ok: true;
+      attached: number;
+      unmatched: string[];
+      imagesUploaded: number;
+      imageErrors: string[];
+    }
   | { error: string }
 > {
   const current = await getTgaYear(year, db);
@@ -434,7 +448,15 @@ export async function load2025Nominees(
     }
   }
 
-  return { ok: true, attached, unmatched };
+  const images = await attachTga2025OtherNomineeImages(year, db);
+
+  return {
+    ok: true,
+    attached,
+    unmatched,
+    imagesUploaded: images.imagesUploaded,
+    imageErrors: images.imageErrors,
+  };
 }
 
 export async function load2025Winners(
@@ -849,35 +871,96 @@ export async function isCommunityTgaOptedIn(
   return Boolean(row);
 }
 
-export async function setCommunityTgaOptIn(
+export type CommunityTgaYearListItem = {
+  year: number;
+  status: TgaStatus;
+};
+
+export async function listCommunityTgaYears(
+  communityId: string,
+  db: Db = getDb(),
+): Promise<CommunityTgaYearListItem[]> {
+  const rows = await db
+    .select({
+      year: tgaYears.year,
+      enabled: tgaYears.enabled,
+      opensAt: tgaYears.opensAt,
+      showStartsAt: tgaYears.showStartsAt,
+    })
+    .from(tgaCommunityYears)
+    .innerJoin(tgaYears, eq(tgaYears.year, tgaCommunityYears.year))
+    .where(eq(tgaCommunityYears.communityId, communityId))
+    .orderBy(desc(tgaYears.year));
+  return rows.map((row) => ({
+    year: row.year,
+    status: computeTgaStatus(row),
+  }));
+}
+
+export async function createCommunityTgaYear(
   communityId: string,
   year: number,
-  enabled: boolean,
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
   const slate = await getTgaYear(year, db);
   if (!slate?.enabled) {
     return { error: `${TGA_PUBLIC_LABEL} is not on for that year.` };
   }
-  if (enabled) {
-    await db
-      .insert(tgaCommunityYears)
-      .values({ communityId, year })
-      .onConflictDoNothing();
-    const { seedTgaHostsOnOptIn } = await import(
-      "@/lib/communities/community-hosts"
-    );
-    await seedTgaHostsOnOptIn(communityId, year, null, db);
-  } else {
-    await db
-      .delete(tgaCommunityYears)
-      .where(
-        and(
-          eq(tgaCommunityYears.communityId, communityId),
-          eq(tgaCommunityYears.year, year),
-        ),
-      );
+  if (computeTgaStatus(slate) === "locked") {
+    return { error: "Picks have locked for that year." };
   }
+  if (await isCommunityTgaOptedIn(communityId, year, db)) {
+    return { error: `${TGA_PUBLIC_LABEL} is already created for that year.` };
+  }
+  await db.insert(tgaCommunityYears).values({ communityId, year });
+  const { seedTgaHostsOnOptIn } = await import(
+    "@/lib/communities/community-hosts"
+  );
+  await seedTgaHostsOnOptIn(communityId, year, null, db);
+  return { ok: true };
+}
+
+export async function deleteCommunityTgaYear(
+  communityId: string,
+  year: number,
+  confirmYear: unknown,
+  db: Db = getDb(),
+): Promise<{ ok: true } | { error: string }> {
+  if (!tgaDeleteConfirmMatches(year, confirmYear)) {
+    return { error: "Type the year to confirm." };
+  }
+  if (!(await isCommunityTgaOptedIn(communityId, year, db))) {
+    return { error: `${TGA_PUBLIC_LABEL} was not found for that year.` };
+  }
+  const scope = and(
+    eq(tgaCommunityPicks.communityId, communityId),
+    eq(tgaCommunityPicks.year, year),
+  );
+  await db.delete(tgaCommunityPicks).where(scope);
+  await db
+    .delete(tgaCommunityScores)
+    .where(
+      and(
+        eq(tgaCommunityScores.communityId, communityId),
+        eq(tgaCommunityScores.year, year),
+      ),
+    );
+  await db
+    .delete(tgaCommunitySheets)
+    .where(
+      and(
+        eq(tgaCommunitySheets.communityId, communityId),
+        eq(tgaCommunitySheets.year, year),
+      ),
+    );
+  await db
+    .delete(tgaCommunityYears)
+    .where(
+      and(
+        eq(tgaCommunityYears.communityId, communityId),
+        eq(tgaCommunityYears.year, year),
+      ),
+    );
   return { ok: true };
 }
 

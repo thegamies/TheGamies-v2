@@ -63,6 +63,35 @@ export async function seedEditionCategories(
     .onConflictDoNothing();
 }
 
+/** Ops seed: replace the edition ballot with an explicit category set. */
+export async function replaceEditionCategoriesForSeed(
+  editionId: string,
+  categoryIds: readonly string[],
+  db: Db = getDb(),
+): Promise<void> {
+  await ensureAwardCategories(db);
+  const previousIds = await listEditionEnabledCategoryIds(editionId, db);
+  const next = [...new Set(categoryIds.filter(Boolean))];
+  const nextSet = new Set(next);
+  const removedIds = previousIds.filter((id) => !nextSet.has(id));
+
+  await db
+    .delete(communityEditionCategories)
+    .where(eq(communityEditionCategories.editionId, editionId));
+  if (next.length > 0) {
+    await db.insert(communityEditionCategories).values(
+      next.map((categoryId, index) => ({
+        editionId,
+        categoryId,
+        sortOrder: index + 1,
+      })),
+    );
+  }
+  if (removedIds.length > 0) {
+    await purgeEditionBallotCategoryVotes(editionId, removedIds, db);
+  }
+}
+
 /**
  * Categories on the ballot / freeze for this edition.
  * Empty when the host has not added any (no site-catalog fallback).

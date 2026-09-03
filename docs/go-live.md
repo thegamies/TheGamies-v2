@@ -114,7 +114,7 @@ Confirm these exist on **production** (and staging, where still missing):
 | `R2_*` account/keys + `STAGING_R2_AVATAR_BUCKET` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview uploads |
 | `PRODUCTION_R2_AVATAR_BUCKET` + `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production uploads (separate bucket) |
 | `AUTH_EMAIL_FROM` | From-address if not the default |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Only if you want analytics on day one |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Optional override. Unset = site property. `off` disables |
 | `ADMIN_SYNC_SECRET` | Ops; rotate if it ever leaked in a screenshot |
 
 ---
@@ -158,7 +158,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 - Confirm the copy with whoever owns legal (especially US 13+ / COPPA posture and cookie banner)
 - Mailboxes actually receive mail
-- Cookie banner + GA id: unset id → no gtag (good); banner still shows (intentional)
+- Cookie banner + GA: site property ships gtag; `off` disables. Banner still shows either way.
 - AdSense **European regulations** message published in Privacy & messaging for `thegamies.gg` (Funding Choices; privacy policy `https://thegamies.gg/privacy`; Consent Mode on). The site tag is in the app; the message itself is created in AdSense.
 
 ### Hosting plans

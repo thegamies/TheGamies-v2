@@ -1,36 +1,59 @@
 import {
+  AVATAR_MAX_BYTES,
   type R2AvatarConfig,
   isJpegBytePayload,
-  validateAvatarUploadInput,
+  isPngBytePayload,
 } from "@/lib/profile/avatar-upload";
 
-export function tgaNomineeObjectKey(year: number, nomineeId: string): string {
-  return `tga/${year}/${nomineeId}.jpg`;
+export type TgaNomineeImageKind = {
+  ext: "jpg" | "png";
+  contentType: "image/jpeg" | "image/png";
+};
+
+export function detectTgaNomineeImageKind(
+  body: ArrayBuffer,
+): TgaNomineeImageKind | null {
+  if (isJpegBytePayload(body)) {
+    return { ext: "jpg", contentType: "image/jpeg" };
+  }
+  if (isPngBytePayload(body)) {
+    return { ext: "png", contentType: "image/png" };
+  }
+  return null;
+}
+
+export function tgaNomineeObjectKey(
+  year: number,
+  nomineeId: string,
+  ext: "jpg" | "png" = "jpg",
+): string {
+  return `tga/${year}/${nomineeId}.${ext}`;
 }
 
 export function buildTgaNomineePublicUrl(
   publicBaseUrl: string,
   year: number,
   nomineeId: string,
+  ext: "jpg" | "png" = "jpg",
 ): string {
   const base = publicBaseUrl.replace(/\/$/, "");
-  return `${base}/${tgaNomineeObjectKey(year, nomineeId)}?v=${Date.now()}`;
+  return `${base}/${tgaNomineeObjectKey(year, nomineeId, ext)}?v=${Date.now()}`;
 }
 
 export async function uploadTgaNomineeImageObject(
   config: R2AvatarConfig,
   input: { year: number; nomineeId: string; body: ArrayBuffer },
 ): Promise<{ imageUrl: string }> {
-  if (!isJpegBytePayload(input.body)) {
-    throw new Error("Photo must be a JPEG image.");
+  const kind = detectTgaNomineeImageKind(input.body);
+  if (!kind) {
+    throw new Error("Photo must be a JPEG or PNG image.");
   }
-  validateAvatarUploadInput({
-    contentType: "image/jpeg",
-    contentLength: input.body.byteLength,
-  });
+  if (input.body.byteLength > AVATAR_MAX_BYTES) {
+    throw new Error("Photo must be 2MB or smaller.");
+  }
 
   const { AwsClient } = await import("aws4fetch");
-  const objectKey = tgaNomineeObjectKey(input.year, input.nomineeId);
+  const objectKey = tgaNomineeObjectKey(input.year, input.nomineeId, kind.ext);
   const endpoint = `https://${config.accountId}.r2.cloudflarestorage.com/${config.bucket}/${objectKey}`;
   const client = new AwsClient({
     accessKeyId: config.accessKeyId,
@@ -44,7 +67,7 @@ export async function uploadTgaNomineeImageObject(
   const response = await client.fetch(endpoint, {
     method: "PUT",
     body: payload,
-    headers: { "Content-Type": "image/jpeg" },
+    headers: { "Content-Type": kind.contentType },
   });
   if (!response.ok) {
     throw new Error("Photo could not be saved.");
@@ -54,6 +77,7 @@ export async function uploadTgaNomineeImageObject(
       config.publicBaseUrl,
       input.year,
       input.nomineeId,
+      kind.ext,
     ),
   };
 }

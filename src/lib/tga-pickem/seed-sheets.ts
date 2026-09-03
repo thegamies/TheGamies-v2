@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, like, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
 import {
   communities,
   communityMembers,
@@ -15,8 +15,7 @@ import {
   type Db,
 } from "@thegamies/db";
 import { insertInChunks } from "@/lib/db/insert-chunks";
-import { SEED_COMMUNITY_AUTH_PREFIX } from "@/lib/communities/seed-community";
-import { SEED_AUTH_PREFIX } from "@/lib/live-aggregate/seed-standings";
+import { seedAccountsWhere } from "@/lib/seed-accounts";
 import { listTgaBallot } from "./service";
 
 export const SEED_TGA_MAX_BATCH = 50;
@@ -58,10 +57,7 @@ export function buildSeedTgaPicks(
   return picks;
 }
 
-const seedProfileFilter = or(
-  like(profiles.authUserId, `${SEED_AUTH_PREFIX}%`),
-  like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`),
-);
+const seedProfileFilter = seedAccountsWhere();
 
 export async function countTgaSheetSeeds(
   year: number,

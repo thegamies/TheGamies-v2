@@ -75,7 +75,7 @@ Stacking identical treatments is forbidden — each level must read quieter than
 | Level | Role | Look | Use |
 |---|---|---|---|
 | **Primary** | Community section switcher | Bordered chips inside `CommunityHeader` (`--panel` band) | Overview · Live Rankings · Events · Members · Settings |
-| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: On the ballot / Ballot · Voters (open/closed) · Settings (hosts). Community Settings: Live Rankings · Events · Hosts · Community. Site GOTY + community Live: Game of the Year · Categories |
+| **Secondary** | In-page views | Underline tabs on a hairline under a **local** heading | Results: Reveal · Results · Full standings · Categories · Voters · Your ballot · Settings (hosts). Pre-publish: Ballot · Voters (open/closed; names only until publish) · Settings (hosts). Coming soon: Settings (hosts). Community Settings: Live Rankings · Events · Hosts · Community. Site GOTY + community Live: Game of the Year · Categories |
 | **Tertiary** | Board / filter | Segmented controls on one row below the Results view divider | Community / Hosts. Results: Ranked / Comparison. Dev **Debug** popover (local only) |
 
 Shared helpers: `navItemClass()` in [`src/components/ui/navLevels.ts`](../src/components/ui/navLevels.ts). Gallery: [`/design-system`](/design-system) → Navigation + Community header.

@@ -7,6 +7,7 @@ import {
   communityAvatarObjectKey,
   communityBannerObjectKey,
   isJpegBytePayload,
+  isPngBytePayload,
   profileBannerObjectKey,
   validateAvatarUploadInput,
   validateBannerUploadInput,
@@ -42,6 +43,9 @@ describe("avatar upload helpers", () => {
       contentLength: 1024,
     });
     expect(isJpegBytePayload(new Uint8Array([0xff, 0xd8, 0xff]).buffer)).toBe(
+      true,
+    );
+    expect(isPngBytePayload(new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer)).toBe(
       true,
     );
     expect(() =>

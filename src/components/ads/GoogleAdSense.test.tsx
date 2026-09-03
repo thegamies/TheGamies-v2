@@ -14,7 +14,7 @@ describe("GoogleAdSense", () => {
       `src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}"`,
     );
     expect(html).toContain(" async");
-    expect(html.toLowerCase()).toContain("crossorigin=\"anonymous\"");
+    expect(html.toLowerCase()).toContain('crossorigin="anonymous"');
     expect(html.indexOf("fundingchoicesmessages")).toBeLessThan(
       html.indexOf("adsbygoogle.js"),
     );

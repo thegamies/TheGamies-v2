@@ -94,7 +94,7 @@ Configure on the repo:
 | `AVATAR_PUBLIC_BASE_URL` / `STAGING_AVATAR_PUBLIC_BASE_URL` | Staging / preview public base (prefer `STAGING_*`) |
 | `PRODUCTION_R2_AVATAR_BUCKET` | Production upload bucket (host env `R2_AVATAR_BUCKET`) |
 | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | Production public base (host env `AVATAR_PUBLIC_BASE_URL`) |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public). Unset = no gtag |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | GA4 measurement id (public). Unset = site property. `off` disables gtag |
 | `NEXT_PUBLIC_ADSENSE_CLIENT` | Optional. Unset = site AdSense publisher. `off` disables |
 
 Until deploy credentials exist, `ci.yml` still runs quality checks; host deploys skip.

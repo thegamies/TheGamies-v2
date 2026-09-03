@@ -4,6 +4,7 @@ import {
   SEED_COMMUNITY_MAX_BATCH,
   resolveCommunitySeedStartIndex,
   seedCommunityAuthUserId,
+  seedCommunityDisplayName,
   seedCommunityUsername,
 } from "./seed-community";
 
@@ -11,6 +12,8 @@ describe("community seed ids", () => {
   it("pads auth and username indices", () => {
     expect(seedCommunityAuthUserId(7)).toBe(`${SEED_COMMUNITY_AUTH_PREFIX}0007`);
     expect(seedCommunityUsername(7)).toBe("seedcmem007");
+    expect(seedCommunityDisplayName(7, false)).toBe("Seed Member 007");
+    expect(seedCommunityDisplayName(1, true)).toBe("Seed Host 001");
   });
 
   it("allows indices above 1000", () => {

@@ -59,7 +59,12 @@ export const TGA_2025_WINNERS: Record<string, string[]> = {
     "Team Vitality — Counter-Strike 2",
     "Team Vitality",
   ],
-  "Best Community Support": ["Baldur's Gate 3", "Baldurs Gate 3"],
+  "Best Community Support": [
+    "Baldur's Gate 3",
+    "Baldur's Gate III",
+    "Baldurs Gate 3",
+    "Baldurs Gate III",
+  ],
   "Content Creator of the Year": ["MoistCr1TiKaL"],
   "Innovation in Accessibility": [
     "Doom: The Dark Ages",

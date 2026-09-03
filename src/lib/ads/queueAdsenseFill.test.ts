@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   ADSENSE_QUEUED_ATTR,
+  adsenseInsIsFilled,
   adsenseInsNeedsFill,
   queueAdsenseFill,
 } from "./queueAdsenseFill";
@@ -49,5 +50,32 @@ describe("queueAdsenseFill", () => {
     expect(adsenseInsNeedsFill(ins)).toBe(false);
     expect(queueAdsenseFill(ins)).toBe(false);
     expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("adsenseInsIsFilled", () => {
+  it("treats data-ad-status=filled as filled", () => {
+    expect(adsenseInsIsFilled(makeIns({ "data-ad-status": "filled" }))).toBe(
+      true,
+    );
+  });
+
+  it("treats data-ad-status=unfilled as empty even with an iframe leftover", () => {
+    const ins = makeIns({ "data-ad-status": "unfilled" });
+    ins.appendChild(document.createElement("iframe"));
+    expect(adsenseInsIsFilled(ins)).toBe(false);
+  });
+
+  it("does not treat a nested iframe as filled without data-ad-status", () => {
+    const ins = makeIns();
+    ins.appendChild(document.createElement("iframe"));
+    expect(adsenseInsIsFilled(ins)).toBe(false);
+  });
+
+  it("is empty before AdSense responds", () => {
+    expect(adsenseInsIsFilled(makeIns())).toBe(false);
+    expect(
+      adsenseInsIsFilled(makeIns({ "data-adsbygoogle-status": "done" })),
+    ).toBe(false);
   });
 });

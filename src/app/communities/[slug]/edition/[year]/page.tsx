@@ -5,7 +5,6 @@ import {
   EditionBallotEditor,
   type EditionBallotEditorItem,
 } from "@/components/communities/EditionBallotEditor";
-import { EditionBallotPreview } from "@/components/communities/EditionBallotPreview";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
@@ -83,7 +82,7 @@ import {
   isEditionResultsEntranceOpen,
 } from "@/lib/communities/edition-results-entrance";
 import type { EditionResultsViewId } from "@/lib/communities/edition-results-scoring";
-import { editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
+import { editionRevealsVoterBallots, editionShowsVoterTurnout, editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
@@ -146,7 +145,7 @@ export default async function CommunityEditionYearPage({
       ? Math.floor(votersPageRaw)
       : 1;
   const votersQ = (first(sp.q) ?? "").trim();
-  const voterUsername = (first(sp.voter) ?? "").trim();
+  let voterUsername = (first(sp.voter) ?? "").trim();
   const categoryId = (first(sp.category) ?? "").trim() || null;
   const categoryPageRaw = Number(first(sp.page) ?? "1");
   const categoryPageNum =
@@ -190,6 +189,9 @@ export default async function CommunityEditionYearPage({
   }
 
   if (!edition || !showEditionNav(edition.status)) notFound();
+  if (!editionRevealsVoterBallots(edition.status)) {
+    voterUsername = "";
+  }
 
   const rankMode = edition.rankMode;
   const canManage = canManageCommunity(community.viewerRole);
@@ -237,8 +239,7 @@ export default async function CommunityEditionYearPage({
 
   const awardCategories =
     edition.status === "open" ||
-    edition.status === "scheduled" ||
-    (profile && isMember) ||
+    (profile && isMember && edition.status !== "scheduled") ||
     (edition.status === "published" && voterUsername.length > 0)
       ? await listEditionAwardCategories(edition.id).catch(() => [])
       : [];
@@ -317,8 +318,7 @@ export default async function CommunityEditionYearPage({
       view === "comparison" ||
       view === "standings" ||
       view === "categories");
-  const showLiveVoters =
-    edition.status === "open" || edition.status === "closed";
+  const showLiveVoters = editionShowsVoterTurnout(edition.status);
   const prePublishView = showHostSettings
     ? "settings"
     : showHostResultsPreview
@@ -963,6 +963,9 @@ export default async function CommunityEditionYearPage({
                 slug={community.slug}
                 year={edition.year}
                 canManage={canManage}
+                includeBallot={
+                  edition.status === "open" || edition.status === "closed"
+                }
                 includeVoters={showLiveVoters}
                 includeRevealShow={includeRevealShowTab}
                 mode={mode}
@@ -974,9 +977,6 @@ export default async function CommunityEditionYearPage({
                       : prePublishView === "voters"
                         ? "voters"
                         : "ballot"
-                }
-                ballotLabel={
-                  edition.status === "scheduled" ? "On the ballot" : "Ballot"
                 }
               />
               {showHostSettings ? (
@@ -1016,12 +1016,7 @@ export default async function CommunityEditionYearPage({
                     showBoardModes
                   />
                 </div>
-              ) : edition.status === "scheduled" ? (
-                <EditionBallotPreview
-                  year={edition.year}
-                  categories={awardCategories}
-                />
-              ) : edition.status === "open" ? (
+              ) : edition.status === "scheduled" ? null : edition.status === "open" ? (
                 !user ? (
                   <p className="mt-6 max-w-xl text-muted">
                     <Link

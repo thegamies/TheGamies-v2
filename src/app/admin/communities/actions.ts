@@ -29,6 +29,7 @@ export async function seedCommunityEditionAction(input: {
   poolSize: number;
   reseed: boolean;
   refreshPublishedResults: boolean;
+  receptionDemo2025?: boolean;
 }): Promise<
   | {
       ok: true;
@@ -47,6 +48,7 @@ export async function seedCommunityEditionAction(input: {
       endIndex: number;
       nextIndex: number;
       resultsRefreshed: boolean;
+      unmatchedTitles: string[];
     }
   | { error: string }
 > {

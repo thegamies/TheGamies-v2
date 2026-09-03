@@ -1,4 +1,4 @@
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   communityEditionBallotCategoryVotes,
   communityEditionBallotItems,
@@ -28,8 +28,30 @@ import {
   clearEditionResultsFrozen,
   rebuildEditionResultsFrozen,
 } from "./edition-results";
-import { seedEditionCategories } from "./edition-categories";
+import {
+  replaceEditionCategoriesForSeed,
+  seedEditionCategories,
+} from "./edition-categories";
 import { computeEditionStatus } from "./edition-status";
+import {
+  markProfilesAsSeed,
+  seedAccountsWithAuthPrefixWhere,
+  seedProfileCreateFields,
+} from "@/lib/seed-accounts";
+import { resolveDemo2025Catalog } from "./seed-2025-demo-catalog";
+import {
+  DEMO_2025_CATEGORY_IDS,
+  DEMO_2025_LIST_SIZE,
+  DEMO_2025_MIN_GOTY_GAMES,
+  DEMO_2025_YEAR,
+  pickDemoCategoryVote,
+  pickDemoGotyList,
+  rngForVoter,
+  seedCommunityDisplayName,
+  tasteForIndex,
+} from "./seed-2025-demo";
+
+export { seedCommunityDisplayName } from "./seed-2025-demo";
 
 export const SEED_COMMUNITY_AUTH_PREFIX = "seed:community:";
 export const SEED_COMMUNITY_USERNAME_PREFIX = "seedcmem";
@@ -57,7 +79,7 @@ export async function getMaxCommunitySeedIndex(
       maxIndex: sql<number>`coalesce(max(nullif(replace(${profiles.authUserId}, ${SEED_COMMUNITY_AUTH_PREFIX}, ''), '')::int), 0)`,
     })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_COMMUNITY_AUTH_PREFIX));
   return Number(row?.maxIndex ?? 0);
 }
 
@@ -82,7 +104,7 @@ export async function countCommunitySeeds(
   const [profileCount] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_COMMUNITY_AUTH_PREFIX));
 
   let membersInCommunity = 0;
   let ballotsInEdition = 0;
@@ -94,9 +116,8 @@ export async function countCommunitySeeds(
       .where(eq(communities.slug, communitySlug.trim().toLowerCase()))
       .limit(1);
     if (community) {
-      const seedAuth = like(
-        profiles.authUserId,
-        `${SEED_COMMUNITY_AUTH_PREFIX}%`,
+      const seedAuth = seedAccountsWithAuthPrefixWhere(
+        SEED_COMMUNITY_AUTH_PREFIX,
       );
       const [memberCount] = await db
         .select({ n: sql<number>`count(*)::int` })
@@ -143,6 +164,11 @@ export type SeedCommunityEditionInput = {
    * so results reflect new ballots (ops only).
    */
   refreshPublishedResults?: boolean;
+  /**
+   * Weighted 2025 reception demo: taste-profile voters, ten categories,
+   * catalog-matched pools. Year must be 2025.
+   */
+  receptionDemo2025?: boolean;
 };
 
 export type SeedCommunityEditionResult = {
@@ -161,6 +187,7 @@ export type SeedCommunityEditionResult = {
   endIndex: number;
   nextIndex: number;
   resultsRefreshed: boolean;
+  unmatchedTitles: string[];
 };
 
 /**
@@ -370,7 +397,10 @@ export async function seedCommunityEditionBallots(
   const year = Math.floor(input.year);
   const startIndex = Math.max(1, Math.floor(input.startIndex ?? 1));
   const count = Math.floor(input.count);
-  const listSize = Math.min(100, Math.max(1, Math.floor(input.listSize ?? 10)));
+  const receptionDemo2025 = input.receptionDemo2025 === true;
+  const listSize = receptionDemo2025
+    ? DEMO_2025_LIST_SIZE
+    : Math.min(100, Math.max(1, Math.floor(input.listSize ?? 10)));
   const voiceCount = Math.max(0, Math.floor(input.voiceCount ?? 0));
   const ratingBias = Math.max(
     -100,
@@ -386,6 +416,9 @@ export async function seedCommunityEditionBallots(
   if (!slug) return { error: "Enter a community slug." };
   if (!Number.isFinite(year) || year < 1970 || year > 2100) {
     return { error: "Pick a valid year." };
+  }
+  if (receptionDemo2025 && year !== DEMO_2025_YEAR) {
+    return { error: "The 2025 reception demo only seeds the 2025 event." };
   }
   if (!Number.isFinite(count) || count < 1 || count > SEED_COMMUNITY_MAX_BATCH) {
     return {
@@ -411,13 +444,19 @@ export async function seedCommunityEditionBallots(
     (_, i) => startIndex + i,
   );
 
-  const pool = await loadSeedGamePool(year, poolSize, db);
-  if (pool.length < Math.min(listSize, pool.length) || pool.length === 0) {
-    return {
-      error: `Need released ${year} games in the catalog to seed ballots.`,
-    };
+  const pool = receptionDemo2025
+    ? []
+    : await loadSeedGamePool(year, poolSize, db);
+  if (!receptionDemo2025) {
+    if (pool.length < Math.min(listSize, pool.length) || pool.length === 0) {
+      return {
+        error: `Need released ${year} games in the catalog to seed ballots.`,
+      };
+    }
   }
-  const effectiveListSize = Math.min(listSize, pool.length);
+  const effectiveListSize = receptionDemo2025
+    ? DEMO_2025_LIST_SIZE
+    : Math.min(listSize, pool.length);
 
   await ensureAwardCategories(db);
   const categories = await listActiveAwardCategories(db);
@@ -427,7 +466,26 @@ export async function seedCommunityEditionBallots(
         "No active award categories found after syncing the catalog. Check award category migrations.",
     };
   }
-  await seedEditionCategories(edition.id, db);
+
+  const demoCatalog = receptionDemo2025
+    ? await resolveDemo2025Catalog(db)
+    : null;
+  if (demoCatalog && demoCatalog.goty.length < DEMO_2025_MIN_GOTY_GAMES) {
+    const missing = demoCatalog.unmatched.slice(0, 12).join(", ");
+    return {
+      error: `The 2025 reception demo needs at least ${DEMO_2025_MIN_GOTY_GAMES} catalog matches for the GOTY pool (found ${demoCatalog.goty.length}). Missing examples: ${missing}.`,
+    };
+  }
+
+  if (receptionDemo2025) {
+    await replaceEditionCategoriesForSeed(
+      edition.id,
+      DEMO_2025_CATEGORY_IDS,
+      db,
+    );
+  } else {
+    await seedEditionCategories(edition.id, db);
+  }
 
   const wantedAuthIds = indices.map(seedCommunityAuthUserId);
   const wantedUsernames = indices.map(seedCommunityUsername);
@@ -442,7 +500,7 @@ export async function seedCommunityEditionBallots(
       index,
       authUserId: wantedAuthIds[i]!,
       username: wantedUsernames[i]!,
-      displayName: `Seed Member ${String(index).padStart(3, "0")}`,
+      displayName: seedCommunityDisplayName(index, i < voiceCount),
     }))
     .filter((row) => !byAuth.has(row.authUserId));
 
@@ -466,6 +524,7 @@ export async function seedCommunityEditionBallots(
           displayName: m.displayName,
           bio: "Synthetic community member for edition QA.",
           visibility: "public" as const,
+          ...seedProfileCreateFields(),
         })),
       )
       .returning();
@@ -483,6 +542,7 @@ export async function seedCommunityEditionBallots(
   >[];
   const profileIds = readyProfiles.map((p) => p.id);
   const createdProfiles = missing.length;
+  await markProfilesAsSeed(profileIds, db);
 
   const existingMembers = await db
     .select({ profileId: communityMembers.profileId })
@@ -509,6 +569,19 @@ export async function seedCommunityEditionBallots(
   }
   const joinedMembers = membersToJoin.length;
   const alreadyMembers = readyProfiles.length - joinedMembers;
+
+  for (let i = 0; i < readyProfiles.length; i += 1) {
+    const profile = readyProfiles[i]!;
+    const index = indices[i]!;
+    const nextName = seedCommunityDisplayName(index, i < voiceCount);
+    if (profile.displayName !== nextName) {
+      await db
+        .update(profiles)
+        .set({ displayName: nextName })
+        .where(eq(profiles.id, profile.id));
+      profile.displayName = nextName;
+    }
+  }
 
   const voiceProfiles = readyProfiles.slice(0, voiceCount);
   let voicesSet = 0;
@@ -626,9 +699,44 @@ export async function seedCommunityEditionBallots(
     gameId: string;
   }[] = [];
 
+  const indexByProfileId = new Map(
+    readyProfiles.map((profile, i) => [profile.id, indices[i]!] as const),
+  );
+
   for (const row of toWrite) {
     const ballotId = row.ballotId ?? ballotByProfile.get(row.profileId);
     if (!ballotId) continue;
+    const voterIndex = indexByProfileId.get(row.profileId) ?? 1;
+
+    if (demoCatalog) {
+      const taste = tasteForIndex(voterIndex);
+      const rng = rngForVoter(voterIndex);
+      const pickedIds = pickDemoGotyList(
+        demoCatalog.goty,
+        taste,
+        rng,
+        effectiveListSize,
+      );
+      for (let rankIndex = 0; rankIndex < pickedIds.length; rankIndex += 1) {
+        itemRows.push({
+          ballotId,
+          gameId: pickedIds[rankIndex]!,
+          rank: rankIndex + 1,
+          blurb: null,
+        });
+      }
+      for (const cat of demoCatalog.categories) {
+        const gameId = pickDemoCategoryVote(cat.games, taste, rng);
+        if (!gameId) continue;
+        categoryVoteRows.push({
+          ballotId,
+          categoryId: cat.categoryId,
+          gameId,
+        });
+      }
+      continue;
+    }
+
     const picked = weightedSample(pool, effectiveListSize, (g) =>
       weightForRatedGame(g, ratingBias),
     );
@@ -692,11 +800,12 @@ export async function seedCommunityEditionBallots(
     year,
     editionId: edition.id,
     editionStatus: edition.status,
-    gamePoolSize: pool.length,
+    gamePoolSize: demoCatalog?.goty.length ?? pool.length,
     startIndex,
     endIndex,
     nextIndex: endIndex + 1,
     resultsRefreshed,
+    unmatchedTitles: demoCatalog?.unmatched ?? [],
   };
 }
 
@@ -712,7 +821,7 @@ export async function clearCommunitySeeds(
   const seedProfiles = await db
     .select({ id: profiles.id })
     .from(profiles)
-    .where(like(profiles.authUserId, `${SEED_COMMUNITY_AUTH_PREFIX}%`));
+    .where(seedAccountsWithAuthPrefixWhere(SEED_COMMUNITY_AUTH_PREFIX));
   const seedIds = seedProfiles.map((p) => p.id);
   if (seedIds.length === 0) {
     return {

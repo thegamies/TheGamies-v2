@@ -11,12 +11,23 @@ export function GoogleAdSense({ enabled = true }: { enabled?: boolean }) {
 
   return (
     <>
-      <script async src={fundingChoicesScriptSrc(client)} />
-      <script dangerouslySetInnerHTML={{ __html: googleFcPresentScript() }} />
       <script
+        id="funding-choices"
+        async
+        src={fundingChoicesScriptSrc(client)}
+        suppressHydrationWarning
+      />
+      <script
+        id="googlefc-present"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: googleFcPresentScript() }}
+      />
+      <script
+        id="adsbygoogle"
         async
         src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`}
         crossOrigin="anonymous"
+        suppressHydrationWarning
       />
     </>
   );

@@ -47,6 +47,15 @@ export function picksAreOpen(
   return computeTgaStatus(year, now) === "open";
 }
 
+/** Nominee sheet is only for open picks and after lock. */
+export function tgaBallotVisible(
+  year: TgaYearSchedule,
+  now: Date = new Date(),
+): boolean {
+  const status = computeTgaStatus(year, now);
+  return status === "open" || status === "locked";
+}
+
 /** Official calls and scored standings only after the show starts. */
 export function revealTgaWinners(
   year: TgaYearSchedule,
@@ -92,6 +101,13 @@ export function slateCompleteReason(
     }
   }
   return null;
+}
+
+export function tgaDeleteConfirmMatches(
+  year: number,
+  typed: unknown,
+): boolean {
+  return String(typed ?? "").trim() === String(year);
 }
 
 export function tgaStatusLabel(status: TgaStatus): string {

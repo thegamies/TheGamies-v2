@@ -101,7 +101,7 @@ GOTY years stay off the homepage, `/game-of-the-year`, year boards, and game-pag
 ## Ops: standings seed
 
 `/admin/seed` (site operators) creates synthetic profiles
-(`seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
+(`profiles.is_seed`, `seed:standings:*` auth ids, usernames `seedvoter001`…) plus owned GOTY lists.
 **Include category votes** is off by default; when on, votes come from each
 list’s ranked picks (top-rank weighted).
 

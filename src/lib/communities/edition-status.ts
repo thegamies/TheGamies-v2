@@ -345,6 +345,16 @@ export function editionUsesPublishedResultsNav(status: EditionStatus): boolean {
   return status === "published";
 }
 
+/** Names of who submitted, before results. Ballots stay hidden. */
+export function editionShowsVoterTurnout(status: EditionStatus): boolean {
+  return status === "open" || status === "closed";
+}
+
+/** Other people’s ballots are only public after results publish. */
+export function editionRevealsVoterBallots(status: EditionStatus): boolean {
+  return status === "published";
+}
+
 const DATE_INPUT_RE = /^\d{4}-\d{2}-\d{2}$/;
 const DATETIME_LOCAL_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 

@@ -22,6 +22,8 @@ import {
   parseEditionYear,
   showEditionNav,
   editionUsesPublishedResultsNav,
+  editionShowsVoterTurnout,
+  editionRevealsVoterBallots,
   validateEditionSchedule,
 } from "./edition-status";
 import { pickFeaturedEdition, pickOverviewEditions, parseEditionCreateRankMode, type CommunityEditionPublic } from "./editions";
@@ -91,6 +93,16 @@ describe("edition nav gates", () => {
     expect(editionUsesPublishedResultsNav("closed")).toBe(false);
     expect(editionUsesPublishedResultsNav("open")).toBe(false);
     expect(editionUsesPublishedResultsNav("scheduled")).toBe(false);
+  });
+
+  it("lists who voted before publish without opening ballots", () => {
+    expect(editionShowsVoterTurnout("scheduled")).toBe(false);
+    expect(editionShowsVoterTurnout("open")).toBe(true);
+    expect(editionShowsVoterTurnout("closed")).toBe(true);
+    expect(editionShowsVoterTurnout("published")).toBe(false);
+    expect(editionRevealsVoterBallots("open")).toBe(false);
+    expect(editionRevealsVoterBallots("closed")).toBe(false);
+    expect(editionRevealsVoterBallots("published")).toBe(true);
   });
 });
 

@@ -324,6 +324,8 @@ export const profiles = pgTable("profiles", {
   usernameChangedAt: timestamp("username_changed_at", { mode: "date" }),
   /** Site operations (`/admin`). Not a community Admin. */
   isSiteAdmin: boolean("is_site_admin").notNull().default(false),
+  /** Synthetic ops account (standings / community / TGA seed). Not a signed-in person. */
+  isSeed: boolean("is_seed").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

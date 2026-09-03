@@ -14,6 +14,7 @@ export function EditionEventTabs({
   canManage,
   active,
   ballotLabel = "Ballot",
+  includeBallot = true,
   includeVoters = false,
   includeRevealShow = false,
   mode = "community",
@@ -23,12 +24,15 @@ export function EditionEventTabs({
   canManage: boolean;
   active: "show" | "ballot" | "voters" | "settings";
   ballotLabel?: string;
+  includeBallot?: boolean;
   includeVoters?: boolean;
   /** Closed + host: Results preview before Ballot. */
   includeRevealShow?: boolean;
   mode?: EditionResultsPublicMode;
 }) {
-  if (!canManage && !includeVoters && !includeRevealShow) return null;
+  if (!canManage && !includeVoters && !includeRevealShow && !includeBallot) {
+    return null;
+  }
 
   const ballotHref = `/communities/${encodeURIComponent(slug)}/edition/${year}`;
   const votersHref = editionResultsHref(slug, year, {
@@ -47,13 +51,15 @@ export function EditionEventTabs({
           Results preview
         </Link>
       ) : null}
-      <Link
-        href={ballotHref}
-        scroll={false}
-        className={navItemClass("secondary", active === "ballot")}
-      >
-        {ballotLabel}
-      </Link>
+      {includeBallot ? (
+        <Link
+          href={ballotHref}
+          scroll={false}
+          className={navItemClass("secondary", active === "ballot")}
+        >
+          {ballotLabel}
+        </Link>
+      ) : null}
       {includeVoters ? (
         <Link
           href={votersHref}

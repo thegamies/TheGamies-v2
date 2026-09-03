@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   communitySettingsHref,
   communityCreateEventHref,
+  communityCreateTgaHref,
   parseCommunitySettingsTab,
 } from "./community-settings-href";
 
@@ -57,6 +58,17 @@ describe("communityCreateEventHref", () => {
     );
     expect(communityCreateEventHref("the gamies")).toBe(
       "/communities/the%20gamies/create/event",
+    );
+  });
+});
+
+describe("communityCreateTgaHref", () => {
+  it("points at the host create page", () => {
+    expect(communityCreateTgaHref("test")).toBe(
+      "/communities/test/create/the-game-awards",
+    );
+    expect(communityCreateTgaHref("the gamies")).toBe(
+      "/communities/the%20gamies/create/the-game-awards",
     );
   });
 });

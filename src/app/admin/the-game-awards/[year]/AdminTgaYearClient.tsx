@@ -66,7 +66,14 @@ export function AdminTgaYearClient({
   function run(
     fn: () => Promise<
       | { error?: string }
-      | { ok?: boolean; attached?: number; called?: number; unmatched?: string[] }
+      | {
+          ok?: boolean;
+          attached?: number;
+          called?: number;
+          unmatched?: string[];
+          imagesUploaded?: number;
+          imageErrors?: string[];
+        }
       | { id?: string }
     >,
   ) {
@@ -83,12 +90,22 @@ export function AdminTgaYearClient({
             ? `Called ${result.called} winners. Not on the slate: ${result.unmatched.join("; ")}`
             : `Called ${result.called} winners.`,
         );
-      } else if ("unmatched" in result && result.unmatched && result.unmatched.length > 0) {
-        setMessage(
-          `Added ${result.attached ?? 0} nominees. Not in the catalog: ${result.unmatched.join("; ")}`,
-        );
       } else if ("attached" in result && result.attached != null) {
-        setMessage(`Added ${result.attached} nominees.`);
+        const catalog =
+          result.unmatched && result.unmatched.length > 0
+            ? ` Not in the catalog: ${result.unmatched.join("; ")}.`
+            : "";
+        const portraits =
+          result.imagesUploaded != null
+            ? ` Portraits uploaded: ${result.imagesUploaded}.`
+            : "";
+        const portraitErrors =
+          result.imageErrors && result.imageErrors.length > 0
+            ? ` Portrait issues: ${result.imageErrors.join("; ")}.`
+            : "";
+        setMessage(
+          `Added ${result.attached} nominees.${catalog}${portraits}${portraitErrors}`.trim(),
+        );
       }
       router.refresh();
     });
@@ -321,9 +338,8 @@ export function AdminTgaYearClient({
             <div className="mt-4 max-w-md">
               {category.kind === "game" ? (
                 <GameSearchField
-                  year={year}
                   aria-label={`Add a game to ${category.label}`}
-                  allowEditions
+                  placeholder="Search games"
                   excludeIds={
                     new Set(
                       category.nominees
