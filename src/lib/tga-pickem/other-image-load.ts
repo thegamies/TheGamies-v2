@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { envAppOrigin } from "@/lib/seo/origin";
+import { envAppOrigin } from "@/lib/seo/origin-env";
 import { TGA_2025_OTHER_IMAGE_DIR } from "./other-image-seed";
 
 const SAFE_FILE = /^[a-z0-9][a-z0-9._-]*\.(jpg|jpeg|png)$/i;

@@ -7,7 +7,7 @@ import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 import {
   SEED_TGA_MAX_BATCH,
   tgaCommunitySeedSlugError,
-} from "@/lib/tga-pickem/seed-sheets";
+} from "@/lib/tga-pickem/seed-sheets-rules";
 import {
   clearTgaCommunitySeedSheetsAction,
   clearTgaSeedSheetsAction,
