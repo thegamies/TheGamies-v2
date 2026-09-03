@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalHost, normalizeOrigin } from "./origin";
+import { isLocalHost, normalizeOrigin } from "./origin-env";
 
 describe("isLocalHost", () => {
   it("treats loopback as local", () => {

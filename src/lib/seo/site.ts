@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ogImagePath } from "./og-path";
-import { envAppOrigin } from "./origin";
+import { envAppOrigin } from "./origin-env";
 
 export const SITE_NAME = "The Gamies";
 

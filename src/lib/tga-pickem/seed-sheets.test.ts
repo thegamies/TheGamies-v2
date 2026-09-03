@@ -3,8 +3,8 @@ import {
   buildSeedTgaPicks,
   pickSeedNomineeId,
   seedWorldPremieresGuess,
-  tgaCommunitySeedSlugError,
 } from "./seed-sheets";
+import { tgaCommunitySeedSlugError } from "./seed-sheets-rules";
 
 describe("buildSeedTgaPicks", () => {
   it("picks one nominee per category that has nominees", () => {

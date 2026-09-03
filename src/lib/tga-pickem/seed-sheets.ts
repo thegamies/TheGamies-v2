@@ -17,13 +17,17 @@ import {
 import { insertInChunks } from "@/lib/db/insert-chunks";
 import { seedAccountsWhere } from "@/lib/seed-accounts";
 import { listTgaBallot } from "./service";
+import {
+  SEED_TGA_INSERT_CHUNK,
+  SEED_TGA_MAX_BATCH,
+  tgaCommunitySeedSlugError,
+} from "./seed-sheets-rules";
 
-export const SEED_TGA_MAX_BATCH = 50;
-export const SEED_TGA_INSERT_CHUNK = 200;
-
-export function tgaCommunitySeedSlugError(slug: string): string | null {
-  return slug.trim() ? null : "Enter a community slug.";
-}
+export {
+  SEED_TGA_INSERT_CHUNK,
+  SEED_TGA_MAX_BATCH,
+  tgaCommunitySeedSlugError,
+} from "./seed-sheets-rules";
 
 function getDb(db?: Db): Db {
   return db ?? createDb();
