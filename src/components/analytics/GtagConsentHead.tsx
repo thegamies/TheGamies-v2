@@ -13,6 +13,8 @@ export function GtagConsentHead() {
 
   return (
     <script
+      id="gtag-consent-default"
+      suppressHydrationWarning
       dangerouslySetInnerHTML={{
         __html: gtagConsentBootstrapScript({
           waitForUpdateMs: ads ? ADS_CONSENT_WAIT_MS : 500,
