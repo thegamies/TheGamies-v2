@@ -19,6 +19,42 @@ export function pickCommunityTgaPromoYear<
   })[0] ?? null;
 }
 
+/** Site-On years that have not locked and are not already created. */
+export function communityTgaCreateYears<
+  T extends {
+    year: number;
+    promoted: boolean;
+    enabled: boolean;
+    status: TgaStatus;
+  },
+>(rows: T[], existingYears: number[]): T[] {
+  const taken = new Set(existingYears);
+  return rows.filter(
+    (row) => row.enabled && row.status !== "locked" && !taken.has(row.year),
+  );
+}
+
+/** Community Settings create: site-On years that have not locked. */
+export function pickCommunityTgaSettingsYear<
+  T extends {
+    year: number;
+    promoted: boolean;
+    enabled: boolean;
+    status: TgaStatus;
+  },
+>(rows: T[], existingYears: number[] = []): T | null {
+  return pickCommunityTgaPromoYear(communityTgaCreateYears(rows, existingYears));
+}
+
+export function communityTgaSettingsEmptyReason(
+  rows: { enabled: boolean; status: TgaStatus }[],
+): "none" | "locked" {
+  if (rows.some((row) => row.enabled && row.status === "locked")) {
+    return "locked";
+  }
+  return "none";
+}
+
 function scheduleStamp(date: Date | null | undefined): string | null {
   if (!date || Number.isNaN(date.getTime())) return null;
   return formatEditionScheduleTime(date);

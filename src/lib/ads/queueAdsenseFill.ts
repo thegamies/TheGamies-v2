@@ -8,6 +8,11 @@ export function adsenseInsNeedsFill(ins: Element): boolean {
   return true;
 }
 
+/** True when AdSense served a creative (not an empty / unfilled slot). */
+export function adsenseInsIsFilled(ins: Element): boolean {
+  return ins.getAttribute("data-ad-status") === "filled";
+}
+
 /**
  * Queue one fill for a manual AdSense `<ins>`. Returns false when the unit is
  * already filled or already queued (second Strict Mode effect, Auto ads).

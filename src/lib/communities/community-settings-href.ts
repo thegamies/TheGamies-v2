@@ -43,3 +43,8 @@ export function communitySettingsHref(
 export function communityCreateEventHref(slug: string) {
   return `/communities/${encodeURIComponent(slug)}/create/event`;
 }
+
+/** Host create Pick’em page. */
+export function communityCreateTgaHref(slug: string) {
+  return `/communities/${encodeURIComponent(slug)}/create/the-game-awards`;
+}

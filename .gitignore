@@ -24,6 +24,7 @@ coverage/
 
 # Hosting / misc
 .open-next/
+.vercel/
 .wrangler/
 .dev.vars
 .DS_Store

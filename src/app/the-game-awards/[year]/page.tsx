@@ -16,16 +16,18 @@ import {
   listTgaYears,
   maskTgaBallotWinners,
 } from "@/lib/tga-pickem/service";
-import { getSiteSheet } from "@/lib/tga-pickem/sheets";
-import { picksAreOpen, revealTgaWinners, tgaStatusLabel } from "@/lib/tga-pickem/status";
+import { getSiteSheet, listSiteTgaEntrants } from "@/lib/tga-pickem/sheets";
+import { picksAreOpen, revealTgaWinners, tgaBallotVisible, tgaStatusLabel } from "@/lib/tga-pickem/status";
 import {
   parseTgaSheetUsername,
   parseTgaYearView,
   tgaYearHref,
 } from "@/lib/tga-pickem/year-href";
+import { TgaBallotComingSoon } from "@/components/tga-pickem/TgaBallotComingSoon";
 import { TgaBallotForm } from "@/components/tga-pickem/TgaBallotForm";
 import { TgaBallotScore } from "@/components/tga-pickem/TgaBallotScore";
 import { TgaLeaderboard } from "@/components/tga-pickem/TgaLeaderboard";
+import { TgaTurnoutList } from "@/components/tga-pickem/TgaTurnoutList";
 import { TgaPublicSheet } from "@/components/tga-pickem/TgaPublicSheet";
 import { TgaYearTabs } from "@/components/tga-pickem/TgaYearTabs";
 import { getProfileByUsername } from "@/lib/profile/service";
@@ -72,6 +74,7 @@ export default async function TgaYearPage({
   const path = `/the-game-awards/${year}`;
   const open = picksAreOpen(slate);
   const reveal = revealTgaWinners(slate);
+  const showBallot = tgaBallotVisible(slate);
   const years = await listTgaYears().then((rows) =>
     rows.filter((row) => row.enabled),
   );
@@ -119,13 +122,15 @@ export default async function TgaYearPage({
         />
       ) : view === "sheet" && sheetUsername && reveal ? (
         <TgaSiteSheet year={year} path={path} username={sheetUsername} />
-      ) : (
+      ) : showBallot ? (
         <TgaBallot
           year={year}
           profileId={profile?.id ?? null}
           open={open}
           reveal={reveal}
         />
+      ) : (
+        <TgaBallotComingSoon year={slate} />
       )}
     </main>
   );
@@ -183,11 +188,16 @@ async function TgaStandings({
   sheetHref?: (username: string) => string;
 }) {
   if (!reveal) {
+    const turnout = await listSiteTgaEntrants(
+      year,
+      Number.isInteger(page) ? page : 1,
+    );
     return (
-      <TgaLeaderboard
-        rows={[]}
-        page={1}
-        totalPages={1}
+      <TgaTurnoutList
+        rows={turnout.rows}
+        total={turnout.total}
+        page={turnout.page}
+        totalPages={turnout.totalPages}
         pageHref={(next) => tgaYearHref(path, { view: "standings", page: next })}
         emptyCopy={TGA_STANDINGS_OPEN_COPY}
       />

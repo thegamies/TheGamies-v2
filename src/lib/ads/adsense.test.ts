@@ -4,6 +4,7 @@ import {
   ADSENSE_CLIENT_ID,
   adsTxtBody,
   adsenseAllowedOnPath,
+  adsensePublisherId,
   adsenseTestAds,
   getAdsenseBannerSlot,
   getAdsenseClientId,
@@ -108,6 +109,7 @@ describe("adsenseAllowedOnPath", () => {
 
 describe("adsTxtBody", () => {
   it("lists the Google AdSense seller line", () => {
+    expect(adsensePublisherId(ADSENSE_CLIENT_ID)).toBe("pub-9835884276920090");
     expect(adsTxtBody()).toBe(
       "google.com, pub-9835884276920090, DIRECT, f08c47fec0942fa0\n",
     );

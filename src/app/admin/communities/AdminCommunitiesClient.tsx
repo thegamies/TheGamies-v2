@@ -12,7 +12,7 @@ import {
   seedCommunityEditionAction,
 } from "./actions";
 
-const COUNT_PRESETS = [5, 10, 25, 50, 100, 250, 500] as const;
+const COUNT_PRESETS = [5, 10, 25, 50, 100, 150, 250, 500] as const;
 const BATCH_SIZE = 50;
 
 type Stats = {
@@ -40,6 +40,7 @@ export function AdminCommunitiesClient({
   const [poolSize, setPoolSize] = useState(500);
   const [reseed, setReseed] = useState(true);
   const [refreshPublished, setRefreshPublished] = useState(true);
+  const [receptionDemo2025, setReceptionDemo2025] = useState(false);
   const [deleteProfiles, setDeleteProfiles] = useState(false);
   const [stats, setStats] = useState<Stats | null>(initialStats);
   const [message, setMessage] = useState<string | null>(null);
@@ -79,6 +80,7 @@ export function AdminCommunitiesClient({
       poolSize,
       reseed: opts.reseed,
       refreshPublishedResults: opts.refreshPublishedResults,
+      receptionDemo2025,
     });
   }
 
@@ -137,6 +139,8 @@ export function AdminCommunitiesClient({
       let lastEnd = 0;
       let wroteAnything = false;
       let editionStatus = "";
+      let unmatchedTitles: string[] = [];
+      let gamePoolSize = 0;
 
       while (remaining > 0 && !stopRef.current) {
         const batch = Math.min(BATCH_SIZE, remaining);
@@ -163,6 +167,8 @@ export function AdminCommunitiesClient({
         skipped += result.skipped;
         lastEnd = result.endIndex;
         editionStatus = result.editionStatus;
+        unmatchedTitles = result.unmatchedTitles;
+        gamePoolSize = result.gamePoolSize;
         startIndex = result.nextIndex;
         remaining -= batch;
         setMessage(
@@ -171,10 +177,17 @@ export function AdminCommunitiesClient({
       }
 
       if (wroteAnything && !hadError) {
+        const unmatchedNote =
+          unmatchedTitles.length > 0
+            ? ` Catalog misses (${unmatchedTitles.length}): ${unmatchedTitles.slice(0, 8).join(", ")}${unmatchedTitles.length > 8 ? "…" : ""}.`
+            : "";
+        const poolNote = gamePoolSize
+          ? ` GOTY pool ${gamePoolSize} games.`
+          : "";
         const stoppedEarly = stopRef.current && remaining > 0;
         const done = stoppedEarly
-            ? `Stopped. Through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}.`
-            : `Done through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}. Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.`;
+            ? `Stopped. Through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}.${poolNote}${unmatchedNote}`
+            : `Done through member ${lastEnd}: +${createdProfiles} profiles, ${createdBallots} new / ${updatedBallots} updated ballots, ${joinedMembers} joined, ${voicesSet} Hosts, ${skipped} skipped. Edition ${year} is ${editionStatus}.${poolNote}${unmatchedNote} Open /communities/${slug.trim()}/edition/${year} as a host to preview submitters, or publish below for public results.`;
         await maybeRefreshPublished(done);
       }
       await refreshStats();
@@ -282,10 +295,12 @@ export function AdminCommunitiesClient({
       ) : null}
 
       <p className="mt-3 max-w-2xl text-sm text-muted">
-        Seed members cannot sign in. While voting is open, hosts see a submitted
-        ballot list on the Edition page. Public Community/Hosts boards appear
-        after you publish. Large counts run in batches of {BATCH_SIZE} so you
-        can stop between batches.
+        Seed members cannot sign in. Hosts from this run are labeled Seed Host
+        so they read as hosts on the board. While voting is open, hosts see a
+        submitted ballot list on the Edition page. Public Community/Hosts
+        boards appear after you publish. Large counts run in batches of{" "}
+        {BATCH_SIZE} so you can stop between batches. For a convincing 2025
+        reception board, use about 150 members with the demo option below.
       </p>
 
       <div className="space-y-4">
@@ -306,8 +321,25 @@ export function AdminCommunitiesClient({
             type="number"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
+            disabled={busy || receptionDemo2025}
+          />
+        </label>
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={receptionDemo2025}
+            onChange={(e) => {
+              const on = e.target.checked;
+              setReceptionDemo2025(on);
+              if (on) {
+                setYear(2025);
+                setListSize(10);
+                if (count < 100) setCount(150);
+              }
+            }}
             disabled={busy}
           />
+          2025 reception demo (weighted Top 10 + ten categories, taste profiles)
         </label>
         <div>
           <p className="text-sm text-muted">Members / ballots this run</p>
@@ -351,11 +383,11 @@ export function AdminCommunitiesClient({
             max={100}
             value={listSize}
             onChange={(e) => setListSize(Number(e.target.value))}
-            disabled={busy}
+            disabled={busy || receptionDemo2025}
           />
         </label>
         <label className="block text-sm text-muted">
-          Hosts from the start of this run
+          Hosts from the start of this run (named Seed Host)
           <input
             className={`${fieldInputClass} mt-1`}
             type="number"
@@ -375,7 +407,7 @@ export function AdminCommunitiesClient({
             max={100}
             value={ratingBias}
             onChange={(e) => setRatingBias(Number(e.target.value))}
-            disabled={busy}
+            disabled={busy || receptionDemo2025}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -387,7 +419,7 @@ export function AdminCommunitiesClient({
             max={2000}
             value={poolSize}
             onChange={(e) => setPoolSize(Number(e.target.value))}
-            disabled={busy}
+            disabled={busy || receptionDemo2025}
           />
         </label>
         <label className="flex items-center gap-2 text-sm text-muted">

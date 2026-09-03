@@ -4,7 +4,9 @@ import {
   computeTgaStatus,
   picksAreOpen,
   revealTgaWinners,
+  tgaBallotVisible,
   slateCompleteReason,
+  tgaDeleteConfirmMatches,
   validateTgaSchedule,
 } from "./status";
 
@@ -41,6 +43,15 @@ describe("computeTgaStatus", () => {
   });
 });
 
+describe("tgaDeleteConfirmMatches", () => {
+  it("requires the full year", () => {
+    expect(tgaDeleteConfirmMatches(2026, "2026")).toBe(true);
+    expect(tgaDeleteConfirmMatches(2026, " 2026 ")).toBe(true);
+    expect(tgaDeleteConfirmMatches(2026, "2025")).toBe(false);
+    expect(tgaDeleteConfirmMatches(2026, "")).toBe(false);
+  });
+});
+
 describe("validateTgaSchedule", () => {
   it("requires show start after open", () => {
     const a = new Date("2026-12-11T00:00:00.000Z");
@@ -54,6 +65,23 @@ describe("visibility helpers", () => {
   it("only promotes when on", () => {
     expect(chromePromoted({ enabled: false, promoted: true })).toBe(false);
     expect(chromePromoted({ enabled: true, promoted: true })).toBe(true);
+  });
+
+  it("hides the ballot until picks open", () => {
+    const year = {
+      enabled: true,
+      opensAt: new Date("2026-12-01T00:00:00.000Z"),
+      showStartsAt: new Date("2026-12-11T00:00:00.000Z"),
+    };
+    expect(tgaBallotVisible(year, new Date("2026-11-01T00:00:00.000Z"))).toBe(
+      false,
+    );
+    expect(tgaBallotVisible(year, new Date("2026-12-05T00:00:00.000Z"))).toBe(
+      true,
+    );
+    expect(tgaBallotVisible(year, new Date("2026-12-11T01:00:00.000Z"))).toBe(
+      true,
+    );
   });
 
   it("opens picks only while status is open", () => {

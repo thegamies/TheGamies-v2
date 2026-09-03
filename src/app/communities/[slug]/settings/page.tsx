@@ -24,7 +24,6 @@ import {
 import { listCommunityBansPage, getPendingCommunityDeletionRequest } from "@/lib/communities/moderation";
 import { CommunityDesignatedHostsForm } from "./CommunityDesignatedHostsForm";
 import { CommunityHostsForm } from "./CommunityHostsForm";
-import { TgaCommunityHostsForm } from "./TgaCommunityHostsForm";
 import { CommunityIdentitySettings } from "./CommunityIdentitySettings";
 import { CommunityBansSettings } from "./CommunityBansSettings";
 import { CommunityLeaveForm } from "./CommunityLeaveForm";
@@ -33,14 +32,12 @@ import { EditionSettings } from "./EditionSettings";
 import { LiveLockForm } from "./LiveLockForm";
 import { LiveRevealSettings } from "./LiveRevealSettings";
 import { LiveSettingsForm } from "./LiveSettingsForm";
-import { TgaSettingsForm } from "./TgaSettingsForm";
+import { TgaSettings } from "./TgaSettings";
 import { listCurrentCommunityHosts } from "@/lib/communities/community-hosts";
 import {
   communityTgaNavVisible,
-  isCommunityTgaOptedIn,
-  listTgaYears,
+  listCommunityTgaYears,
 } from "@/lib/tga-pickem/service";
-import { listTgaCommunityHostRoster } from "@/lib/tga-pickem/community-hosts";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -131,21 +128,13 @@ export default async function CommunitySettingsPage({
   }
   const canLeave =
     leaveBlockedReason("admin", community.hostCount) == null;
-  const tgaYears = (await listTgaYears().catch(() => [])).filter(
-    (row) => row.enabled,
-  );
-  const tgaYear =
-    tgaYears.find((row) => row.promoted)?.year ?? tgaYears[0]?.year ?? null;
-  const tgaOptedIn =
-    tgaYear != null &&
-    (await isCommunityTgaOptedIn(community.id, tgaYear).catch(() => false));
   const designatedHosts =
     tab === "hosts"
       ? await listCurrentCommunityHosts(community.id).catch(() => [])
       : [];
-  const tgaHosts =
-    tab === "tga" && tgaOptedIn && tgaYear != null
-      ? await listTgaCommunityHostRoster(community.id, tgaYear).catch(() => [])
+  const communityTgaYears =
+    tab === "tga"
+      ? await listCommunityTgaYears(community.id).catch(() => [])
       : [];
 
   return (
@@ -201,20 +190,7 @@ export default async function CommunitySettingsPage({
         ) : tab === "events" ? (
           <EditionSettings slug={community.slug} editions={editions} />
         ) : tab === "tga" ? (
-          <>
-            <TgaSettingsForm
-              slug={community.slug}
-              year={tgaYear}
-              enabled={tgaOptedIn}
-            />
-            {tgaOptedIn && tgaYear != null ? (
-              <TgaCommunityHostsForm
-                slug={community.slug}
-                year={tgaYear}
-                members={tgaHosts}
-              />
-            ) : null}
-          </>
+          <TgaSettings slug={community.slug} years={communityTgaYears} />
         ) : tab === "hosts" ? (
           <CommunityDesignatedHostsForm
             slug={community.slug}

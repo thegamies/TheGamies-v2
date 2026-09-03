@@ -41,7 +41,7 @@ Sections use the accent-tick `SectionRule` between later blocks.
 
 **Category standings** (`?view=category&category=`) — paginated cover cards for one award (**10** per page, Load more via API).
 
-**Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. Available after results publish **and** while voting is open or closed (turnout; names only — ballots stay hidden until publish). Community · Hosts filters Hosts-only when on Hosts. After publish, **display name** opens that voter’s ballot (from ballot tables, read-only after close); **@username** opens their profile.
+**Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. While voting is **open or closed**, this is turnout only: names, no ballot links (`?voter=` is ignored until publish). After results publish, **display name** opens that voter’s ballot (from ballot tables, read-only after close); **@username** opens their profile. Community · Hosts filters Hosts-only when on Hosts.
 
 **Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Hosts toggle is hidden here.
 

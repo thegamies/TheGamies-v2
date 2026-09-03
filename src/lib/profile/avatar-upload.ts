@@ -103,6 +103,17 @@ export function isJpegBytePayload(body: ArrayBuffer): boolean {
   );
 }
 
+export function isPngBytePayload(body: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(body);
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47
+  );
+}
+
 export function validateAvatarUploadInput(input: {
   contentType: string;
   contentLength: number;

@@ -13,6 +13,7 @@ import { GameCover } from "@/components/ui/GameCover";
  */
 export function GameSearchField({
   year,
+  gotyMode,
   onSelect,
   placeholder,
   "aria-label": ariaLabel,
@@ -22,7 +23,10 @@ export function GameSearchField({
   eligibility,
   allowEditions = false,
 }: {
-  year: number;
+  /** Omit to search the whole catalog (TGA nominees, anticipated titles). */
+  year?: number;
+  /** Defaults to year-filtered GOTY search when a year is set. */
+  gotyMode?: boolean;
   onSelect: (hit: GameSearchHit) => void;
   placeholder?: string;
   "aria-label": string;
@@ -73,11 +77,12 @@ export function GameSearchField({
       return;
     }
     const q = next.trim();
+    const useGotyMode = gotyMode ?? year != null;
     startSearch(async () => {
       const results = await searchGamesForList({
         q,
         year,
-        gotyMode: true,
+        gotyMode: useGotyMode,
         eligibility,
         allowEditions,
       });
@@ -104,7 +109,9 @@ export function GameSearchField({
         onFocus={() => {
           if (query.trim().length >= 2) setOpen(true);
         }}
-        placeholder={placeholder ?? `Search ${year} games`}
+        placeholder={
+          placeholder ?? (year != null ? `Search ${year} games` : "Search games")
+        }
         autoComplete="off"
         aria-label={ariaLabel}
         aria-expanded={showOverlay}

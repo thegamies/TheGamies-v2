@@ -1,12 +1,18 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import {
   createDb,
+  profiles,
+  tgaCommunityHosts,
   tgaCommunityPicks,
   tgaCommunitySheets,
   tgaSitePicks,
   tgaSiteSheets,
   type Db,
 } from "@thegamies/db";
+import {
+  TGA_LEADERBOARD_PAGE_SIZE,
+  leaderboardPageCount,
+} from "./scoring";
 import { getTgaYear, listTgaBallot } from "./service";
 import { picksAreOpen } from "./status";
 
@@ -18,6 +24,143 @@ export type TgaSheetView = {
   worldPremieresGuess: number | null;
   picks: Record<string, string>;
 };
+
+export type TgaEntrantRow = {
+  profileId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+};
+
+export type TgaEntrantsPage = {
+  rows: TgaEntrantRow[];
+  page: number;
+  totalPages: number;
+  total: number;
+};
+
+function mapEntrantRow(row: {
+  profileId: string;
+  displayName: string;
+  username: string;
+  avatarUrl: string | null;
+}): TgaEntrantRow {
+  return {
+    profileId: row.profileId,
+    displayName: row.displayName,
+    username: row.username,
+    avatarUrl: row.avatarUrl,
+  };
+}
+
+/** Names of people with a sheet. No picks. Paginated. */
+export async function listSiteTgaEntrants(
+  year: number,
+  page: number,
+  db: Db = getDb(),
+): Promise<TgaEntrantsPage> {
+  const [{ value: total }] = await db
+    .select({ value: sql<number>`count(*)::int` })
+    .from(tgaSiteSheets)
+    .where(eq(tgaSiteSheets.year, year));
+  const totalCount = total ?? 0;
+  const totalPages = leaderboardPageCount(totalCount);
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const offset = (safePage - 1) * TGA_LEADERBOARD_PAGE_SIZE;
+  const rows = await db
+    .select({
+      profileId: tgaSiteSheets.profileId,
+      displayName: profiles.displayName,
+      username: profiles.username,
+      avatarUrl: profiles.avatarUrl,
+    })
+    .from(tgaSiteSheets)
+    .innerJoin(profiles, eq(profiles.id, tgaSiteSheets.profileId))
+    .where(eq(tgaSiteSheets.year, year))
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(TGA_LEADERBOARD_PAGE_SIZE)
+    .offset(offset);
+  return {
+    rows: rows.map(mapEntrantRow),
+    page: safePage,
+    totalPages,
+    total: totalCount,
+  };
+}
+
+/** Names of people with a community sheet. No picks. Paginated. */
+export async function listCommunityTgaEntrants(
+  communityId: string,
+  year: number,
+  page: number,
+  opts: { hostsOnly?: boolean } = {},
+  db: Db = getDb(),
+): Promise<TgaEntrantsPage> {
+  const hostsOnly = Boolean(opts.hostsOnly);
+  const scope = and(
+    eq(tgaCommunitySheets.communityId, communityId),
+    eq(tgaCommunitySheets.year, year),
+  );
+  const fromSheets = () => {
+    const query = db
+      .select({
+        profileId: tgaCommunitySheets.profileId,
+        displayName: profiles.displayName,
+        username: profiles.username,
+        avatarUrl: profiles.avatarUrl,
+      })
+      .from(tgaCommunitySheets)
+      .innerJoin(profiles, eq(profiles.id, tgaCommunitySheets.profileId));
+    if (!hostsOnly) return query.where(scope);
+    return query
+      .innerJoin(
+        tgaCommunityHosts,
+        and(
+          eq(tgaCommunityHosts.communityId, tgaCommunitySheets.communityId),
+          eq(tgaCommunityHosts.year, tgaCommunitySheets.year),
+          eq(tgaCommunityHosts.profileId, tgaCommunitySheets.profileId),
+        ),
+      )
+      .where(scope);
+  };
+
+  let totalCount = 0;
+  if (hostsOnly) {
+    const counted = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(tgaCommunitySheets)
+      .innerJoin(
+        tgaCommunityHosts,
+        and(
+          eq(tgaCommunityHosts.communityId, tgaCommunitySheets.communityId),
+          eq(tgaCommunityHosts.year, tgaCommunitySheets.year),
+          eq(tgaCommunityHosts.profileId, tgaCommunitySheets.profileId),
+        ),
+      )
+      .where(scope);
+    totalCount = counted[0]?.value ?? 0;
+  } else {
+    const [row] = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(tgaCommunitySheets)
+      .where(scope);
+    totalCount = row?.value ?? 0;
+  }
+
+  const totalPages = leaderboardPageCount(totalCount);
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const offset = (safePage - 1) * TGA_LEADERBOARD_PAGE_SIZE;
+  const rows = await fromSheets()
+    .orderBy(asc(profiles.displayName), asc(profiles.username))
+    .limit(TGA_LEADERBOARD_PAGE_SIZE)
+    .offset(offset);
+  return {
+    rows: rows.map(mapEntrantRow),
+    page: safePage,
+    totalPages,
+    total: totalCount,
+  };
+}
 
 export async function getSiteSheet(
   profileId: string,

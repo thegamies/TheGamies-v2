@@ -75,8 +75,14 @@ export const TGA_2025_NOMINEES: Record<string, TgaSeedNominee[]> = {
   "Best Mobile Game": [
     game("Umamusume: Pretty Derby", "Uma Musume Pretty Derby"),
     game("Destiny Rising"),
-    game("Persona 5: The Phantom X", "Persona 5 The Phantom X"),
-    game("Sonic Rumble"),
+    game(
+      "Persona 5: The Phantom X",
+      "Persona 5 The Phantom X",
+      "Persona5: The Phantom X",
+      "Persona5 The Phantom X",
+      "P5X",
+    ),
+    game("Sonic Rumble Party", "Sonic Rumble"),
     game("Wuthering Waves"),
   ],
   "Best Ongoing Game": [
@@ -91,7 +97,6 @@ export const TGA_2025_NOMINEES: Record<string, TgaSeedNominee[]> = {
     game("Blue Prince"),
     game("Despelote"),
     game("Dispatch"),
-    game("Megabonk"),
   ],
   "Best Action Game": [
     game("Hades II", "Hades 2"),
@@ -165,7 +170,7 @@ export const TGA_2025_NOMINEES: Record<string, TgaSeedNominee[]> = {
     game("007 First Light"),
     game("Marvel's Wolverine", "Marvels Wolverine"),
     game("Resident Evil Requiem"),
-    game("The Witcher 4"),
+    game("The Witcher IV", "The Witcher 4", "Witcher IV", "Witcher 4"),
   ],
   "Games for Impact": [
     game("South of Midnight"),
@@ -197,7 +202,12 @@ export const TGA_2025_NOMINEES: Record<string, TgaSeedNominee[]> = {
     other("Team Liquid PH — Mobile Legends: Bang Bang"),
   ],
   "Best Community Support": [
-    game("Baldur's Gate 3", "Baldurs Gate 3"),
+    game(
+      "Baldur's Gate 3",
+      "Baldur's Gate III",
+      "Baldurs Gate 3",
+      "Baldurs Gate III",
+    ),
     game("Final Fantasy XIV", "Final Fantasy 14", "Final Fantasy XIV Online"),
     game("Fortnite"),
     game("Helldivers 2", "Helldivers II"),
@@ -242,16 +252,72 @@ function other(name: string): TgaSeedNominee {
 }
 
 export function normalizeNomineeTitle(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[:!.,]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return foldRomanNumerals(
+    value
+      .toLowerCase()
+      .replace(/['’]/g, "")
+      .replace(/[:!.,]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+const ROMAN_TO_ARABIC: Array<[RegExp, string]> = [
+  [/\bviii\b/g, "8"],
+  [/\bvii\b/g, "7"],
+  [/\bvi\b/g, "6"],
+  [/\biv\b/g, "4"],
+  [/\biii\b/g, "3"],
+  [/\bii\b/g, "2"],
+];
+
+function foldRomanNumerals(value: string): string {
+  let next = value;
+  for (const [pattern, arabic] of ROMAN_TO_ARABIC) {
+    next = next.replace(pattern, arabic);
+  }
+  return next;
+}
+
+const ARABIC_TO_ROMAN: Array<[RegExp, string]> = [
+  [/\b8\b/g, "VIII"],
+  [/\b7\b/g, "VII"],
+  [/\b6\b/g, "VI"],
+  [/\b4\b/g, "IV"],
+  [/\b3\b/g, "III"],
+  [/\b2\b/g, "II"],
+];
+
+const ROMAN_TO_ARABIC_TITLE: Array<[RegExp, string]> = [
+  [/\bVIII\b/gi, "8"],
+  [/\bVII\b/gi, "7"],
+  [/\bVI\b/gi, "6"],
+  [/\bIV\b/gi, "4"],
+  [/\bIII\b/gi, "3"],
+  [/\bII\b/gi, "2"],
+];
+
+/** Extra catalog spellings to try when attaching a seeded game nominee. */
+export function expandNomineeSearchTitles(titles: string[]): string[] {
+  const out = new Set<string>();
+  for (const raw of titles) {
+    const title = raw.trim();
+    if (!title) continue;
+    out.add(title);
+    for (const [pattern, roman] of ARABIC_TO_ROMAN) {
+      const swapped = title.replace(pattern, roman);
+      if (swapped !== title) out.add(swapped);
+    }
+    for (const [pattern, arabic] of ROMAN_TO_ARABIC_TITLE) {
+      const swapped = title.replace(pattern, arabic);
+      if (swapped !== title) out.add(swapped);
+    }
+  }
+  return [...out];
 }
 
 export function nomineeSearchTitles(nominee: Extract<TgaSeedNominee, { type: "game" }>) {
-  return [...new Set(nominee.titles.map((title) => title.trim()).filter(Boolean))];
+  return expandNomineeSearchTitles(nominee.titles);
 }
 
 /** Every 2025 category in the seed has a nominee list. */

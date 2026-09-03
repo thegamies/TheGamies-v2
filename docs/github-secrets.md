@@ -45,7 +45,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `R2_SECRET_ACCESS_KEY` | same | Avatar uploads |
 | `STAGING_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | Staging / preview upload bucket. Alias: `R2_AVATAR_BUCKET` if unset |
 | `STAGING_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | Staging / preview public CDN base. Alias: `AVATAR_PUBLIC_BASE_URL` if unset |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional. Unset = no analytics |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional. Unset = site GA4 property. `off` disables |
 | `NEXT_PUBLIC_ADSENSE_CLIENT` | same | Optional. Unset = site AdSense publisher. `off` disables |
 | `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From |
 
@@ -70,7 +70,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `R2_SECRET_ACCESS_KEY` | same | Shared |
 | `PRODUCTION_R2_AVATAR_BUCKET` | `R2_AVATAR_BUCKET` | **Production-only** upload bucket. Never the staging bucket |
 | `PRODUCTION_AVATAR_PUBLIC_BASE_URL` | `AVATAR_PUBLIC_BASE_URL` | **Production-only** public CDN base |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | same | Optional. Unset = site GA4 property. `off` disables |
 | `NEXT_PUBLIC_ADSENSE_CLIENT` | same | Optional. Unset = site AdSense publisher. `off` disables |
 | `AUTH_EMAIL_FROM` | same | Optional |
 

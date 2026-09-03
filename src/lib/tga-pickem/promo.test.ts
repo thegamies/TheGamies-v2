@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { pickCommunityTgaPromoYear, tgaPromoCopy, tgaPromoTitle } from "./promo";
+import {
+  communityTgaSettingsEmptyReason,
+  pickCommunityTgaPromoYear,
+  pickCommunityTgaSettingsYear,
+  tgaPromoCopy,
+  tgaPromoTitle,
+} from "./promo";
 
 const schedule = {
   enabled: true,
@@ -53,6 +59,46 @@ describe("tgaPromoCopy", () => {
       ])?.year,
     ).toBe(2026);
     expect(pickCommunityTgaPromoYear([])).toBeNull();
+  });
+
+  it("does not offer a locked year in community settings", () => {
+    expect(
+      pickCommunityTgaSettingsYear([
+        {
+          year: 2026,
+          promoted: true,
+          enabled: true,
+          status: "locked" as const,
+        },
+        {
+          year: 2027,
+          promoted: false,
+          enabled: true,
+          status: "scheduled" as const,
+        },
+      ])?.year,
+    ).toBe(2027);
+    expect(
+      pickCommunityTgaSettingsYear(
+        [
+          {
+            year: 2027,
+            promoted: false,
+            enabled: true,
+            status: "scheduled" as const,
+          },
+        ],
+        [2027],
+      ),
+    ).toBeNull();
+    expect(
+      communityTgaSettingsEmptyReason([
+        { enabled: true, status: "locked" },
+      ]),
+    ).toBe("locked");
+    expect(
+      communityTgaSettingsEmptyReason([{ enabled: false, status: "off" }]),
+    ).toBe("none");
   });
 
   it("falls back when the year is off", () => {

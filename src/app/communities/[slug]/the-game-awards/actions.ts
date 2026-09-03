@@ -1,14 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import { communitySettingsHref } from "@/lib/communities/community-settings-href";
 import { canManageCommunity } from "@/lib/communities/rules";
 import type { CommunityRole } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { setCommunityTgaOptIn } from "@/lib/tga-pickem/service";
+import {
+  createCommunityTgaYear,
+  deleteCommunityTgaYear,
+  parseTgaYear,
+} from "@/lib/tga-pickem/service";
+import { tgaYearHref } from "@/lib/tga-pickem/year-href";
 import {
   searchTgaCommunityHostMembers,
   setTgaCommunityHost,
@@ -44,24 +51,57 @@ async function requireMember(slug: string): Promise<MemberAuth> {
   };
 }
 
-export async function setCommunityTgaOptInAction(
+function revalidateCommunityTga(slug: string, year?: number) {
+  revalidatePath(`/communities/${slug}`);
+  revalidatePath(`/communities/${slug}/settings`);
+  revalidatePath(`/communities/${slug}/the-game-awards`);
+  if (year != null) {
+    revalidatePath(`/communities/${slug}/the-game-awards/${year}`);
+  }
+}
+
+export async function createCommunityTgaYearAction(
   _prev: { error: string } | null,
   formData: FormData,
 ): Promise<{ error: string } | null> {
   const slug = String(formData.get("slug") ?? "");
-  const year = Number(formData.get("year"));
-  const enabled = String(formData.get("enabled")) === "true";
+  const year = parseTgaYear(formData.get("year"));
+  if (typeof year !== "number") return year;
   const auth = await requireMember(slug);
   if ("error" in auth) return auth;
   if (!canManageCommunity(auth.viewerRole)) {
     return { error: "Only community admins can change this." };
   }
-  const result = await setCommunityTgaOptIn(auth.communityId, year, enabled);
+  const result = await createCommunityTgaYear(auth.communityId, year);
   if ("error" in result) return { error: result.error };
-  revalidatePath(`/communities/${slug}`);
-  revalidatePath(`/communities/${slug}/settings`);
-  revalidatePath(`/communities/${slug}/the-game-awards`);
-  return null;
+  revalidateCommunityTga(slug, year);
+  redirect(
+    tgaYearHref(`/communities/${slug}/the-game-awards/${year}`, {
+      view: "settings",
+    }),
+  );
+}
+
+export async function deleteCommunityTgaYearAction(
+  _prev: { error: string } | null,
+  formData: FormData,
+): Promise<{ error: string } | null> {
+  const slug = String(formData.get("slug") ?? "");
+  const year = parseTgaYear(formData.get("year"));
+  if (typeof year !== "number") return year;
+  const auth = await requireMember(slug);
+  if ("error" in auth) return auth;
+  if (!canManageCommunity(auth.viewerRole)) {
+    return { error: "Only community admins can change this." };
+  }
+  const result = await deleteCommunityTgaYear(
+    auth.communityId,
+    year,
+    formData.get("confirmYear"),
+  );
+  if ("error" in result) return { error: result.error };
+  revalidateCommunityTga(slug, year);
+  redirect(communitySettingsHref(slug, { tab: "tga" }));
 }
 
 export async function saveCommunityTgaSheetAction(

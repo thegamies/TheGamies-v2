@@ -1,9 +1,12 @@
 import { Suspense } from "react";
-import Script from "next/script";
 import { getGaMeasurementId } from "@/lib/analytics/measurement";
-import { gtagConfigScript, gtagConsentBootstrapScript } from "@/lib/analytics/gtag";
+import { gtagConfigScript } from "@/lib/analytics/gtag";
 import { AnalyticsListener } from "./AnalyticsListener";
 
+/**
+ * GA4 snippet must be a real `<script>` in `<head>` (Google’s checker reads
+ * HTML source, not afterInteractive).
+ */
 export function GoogleAnalytics() {
   const measurementId = getGaMeasurementId();
   if (!measurementId) return null;
@@ -11,18 +14,27 @@ export function GoogleAnalytics() {
   return (
     <>
       <script
-        dangerouslySetInnerHTML={{ __html: gtagConsentBootstrapScript() }}
-      />
-      <Script
+        async
         src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`}
-        strategy="afterInteractive"
+        suppressHydrationWarning
       />
-      <Script id="ga-config" strategy="afterInteractive">
-        {gtagConfigScript(measurementId)}
-      </Script>
-      <Suspense fallback={null}>
-        <AnalyticsListener measurementId={measurementId} />
-      </Suspense>
+      <script
+        id="ga-config"
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: gtagConfigScript(measurementId) }}
+      />
     </>
+  );
+}
+
+/** Client route changes after the first view (that view is sent from `<head>`). */
+export function GoogleAnalyticsRouteTracker() {
+  const measurementId = getGaMeasurementId();
+  if (!measurementId) return null;
+
+  return (
+    <Suspense fallback={null}>
+      <AnalyticsListener measurementId={measurementId} />
+    </Suspense>
   );
 }
