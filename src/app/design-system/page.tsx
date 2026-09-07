@@ -25,6 +25,7 @@ import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/contro
 import { navItemClass } from "@/components/ui/navLevels";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";
 import { CookieConsentBanner } from "@/components/analytics/CookieConsentBanner";
+import { LibraryStatusIcon } from "@/components/library/LibraryStatusIcon";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { UserAvatar } from "@/components/profile/UserAvatar";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
@@ -38,6 +39,10 @@ import {
   SkeletonText,
 } from "@/components/ui/Skeleton";
 import type { EditionStatus } from "@/lib/communities/edition-status";
+import {
+  LIBRARY_STATUSES,
+  LIBRARY_STATUS_LABELS,
+} from "@/lib/activity/kinds";
 
 export const metadata = {
   title: "Design system",
@@ -221,6 +226,18 @@ export default function DesignSystemPage() {
           <Button variant="accent" disabled>
             Disabled
           </Button>
+        </div>
+        <p className="mt-8 mb-4 max-w-2xl text-sm text-muted">
+          Library status marks: stroke icons on the game-page picker and
+          shelf. Helper: <code className="text-ink">LibraryStatusIcon</code>.
+        </p>
+        <div className="flex flex-wrap gap-6 text-sm text-ink">
+          {LIBRARY_STATUSES.map((status) => (
+            <span key={status} className="flex items-center gap-2">
+              <LibraryStatusIcon status={status} />
+              {LIBRARY_STATUS_LABELS[status]}
+            </span>
+          ))}
         </div>
         <p className="mt-8 mb-4 max-w-2xl text-sm text-muted">
           Radios: empty `--line` ring, `--accent` fill when selected. Native

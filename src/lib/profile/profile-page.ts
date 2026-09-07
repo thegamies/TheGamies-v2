@@ -1,11 +1,24 @@
-export type ProfileTab = "lists" | "communities";
+export type ProfileTab =
+  | "lists"
+  | "library"
+  | "communities"
+  | "following"
+  | "followers";
 
 export const PROFILE_LISTS_PAGE_SIZE = 12;
 export const PROFILE_COMMUNITIES_PAGE_SIZE = 24;
 export const PROFILE_LIST_PREVIEW_ITEM_LIMIT = 5;
 
 export function parseProfileTab(raw: unknown): ProfileTab {
-  return raw === "communities" ? "communities" : "lists";
+  if (
+    raw === "library" ||
+    raw === "communities" ||
+    raw === "following" ||
+    raw === "followers"
+  ) {
+    return raw;
+  }
+  return "lists";
 }
 
 export function parseProfilePage(raw: unknown): number {
@@ -34,8 +47,8 @@ export function profileHref(
 ): string {
   const params = new URLSearchParams();
   const tab = opts.tab ?? "lists";
-  if (tab === "communities") {
-    params.set("tab", "communities");
+  if (tab !== "lists") {
+    params.set("tab", tab);
   }
   if (opts.page != null && opts.page > 1) {
     params.set("page", String(opts.page));

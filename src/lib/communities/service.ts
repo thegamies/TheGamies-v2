@@ -209,25 +209,28 @@ export async function listCommunitiesForProfile(
   profileId: string,
   db: Db = getDb(),
 ): Promise<ProfileCommunity[]> {
-  const page = await listCommunitiesForProfilePage(profileId, 1, db);
+  const page = await listCommunitiesForProfilePage(profileId, 1, {}, db);
   return page.communities;
 }
 
 export async function listCommunitiesForProfilePage(
   profileId: string,
   pageRaw: number,
+  opts: { includePrivate?: boolean } = {},
   db: Db = getDb(),
 ): Promise<ProfileCommunitiesPage> {
   const pageSize = PROFILE_COMMUNITIES_PAGE_SIZE;
-  const publicMembership = and(
-    eq(communityMembers.profileId, profileId),
-    eq(communities.visibility, "public"),
-  );
+  const membership = opts.includePrivate
+    ? eq(communityMembers.profileId, profileId)
+    : and(
+        eq(communityMembers.profileId, profileId),
+        eq(communities.visibility, "public"),
+      );
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
-    .where(publicMembership);
+    .where(membership);
   const total = Number(countRow?.n ?? 0);
   const { page, offset, totalPages } = paginateProfileItems(
     pageRaw,
@@ -246,7 +249,7 @@ export async function listCommunitiesForProfilePage(
     })
     .from(communityMembers)
     .innerJoin(communities, eq(communities.id, communityMembers.communityId))
-    .where(publicMembership)
+    .where(membership)
     .orderBy(asc(communities.name))
     .limit(pageSize)
     .offset(offset);

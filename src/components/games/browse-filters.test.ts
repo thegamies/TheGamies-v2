@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { YEAR_PICKER_MIN } from "@/lib/ui/calendar-year";
-import { ALL_YEARS_VALUE, browseYearOptions } from "./browse-filters";
+import {
+  ALL_YEARS_VALUE,
+  browseYearOptions,
+  parseGamesBrowseSort,
+} from "./browse-filters";
 
 describe("browseYearOptions", () => {
   it("lists current year plus two, down to the year picker minimum", () => {
@@ -13,5 +17,13 @@ describe("browseYearOptions", () => {
 
   it("keeps all-years as an empty filter value", () => {
     expect(ALL_YEARS_VALUE).toBe("");
+  });
+});
+
+describe("parseGamesBrowseSort", () => {
+  it("accepts trending alongside catalog sorts", () => {
+    expect(parseGamesBrowseSort("trending")).toBe("trending");
+    expect(parseGamesBrowseSort("name")).toBe("name");
+    expect(parseGamesBrowseSort("nope")).toBe("popularity");
   });
 });

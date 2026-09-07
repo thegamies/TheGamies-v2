@@ -13,6 +13,7 @@ Communities are groups (ceremony + live board). Follow is 1:1 taste subscription
 - Store by `profile_id` (username changes do not break edges).
 - Cannot follow yourself.
 - **Cannot follow a private profile.** Private profile pages stay not-found for non-owners; there is no follow button around that.
+- **Cannot follow seed accounts** on lasting production/staging, except **site operators**. Local and PR preview builds may follow them (and see them in Discover search). They stay omitted from public People search.
 - No follow suggestions in the first slice.
 - No block / mute in the first slice (later abuse work).
 - No push / email / in-app notification that someone followed you. The feed is pull.
@@ -33,8 +34,11 @@ If a public profile later becomes private: existing follow edges remain in the t
 
 - Profile header: Follow / Following
 - Following and Followers lists (paged)
-- Home **Following** feed when signed in — see [activity-and-trending.md](./activity-and-trending.md)
+- Site nav: **People** when signed out (`/people`, username search only). **Following** when signed in (`/following`) with Activity first, then Trending (people you follow only), Following, Followers, and Discover people (same SQL search)
+- `/following` grouped feed on the Activity tab when signed in — see [activity-and-trending.md](./activity-and-trending.md)
 - Empty feed: point at public lists the visitor already uses, not a community firehose
+
+Discover / People search is `ILIKE` on public living usernames and display names, hit-capped. Seed accounts are omitted. A blank query returns no rows.
 
 ## Schema (when built)
 

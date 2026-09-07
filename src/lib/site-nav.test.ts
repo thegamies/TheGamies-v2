@@ -4,6 +4,7 @@ import {
   buildPrimarySiteNavLinks,
   buildUtilitySiteNavLinks,
   showDesignSystemNav,
+  withSignedInNavLinks,
   siteCreateLink,
 } from "./site-nav";
 
@@ -58,7 +59,7 @@ describe("showDesignSystemNav", () => {
 });
 
 describe("buildPrimarySiteNavLinks", () => {
-  it("is Games, GOTY, and Communities only", () => {
+  it("is Games, GOTY, and Communities", () => {
     expect(buildPrimarySiteNavLinks()).toEqual([
       { href: "/games", label: "Games" },
       { href: "/game-of-the-year", label: "GOTY" },
@@ -71,6 +72,23 @@ describe("buildPrimarySiteNavLinks", () => {
       { href: "/games", label: "Games" },
       { href: "/game-of-the-year", label: "GOTY" },
       { href: "/the-game-awards/2026", label: "Video Game Awards Pick’em" },
+      { href: "/communities", label: "Communities" },
+    ]);
+  });
+});
+
+describe("withSignedInNavLinks", () => {
+  it("inserts People when signed out and Following when signed in", () => {
+    expect(withSignedInNavLinks(buildPrimarySiteNavLinks(), false)).toEqual([
+      { href: "/games", label: "Games" },
+      { href: "/game-of-the-year", label: "GOTY" },
+      { href: "/people", label: "People" },
+      { href: "/communities", label: "Communities" },
+    ]);
+    expect(withSignedInNavLinks(buildPrimarySiteNavLinks(), true)).toEqual([
+      { href: "/games", label: "Games" },
+      { href: "/game-of-the-year", label: "GOTY" },
+      { href: "/following", label: "Following" },
       { href: "/communities", label: "Communities" },
     ]);
   });
@@ -116,6 +134,7 @@ describe("buildAccountMenuGroups", () => {
     expect(groups.flatMap((group) => group.items)).toEqual([
       { href: "/u/ecdm98", label: "View Profile" },
       { href: "/u/ecdm98", label: "My Lists" },
+      { href: "/u/ecdm98?tab=library", label: "My Library" },
       { href: "/u/ecdm98?tab=communities", label: "My Communities" },
       { href: "/account", label: "Settings" },
       { href: "/admin", label: "Admin" },
@@ -131,6 +150,7 @@ describe("buildAccountMenuGroups", () => {
     expect(groups.flatMap((group) => group.items)).toEqual([
       { href: "/u/ecdm98", label: "View Profile" },
       { href: "/u/ecdm98", label: "My Lists" },
+      { href: "/u/ecdm98?tab=library", label: "My Library" },
       { href: "/u/ecdm98?tab=communities", label: "My Communities" },
       { href: "/account", label: "Settings" },
     ]);

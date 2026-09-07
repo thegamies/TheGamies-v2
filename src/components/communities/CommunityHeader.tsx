@@ -72,6 +72,11 @@ export function CommunityNav({
       key: "live",
     });
   }
+  items.push({
+    href: communityPrimaryHref(slug, "trending"),
+    label: "Trending",
+    key: "trending",
+  });
   if (editionStatus && showEditionNav(editionStatus)) {
     items.push({
       href: communityPrimaryHref(slug, "edition", years),

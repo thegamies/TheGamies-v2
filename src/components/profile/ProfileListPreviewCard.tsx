@@ -45,7 +45,7 @@ export function ProfileListPreviewCard({
                 className={standingStripColClass(item.rank === 1)}
               >
                 <StandingGameCard
-                  place={item.rank}
+                  place={list.hideRanks ? null : item.rank}
                   placeSize="lg"
                   slug={item.slug}
                   title={item.title}

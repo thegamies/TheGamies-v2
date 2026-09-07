@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PROFILE_LIBRARY_PAGE_SIZE } from "@/lib/library/service";
 import {
   PROFILE_COMMUNITIES_PAGE_SIZE,
   PROFILE_LIST_PREVIEW_ITEM_LIMIT,
@@ -15,6 +16,9 @@ describe("parseProfileTab", () => {
     expect(parseProfileTab("lists")).toBe("lists");
     expect(parseProfileTab("nope")).toBe("lists");
     expect(parseProfileTab("communities")).toBe("communities");
+    expect(parseProfileTab("library")).toBe("library");
+    expect(parseProfileTab("following")).toBe("following");
+    expect(parseProfileTab("followers")).toBe("followers");
   });
 });
 
@@ -39,6 +43,12 @@ describe("profileHref", () => {
     expect(profileHref("alex", { tab: "communities" })).toBe(
       "/u/alex?tab=communities",
     );
+    expect(profileHref("alex", { tab: "library" })).toBe(
+      "/u/alex?tab=library",
+    );
+    expect(profileHref("alex", { tab: "following", page: 2 })).toBe(
+      "/u/alex?tab=following&page=2",
+    );
     expect(profileHref("alex", { tab: "lists", page: 2 })).toBe(
       "/u/alex?page=2",
     );
@@ -57,6 +67,7 @@ describe("paginateProfileItems", () => {
     expect(PROFILE_LISTS_PAGE_SIZE).toBe(12);
     expect(PROFILE_COMMUNITIES_PAGE_SIZE).toBe(24);
     expect(PROFILE_LIST_PREVIEW_ITEM_LIMIT).toBe(5);
+    expect(PROFILE_LIBRARY_PAGE_SIZE).toBe(24);
   });
 
   it("clamps the page and computes offset", () => {

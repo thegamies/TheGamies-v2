@@ -337,6 +337,27 @@
       "when": 1789257600000,
       "tag": "0047_profile_is_seed",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789344000000,
+      "tag": "0048_library_follow",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789430400000,
+      "tag": "0049_trending_recency_weights",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789516800000,
+      "tag": "0050_library_status_rename",
+      "breakpoints": true
     }
   ]
 }

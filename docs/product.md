@@ -120,10 +120,10 @@ Site
 
 Library, follow, a **following** feed, list rank visibility, and trending. **Do not pull onto the launch branch.** Specs: [library.md](./features/library.md), [follow.md](./features/follow.md), [activity-and-trending.md](./features/activity-and-trending.md), rank visibility on [lists.md](./features/lists.md).
 
-- **Library** — Want / Playing / Played / Dropped; uncoupled from GOTY; public/private per row
+- **Library** — Wishlist / Backlog / Playing / Paused / Beat / Dropped; uncoupled from GOTY; public/private per row
 - **Follow** — open follow of public profiles; home feed is pull (no notifications)
 - **Rank visibility** — `ranked` / `games_only` / `hidden` on lists; Categories follow the same control; owned GOTY still feeds live contrib
-- **Trending** — game boards from activity (site / community / following); no community member activity feed
+- **Trending** — game boards from activity (Games sort filter, community tab, following-scoped Games filter); no community member activity feed
 
 Messaging / complex notifications stay **out**.
 

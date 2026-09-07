@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CommunityListCard } from "@/components/communities/CommunityListCard";
+import { FollowButton } from "@/components/follow/FollowButton";
+import { FollowCounts } from "@/components/follow/FollowCounts";
+import { FollowRosterList } from "@/components/follow/FollowRosterList";
+import { LibraryShelf } from "@/components/library/LibraryShelf";
 import { ProfileListPreviewCard } from "@/components/profile/ProfileListPreviewCard";
 import { ProfilePager } from "@/components/profile/ProfilePager";
 import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
@@ -10,6 +13,18 @@ import { UserAvatar } from "@/components/profile/UserAvatar";
 import { MastheadBanner } from "@/components/ui/MastheadBanner";
 import { getRequestSessionUser } from "@/lib/auth/session";
 import { listCommunitiesForProfilePage } from "@/lib/communities/service";
+import {
+  FOLLOW_ROSTER_PAGE_SIZE,
+  followCounts,
+  isFollowing,
+  listFollowersPage,
+  listFollowingPage,
+} from "@/lib/follow/service";
+import { allowFollowSeedAccounts } from "@/lib/follow/rules";
+import {
+  PROFILE_LIBRARY_PAGE_SIZE,
+  listLibraryForProfilePage,
+} from "@/lib/library/service";
 import { listOwnedForProfilePage } from "@/lib/lists/service";
 import {
   parseProfilePage,
@@ -19,6 +34,7 @@ import {
   PROFILE_LISTS_PAGE_SIZE,
 } from "@/lib/profile/profile-page";
 import {
+  getProfileByAuthUserId,
   getProfileByUsername,
   ownsProfile,
 } from "@/lib/profile/service";
@@ -65,6 +81,9 @@ export default async function PublicProfilePage({
   }
 
   const sessionUser = await getRequestSessionUser();
+  const viewerProfile = sessionUser?.id
+    ? await getProfileByAuthUserId(sessionUser.id).catch(() => null)
+    : null;
   const isOwner = ownsProfile(profile, sessionUser?.id);
 
   if (profile.visibility === "private" && !isOwner) {
@@ -74,6 +93,21 @@ export default async function PublicProfilePage({
   const sp = await searchParams;
   const tab = parseProfileTab(first(sp.tab));
   const pageRaw = parseProfilePage(first(sp.page));
+  const counts = await followCounts(profile.id).catch(() => ({
+    following: 0,
+    followers: 0,
+  }));
+  const canFollowSeed = allowFollowSeedAccounts({
+    isSiteAdmin: viewerProfile?.isSiteAdmin,
+  });
+  const canFollowProfile =
+    Boolean(viewerProfile) &&
+    !isOwner &&
+    profile.visibility === "public" &&
+    (!profile.isSeed || canFollowSeed);
+  const viewerFollowing = canFollowProfile
+    ? await isFollowing(viewerProfile!.id, profile.id).catch(() => false)
+    : false;
 
   return (
     <>
@@ -107,6 +141,19 @@ export default async function PublicProfilePage({
                   This profile is private — only you can see it here.
                 </p>
               ) : null}
+              {profile.visibility === "public" || isOwner ? (
+                <FollowCounts
+                  username={profile.username}
+                  following={counts.following}
+                  followers={counts.followers}
+                />
+              ) : null}
+              {canFollowProfile ? (
+                <FollowButton
+                  username={profile.username}
+                  initialFollowing={viewerFollowing}
+                />
+              ) : null}
               <ProfileSocialLinks value={profile.socialLinks} />
             </div>
           </div>
@@ -123,12 +170,37 @@ export default async function PublicProfilePage({
               profileId={profile.id}
               username={profile.username}
               pageRaw={pageRaw}
+              isOwner={isOwner}
+            />
+          ) : tab === "library" ? (
+            <ProfileLibrary
+              profileId={profile.id}
+              username={profile.username}
+              pageRaw={pageRaw}
+              isOwner={isOwner}
+            />
+          ) : tab === "following" ? (
+            <ProfileFollowRoster
+              profileId={profile.id}
+              username={profile.username}
+              pageRaw={pageRaw}
+              direction="following"
+              isOwner={isOwner}
+            />
+          ) : tab === "followers" ? (
+            <ProfileFollowRoster
+              profileId={profile.id}
+              username={profile.username}
+              pageRaw={pageRaw}
+              direction="followers"
+              isOwner={isOwner}
             />
           ) : (
             <ProfileLists
               profileId={profile.id}
               username={profile.username}
               pageRaw={pageRaw}
+              isOwner={isOwner}
             />
           )}
         </div>
@@ -141,12 +213,16 @@ async function ProfileLists({
   profileId,
   username,
   pageRaw,
+  isOwner,
 }: {
   profileId: string;
   username: string;
   pageRaw: number;
+  isOwner: boolean;
 }) {
-  const result = await listOwnedForProfilePage(profileId, pageRaw).catch(
+  const result = await listOwnedForProfilePage(profileId, pageRaw, {
+    includeHidden: isOwner,
+  }).catch(
     () => null,
   );
   const listsPage = result ?? {
@@ -205,12 +281,16 @@ async function ProfileCommunities({
   profileId,
   username,
   pageRaw,
+  isOwner,
 }: {
   profileId: string;
   username: string;
   pageRaw: number;
+  isOwner: boolean;
 }) {
-  const result = await listCommunitiesForProfilePage(profileId, pageRaw).catch(
+  const result = await listCommunitiesForProfilePage(profileId, pageRaw, {
+    includePrivate: isOwner,
+  }).catch(
     () => null,
   );
   const memberships = result ?? {
@@ -270,6 +350,140 @@ async function ProfileCommunities({
             : null
         }
       />
+    </div>
+  );
+}
+
+async function ProfileLibrary({
+  profileId,
+  username,
+  pageRaw,
+  isOwner,
+}: {
+  profileId: string;
+  username: string;
+  pageRaw: number;
+  isOwner: boolean;
+}) {
+  const result = await listLibraryForProfilePage(profileId, pageRaw, {
+    publicOnly: !isOwner,
+  }).catch(() => null);
+  const shelf = result ?? {
+    items: [],
+    page: 1,
+    pageSize: PROFILE_LIBRARY_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  };
+
+  if (shelf.total === 0) {
+    return (
+      <p className="mt-6 text-muted">
+        {isOwner ? "No games in your library yet." : "No public library yet."}
+      </p>
+    );
+  }
+
+  const from = (shelf.page - 1) * shelf.pageSize + 1;
+  const to = Math.min(shelf.page * shelf.pageSize, shelf.total);
+
+  return (
+    <div>
+      <LibraryShelf items={shelf.items} showVisibility={isOwner} />
+      <ProfilePager
+        label="Library pages"
+        from={from}
+        to={to}
+        total={shelf.total}
+        page={shelf.page}
+        totalPages={shelf.totalPages}
+        prevHref={
+          shelf.page > 1
+            ? profileHref(username, {
+                tab: "library",
+                page: shelf.page - 1,
+              })
+            : null
+        }
+        nextHref={
+          shelf.page < shelf.totalPages
+            ? profileHref(username, {
+                tab: "library",
+                page: shelf.page + 1,
+              })
+            : null
+        }
+      />
+    </div>
+  );
+}
+
+async function ProfileFollowRoster({
+  profileId,
+  username,
+  pageRaw,
+  direction,
+  isOwner,
+}: {
+  profileId: string;
+  username: string;
+  pageRaw: number;
+  direction: "following" | "followers";
+  isOwner: boolean;
+}) {
+  const loader =
+    direction === "following" ? listFollowingPage : listFollowersPage;
+  const result = await loader(profileId, pageRaw, {
+    includePrivate: isOwner,
+  }).catch(() => null);
+  const roster = result ?? {
+    people: [],
+    page: 1,
+    pageSize: FOLLOW_ROSTER_PAGE_SIZE,
+    total: 0,
+    totalPages: 1,
+  };
+
+  const from = (roster.page - 1) * roster.pageSize + 1;
+  const to = Math.min(roster.page * roster.pageSize, roster.total);
+
+  return (
+    <div>
+      <h2 className="mt-8 font-display text-3xl tracking-wide text-ink">
+        {direction === "following" ? "Following" : "Followers"}
+      </h2>
+      <FollowRosterList
+        people={roster.people}
+        canUnfollow={isOwner && direction === "following"}
+      />
+      {roster.total === 0 ? null : (
+        <ProfilePager
+          label={
+            direction === "following" ? "Following pages" : "Follower pages"
+          }
+          from={from}
+          to={to}
+          total={roster.total}
+          page={roster.page}
+          totalPages={roster.totalPages}
+          prevHref={
+            roster.page > 1
+              ? profileHref(username, {
+                  tab: direction,
+                  page: roster.page - 1,
+                })
+              : null
+          }
+          nextHref={
+            roster.page < roster.totalPages
+              ? profileHref(username, {
+                  tab: direction,
+                  page: roster.page + 1,
+                })
+              : null
+          }
+        />
+      )}
     </div>
   );
 }

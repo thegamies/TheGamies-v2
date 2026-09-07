@@ -86,6 +86,11 @@ import {
 } from "@/lib/lists/auth-intent";
 import { LIST_BLURB_MAX, LIST_MAX_ITEMS, clampListSlotCount } from "@/lib/lists/schema";
 import {
+  LIST_RANK_VISIBILITIES,
+  LIST_RANK_VISIBILITY_LABELS,
+  type ListRankVisibility,
+} from "@/lib/activity/kinds";
+import {
   withListShareView,
   type ListShareView,
 } from "@/lib/lists/urls";
@@ -116,6 +121,7 @@ type ListEditorProps = {
   initialListFormat?: ListFormat;
   initialRankStyle?: ExportRankStyle;
   initialShowSuffix?: boolean;
+  initialRankVisibility?: ListRankVisibility;
   signedIn?: boolean;
   error?: string | null;
   /** Complete Save/Share after returning from /auth/sign-in. */
@@ -141,6 +147,7 @@ function persistSnapshot(input: {
   listFormat: ListFormat;
   rankStyle: ExportRankStyle;
   showSuffix: boolean;
+  rankVisibility: ListRankVisibility;
 }): string {
   return JSON.stringify({
     listType: input.listType,
@@ -149,6 +156,7 @@ function persistSnapshot(input: {
     defaultFormat: input.listFormat,
     rankStyle: input.rankStyle,
     showSuffix: input.showSuffix,
+    rankVisibility: input.rankVisibility,
     items: input.items.map((item, index) => ({
       igdbId: item.igdbId,
       gameId: item.gameId,
@@ -172,6 +180,7 @@ export function ListEditor({
   initialListFormat = "grid",
   initialRankStyle = "chip",
   initialShowSuffix = false,
+  initialRankVisibility = "ranked",
   signedIn = false,
   error = null,
   authIntent = null,
@@ -203,6 +212,7 @@ export function ListEditor({
       listFormat: initialListFormat,
       rankStyle: initialRankStyle,
       showSuffix: initialShowSuffix,
+      rankVisibility: initialRankVisibility,
     }),
   );
 
@@ -241,6 +251,9 @@ export function ListEditor({
   const [rankStyle, setRankStyle] =
     useState<ExportRankStyle>(initialRankStyle);
   const [showSuffix, setShowSuffix] = useState(initialShowSuffix);
+  const [rankVisibility, setRankVisibility] = useState<ListRankVisibility>(
+    initialRankVisibility,
+  );
   const searchStorageKey = `tg_list_search:${initialListType}:${initialYear ?? ""}`;
   const [query, setQuery] = useState(() => {
     if (typeof window === "undefined") return "";
@@ -297,6 +310,7 @@ export function ListEditor({
       listFormat: defaultFormat,
       rankStyle,
       showSuffix,
+      rankVisibility,
     });
   const dirty = signedIn && currentSnapshot() !== savedSnapshot;
   const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
@@ -632,6 +646,7 @@ export function ListEditor({
       rankStyle,
       showSuffix,
       listFormat: defaultFormat,
+      rankVisibility,
     });
   }
 
@@ -1015,6 +1030,29 @@ export function ListEditor({
               value={listFormat}
               onChange={changeListFormat}
             />
+
+            {signedIn ? (
+              <div className="self-end">
+                <p className={controlLabelClass}>List visibility</p>
+                <div
+                  role="group"
+                  aria-label="List visibility"
+                  className={controlGroupClass}
+                >
+                  {LIST_RANK_VISIBILITIES.map((value) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setRankVisibility(value)}
+                      aria-pressed={rankVisibility === value}
+                      className={segmentBtnClass(rankVisibility === value)}
+                    >
+                      {LIST_RANK_VISIBILITY_LABELS[value]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             <label className="flex cursor-pointer items-center gap-2 self-end pb-1 text-sm text-muted">
               <input

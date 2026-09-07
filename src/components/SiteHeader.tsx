@@ -16,6 +16,7 @@ import {
   buildPrimarySiteNavLinks,
   buildUtilitySiteNavLinks,
   showDesignSystemNav,
+  withSignedInNavLinks,
   type SiteNavAccount,
 } from "@/lib/site-nav";
 import { getPromotedTgaHref } from "@/lib/tga-pickem/service";
@@ -32,7 +33,10 @@ export async function SiteHeader() {
   });
   const includeAdmin = profile?.isSiteAdmin === true;
   const tgaHref = await getPromotedTgaHref().catch(() => null);
-  const primaryLinks = buildPrimarySiteNavLinks({ tgaHref });
+  const primaryLinks = withSignedInNavLinks(
+    buildPrimarySiteNavLinks({ tgaHref }),
+    Boolean(user),
+  );
   const utilityLinks = buildUtilitySiteNavLinks({
     includeAdmin,
     includeDesignSystem,

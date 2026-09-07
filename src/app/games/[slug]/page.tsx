@@ -7,6 +7,7 @@ import { GameImagesSection } from "@/components/games/GameImagesSection";
 import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameVideosSection } from "@/components/games/GameVideosSection";
+import { GameLibraryControls } from "@/components/library/GameLibraryControls";
 import { GameCover } from "@/components/ui/GameCover";
 import {
   getGameArtworksForDetail,
@@ -14,6 +15,13 @@ import {
   getGameScreenshotsForDetail,
   getGameVideosForDetail,
 } from "@/lib/catalog";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
+import { countFollowsLibraryForGame } from "@/lib/activity/query";
+import { listFollowedProfileIds } from "@/lib/follow/service";
+import { getLibraryEntry } from "@/lib/library/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
 import {
@@ -97,6 +105,21 @@ export default async function GameDetailPage({ params }: { params: Params }) {
     videos = [];
   }
 
+  const user = await getRequestSessionUser();
+  const profile = user?.id
+    ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
+    : null;
+  const libraryEntry = profile
+    ? await getLibraryEntry(profile.id, game.id).catch(() => null)
+    : null;
+  const followedIds = profile
+    ? await listFollowedProfileIds(profile.id).catch(() => [] as string[])
+    : [];
+  const followCounts =
+    profile && followedIds.length > 0
+      ? await countFollowsLibraryForGame(game.id, followedIds).catch(() => null)
+      : null;
+
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);
 
@@ -111,7 +134,7 @@ export default async function GameDetailPage({ params }: { params: Params }) {
         </p>
 
         <div className="mt-6 flex flex-col gap-8 sm:flex-row sm:items-start">
-          <div className="w-[240px] shrink-0">
+          <div className="mx-auto w-[240px] shrink-0 sm:mx-0">
             <GameCover
               title={game.title}
               imageUrl={game.coverUrl}
@@ -119,6 +142,16 @@ export default async function GameDetailPage({ params }: { params: Params }) {
               height={COVER_HEIGHT}
               priority
             />
+            <div className="border border-t-0 border-line bg-panel p-3">
+              <GameLibraryControls
+                gameId={game.id}
+                gameSlug={game.slug}
+                signedIn={Boolean(profile)}
+                initialStatus={libraryEntry?.status ?? null}
+                initialVisibility={libraryEntry?.visibility ?? "public"}
+                followCounts={followCounts}
+              />
+            </div>
           </div>
 
           <div className="min-w-0 flex-1">
@@ -133,12 +166,10 @@ export default async function GameDetailPage({ params }: { params: Params }) {
               layout="broadcast-compact"
               className="mt-8"
             />
-          </div>
-        </div>
 
-        <GameCategoryWins wins={categoryWins} className="mt-10" />
+            <GameCategoryWins wins={categoryWins} className="mt-8" />
 
-        <dl className="mt-10 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            <dl className="mt-10 grid gap-4 border-t border-line pt-6 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-muted">Released</dt>
                 <dd className="mt-1 text-ink">
@@ -187,7 +218,7 @@ export default async function GameDetailPage({ params }: { params: Params }) {
                 </div>
               ) : null}
               {game.timeToBeat ? (
-                <div className="sm:col-span-2 lg:col-span-3">
+                <div className="sm:col-span-2">
                   <dt className="text-muted">Time to beat</dt>
                   <dd className="mt-2 flex flex-wrap gap-x-8 gap-y-3">
                     {TIME_TO_BEAT_LABELS.map(([key, label]) => {
@@ -205,13 +236,15 @@ export default async function GameDetailPage({ params }: { params: Params }) {
               ) : null}
             </dl>
 
-        {videos.length || artworks.length || screenshots.length ? (
-          <div className="mt-14 space-y-10">
-            <GameVideosSection videos={videos} />
-            <GameImagesSection artworks={artworks} />
-            <GameScreenshotsSection screenshots={screenshots} />
+            {videos.length || artworks.length || screenshots.length ? (
+              <div className="mt-10 space-y-10">
+                <GameVideosSection videos={videos} />
+                <GameScreenshotsSection screenshots={screenshots} />
+                <GameImagesSection artworks={artworks} />
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </main>
     </>
   );

@@ -11,8 +11,10 @@ import {
   setLandingStandingsYears,
   setPublicBoardMinCategoryVotes,
   setPublicBoardMinLists,
+  setPublicTrendingMinPeople,
   setSiteRankMode,
   setStandingFillMinVisible,
+  setTrendingRecencyWeights,
 } from "@/lib/site-settings/service";
 import { parseSharedRankMode } from "@/lib/standings/shared-rank";
 
@@ -200,6 +202,83 @@ export async function savePublicBoardMinCategoryVotesAction(
         err instanceof Error
           ? err.message
           : "Could not save the category vote minimum.",
+    };
+  }
+}
+
+export async function savePublicTrendingMinPeopleAction(
+  raw: string,
+): Promise<{ error?: string; ok?: boolean; publicTrendingMinPeople?: number }> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    return { error: "Enter a whole number of people." };
+  }
+  try {
+    const saved = await setPublicTrendingMinPeople(parsed);
+    revalidatePath("/");
+    revalidatePath("/games");
+    revalidatePath("/admin/rankings");
+    return {
+      ok: true,
+      publicTrendingMinPeople: saved.publicTrendingMinPeople,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save the trending minimum.",
+    };
+  }
+}
+
+export async function saveTrendingRecencyWeightsAction(raw: {
+  hours24: string;
+  days1to3: string;
+  restOf7d: string;
+  days7to30: string;
+}): Promise<{
+  error?: string;
+  ok?: boolean;
+  trendingRecencyWeights?: {
+    hours24: number;
+    days1to3: number;
+    restOf7d: number;
+    days7to30: number;
+  };
+}> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  if (
+    ![raw.hours24, raw.days1to3, raw.restOf7d, raw.days7to30].every((value) =>
+      Number.isFinite(Number(value)),
+    )
+  ) {
+    return { error: "Enter a number for each recency weight." };
+  }
+  try {
+    const saved = await setTrendingRecencyWeights({
+      hours24: Number(raw.hours24),
+      days1to3: Number(raw.days1to3),
+      restOf7d: Number(raw.restOf7d),
+      days7to30: Number(raw.days7to30),
+    });
+    revalidatePath("/");
+    revalidatePath("/games");
+    revalidatePath("/following");
+    revalidatePath("/admin/rankings");
+    return {
+      ok: true,
+      trendingRecencyWeights: saved.trendingRecencyWeights,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save trending recency weights.",
     };
   }
 }

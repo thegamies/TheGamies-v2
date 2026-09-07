@@ -6,6 +6,13 @@ import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
 import { getShareListByPublicId, getShareListCategoryPicks, getShareListItems } from "@/lib/lists/service";
 import { listSharePath, listShareViewHref, parseListShareView } from "@/lib/lists/urls";
+import {
+  listPublicIndexable,
+  orderItemsForPublicView,
+  viewerCanOpenList,
+  viewerSeesListCategories,
+  viewerSeesListRanks,
+} from "@/lib/lists/rank-visibility";
 import { getProfileByAuthUserId, getProfileByUsername } from "@/lib/profile/service";
 import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
 import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
@@ -35,7 +42,9 @@ export async function generateMetadata({
   const ownerProfile = data.owner?.username
     ? await getProfileByUsername(data.owner.username).catch(() => null)
     : null;
-  const index = Boolean(ownerProfile && shouldIndexProfile(ownerProfile));
+  const index =
+    Boolean(ownerProfile && shouldIndexProfile(ownerProfile)) &&
+    listPublicIndexable(data.list.rankVisibility);
   return publicPageMetadata({
     title: data.list.title,
     description: data.list.year
@@ -109,6 +118,18 @@ export default async function SharedListByPublicIdPage({
   const editSecret =
     cookie?.publicId === publicId ? cookie.secret : null;
   const canEdit = canEditList(data.list, { profileId, editSecret });
+  if (!viewerCanOpenList(data.list.rankVisibility, canEdit)) notFound();
+  const hideRanks = !viewerSeesListRanks(data.list.rankVisibility, canEdit);
+  const showCategories = viewerSeesListCategories(
+    data.list.rankVisibility,
+    canEdit,
+  );
+  if (!showCategories && data.items.length === 0) {
+    data.items = await getShareListItems(data.list.id).catch(() => []);
+  }
+  if (hideRanks) {
+    data.items = orderItemsForPublicView(data.items, true);
+  }
   const canClaim = !data.list.profileId && Boolean(editSecret);
   const alreadyOwned = Boolean(
     data.list.profileId && profileId && data.list.profileId === profileId,
@@ -128,10 +149,12 @@ export default async function SharedListByPublicIdPage({
         alreadyOwned={alreadyOwned}
         editHref={editHref}
         sharePath={listSharePath({ publicId })}
-        view={view}
+        view={showCategories ? view : "goty"}
         categoryPicks={categoryPicks}
         saved={saved}
         error={error}
+        hideRanks={hideRanks}
+        showCategories={showCategories}
       />
     </>
   );

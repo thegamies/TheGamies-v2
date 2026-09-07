@@ -10,6 +10,7 @@ export const SITEMAP_STATIC_PATHS = [
   "/",
   "/games",
   "/game-of-the-year",
+  "/people",
   "/the-game-awards",
   "/about",
   "/contact",
@@ -25,6 +26,7 @@ export const ROBOTS_DISALLOW = [
   "/auth",
   "/design-system",
   "/dev",
+  "/following",
   "/communities/new",
   "/communities/join",
 ] as const;

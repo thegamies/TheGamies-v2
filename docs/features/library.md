@@ -4,7 +4,7 @@ Personal shelf of games with a status. Separate from GOTY / custom lists and fro
 
 ## Why
 
-Lists are the yearly argument. Library is the diary: what someone wants, is playing, has played, or dropped — including titles that cannot sit on a GOTY ranking (unreleased, wrong year). Follow, trending, and community “what moved” boards read library **activity**, not a census of the whole shelf.
+Lists are the yearly argument. Library is the diary: what someone wishlists, has queued, is playing, paused, beat, or dropped — including titles that cannot sit on a GOTY ranking (unreleased, wrong year). Follow, trending, and community “what moved” boards read library **activity**, not a census of the whole shelf.
 
 ## Statuses
 
@@ -12,17 +12,19 @@ One row per profile per game. Statuses are mutually exclusive:
 
 | Status | Meaning |
 |---|---|
-| **Want to play** | On the shelf, not started |
+| **Wishlist** | Marked for later, not a working queue |
+| **Backlog** | On the shelf to play |
 | **Playing** | In progress |
-| **Played** | Finished / has a take |
-| **Dropped** | Stopped without treating it as Played |
+| **Paused** | Stopped for now, still on the shelf |
+| **Beat** | Finished |
+| **Dropped** | Stopped without treating it as Beat |
 
-No row = not in the library. Replay is **Played → Playing** (the event log records the transition). No cap on how many games may be Playing. No owned / beaten / hours / star rating — GOTY remains the ranked argument. Custom lists remain named ranked piles; Want is the one-click shelf.
+No row = not in the library. Replay is **Beat → Playing** (the event log records the transition). No cap on how many games may be Playing. No owned / hours / star rating — GOTY remains the ranked argument. Custom lists remain named ranked piles; Backlog is the queued shelf.
 
 Uncoupled from GOTY:
 
-- Played does not add the game to a GOTY list.
-- GOTY does not require Played (unfinished contenders are valid).
+- Beat does not add the game to a GOTY list.
+- GOTY does not require Beat (unfinished contenders are valid).
 - Hidden / games-only GOTY hides **order** (and categories); library visibility is its own control.
 
 ## Visibility
@@ -38,7 +40,7 @@ Changing a row to private **retracts** it: feed and trending **filter on read** 
 
 ## Surfaces (when built)
 
-- Game page: Want / Playing / Played / Dropped for signed-in profiles. Unsigned visitors get the same sign-in prompt pattern as list Save/Share. Later: counts of people you follow, not a public roster.
+- Game page: **Add to library** under the cover opens a status picker (icons + Wishlist / Backlog / Playing / Paused / Beat / Dropped). Unsigned visitors get the same sign-in prompt pattern as list Save/Share. **Only I can see this**, **Remove from library**, and counts of people you follow sit under the cover with that control.
 - Profile `/u/[username]`: **Library** tab beside Lists and Communities (`?tab=library`). SQL-paginated; never dump the shelf.
 - Account close: delete library rows and related activity events (tombstone stays on the profile as today).
 
@@ -46,7 +48,7 @@ Unsigned / anonymous list drafts never write library.
 
 ## Catalog rules
 
-Library may include titles GOTY ranking rejects (unreleased Want is the point). Adult titles are allowed on the shelf. **Trending excludes adult games** (same as live GOTY boards). Live GOTY eligibility is unchanged.
+Library may include titles GOTY ranking rejects (unreleased Wishlist / Backlog is the point). Adult titles are allowed on the shelf. **Trending excludes adult games** (same as live GOTY boards). Live GOTY eligibility is unchanged.
 
 ## Schema (when built)
 
@@ -54,10 +56,13 @@ Library may include titles GOTY ranking rejects (unreleased Want is the point). 
 
 This table **is** contrib for “who has this status.” Do not duplicate a `library_contrib` table. Site trending caches are later, only if a windowed `GROUP BY` on events is too hot — see [activity-and-trending.md](./activity-and-trending.md).
 
+## Ops (local / staging)
+
+Admin Standings seed can fill public Wishlist / Backlog / Playing / Beat rows on seed accounts (and matching activity events) so site trending has enough people. Seed accounts stay out of public People search. Site operators, and local or preview builds, can follow them; everyone else cannot.
+
 ## Non-goals (this feature)
 
 - Notifications / email / push when a status changes
 - Import from Steam / IGDB / elsewhere
-- Seed voters writing library rows
 - Completionist tracking
 - Community member activity feed (library ticks in a community firehose)

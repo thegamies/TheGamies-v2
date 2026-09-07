@@ -105,19 +105,35 @@ export function parseStoredListFormat(value: string): ListFormat {
   return parsed.success ? parsed.data : "grid";
 }
 
+export const listRankVisibilitySchema = z.enum([
+  "ranked",
+  "games_only",
+  "hidden",
+]);
+export type ListRankVisibility = z.infer<typeof listRankVisibilitySchema>;
+
+export function parseStoredRankVisibility(
+  value: string | null | undefined,
+): ListRankVisibility {
+  const parsed = listRankVisibilitySchema.safeParse(value);
+  return parsed.success ? parsed.data : "ranked";
+}
+
 export const clientDraftUpsertSchema = z.object({
   publicId: z.string().min(1).optional().nullable(),
   listType: listTypeSchema,
   title: listTitleSchema,
   year: listYearSchema.optional().nullable(),
   items: replaceItemsByIgdbSchema,
-  rankStyle: listRankStyleSchema.optional(),
+    rankStyle: listRankStyleSchema.optional(),
   showSuffix: z.boolean().optional(),
   listFormat: listFormatSchema.optional(),
+  rankVisibility: listRankVisibilitySchema.optional(),
 });
 
 export const updateListMetaSchema = z.object({
   title: listTitleSchema.optional(),
   year: listYearSchema.optional(),
   listType: listTypeSchema.optional(),
+  rankVisibility: listRankVisibilitySchema.optional(),
 });

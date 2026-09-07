@@ -47,7 +47,8 @@ const ADMIN_LINKS = [
   {
     href: "/admin/seed",
     title: "Standings seed",
-    description: "Create synthetic GOTY voters for standings QA.",
+    description:
+      "Create synthetic GOTY voters and seed libraries for QA.",
   },
   {
     href: "/admin/communities",

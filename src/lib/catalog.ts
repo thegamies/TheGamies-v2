@@ -57,25 +57,22 @@ export type BrowseGamesInput = {
   includeAdult?: boolean;
 };
 
+export const GAMES_BROWSE_PAGE_SIZE = 48;
+
 function getDb(): Db {
   return createDb();
 }
 
-export async function browseGames(input: BrowseGamesInput = {}) {
-  const db = getDb();
+function browseGamesWhere(input: BrowseGamesInput) {
   const {
     q,
     year,
     yearAtMost,
     yearAtLeast,
     yearKnownAtLeast,
-    sort = "popularity",
-    sortDir = "desc",
     releaseStatus = "all",
     excludeEditions = false,
     gotyEligibleTypes = false,
-    limit = 48,
-    offset = 0,
     includeAdult = false,
   } = input;
 
@@ -101,9 +98,7 @@ export async function browseGames(input: BrowseGamesInput = {}) {
   }
   if (q?.trim()) {
     const term = `%${q.trim()}%`;
-    conditions.push(
-      or(ilike(games.title, term), ilike(games.slug, term))!,
-    );
+    conditions.push(or(ilike(games.title, term), ilike(games.slug, term))!);
   }
   if (excludeEditions) {
     conditions.push(isNull(games.versionParentIgdbId));
@@ -132,7 +127,30 @@ export async function browseGames(input: BrowseGamesInput = {}) {
     );
   }
 
-  const where = conditions.length ? and(...conditions) : undefined;
+  return conditions.length ? and(...conditions) : undefined;
+}
+
+export async function countBrowseGames(
+  input: BrowseGamesInput = {},
+): Promise<number> {
+  const db = getDb();
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(games)
+    .where(browseGamesWhere(input));
+  return Number(row?.n ?? 0);
+}
+
+export async function browseGames(input: BrowseGamesInput = {}) {
+  const db = getDb();
+  const {
+    sort = "popularity",
+    sortDir = "desc",
+    limit = GAMES_BROWSE_PAGE_SIZE,
+    offset = 0,
+  } = input;
+
+  const where = browseGamesWhere(input);
 
   const order =
     sort === "name"
@@ -161,7 +179,7 @@ export async function browseGames(input: BrowseGamesInput = {}) {
     .from(games)
     .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .where(where)
-    .orderBy(order)
+    .orderBy(order, games.id)
     .limit(limit)
     .offset(offset);
 

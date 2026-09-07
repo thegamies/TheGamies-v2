@@ -1,4 +1,5 @@
 import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
+import type { z } from "zod";
 import {
   awardCategories,
   createDb,
@@ -46,7 +47,13 @@ import {
   syncOwnedGotyContribFromList,
 } from "@/lib/live-aggregate/contrib";
 import { scheduleYearRefresh } from "@/lib/live-aggregate/refresh";
-import { z } from "zod";
+import {
+  emitGotyMembershipEvents,
+  emitListReveal,
+  loadListGameIds,
+  shouldEmitListReveal,
+} from "@/lib/activity/emit";
+import { parseListRankVisibility } from "@/lib/activity/kinds";
 
 export type ListRow = typeof lists.$inferSelect;
 export type ListItemRow = typeof listItems.$inferSelect;
@@ -394,6 +401,9 @@ export async function updateListMeta(
       patch.year = parsed.data.year;
     }
   }
+  if (parsed.data.rankVisibility) {
+    patch.rankVisibility = parsed.data.rankVisibility;
+  }
 
   try {
     const [updated] = await db
@@ -401,6 +411,16 @@ export async function updateListMeta(
       .set(patch)
       .where(eq(lists.id, list.id))
       .returning();
+    if (
+      shouldEmitListReveal({
+        listType: updated.listType,
+        profileId: updated.profileId,
+        previous: list.rankVisibility,
+        next: updated.rankVisibility,
+      })
+    ) {
+      await emitListReveal(updated, db);
+    }
     return { list: updated };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -433,12 +453,14 @@ export async function replaceItems(
   if (over) return { error: over };
 
   const normalized = normalizeRanks(parsed.data);
+  const oldGameIds = await loadListGameIds(list.id, db);
   if (normalized.length === 0) {
     await db.delete(listItems).where(eq(listItems.listId, list.id));
     await db
       .update(lists)
       .set({ updatedAt: new Date() })
       .where(eq(lists.id, list.id));
+    await emitGotyMembershipEvents(list, oldGameIds, [], db);
     if (list.profileId && list.listType === "goty") {
       await syncLiveAggregateForList(list, db);
     }
@@ -485,6 +507,13 @@ export async function replaceItems(
     .update(lists)
     .set({ updatedAt: new Date() })
     .where(eq(lists.id, list.id));
+
+  await emitGotyMembershipEvents(
+    list,
+    oldGameIds,
+    normalized.map((item) => item.gameId),
+    db,
+  );
 
   const items = await loadListItems(list.id, db);
   if (list.profileId && list.listType === "goty") {
@@ -789,15 +818,23 @@ export async function listOwnedForProfile(
 export async function listOwnedForProfilePage(
   profileId: string,
   pageRaw: number,
+  opts: { includeHidden?: boolean } = {},
   db: Db = getDb(),
 ): Promise<ProfileListsPage> {
   const pageSize = PROFILE_LISTS_PAGE_SIZE;
   const itemLimit = PROFILE_LIST_PREVIEW_ITEM_LIMIT;
+  const includeHidden = opts.includeHidden !== false;
+  const ownedFilter = includeHidden
+    ? eq(lists.profileId, profileId)
+    : and(
+        eq(lists.profileId, profileId),
+        sql`${lists.rankVisibility} is distinct from 'hidden'`,
+      );
 
   const [countRow] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(lists)
-    .where(eq(lists.profileId, profileId));
+    .where(ownedFilter);
   const total = Number(countRow?.n ?? 0);
   const { page, offset, totalPages } = paginateProfileItems(
     pageRaw,
@@ -813,9 +850,10 @@ export async function listOwnedForProfilePage(
       year: lists.year,
       listType: lists.listType,
       slug: lists.slug,
+      rankVisibility: lists.rankVisibility,
     })
     .from(lists)
-    .where(eq(lists.profileId, profileId))
+    .where(ownedFilter)
     .orderBy(
       sql`case when ${lists.listType} = 'goty' then 0 else 1 end`,
       sql`${lists.year} desc nulls last`,
@@ -828,31 +866,65 @@ export async function listOwnedForProfilePage(
     return { lists: [], page, pageSize, total, totalPages };
   }
 
-  const itemRows = await db
-    .select({
-      listId: listItems.listId,
-      rank: listItems.rank,
-      gameId: games.id,
-      slug: games.slug,
-      title: games.title,
-      coverImageId: covers.imageId,
-    })
-    .from(listItems)
-    .innerJoin(games, eq(games.id, listItems.gameId))
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
-    .where(
-      and(
-        inArray(
-          listItems.listId,
-          owned.map((row) => row.id),
-        ),
-        lte(listItems.rank, itemLimit),
-      ),
-    )
-    .orderBy(asc(listItems.listId), asc(listItems.rank));
+  const rankedIds = includeHidden
+    ? owned.map((row) => row.id)
+    : owned
+        .filter(
+          (row) => parseListRankVisibility(row.rankVisibility) === "ranked",
+        )
+        .map((row) => row.id);
+  const unorderedIds = includeHidden
+    ? []
+    : owned
+        .filter(
+          (row) =>
+            parseListRankVisibility(row.rankVisibility) === "games_only",
+        )
+        .map((row) => row.id);
+
+  const rankedRows =
+    rankedIds.length === 0
+      ? []
+      : await db
+          .select({
+            listId: listItems.listId,
+            rank: listItems.rank,
+            gameId: games.id,
+            slug: games.slug,
+            title: games.title,
+            coverImageId: covers.imageId,
+          })
+          .from(listItems)
+          .innerJoin(games, eq(games.id, listItems.gameId))
+          .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+          .where(
+            and(
+              inArray(listItems.listId, rankedIds),
+              lte(listItems.rank, itemLimit),
+            ),
+          )
+          .orderBy(asc(listItems.listId), asc(listItems.rank));
+
+  const unorderedRows =
+    unorderedIds.length === 0
+      ? []
+      : await db
+          .select({
+            listId: listItems.listId,
+            rank: listItems.rank,
+            gameId: games.id,
+            slug: games.slug,
+            title: games.title,
+            coverImageId: covers.imageId,
+          })
+          .from(listItems)
+          .innerJoin(games, eq(games.id, listItems.gameId))
+          .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+          .where(inArray(listItems.listId, unorderedIds))
+          .orderBy(asc(listItems.listId), asc(games.title));
 
   const itemsByListId = groupPreviewItemsByListId(
-    itemRows.map((row) => ({
+    [...rankedRows, ...unorderedRows].map((row) => ({
       listId: row.listId,
       gameId: row.gameId,
       slug: row.slug,
@@ -869,6 +941,9 @@ export async function listOwnedForProfilePage(
       year: row.year,
       listType: row.listType,
       slug: row.slug,
+      hideRanks:
+        !includeHidden &&
+        parseListRankVisibility(row.rankVisibility) !== "ranked",
       items: itemsByListId.get(row.id) ?? [],
     })),
     page,
@@ -925,11 +1000,13 @@ async function writeItemsFromIgdb(
     }));
 
   if (normalized.length === 0) {
+    const oldGameIds = await loadListGameIds(list.id, db);
     await db.delete(listItems).where(eq(listItems.listId, list.id));
     await db
       .update(lists)
       .set({ updatedAt: new Date() })
       .where(eq(lists.id, list.id));
+    await emitGotyMembershipEvents(list, oldGameIds, [], db);
     return { ok: true };
   }
 
@@ -965,6 +1042,7 @@ async function writeItemsFromIgdb(
     }
   }
 
+  const oldGameIds = await loadListGameIds(list.id, db);
   await db.delete(listItems).where(eq(listItems.listId, list.id));
   await db.insert(listItems).values(
     normalized.map((item) => {
@@ -983,6 +1061,13 @@ async function writeItemsFromIgdb(
     .set({ updatedAt: new Date() })
     .where(eq(lists.id, list.id));
 
+  await emitGotyMembershipEvents(
+    list,
+    oldGameIds,
+    normalized.map((item) => byIgdb.get(item.igdbId)!.id),
+    db,
+  );
+
   return { ok: true };
 }
 
@@ -995,6 +1080,7 @@ async function applyMetaPatch(
     rankStyle?: "banner" | "chip" | "off";
     showSuffix?: boolean;
     listFormat?: "poster" | "list" | "grid";
+    rankVisibility?: "ranked" | "games_only" | "hidden";
   },
   db: Db,
 ): Promise<{ list: ListRow } | { error: string }> {
@@ -1007,6 +1093,7 @@ async function applyMetaPatch(
   if (input.rankStyle) patch.rankStyle = input.rankStyle;
   if (typeof input.showSuffix === "boolean") patch.showSuffix = input.showSuffix;
   if (input.listFormat) patch.listFormat = input.listFormat;
+  if (input.rankVisibility) patch.rankVisibility = input.rankVisibility;
   if (input.listType === "goty" && input.year == null) {
     return { error: "GOTY lists need a year." };
   }
@@ -1020,6 +1107,16 @@ async function applyMetaPatch(
       .set(patch)
       .where(eq(lists.id, list.id))
       .returning();
+    if (
+      shouldEmitListReveal({
+        listType: updated.listType,
+        profileId: updated.profileId,
+        previous: list.rankVisibility,
+        next: updated.rankVisibility,
+      })
+    ) {
+      await emitListReveal(updated, db);
+    }
     return { list: updated };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -1103,6 +1200,7 @@ export async function shareListFromClientDraft(
         rankStyle: data.rankStyle,
         showSuffix: data.showSuffix,
         listFormat: data.listFormat,
+        rankVisibility: data.rankVisibility,
       },
       db,
     );
@@ -1164,6 +1262,7 @@ export async function syncExistingSharedListFromClientDraft(
       rankStyle: data.rankStyle,
       showSuffix: data.showSuffix,
       listFormat: data.listFormat,
+      rankVisibility: data.rankVisibility,
     },
     db,
   );
@@ -1253,6 +1352,7 @@ export async function saveOwnedListFromClientDraft(
       rankStyle: data.rankStyle,
       showSuffix: data.showSuffix,
       listFormat: data.listFormat,
+      rankVisibility: data.rankVisibility,
     },
     db,
   );

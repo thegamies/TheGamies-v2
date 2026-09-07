@@ -4,6 +4,7 @@ import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
+import { DEFAULT_TRENDING_RECENCY_WEIGHTS } from "@/lib/activity/trending";
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { AdminRankingsClient } from "./AdminRankingsClient";
 
@@ -22,6 +23,8 @@ export default async function AdminRankingsPage() {
   let initialRankMode: SharedRankMode = "competition";
   let initialPublicBoardMinLists = 5;
   let initialPublicBoardMinCategoryVotes = 5;
+  let initialPublicTrendingMinPeople = 5;
+  let initialTrendingRecencyWeights = DEFAULT_TRENDING_RECENCY_WEIGHTS;
   let initialStandingFillMinVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   try {
     const stats = await getYearStats(year);
@@ -43,12 +46,16 @@ export default async function AdminRankingsPage() {
     initialRankMode = settings.rankMode;
     initialPublicBoardMinLists = settings.publicBoardMinLists;
     initialPublicBoardMinCategoryVotes = settings.publicBoardMinCategoryVotes;
+    initialPublicTrendingMinPeople = settings.publicTrendingMinPeople;
+    initialTrendingRecencyWeights = settings.trendingRecencyWeights;
     initialStandingFillMinVisible = settings.standingFillMinVisible;
   } catch {
     initialLandingYears = null;
     initialRankMode = "competition";
     initialPublicBoardMinLists = 5;
     initialPublicBoardMinCategoryVotes = 5;
+    initialPublicTrendingMinPeople = 5;
+    initialTrendingRecencyWeights = DEFAULT_TRENDING_RECENCY_WEIGHTS;
     initialStandingFillMinVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   }
 
@@ -67,7 +74,8 @@ export default async function AdminRankingsPage() {
         year cache, choose homepage years, or set how ties are numbered on
         the public boards, how many lists a year needs before Game of the
         Year is public, how many votes an award needs before that category
-        board is public, or how many covers sit in view on the homepage
+        board is public, how strongly recent people lift a game on
+        trending, or how many covers sit in view on the homepage
         row.
       </p>
       <div className="mt-10">
@@ -80,6 +88,8 @@ export default async function AdminRankingsPage() {
           initialPublicBoardMinCategoryVotes={
             initialPublicBoardMinCategoryVotes
           }
+          initialPublicTrendingMinPeople={initialPublicTrendingMinPeople}
+          initialTrendingRecencyWeights={initialTrendingRecencyWeights}
           initialStandingFillMinVisible={initialStandingFillMinVisible}
         />
       </div>

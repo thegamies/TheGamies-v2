@@ -71,6 +71,25 @@ export function buildPrimarySiteNavLinks(options?: {
   return links;
 }
 
+/** Signed out: People. Signed in: Following. Inserted before Communities. */
+export function withSignedInNavLinks(
+  primary: SiteNavLink[],
+  signedIn: boolean,
+): SiteNavLink[] {
+  const people = signedIn
+    ? { href: "/following", label: "Following" }
+    : { href: "/people", label: "People" };
+  const communitiesIdx = primary.findIndex(
+    (link) => link.href === "/communities",
+  );
+  if (communitiesIdx < 0) return [...primary, people];
+  return [
+    ...primary.slice(0, communitiesIdx),
+    people,
+    ...primary.slice(communitiesIdx),
+  ];
+}
+
 export function siteCreateLink(): SiteNavLink {
   return { href: SITE_CREATE_HREF, label: "+ Create" };
 }
@@ -99,6 +118,10 @@ export function buildAccountMenuGroups(options: {
     ? [
         { href: profileHref(options.username), label: "View Profile" },
         { href: profileHref(options.username, { tab: "lists" }), label: "My Lists" },
+        {
+          href: profileHref(options.username, { tab: "library" }),
+          label: "My Library",
+        },
         {
           href: profileHref(options.username, { tab: "communities" }),
           label: "My Communities",

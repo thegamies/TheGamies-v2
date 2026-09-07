@@ -40,7 +40,7 @@ Public name for a community’s yearly awards vote (internal/code: **edition**).
 
 ### Library
 
-Personal shelf with status **Want to play**, **Playing**, **Played**, or **Dropped**. Not a GOTY list. Later than v1. See [library.md](./features/library.md).
+Personal shelf with status **Wishlist**, **Backlog**, **Playing**, **Paused**, **Beat**, or **Dropped**. Not a GOTY list. Later than v1. See [library.md](./features/library.md).
 
 ### Follow
 

@@ -20,6 +20,13 @@ export function ProfileTabs({
         Lists
       </Link>
       <Link
+        href={profileHref(username, { tab: "library" })}
+        scroll={false}
+        className={navItemClass("secondary", tab === "library")}
+      >
+        Library
+      </Link>
+      <Link
         href={profileHref(username, { tab: "communities" })}
         scroll={false}
         className={navItemClass("secondary", tab === "communities")}
