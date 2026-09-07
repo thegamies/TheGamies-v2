@@ -22,6 +22,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 - Adult games excluded from contrib
 - GOTY ranking rows must pass `gotyEligibilityError` on save (packs/DLC-addons never score on the GOTY board)
 - Default scoring: top 10 only (`pointsForRank` → 11 − rank)
+- **Later:** list `rank_visibility` (`ranked` / `games_only` / `hidden`) does **not** change eligibility. Hidden and games-only owned GOTY lists still write contrib. Visibility is the public list page and feed — see [lists.md](./lists.md).
 
 ## Write path
 

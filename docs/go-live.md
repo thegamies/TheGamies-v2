@@ -27,7 +27,9 @@ These v1 loops exist in the app today:
 - Auth emails via Cloudflare Worker, cookie banner + optional GA4, Terms / Privacy / Guidelines / About / Contact
 - Cloudflare **staging + PR previews**, IGDB CLI + `/admin/sync`, queued IGDB webhooks Worker (code + staging/production envs designed)
 
-Explicitly **out of v1** (leave them out): library/played status, native app, messaging, Remotion/video export, GraphQL, recalculating frozen edition results, Postgres RLS until Auth JWT → DB role is decided.
+Explicitly **out of v1** (leave them out): native app, messaging, Remotion/video export, GraphQL, recalculating frozen edition results, Postgres RLS until Auth JWT → DB role is decided.
+
+**Later (locked, not launch):** library, follow, following feed, list rank visibility, trending — [library.md](./features/library.md), [follow.md](./features/follow.md), [activity-and-trending.md](./features/activity-and-trending.md). Do not pull onto a launch branch.
 
 ---
 
@@ -179,6 +181,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Expo / native
 - Postgres RLS after Auth JWT → DB role is defined
 - Video Game Awards Pick’em (site + community; admin slate and show room)
+- Library, follow, following feed, list rank visibility, site/community/following trending ([library.md](./features/library.md), [follow.md](./features/follow.md), [activity-and-trending.md](./features/activity-and-trending.md)) — locked spec, not launch
 
 ---
 

@@ -11,8 +11,9 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 | Owned list | Attached to a profile (`profileId` + `slug`); canonical URL `/u/[username]/[slug]` |
 | Anon share (legacy) | Older DB rows without profile at `/l/[publicId]` until claimed |
 | Claim | Attach a legacy anonymous shared list to a signed-in profile (assigns slug) |
+| Rank visibility | Later than v1: `lists.rank_visibility` = `ranked` \| `games_only` \| `hidden`. Default **ranked**. See below. |
 
-Lists have **no draft/published status**. If a row exists in Postgres, it is shareable.
+Lists have **no draft/published status**. If a row exists in Postgres, it is shareable **unless** rank visibility is `hidden` (later). Today every owned list URL works even when the profile is private.
 
 ## Flow
 
@@ -64,7 +65,7 @@ Create UI mirrors the Social Gamer Card prototype:
 - Up to **100** ranked games; ranks are contiguous 1..n.
 - GOTY ranking: exact catalog year, known release date already out, not adult, not an edition/version child, not pack/DLC-addon/bundle-style IGDB types. Expansions, remakes, remasters, and expanded games are allowed. Award category picks use category eligibility (DLC can sit on Best Expansion / DLC).
 - One **owned** GOTY list per profile per year (year picker stays put and shows top 5 + Edit list when that year already exists; claim/save fail clearly otherwise).
-- Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)).
+- Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)). **Later:** `rank_visibility` does **not** stop contrib — hidden and games-only lists still score.
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.
 - Owned GOTY lists may include **one game per site award category** (signed-in only to pick). The Categories tab is visible when signed out with a sign-in prompt. Category picks live on a **Categories** tab beside **Game of the Year** in the builder (title above tabs; Format/Size hidden on Categories).
 
@@ -75,8 +76,26 @@ Create UI mirrors the Social Gamer Card prototype:
 - Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
 - Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). After sign-up, confirm email when Neon requires it (link in the message). The save/share `next` is kept so the user returns to the list. General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
-- Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs.
+- Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). **Later:** **Library** tab (`?tab=library`) — see [library.md](./library.md). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs. Hidden lists omit the public cover strip for non-owners.
 - Site live standings: `/game-of-the-year`, `/game-of-the-year/[year]`. Homepage and `/game-of-the-year` year strips link the year and **Top Categories** into the year board (display type, hover accent). `/game-of-the-year` has a right-pinned **All** popover. Year boards use the same public-year list (enough GOTY lists or at least one public category). Bordered **Full Standings** / **Create list** / **My list** sit on the year row; **See All** / **Make picks** / **My picks** sit on Top Categories. Years with no public category highlights still show Top Categories and a centered empty with a bordered add-categories control. Year boards put the creator copy next to the list total (list CTA on GOTY, categories CTA on Categories). Unsigned visitors always get create/make picks; signed-in owners get my list/my picks when they already have a GOTY list for that year.
+
+## Rank visibility (later than v1)
+
+Do not implement on the launch branch. Full lock: [activity-and-trending.md](./activity-and-trending.md).
+
+`rank_visibility` applies to the **whole public list**, including GOTY **Categories** (`?view=categories`). No separate categories toggle. Custom lists have no Categories tab; the column still controls whether their ranking is public.
+
+| Value | Public list | Categories | Live GOTY / category contrib | Activity events |
+|---|---|---|---|---|
+| `ranked` (default) | Today’s editorial ranking | Public | Scores | GOTY `list_add` / `list_remove` |
+| `games_only` | Unordered covers; no ranks / rank chrome | **Not public** (omit tab; `?view=categories` for non-owners is the same unordered GOTY set) | Scores | GOTY add/remove only (no rank moves, no category picks) |
+| `hidden` | Not-found for non-owners (including Categories) | Not public | Scores | None |
+
+Owner and editor always see ranking + picks. Private **profile** is not enough: `/u/[username]/[slug]` still works today.
+
+Image export / OG when built: `ranked` = current poster; `games_only` = unordered cover grid, no ordinals (crawlable as a cover set); `hidden` = no public image (`noindex` / not-found). Cached OG after flipping to hidden may leak until cache dies.
+
+Flipping `games_only` or `hidden` → `ranked` emits `list_reveal`. Rank swaps never emit events.
 
 ## Non-goals (this feature)
 

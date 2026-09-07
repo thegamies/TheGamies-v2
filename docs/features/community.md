@@ -57,6 +57,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - Site-admin-only create gate
 - Per-community custom defs / multi / ranked edition category modes
 - Full all-member ballot matrix virtualization
+- Member activity feed (library/list ticks). **Later:** community **trending** board is independent of Live Rankings on/off — [activity-and-trending.md](./activity-and-trending.md)
 
 ## Public shell
 
