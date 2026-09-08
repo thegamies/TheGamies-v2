@@ -11,8 +11,8 @@ describe("communityPrimaryHref", () => {
       communityPrimaryHref("eric", "live", { live: 2026 }),
     ).toBe("/communities/eric/live/2026");
     expect(
-      communityPrimaryHref("eric", "edition", { edition: 2026 }),
-    ).toBe("/communities/eric/edition/2026");
+      communityPrimaryHref("eric", "trending"),
+    ).toBe("/communities/eric/trending");
     expect(
       communityPrimaryHref("eric", "tga", { tga: 2025 }),
     ).toBe("/communities/eric/the-game-awards/2025");

@@ -28,6 +28,7 @@ Before freezing data, caching, **searching**, or serving lists, ask how the **ho
 - “Pagination in the UI” or “search in the UI” that still loads everything server-side
 - Unbounded `SELECT` (“load all members/games, the client will filter”)
 - Revalidating the whole community after a single roster/category row change
+- Next.js Link viewport prefetch of heavy routes (`prefetch` is off by default; do not turn it on for cover/standings grids)
 
 ## Related
 

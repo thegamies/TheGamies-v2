@@ -7,6 +7,7 @@ import { showEditionNav } from "@/lib/communities/edition-status";
 export type CommunityNavActive =
   | "overview"
   | "live"
+  | "trending"
   | "edition"
   | "tga"
   | "members"
@@ -31,6 +32,8 @@ export function communityPrimaryHref(
       return base;
     case "live":
       return years.live != null ? `${base}/live/${years.live}` : `${base}/live`;
+    case "trending":
+      return `${base}/trending`;
     case "edition":
       return years.edition != null
         ? `${base}/edition/${years.edition}`

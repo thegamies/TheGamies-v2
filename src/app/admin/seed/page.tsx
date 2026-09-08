@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { countStandingsSeeds } from "@/lib/live-aggregate/seed-standings";
+import { AdminLibrarySeedClient } from "./AdminLibrarySeedClient";
 import { AdminSeedClient } from "./AdminSeedClient";
 
 /** Seed + year rebuild can exceed the default serverless budget. */
@@ -38,10 +39,12 @@ export default async function AdminSeedPage() {
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
         Generate synthetic voters and Game of the Year lists to exercise live
-        standings locally or on staging. Category votes are optional.
+        standings locally or on staging. Category votes are optional. Library
+        fill is below, and it includes community seed accounts too.
       </p>
       <div className="mt-10">
         <AdminSeedClient initialYear={year} initialStats={initialStats} />
+        <AdminLibrarySeedClient />
       </div>
     </main>
   );

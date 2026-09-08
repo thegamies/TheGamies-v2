@@ -1,6 +1,8 @@
 import { YEAR_PICKER_MIN } from "@/lib/ui/calendar-year";
 import type { BrowseSort, ReleaseStatus } from "@/lib/catalog";
 
+export type GamesBrowseSort = BrowseSort | "trending";
+
 /** Empty year = no year filter (all years). */
 export const ALL_YEARS_VALUE = "";
 
@@ -19,6 +21,21 @@ export const BROWSE_SORT_OPTIONS: { value: BrowseSort; label: string }[] = [
   { value: "name", label: "Name" },
   { value: "first_release_date", label: "Release date" },
 ];
+
+export const GAMES_BROWSE_SORT_OPTIONS: {
+  value: GamesBrowseSort;
+  label: string;
+}[] = [...BROWSE_SORT_OPTIONS, { value: "trending", label: "Trending" }];
+
+export function parseGamesBrowseSort(raw: unknown): GamesBrowseSort {
+  if (raw === "trending") return "trending";
+  if (raw === "name" || raw === "first_release_date") return raw;
+  return "popularity";
+}
+
+export function isCatalogBrowseSort(sort: GamesBrowseSort): sort is BrowseSort {
+  return sort !== "trending";
+}
 
 export const BROWSE_SORT_DIR_OPTIONS: { value: "asc" | "desc"; label: string }[] =
   [

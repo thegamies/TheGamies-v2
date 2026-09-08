@@ -12,8 +12,10 @@ import {
   saveLandingYearsAction,
   savePublicBoardMinCategoryVotesAction,
   savePublicBoardMinListsAction,
+  savePublicTrendingMinPeopleAction,
   saveRankModeAction,
   saveStandingFillMinVisibleAction,
+  saveTrendingRecencyWeightsAction,
   setRevealAction,
 } from "./actions";
 
@@ -51,6 +53,13 @@ type Props = {
   initialRankMode: SharedRankMode;
   initialPublicBoardMinLists: number;
   initialPublicBoardMinCategoryVotes: number;
+  initialPublicTrendingMinPeople: number;
+  initialTrendingRecencyWeights: {
+    hours24: number;
+    days1to3: number;
+    restOf7d: number;
+    days7to30: number;
+  };
   initialStandingFillMinVisible: number;
 };
 
@@ -61,6 +70,8 @@ export function AdminRankingsClient({
   initialRankMode,
   initialPublicBoardMinLists,
   initialPublicBoardMinCategoryVotes,
+  initialPublicTrendingMinPeople,
+  initialTrendingRecencyWeights,
   initialStandingFillMinVisible,
 }: Props) {
   const [year, setYear] = useState(initialYear);
@@ -83,6 +94,27 @@ export function AdminRankingsClient({
   );
   const [minCategoryVotesSaved, setMinCategoryVotesSaved] = useState(
     initialPublicBoardMinCategoryVotes,
+  );
+  const [minTrendingInput, setMinTrendingInput] = useState(
+    String(initialPublicTrendingMinPeople),
+  );
+  const [minTrendingSaved, setMinTrendingSaved] = useState(
+    initialPublicTrendingMinPeople,
+  );
+  const [weight24hInput, setWeight24hInput] = useState(
+    String(initialTrendingRecencyWeights.hours24),
+  );
+  const [weight1to3Input, setWeight1to3Input] = useState(
+    String(initialTrendingRecencyWeights.days1to3),
+  );
+  const [weightRest7dInput, setWeightRest7dInput] = useState(
+    String(initialTrendingRecencyWeights.restOf7d),
+  );
+  const [weight7to30Input, setWeight7to30Input] = useState(
+    String(initialTrendingRecencyWeights.days7to30),
+  );
+  const [recencySaved, setRecencySaved] = useState(
+    initialTrendingRecencyWeights,
   );
   const [minVisibleInput, setMinVisibleInput] = useState(
     String(initialStandingFillMinVisible),
@@ -263,6 +295,148 @@ export function AdminRankingsClient({
         </Button>
         <p className="text-xs text-muted">
           Current category vote minimum: {minCategoryVotesSaved}
+        </p>
+        <label className="block text-sm text-muted">
+          Minimum people for trending
+          <input
+            type="number"
+            min={1}
+            max={1000}
+            className={`${fieldInputClass} mt-1`}
+            value={minTrendingInput}
+            onChange={(e) => setMinTrendingInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result =
+                await savePublicTrendingMinPeopleAction(minTrendingInput);
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.publicTrendingMinPeople != null) {
+                setMinTrendingSaved(result.publicTrendingMinPeople);
+                setMinTrendingInput(String(result.publicTrendingMinPeople));
+              }
+              setMessage("Trending minimum saved.");
+            })
+          }
+        >
+          Save trending minimum
+        </Button>
+        <p className="text-xs text-muted">
+          Current trending minimum: {minTrendingSaved}
+        </p>
+      </section>
+
+      <section className="space-y-4 border-b border-line pb-10">
+        <h2 className="font-display text-2xl tracking-wide text-ink">
+          Trending recency
+        </h2>
+        <p className="text-sm text-muted">
+          How strongly recent people pull a game up on Games, Following, and
+          community trending. Each person still counts once. These weights
+          only change order — the board does not show a people count. The
+          7-to-30-day weight applies on the 30-day board.
+        </p>
+        <label className="block text-sm text-muted">
+          Last 24 hours
+          <input
+            type="number"
+            min={0}
+            max={10}
+            step={0.001}
+            className={`${fieldInputClass} mt-1`}
+            value={weight24hInput}
+            onChange={(e) => setWeight24hInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          1 to 3 days
+          <input
+            type="number"
+            min={0}
+            max={10}
+            step={0.001}
+            className={`${fieldInputClass} mt-1`}
+            value={weight1to3Input}
+            onChange={(e) => setWeight1to3Input(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          Rest of the week
+          <input
+            type="number"
+            min={0}
+            max={10}
+            step={0.001}
+            className={`${fieldInputClass} mt-1`}
+            value={weightRest7dInput}
+            onChange={(e) => setWeightRest7dInput(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label className="block text-sm text-muted">
+          7 to 30 days
+          <input
+            type="number"
+            min={0}
+            max={10}
+            step={0.001}
+            className={`${fieldInputClass} mt-1`}
+            value={weight7to30Input}
+            onChange={(e) => setWeight7to30Input(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result = await saveTrendingRecencyWeightsAction({
+                hours24: weight24hInput,
+                days1to3: weight1to3Input,
+                restOf7d: weightRest7dInput,
+                days7to30: weight7to30Input,
+              });
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.trendingRecencyWeights) {
+                setRecencySaved(result.trendingRecencyWeights);
+                setWeight24hInput(
+                  String(result.trendingRecencyWeights.hours24),
+                );
+                setWeight1to3Input(
+                  String(result.trendingRecencyWeights.days1to3),
+                );
+                setWeightRest7dInput(
+                  String(result.trendingRecencyWeights.restOf7d),
+                );
+                setWeight7to30Input(
+                  String(result.trendingRecencyWeights.days7to30),
+                );
+              }
+              setMessage("Trending recency saved.");
+            })
+          }
+        >
+          Save recency weights
+        </Button>
+        <p className="text-xs text-muted">
+          Current weights: {recencySaved.hours24} / {recencySaved.days1to3} /{" "}
+          {recencySaved.restOf7d} / {recencySaved.days7to30}
         </p>
       </section>
 

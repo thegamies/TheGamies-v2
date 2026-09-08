@@ -22,6 +22,7 @@ Community live boards `SUM(live_goty_contrib)` / `SUM(live_category_contrib)` fo
 - Adult games excluded from contrib
 - GOTY ranking rows must pass `gotyEligibilityError` on save (packs/DLC-addons never score on the GOTY board)
 - Default scoring: top 10 only (`pointsForRank` → 11 − rank)
+- **Later:** list `rank_visibility` (`ranked` / `games_only` / `hidden`) does **not** change eligibility. Hidden and games-only owned GOTY lists still write contrib. Visibility is the public list page and feed — see [lists.md](./lists.md).
 
 ## Write path
 
@@ -111,6 +112,7 @@ list’s ranked picks (top-rank weighted).
 - **Keep adding until stopped** also continues from max index
 - Game picks match the old GOTY load-test: eligible year games (not adult, not version-parent; null release date allowed), weight `ln(1 + rating_count) × (rating / 100)` (missing rating = 75), optional **top N** pool (UI default 50; blank/0 = no limit, Worker-capped at 10,000), **weight power** 0.1–5, **weighted** (`-ln(random()) / weight`) or **uniform**, random list length in **min–max games**, ranks from **min rank**
 - When **Include category votes** is on: upserts the award catalog (`ensureAwardCategories`) before writing votes; errors if no active categories remain. Category picks reuse the GOTY shortlist with **top-rank weight** (shared with community edition seed)
+- Writes `list_add` activity for each seeded GOTY (one `batch_id` per list, timestamps staggered over five days) so Following and trending can see them. Reseed and Clear drop those list events first.
 - Category vote / contrib inserts are **chunked** (Neon HTTP-safe); the admin result reports category count + votes written
 - Year **rebuild** aggregates first, then replaces score rows in chunks (avoids wiping categories when a single large insert fails)
 - Ends with one year score rebuild (or after Stop). If rebuild fails after lists are written, the seed result says so — use Rankings → Rebuild.

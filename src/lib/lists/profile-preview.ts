@@ -14,6 +14,7 @@ export type ProfileListPreview = {
   year: number | null;
   listType: string;
   slug: string | null;
+  hideRanks: boolean;
   items: ProfileListPreviewItem[];
 };
 

@@ -3,6 +3,11 @@ import { getGameBySlug } from "@/lib/catalog";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { isCommunityPublic } from "@/lib/communities/schema";
 import { getShareListByUsernameSlug, getShareListItems } from "@/lib/lists/service";
+import {
+  listPublicIndexable,
+  orderItemsForPublicView,
+  viewerSeesListRanks,
+} from "@/lib/lists/rank-visibility";
 import { getProfileByUsername } from "@/lib/profile/service";
 import { igdbImage } from "@thegamies/igdb";
 import type { OgCardCover } from "@/lib/seo/og-card";
@@ -67,12 +72,15 @@ async function renderForKind(kind: string, params: URLSearchParams) {
       getShareListByUsernameSlug(username, slug, { includeItems: false }),
     ]);
     if (!profile || !shouldIndexProfile(profile) || !data) return defaultCard();
+    if (!listPublicIndexable(data.list.rankVisibility)) return defaultCard();
     const items = await getShareListItems(data.list.id, { limit: 4 });
-    const covers: OgCardCover[] = items
+    const hideRanks = !viewerSeesListRanks(data.list.rankVisibility, false);
+    const ordered = orderItemsForPublicView(items, hideRanks).slice(0, 4);
+    const covers: OgCardCover[] = ordered
       .filter((item) => item.coverUrl)
       .map((item) => ({
         url: igdbImage(item.coverUrl, "cover_big_2x") ?? (item.coverUrl as string),
-        rank: item.rank,
+        rank: hideRanks ? undefined : item.rank,
       }));
     return renderOgImage({
       kicker: data.list.year ? `${data.list.year} list` : "List",

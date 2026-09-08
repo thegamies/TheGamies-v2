@@ -1,5 +1,6 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
+  activityEvents,
   communities,
   communityEditionBallots,
   communityEditionResultVoters,
@@ -7,7 +8,9 @@ import {
   communityEditions,
   communityMembers,
   createDb,
+  libraryEntries,
   lists,
+  profileFollows,
   profiles,
   type Db,
 } from "@thegamies/db";
@@ -158,6 +161,16 @@ export async function purgeAndTombstoneProfile(
   const blocked = lastHostAccountDeleteMessage(lastHostNames);
   if (blocked) return { error: blocked };
 
+  await db.delete(activityEvents).where(eq(activityEvents.profileId, profileId));
+  await db.delete(libraryEntries).where(eq(libraryEntries.profileId, profileId));
+  await db
+    .delete(profileFollows)
+    .where(
+      or(
+        eq(profileFollows.followerProfileId, profileId),
+        eq(profileFollows.followedProfileId, profileId),
+      ),
+    );
   await deleteOwnedListsForProfile(profileId, db);
   const { retireCommunityHostEverywhere } = await import(
     "@/lib/communities/community-hosts"

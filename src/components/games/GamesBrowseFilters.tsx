@@ -4,13 +4,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Select } from "@/components/ui/Select";
 import { controlLabelClass, fieldInputClass } from "@/components/ui/controls";
-import type { BrowseSort, ReleaseStatus } from "@/lib/catalog";
+import type { ReleaseStatus } from "@/lib/catalog";
 import {
   ALL_YEARS_VALUE,
   BROWSE_RELEASE_OPTIONS,
   BROWSE_SORT_DIR_OPTIONS,
-  BROWSE_SORT_OPTIONS,
+  GAMES_BROWSE_SORT_OPTIONS,
   browseYearOptions,
+  type GamesBrowseSort,
 } from "./browse-filters";
 
 const fieldLabelClass = `block ${controlLabelClass}`;
@@ -19,9 +20,11 @@ const selectClass = "mt-1 w-[10.5rem]";
 type Props = {
   q: string;
   year: number | undefined;
-  sort: BrowseSort;
+  sort: GamesBrowseSort;
   sortDir: "asc" | "desc";
   releaseStatus: ReleaseStatus;
+  hours?: string;
+  scope?: string;
 };
 
 export function GamesBrowseFilters({
@@ -30,6 +33,8 @@ export function GamesBrowseFilters({
   sort,
   sortDir,
   releaseStatus,
+  hours,
+  scope,
 }: Props) {
   const [yearValue, setYearValue] = useState(
     year != null ? String(year) : ALL_YEARS_VALUE,
@@ -37,6 +42,7 @@ export function GamesBrowseFilters({
   const [sortValue, setSortValue] = useState(sort);
   const [sortDirValue, setSortDirValue] = useState(sortDir);
   const [releaseValue, setReleaseValue] = useState(releaseStatus);
+  const trending = sortValue === "trending";
 
   const years = browseYearOptions();
   if (year != null && !years.includes(year)) {
@@ -53,30 +59,34 @@ export function GamesBrowseFilters({
       method="get"
       className="mt-8 flex flex-wrap items-end gap-4 border-y border-line py-5"
     >
-      <label className={fieldLabelClass} htmlFor="games-q">
-        Search
-        <input
-          id="games-q"
-          name="q"
-          defaultValue={q}
-          className={`${fieldInputClass} min-w-[12rem]`}
-          placeholder="Title"
-        />
-      </label>
-      <div>
-        <label htmlFor="games-year" className={fieldLabelClass}>
-          Year
+      {trending ? null : (
+        <label className={fieldLabelClass} htmlFor="games-q">
+          Search
+          <input
+            id="games-q"
+            name="q"
+            defaultValue={q}
+            className={`${fieldInputClass} min-w-[12rem]`}
+            placeholder="Title"
+          />
         </label>
-        <Select
-          id="games-year"
-          name="year"
-          value={yearValue}
-          options={yearOptions}
-          className={selectClass}
-          aria-label="Year"
-          onChange={setYearValue}
-        />
-      </div>
+      )}
+      {trending ? null : (
+        <div>
+          <label htmlFor="games-year" className={fieldLabelClass}>
+            Year
+          </label>
+          <Select
+            id="games-year"
+            name="year"
+            value={yearValue}
+            options={yearOptions}
+            className={selectClass}
+            aria-label="Year"
+            onChange={setYearValue}
+          />
+        </div>
+      )}
       <div>
         <label htmlFor="games-sort" className={fieldLabelClass}>
           Sort
@@ -85,40 +95,49 @@ export function GamesBrowseFilters({
           id="games-sort"
           name="sort"
           value={sortValue}
-          options={BROWSE_SORT_OPTIONS}
+          options={GAMES_BROWSE_SORT_OPTIONS}
           className={selectClass}
           aria-label="Sort"
-          onChange={(next) => setSortValue(next as BrowseSort)}
+          onChange={(next) => setSortValue(next as GamesBrowseSort)}
         />
       </div>
-      <div>
-        <label htmlFor="games-sort-dir" className={fieldLabelClass}>
-          Direction
-        </label>
-        <Select
-          id="games-sort-dir"
-          name="sortDir"
-          value={sortDirValue}
-          options={BROWSE_SORT_DIR_OPTIONS}
-          className={selectClass}
-          aria-label="Direction"
-          onChange={(next) => setSortDirValue(next as "asc" | "desc")}
-        />
-      </div>
-      <div>
-        <label htmlFor="games-release" className={fieldLabelClass}>
-          Release
-        </label>
-        <Select
-          id="games-release"
-          name="releaseStatus"
-          value={releaseValue}
-          options={BROWSE_RELEASE_OPTIONS}
-          className={selectClass}
-          aria-label="Release"
-          onChange={(next) => setReleaseValue(next as ReleaseStatus)}
-        />
-      </div>
+      {trending ? (
+        <>
+          {hours ? <input type="hidden" name="hours" value={hours} /> : null}
+          {scope ? <input type="hidden" name="scope" value={scope} /> : null}
+        </>
+      ) : (
+        <>
+          <div>
+            <label htmlFor="games-sort-dir" className={fieldLabelClass}>
+              Direction
+            </label>
+            <Select
+              id="games-sort-dir"
+              name="sortDir"
+              value={sortDirValue}
+              options={BROWSE_SORT_DIR_OPTIONS}
+              className={selectClass}
+              aria-label="Direction"
+              onChange={(next) => setSortDirValue(next as "asc" | "desc")}
+            />
+          </div>
+          <div>
+            <label htmlFor="games-release" className={fieldLabelClass}>
+              Release
+            </label>
+            <Select
+              id="games-release"
+              name="releaseStatus"
+              value={releaseValue}
+              options={BROWSE_RELEASE_OPTIONS}
+              className={selectClass}
+              aria-label="Release"
+              onChange={(next) => setReleaseValue(next as ReleaseStatus)}
+            />
+          </div>
+        </>
+      )}
       <Button type="submit">Apply</Button>
     </form>
   );

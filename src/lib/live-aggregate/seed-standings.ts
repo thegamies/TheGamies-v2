@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
+  activityEvents,
   createDb,
   games,
   listCategoryVotes,
@@ -40,6 +41,28 @@ export const SEED_MAX_INDEX = 1000;
 export const SEED_MAX_BATCH = 100;
 /** Neon HTTP inserts stay reliable when category vote batches stay small. */
 export const SEED_INSERT_CHUNK = 200;
+
+const LIST_ACTIVITY_KINDS = [
+  "list_add",
+  "list_remove",
+  "list_reveal",
+] as const;
+
+/** Stagger a seed GOTY save inside five days so feed + default trending can see it. */
+export function seedGotyListEventTime(now: Date, listIndex: number): Date {
+  const hoursAgo = 2 + ((listIndex * 11) % (24 * 5));
+  return new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+}
+
+async function deleteListActivityForLists(listIds: string[], db: Db) {
+  if (listIds.length === 0) return;
+  await db.delete(activityEvents).where(
+    and(
+      inArray(activityEvents.listId, listIds),
+      inArray(activityEvents.kind, [...LIST_ACTIVITY_KINDS]),
+    ),
+  );
+}
 
 function getDb(): Db {
   return createDb();
@@ -478,6 +501,7 @@ export async function seedStandingsVoters(
   await db
     .delete(listCategoryVotes)
     .where(inArray(listCategoryVotes.listId, listIds));
+  await deleteListActivityForLists(listIds, db);
 
   const itemRows: {
     listId: string;
@@ -505,6 +529,14 @@ export async function seedStandingsVoters(
     year: number;
     gameId: string;
   }[] = [];
+  const activityRows: {
+    profileId: string;
+    kind: "list_add";
+    batchId: string;
+    gameId: string;
+    listId: string;
+    createdAt: Date;
+  }[] = [];
 
   const weightOf = (game: PoolGame) =>
     applySeedWeightPower(
@@ -512,8 +544,10 @@ export async function seedStandingsVoters(
       sampling.weightPower,
     );
 
-  for (const list of allLists) {
+  for (const [listIndex, list] of allLists.entries()) {
     const { picks, ranks } = sampleSeedList(pool, sampling, weightOf);
+    const batchId = crypto.randomUUID();
+    const createdAt = seedGotyListEventTime(now, listIndex);
     for (let i = 0; i < picks.length; i += 1) {
       const game = picks[i]!;
       itemRows.push({
@@ -522,6 +556,16 @@ export async function seedStandingsVoters(
         rank: ranks[i]!,
         blurb: null,
       });
+      if (list.profileId) {
+        activityRows.push({
+          profileId: list.profileId,
+          kind: "list_add",
+          batchId,
+          gameId: game.id,
+          listId: list.id,
+          createdAt,
+        });
+      }
     }
     const scored = buildGotyContribRows(
       picks.map((game, index) => ({
@@ -570,6 +614,13 @@ export async function seedStandingsVoters(
     await insertInChunks(
       categoryVoteRows,
       (chunk) => db.insert(listCategoryVotes).values(chunk),
+      SEED_INSERT_CHUNK,
+    );
+  }
+  if (activityRows.length > 0) {
+    await insertInChunks(
+      activityRows,
+      (chunk) => db.insert(activityEvents).values(chunk),
       SEED_INSERT_CHUNK,
     );
   }
@@ -661,6 +712,7 @@ export async function clearStandingsSeeds(
 
   const listIds = listRows.map((l) => l.id);
   if (listIds.length > 0) {
+    await deleteListActivityForLists(listIds, db);
     await db
       .delete(liveGotyContrib)
       .where(inArray(liveGotyContrib.listId, listIds));

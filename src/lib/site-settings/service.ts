@@ -12,6 +12,12 @@ import {
   parsePublicBoardMinLists,
 } from "@/lib/live-aggregate/public-board";
 import {
+  DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+  parsePublicTrendingMinPeople,
+  parseTrendingRecencyWeights,
+  type TrendingRecencyWeights,
+} from "@/lib/activity/trending";
+import {
   DEFAULT_STANDING_FILL_MIN_VISIBLE,
   parseStandingFillMinVisible,
 } from "@/lib/standings/standing-fill";
@@ -33,6 +39,8 @@ export type SiteSettingsRow = {
   rankMode: SharedRankMode;
   publicBoardMinLists: number;
   publicBoardMinCategoryVotes: number;
+  publicTrendingMinPeople: number;
+  trendingRecencyWeights: TrendingRecencyWeights;
   standingFillMinVisible: number;
 };
 
@@ -45,6 +53,11 @@ export async function getSiteSettings(
       rankMode: siteSettings.rankMode,
       publicBoardMinLists: siteSettings.publicBoardMinLists,
       publicBoardMinCategoryVotes: siteSettings.publicBoardMinCategoryVotes,
+      publicTrendingMinPeople: siteSettings.publicTrendingMinPeople,
+      trendingRecencyWeight24h: siteSettings.trendingRecencyWeight24h,
+      trendingRecencyWeight1To3d: siteSettings.trendingRecencyWeight1To3d,
+      trendingRecencyWeightRest7d: siteSettings.trendingRecencyWeightRest7d,
+      trendingRecencyWeight7To30d: siteSettings.trendingRecencyWeight7To30d,
       standingFillMinVisible: siteSettings.standingFillMinVisible,
     })
     .from(siteSettings)
@@ -60,6 +73,15 @@ export async function getSiteSettings(
     publicBoardMinCategoryVotes: parsePublicBoardMinCategoryVotes(
       row?.publicBoardMinCategoryVotes ?? DEFAULT_PUBLIC_BOARD_MIN_CATEGORY_VOTES,
     ),
+    publicTrendingMinPeople: parsePublicTrendingMinPeople(
+      row?.publicTrendingMinPeople ?? DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+    ),
+    trendingRecencyWeights: parseTrendingRecencyWeights({
+      hours24: row?.trendingRecencyWeight24h,
+      days1to3: row?.trendingRecencyWeight1To3d,
+      restOf7d: row?.trendingRecencyWeightRest7d,
+      days7to30: row?.trendingRecencyWeight7To30d,
+    }),
     standingFillMinVisible: parseStandingFillMinVisible(
       row?.standingFillMinVisible ?? DEFAULT_STANDING_FILL_MIN_VISIBLE,
     ),
@@ -228,6 +250,76 @@ export async function setStandingFillMinVisible(
       target: siteSettings.id,
       set: {
         standingFillMinVisible,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getPublicTrendingMinPeople(
+  db: Db = getDb(),
+): Promise<number> {
+  const settings = await getSiteSettings(db);
+  return settings.publicTrendingMinPeople;
+}
+
+/** Persist the public trending distinct-people floor. */
+export async function setPublicTrendingMinPeople(
+  min: number,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const publicTrendingMinPeople = parsePublicTrendingMinPeople(min);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      publicTrendingMinPeople,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        publicTrendingMinPeople,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getTrendingRecencyWeights(
+  db: Db = getDb(),
+): Promise<TrendingRecencyWeights> {
+  const settings = await getSiteSettings(db);
+  return settings.trendingRecencyWeights;
+}
+
+/** Persist recency sort weights for trending boards. */
+export async function setTrendingRecencyWeights(
+  raw: Partial<TrendingRecencyWeights>,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const trendingRecencyWeights = parseTrendingRecencyWeights(raw);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      trendingRecencyWeight24h: trendingRecencyWeights.hours24,
+      trendingRecencyWeight1To3d: trendingRecencyWeights.days1to3,
+      trendingRecencyWeightRest7d: trendingRecencyWeights.restOf7d,
+      trendingRecencyWeight7To30d: trendingRecencyWeights.days7to30,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        trendingRecencyWeight24h: trendingRecencyWeights.hours24,
+        trendingRecencyWeight1To3d: trendingRecencyWeights.days1to3,
+        trendingRecencyWeightRest7d: trendingRecencyWeights.restOf7d,
+        trendingRecencyWeight7To30d: trendingRecencyWeights.days7to30,
         updatedAt: new Date(),
       },
     });

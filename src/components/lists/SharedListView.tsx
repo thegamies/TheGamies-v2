@@ -77,6 +77,8 @@ type SharedListViewProps = {
   categoryPicks?: SharedCategoryPick[];
   saved?: boolean;
   error?: string | null;
+  hideRanks?: boolean;
+  showCategories?: boolean;
 };
 
 export function SharedListView({
@@ -91,13 +93,17 @@ export function SharedListView({
   categoryPicks = [],
   saved = false,
   error = null,
+  hideRanks = false,
+  showCategories = true,
 }: SharedListViewProps) {
   const isGoty = data.list.listType !== "custom";
-  const onCategories = isGoty && view === "categories";
+  const onCategories = isGoty && showCategories && view === "categories";
   const [viewFormat, setViewFormat] = useState<ListFormat>(() =>
-    parseStoredListFormat(data.list.listFormat),
+    hideRanks ? "grid" : parseStoredListFormat(data.list.listFormat),
   );
-  const rankStyle = parseStoredRankStyle(data.list.rankStyle);
+  const rankStyle = hideRanks
+    ? "off"
+    : parseStoredRankStyle(data.list.rankStyle);
   const rankFormat = data.list.showSuffix ? "ordinal" : "number";
   const year = data.list.year ?? new Date().getUTCFullYear();
   const listType = isGoty ? "goty" : "custom";
@@ -165,7 +171,7 @@ export function SharedListView({
           alreadyOwned={alreadyOwned}
         />
 
-        {isGoty ? (
+        {isGoty && showCategories ? (
           <ScrollableNav aria-label="List" className="mt-8">
             <Link
               href={listShareViewHref(sharePath, { ...tabOpts, view: "goty" })}
@@ -241,12 +247,14 @@ export function SharedListView({
                 <Link href={`/games/${item.slug}`} className="group block">
                   <GameCover title={item.title} imageUrl={item.coverUrl} />
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span
-                      className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent"
-                      aria-label={`Rank ${item.rank}`}
-                    >
-                      {item.rank}
-                    </span>
+                    {hideRanks ? null : (
+                      <span
+                        className="shrink-0 font-display text-[18px] leading-none tracking-wide text-accent"
+                        aria-label={`Rank ${item.rank}`}
+                      >
+                        {item.rank}
+                      </span>
+                    )}
                     <div className="min-w-0 flex-1">
                       <FitDisplayTitle
                         className="w-full group-hover:text-accent"
@@ -269,7 +277,7 @@ export function SharedListView({
           <ol className="mt-10 divide-y divide-line border-y border-line">
             {data.items.map((item) => (
               <li key={item.gameId} className="flex items-center gap-5 py-5">
-                <RankMarker rank={item.rank} size="lg" />
+                {hideRanks ? null : <RankMarker rank={item.rank} size="lg" />}
                 <div className="w-16 shrink-0 sm:w-20">
                   <GameCover title={item.title} imageUrl={item.coverUrl} />
                 </div>

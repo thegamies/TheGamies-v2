@@ -24,4 +24,18 @@ describe("GamesBrowseFilters", () => {
     const currentYear = String(new Date().getUTCFullYear());
     expect(screen.getByRole("button", { name: currentYear })).toBeTruthy();
   });
+
+  it("offers Trending as a sort filter", () => {
+    render(
+      <GamesBrowseFilters
+        q=""
+        year={undefined}
+        sort="popularity"
+        sortDir="desc"
+        releaseStatus="all"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Sort" }));
+    expect(screen.getByRole("button", { name: "Trending" })).toBeTruthy();
+  });
 });

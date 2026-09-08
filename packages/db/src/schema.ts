@@ -656,6 +656,8 @@ export const lists = pgTable(
     rankStyle: text("rank_style").notNull().default("chip"),
     showSuffix: boolean("show_suffix").notNull().default(false),
     listFormat: text("list_format").notNull().default("grid"),
+    /** Public list presentation: ranked | games_only | hidden. Does not affect live contrib. */
+    rankVisibility: text("rank_visibility").notNull().default("ranked"),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
   },
@@ -685,6 +687,71 @@ export const listItems = pgTable(
   (t) => [
     uniqueIndex("list_items_list_rank_uidx").on(t.listId, t.rank),
     uniqueIndex("list_items_list_game_uidx").on(t.listId, t.gameId),
+  ],
+);
+
+/** One library row per person per game. Status is mutually exclusive. */
+export const libraryEntries = pgTable(
+  "library_entries",
+  {
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    status: text("status").notNull(),
+    visibility: text("visibility").notNull().default("public"),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.profileId, t.gameId] }),
+    index("library_entries_status_game_idx").on(t.status, t.gameId),
+    index("library_entries_profile_updated_idx").on(t.profileId, t.updatedAt),
+  ],
+);
+
+/** Open follow graph. Edges stay if a profile later goes private. */
+export const profileFollows = pgTable(
+  "profile_follows",
+  {
+    followerProfileId: uuid("follower_profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    followedProfileId: uuid("followed_profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.followerProfileId, t.followedProfileId] }),
+    index("profile_follows_followed_idx").on(t.followedProfileId, t.createdAt),
+    index("profile_follows_follower_idx").on(t.followerProfileId, t.createdAt),
+  ],
+);
+
+/**
+ * Append-only library + GOTY membership events.
+ * Visibility is joined on read from library_entries / lists — not copied here.
+ */
+export const activityEvents = pgTable(
+  "activity_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id").references(() => games.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    listId: uuid("list_id").references(() => lists.id, { onDelete: "set null" }),
+    batchId: uuid("batch_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("activity_events_created_idx").on(t.createdAt),
+    index("activity_events_profile_created_idx").on(t.profileId, t.createdAt),
+    index("activity_events_game_created_idx").on(t.gameId, t.createdAt),
+    index("activity_events_batch_idx").on(t.batchId),
   ],
 );
 
@@ -1087,6 +1154,7 @@ export const liveCategoryDirty = pgTable(
  * `publicBoardMinLists` — GOTY years stay hidden until this many lists.
  * `publicBoardMinCategoryVotes` — a category board stays hidden until that award has this many votes.
  * `standingFillMinVisible` — temporary: covers in view on homepage / all-years strips (decimals peek).
+ * Trending recency weights order Games / Following / community boards; people count stays a headcount.
  */
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey().default("default"),
@@ -1099,6 +1167,22 @@ export const siteSettings = pgTable("site_settings", {
   publicBoardMinCategoryVotes: integer("public_board_min_category_votes")
     .notNull()
     .default(5),
+  /** Distinct people in the default trending window before Games trending is public. */
+  publicTrendingMinPeople: integer("public_trending_min_people")
+    .notNull()
+    .default(5),
+  trendingRecencyWeight24h: real("trending_recency_weight_24h")
+    .notNull()
+    .default(1),
+  trendingRecencyWeight1To3d: real("trending_recency_weight_1_3d")
+    .notNull()
+    .default(0.5),
+  trendingRecencyWeightRest7d: real("trending_recency_weight_rest_7d")
+    .notNull()
+    .default(0.25),
+  trendingRecencyWeight7To30d: real("trending_recency_weight_7_30d")
+    .notNull()
+    .default(0.125),
   standingFillMinVisible: real("standing_fill_min_visible")
     .notNull()
     .default(2.2),

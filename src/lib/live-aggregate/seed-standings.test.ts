@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildSeedCategoryVotes,
   resolveSeedStartIndex,
+  seedGotyListEventTime,
   weightForRatedGame,
   weightForTopRank,
   weightedSample,
@@ -90,6 +91,26 @@ describe("resolveSeedStartIndex", () => {
     expect(resolveSeedStartIndex({ reseed: false, maxIndex: 50 })).toBe(51);
     expect(resolveSeedStartIndex({ reseed: false, maxIndex: 1000 })).toBe(
       1001,
+    );
+  });
+});
+
+describe("seedGotyListEventTime", () => {
+  it("stays inside a five-day window so the default trending board can see it", () => {
+    const now = new Date("2026-09-07T18:00:00.000Z");
+    const created = seedGotyListEventTime(now, 4);
+    const deltaHours = (now.getTime() - created.getTime()) / 3_600_000;
+    expect(deltaHours).toBeGreaterThanOrEqual(2);
+    expect(deltaHours).toBeLessThanOrEqual(24 * 5 + 2);
+  });
+
+  it("uses one instant per list index so a GOTY save shares a timestamp", () => {
+    const now = new Date("2026-09-07T18:00:00.000Z");
+    expect(seedGotyListEventTime(now, 2).getTime()).toBe(
+      seedGotyListEventTime(now, 2).getTime(),
+    );
+    expect(seedGotyListEventTime(now, 0).getTime()).not.toBe(
+      seedGotyListEventTime(now, 1).getTime(),
     );
   });
 });

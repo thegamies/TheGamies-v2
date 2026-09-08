@@ -23,7 +23,7 @@ import {
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
-import { parseStoredListFormat, parseStoredRankStyle } from "@/lib/lists/schema";
+import { parseStoredListFormat, parseStoredRankStyle, parseStoredRankVisibility } from "@/lib/lists/schema";
 import {
   createGotyEntryMode,
   shouldDiscardLocalGotyDraft,
@@ -132,6 +132,7 @@ export default async function CreateGotyPage({
     listFormat?: "poster" | "list" | "grid";
     rankStyle?: "banner" | "chip" | "off";
     showSuffix?: boolean;
+    rankVisibility?: "ranked" | "games_only" | "hidden";
     items: {
       gameId: string;
       igdbId: number;
@@ -190,6 +191,7 @@ export default async function CreateGotyPage({
         rankStyle: parseStoredRankStyle(result.list.rankStyle),
         showSuffix: result.list.showSuffix,
         listFormat: parseStoredListFormat(result.list.listFormat),
+        rankVisibility: parseStoredRankVisibility(result.list.rankVisibility),
         items: result.items.map((item) => ({
           gameId: item.gameId,
           igdbId: item.igdbId,
@@ -400,6 +402,7 @@ export default async function CreateGotyPage({
           initialListFormat={editor.listFormat}
           initialRankStyle={editor.rankStyle}
           initialShowSuffix={editor.showSuffix}
+          initialRankVisibility={editor.rankVisibility}
           signedIn={signedIn}
           error={error}
           authIntent={discardLocalGotyDraft ? null : authIntent}

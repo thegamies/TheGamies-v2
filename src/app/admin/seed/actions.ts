@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { isAdminAuthorized } from "@/lib/admin-auth";
+import {
+  clearSeedLibraries,
+  seedLibrariesForSeedAccounts,
+} from "@/lib/library/seed";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
 import {
   clearStandingsSeeds,
@@ -103,4 +107,32 @@ export async function loadSeedStatsAction(): Promise<
   if (denied) return denied;
   const stats = await countStandingsSeeds();
   return { ok: true, ...stats };
+}
+
+function revalidateSeedLibraries() {
+  revalidatePath("/admin/seed");
+  revalidatePath("/games");
+}
+
+export async function seedLibrariesAction(): Promise<
+  | { ok: true; profiles: number; entries: number; gamePoolSize: number }
+  | { error: string }
+> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const result = await seedLibrariesForSeedAccounts();
+  if ("error" in result) return result;
+  revalidateSeedLibraries();
+  return { ok: true, ...result };
+}
+
+export async function clearSeedLibrariesAction(): Promise<
+  | { ok: true; profiles: number; entries: number }
+  | { error: string }
+> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const result = await clearSeedLibraries();
+  revalidateSeedLibraries();
+  return { ok: true, ...result };
 }

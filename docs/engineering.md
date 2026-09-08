@@ -170,6 +170,7 @@ Shared chrome and per-request auth must not create **server waterfalls** with pa
 
 - Render **`NavigationProgress` once in `src/app/layout.tsx`**. Keep the root layout a Server Component — the loader is already a client component.
 - `<Link>` clicks start the accent hairline automatically.
+- `<Link>` prefetch is **off** (`src/lib/next-link.tsx` aliased over `next/link`). Do not set `prefetch={true}` on dense lists (covers, standings). Decorative art is not a `Link`.
 - For `router.push` / `replace`, import `useRouter` from `@/lib/useRouter` (wraps `nextjs-toploader/app`), not `next/navigation`. Otherwise the bar will not start.
 - Keep `usePathname` / `useSearchParams` on `next/navigation`. `router.refresh()` does not need the wrapped hook.
 

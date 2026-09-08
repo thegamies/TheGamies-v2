@@ -13,6 +13,7 @@ import {
   createDraftSchema,
   parseStoredListFormat,
   parseStoredRankStyle,
+  parseStoredRankVisibility,
   replaceItemsByIgdbSchema,
   replaceItemsSchema,
   LIST_BLURB_MAX,
@@ -291,6 +292,10 @@ describe("list rank style persistence", () => {
     expect(parseStoredRankStyle("nope")).toBe("chip");
     expect(parseStoredListFormat("poster")).toBe("poster");
     expect(parseStoredListFormat("nope")).toBe("grid");
+    expect(parseStoredRankVisibility("games_only")).toBe("games_only");
+    expect(parseStoredRankVisibility("nope")).toBe("ranked");
+    expect(parseStoredRankVisibility(null)).toBe("ranked");
+    expect(parseStoredRankVisibility(undefined)).toBe("ranked");
     expect(
       clientDraftUpsertSchema.safeParse({
         listType: "goty",

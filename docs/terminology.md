@@ -38,6 +38,18 @@ An award separate from the main ranked Game of the Year ballot (e.g. Best Multip
 
 Public name for a community’s yearly awards vote (internal/code: **edition**). Scheduled open / close / publish times; results stay hidden until publish, then freeze.
 
+### Library
+
+Personal shelf with status **Wishlist**, **Backlog**, **Playing**, **Paused**, **Beat**, or **Dropped**. Not a GOTY list. Later than v1. See [library.md](./features/library.md).
+
+### Follow
+
+Open 1:1 subscription to a public profile’s public list and library activity. Not community membership. Later than v1. See [follow.md](./features/follow.md).
+
+### Trending
+
+Game cover board ranked by how many distinct people moved a title in a time window (library + GOTY adds). Not live GOTY. Later than v1. See [activity-and-trending.md](./features/activity-and-trending.md).
+
 ### Live Rankings
 
 Public name for the optional ongoing community board from members’ signed-in lists (internal: live rankings). Independent of Events.

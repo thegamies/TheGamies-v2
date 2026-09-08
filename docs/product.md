@@ -106,7 +106,6 @@ Site
 
 ## v1 scope — out
 
-- Library / played status
 - Native mobile app
 - Messaging / complex notification system
 - Remotion / video list export (editorial **static** view is in)
@@ -114,6 +113,19 @@ Site
 - Real-time recalculation of **frozen edition** results
 - Heavy admin tools embedded in public community pages
 - Video Game Awards Pick’em is **later than v1 launch** (not a go-live blocker)
+
+---
+
+## Later (locked, not v1)
+
+Library, follow, a **following** feed, list rank visibility, and trending. **Do not pull onto the launch branch.** Specs: [library.md](./features/library.md), [follow.md](./features/follow.md), [activity-and-trending.md](./features/activity-and-trending.md), rank visibility on [lists.md](./features/lists.md).
+
+- **Library** — Wishlist / Backlog / Playing / Paused / Beat / Dropped; uncoupled from GOTY; public/private per row
+- **Follow** — open follow of public profiles; home feed is pull (no notifications)
+- **Rank visibility** — `ranked` / `games_only` / `hidden` on lists; Categories follow the same control; owned GOTY still feeds live contrib
+- **Trending** — game boards from activity (Games sort filter, community tab, following-scoped Games filter); no community member activity feed
+
+Messaging / complex notifications stay **out**.
 
 ---
 

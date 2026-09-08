@@ -25,7 +25,8 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 ## Product priorities (v1)
 
 **In:** games browse/detail, GOTY + custom lists (anon create + soft save prompt + editorial list view), user pages, site live GOTY aggregate (signed-in lists, admin lock), communities with optional live rankings + year **editions** (hidden ballots → frozen Combined/Community/Hosts + categories + voters).  
-**Out:** library/played status, native mobile, messaging, GraphQL, microservices, recalculating frozen edition results, Remotion/video export.
+**Out:** native mobile, messaging, GraphQL, microservices, recalculating frozen edition results, Remotion/video export.  
+**Later (not launch):** library, follow, following feed, list rank visibility, trending — `docs/features/library.md`, `docs/features/follow.md`, `docs/features/activity-and-trending.md`.
 
 Editions ≠ live rankings — see `docs/product.md`.
 
@@ -49,6 +50,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | IGDB catalog sync | `docs/igdb-sync.md` |
 | Auth emails | `docs/email-templates.md` |
 | Community / ballot / results / lists | `docs/features/` |
+| Library / follow / feed / trending (later) | `docs/features/library.md`, `docs/features/follow.md`, `docs/features/activity-and-trending.md` |
 | Video Game Awards Pick’em | `docs/features/tga-pickem.md` |
 
 ## Workflow
