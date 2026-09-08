@@ -822,6 +822,164 @@ export const communityEditionBallotCategoryVotes = pgTable(
   (t) => [primaryKey({ columns: [t.ballotId, t.categoryId] })],
 );
 
+export type CommunityCustomAnswerType =
+  | "any_game"
+  | "selected_games"
+  | "text_game"
+  | "text_only";
+
+export type CommunityCustomEligibility =
+  | "current_year"
+  | "current_or_active"
+  | "active_in_year"
+  | "upcoming"
+  | "any_year";
+
+export type CommunityCustomEntrySource = "host" | "nomination";
+
+export type CommunityCustomSupportLinkKind =
+  | "youtube"
+  | "twitch_clip"
+  | "twitch_vod";
+
+/** Per-edition community-defined award (alongside site award_categories). */
+export const communityCustomCategories = pgTable(
+  "community_custom_categories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description").notNull(),
+    imageUrl: text("image_url"),
+    answerType: text("answer_type")
+      .notNull()
+      .$type<CommunityCustomAnswerType>(),
+    /** Game eligibility for any_game / selected_games (same modes as site awards). */
+    eligibility: text("eligibility")
+      .notNull()
+      .default("current_year")
+      .$type<CommunityCustomEligibility>(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("community_custom_categories_edition_sort_idx").on(
+      t.editionId,
+      t.sortOrder,
+    ),
+    uniqueIndex("community_custom_categories_edition_name_uidx").on(
+      t.editionId,
+      sql`lower(${t.name})`,
+    ),
+  ],
+);
+
+/** Host-selected (or future nomination) entries for a custom category. */
+export const communityCustomCategoryEntries = pgTable(
+  "community_custom_category_entries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => communityCustomCategories.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    gameId: uuid("game_id").references(() => games.id, { onDelete: "restrict" }),
+    description: text("description"),
+    imageUrl: text("image_url"),
+    supportLinkUrl: text("support_link_url"),
+    supportLinkKind: text("support_link_kind").$type<CommunityCustomSupportLinkKind>(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    entrySource: text("entry_source")
+      .notNull()
+      .default("host")
+      .$type<CommunityCustomEntrySource>(),
+    /** Reserved for future community nominations; no FK in v1. */
+    nominationId: uuid("nomination_id"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("community_custom_category_entries_category_sort_idx").on(
+      t.categoryId,
+      t.sortOrder,
+    ),
+    uniqueIndex("community_custom_category_entries_title_uidx").on(
+      t.categoryId,
+      sql`lower(${t.title})`,
+    ),
+    // selected_games uniqueness of gameId is enforced in app (text_game may repeat games).
+  ],
+);
+
+/**
+ * Custom category picks on an edition ballot.
+ * any_game → gameId; selected_games / text_* → entryId.
+ */
+export const communityEditionBallotCustomCategoryVotes = pgTable(
+  "community_edition_ballot_custom_category_votes",
+  {
+    ballotId: uuid("ballot_id")
+      .notNull()
+      .references(() => communityEditionBallots.id, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => communityCustomCategories.id, { onDelete: "cascade" }),
+    gameId: uuid("game_id").references(() => games.id, { onDelete: "cascade" }),
+    entryId: uuid("entry_id").references(
+      () => communityCustomCategoryEntries.id,
+      { onDelete: "cascade" },
+    ),
+  },
+  (t) => [
+    primaryKey({ columns: [t.ballotId, t.categoryId] }),
+    index("community_edition_ballot_custom_votes_entry_idx").on(t.entryId),
+  ],
+);
+
+/** Frozen custom category tallies (parallel to site result_categories). */
+export const communityEditionResultCustomCategories = pgTable(
+  "community_edition_result_custom_categories",
+  {
+    editionId: uuid("edition_id")
+      .notNull()
+      .references(() => communityEditions.id, { onDelete: "cascade" }),
+    mode: text("mode").notNull(),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => communityCustomCategories.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    description: text("description"),
+    answerType: text("answer_type")
+      .notNull()
+      .$type<CommunityCustomAnswerType>(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    place: integer("place").notNull(),
+    entryId: uuid("entry_id"),
+    gameId: uuid("game_id").references(() => games.id, { onDelete: "cascade" }),
+    slug: text("slug"),
+    title: text("title").notNull(),
+    subtitle: text("subtitle"),
+    imageUrl: text("image_url"),
+    coverUrl: text("cover_url"),
+    supportLinkUrl: text("support_link_url"),
+    supportLinkKind: text("support_link_kind").$type<CommunityCustomSupportLinkKind>(),
+    votes: integer("votes").notNull(),
+  },
+  (t) => [
+    primaryKey({
+      columns: [t.editionId, t.mode, t.categoryId, t.place],
+    }),
+    index("community_edition_result_custom_categories_idx").on(
+      t.editionId,
+      t.mode,
+      t.categoryId,
+    ),
+  ],
+);
+
 /** Per-edition Voice designation (year history; not a mutable member flag). */
 export const communityEditionVoices = pgTable(
   "community_edition_voices",

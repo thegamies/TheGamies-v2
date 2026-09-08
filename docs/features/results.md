@@ -77,3 +77,5 @@ Tie stacks fit one card footprint (overlapping covers, auto-rotate + click to cy
 ## Category results
 
 Results: **Ranked / Comparison** on the board row (shared for GOTY and Categories). Ranked GOTY is a wrapping Top 10; Ranked Categories is displayed rank ≤ 3 on one line with horizontal scroll (full ties). Comparison keeps per-award / per-rank chapters; each shows You · Community (#1, stacked if tied) · Hosts (#1) · each Host pick. Categories tab mirrors top 3 strips; full tallies live on `?view=category&category=` (SQL-paginated cover cards, 10 per page).
+
+**Community categories** appear alongside site awards, labeled **Community**. Tallies freeze into `community_edition_result_custom_categories`. Winners may be a game (Any Game / Selected Games) or an entry title (Text + Game / Text Only), with optional entry image and support video (Watch / embed, no autoplay).

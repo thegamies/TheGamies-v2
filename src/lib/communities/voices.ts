@@ -9,6 +9,7 @@ import {
 } from "@thegamies/db";
 import { computeEditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
+import { communityHostsCapacityError } from "./host-limits";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
 
@@ -94,6 +95,13 @@ export async function setEditionVoice(
   }
 
   if (isVoice) {
+    const voiceIds = await listEditionVoiceProfileIds(edition.id, db);
+    const capacityError = communityHostsCapacityError(
+      voiceIds.size,
+      voiceIds.has(targetProfileId),
+    );
+    if (capacityError) return { error: capacityError };
+
     await db
       .insert(communityEditionVoices)
       .values({

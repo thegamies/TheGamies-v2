@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import { COMMUNITY_HOSTS_MAX } from "@/lib/communities/host-limits";
 import Link from "next/link";
 
 export type TgaHostMemberOption = {
@@ -76,6 +77,8 @@ export function TgaCommunityHostsForm({
 
   const trimmed = query.trim();
   const visible = trimmed ? hits : roster;
+  const hostCount = roster.filter((row) => row.isHost).length;
+  const atCapacity = hostCount >= COMMUNITY_HOSTS_MAX;
 
   function onQueryChange(value: string) {
     setQuery(value);
@@ -87,6 +90,12 @@ export function TgaCommunityHostsForm({
 
   function toggleHost(member: TgaHostMemberOption) {
     const nextHost = !member.isHost;
+    if (nextHost && atCapacity) {
+      setMutateError(
+        `A Hosts roster can have at most ${COMMUNITY_HOSTS_MAX} people.`,
+      );
+      return;
+    }
     const previousRoster = roster;
     const previousHits = hits;
     setMutateError(null);
@@ -122,7 +131,8 @@ export function TgaCommunityHostsForm({
         {year} Hosts
       </h3>
       <p className="mt-2 max-w-xl text-sm text-muted">
-        This year’s Host list only. Promote or retire for the community on{" "}
+        This year’s Host list only (up to {COMMUNITY_HOSTS_MAX}). Promote or
+        retire for the community on{" "}
         <Link
           href={communitySettingsHref(slug, { tab: "hosts" })}
           className="underline underline-offset-2"
@@ -130,6 +140,10 @@ export function TgaCommunityHostsForm({
           Hosts
         </Link>
         .
+      </p>
+      <p className="mt-1 text-sm text-muted">
+        {hostCount} of {COMMUNITY_HOSTS_MAX} Hosts
+        {atCapacity ? " · roster full" : null}
       </p>
 
       <div className="mt-4">
@@ -176,7 +190,7 @@ export function TgaCommunityHostsForm({
               <Button
                 type="button"
                 variant="bordered"
-                disabled={mutating}
+                disabled={mutating || (!member.isHost && atCapacity)}
                 className="text-sm"
                 onClick={() => toggleHost(member)}
               >

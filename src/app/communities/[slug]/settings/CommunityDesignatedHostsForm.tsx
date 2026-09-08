@@ -8,6 +8,7 @@ import {
 } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
+import { COMMUNITY_HOSTS_MAX } from "@/lib/communities/host-limits";
 
 export type CommunityDesignatedHostOption = {
   profileId: string;
@@ -69,6 +70,8 @@ export function CommunityDesignatedHostsForm({
 
   const trimmed = query.trim();
   const visible = trimmed ? hits : roster;
+  const hostCount = roster.filter((row) => row.isHost).length;
+  const atCapacity = hostCount >= COMMUNITY_HOSTS_MAX;
 
   function onQueryChange(value: string) {
     setQuery(value);
@@ -80,6 +83,12 @@ export function CommunityDesignatedHostsForm({
 
   function toggleHost(member: CommunityDesignatedHostOption) {
     const nextHost = !member.isHost;
+    if (nextHost && atCapacity) {
+      setMutateError(
+        `A Hosts roster can have at most ${COMMUNITY_HOSTS_MAX} people.`,
+      );
+      return;
+    }
     const previousRoster = roster;
     const previousHits = hits;
     setMutateError(null);
@@ -113,8 +122,13 @@ export function CommunityDesignatedHostsForm({
     <div className="mt-8">
       <h3 className="font-display text-2xl tracking-wide text-ink">Hosts</h3>
       <p className="mt-2 max-w-xl text-sm text-muted">
-        Promote members to the community Hosts roster. Open events pick them up.
-        Closed years keep their own list until you edit that year.
+        Promote members to the community Hosts roster (up to{" "}
+        {COMMUNITY_HOSTS_MAX}). Open events pick them up. Closed years keep
+        their own list until you edit that year.
+      </p>
+      <p className="mt-1 text-sm text-muted">
+        {hostCount} of {COMMUNITY_HOSTS_MAX} Hosts
+        {atCapacity ? " · roster full" : null}
       </p>
 
       <div className="mt-4">
@@ -161,7 +175,7 @@ export function CommunityDesignatedHostsForm({
               <Button
                 type="button"
                 variant="bordered"
-                disabled={mutating}
+                disabled={mutating || (!member.isHost && atCapacity)}
                 className="text-sm"
                 onClick={() => toggleHost(member)}
               >

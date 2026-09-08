@@ -130,7 +130,7 @@ Confirm these exist on **production** (and staging, where still missing):
 | **Site live lock** (pause updates for suspense) | Product **in**; [live-aggregate.md](./features/live-aggregate.md) lists it as a **non-goal** | Reveal already hides scores. If launch GOTY needs a frozen public board, this is unfinished. If ranks may move until you reveal scores, you can ship without it. |
 | **Games browse pagination + filters** | Page loads **48** games; `offset` exists in `browseGames` but the UI has no next page. No platform / genre filter (parity intent with the prior app) | Browse feels unfinished and hides most of the catalog. |
 | **Combined / Host weight** | Deferred; UI is Community · Hosts only | Fine for launch if you are not promising a Combined board. |
-| **Per-community award defs** | Site single-choice only | Fine; hosts pick a subset of site awards. |
+| **Per-community award defs** | Custom single-choice categories shipped; multi/ranked deferred | Hosts pick site awards and may add community categories. |
 | **Community live tie numbering** | Competition only | Fine unless a host needs dense. |
 
 ### Safety and abuse
@@ -172,7 +172,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 ## Later (real, not launch-blocking)
 
 - Degrading score curve beyond top 10 (open decision; default top 10 is locked)
-- Edition category modes: multi / ranked / custom defs (open)
+- Edition category modes: multi / ranked (open; custom single-choice shipped)
 - Approval join, bans, extra roles (open)
 - Full all-member ballot matrix virtualization (Hosts-only comparison is shipped)
 - Live-ops catalog flag for “current/active” eligibility (prior-year released titles currently count)
@@ -215,7 +215,7 @@ Skip Combined scoring, RLS, richer category modes, and the degrading curve until
 From [decisions.md](./decisions.md):
 
 - Exact degrading score curve beyond top 10  
-- Edition / community category voting beyond site single-choice  
+- Edition category modes beyond single-choice (multi / ranked)  
 - Approval membership and extra eligibility  
 - Moderation and ballot invalidation workflow  
 - Auth JWT → Postgres role for RLS  

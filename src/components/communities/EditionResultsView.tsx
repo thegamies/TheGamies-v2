@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
+import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
+import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import { EditionCategoryDebugProvider } from "@/components/communities/EditionCategoryDebug";
 import { EditionResultsBoardToolbar } from "@/components/communities/EditionResultsBoardToolbar";
 import {
@@ -52,6 +54,8 @@ type BallotPayload = {
     coverUrl: string | null;
   }>;
   categories: Array<{ id: string; label: string }>;
+  customCategoryVotes?: EditionBallotCustomCategoryVoteView[];
+  customCategories?: CustomCategoryView[];
 };
 
 export function EditionResultsViewNav({
@@ -340,6 +344,8 @@ export function EditionResultsView({
             items={publicBallot.items}
             categoryVotes={publicBallot.categoryVotes}
             categories={publicBallot.categories}
+            customCategoryVotes={publicBallot.customCategoryVotes}
+            customCategories={publicBallot.customCategories}
             emptyMessage="This voter did not submit a ballot for this edition."
           />
         </section>
@@ -359,6 +365,8 @@ export function EditionResultsView({
           items={yourBallot.items}
           categoryVotes={yourBallot.categoryVotes}
           categories={yourBallot.categories}
+          customCategoryVotes={yourBallot.customCategoryVotes}
+          customCategories={yourBallot.customCategories}
           emptyMessage="You did not submit a ballot for this edition."
         />
       ) : view === "voters" ? (

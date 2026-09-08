@@ -21,7 +21,12 @@ vi.mock("@/components/ui/GameSearchField", () => ({
 }));
 
 vi.mock("@/components/lists/CategoryVotesEditor", () => ({
-  CategoryVotesEditor: () => null,
+  SiteCategoryBallotBlock: () => null,
+}));
+
+vi.mock("@/components/communities/CustomCategoryVotesEditor", () => ({
+  CustomCategoryBallotBlock: () => null,
+  customVotesFromBallotView: () => [],
 }));
 
 afterEach(() => {

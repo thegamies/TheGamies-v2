@@ -45,6 +45,73 @@ export type CategoryVoteSelection = {
   coverUrl: string | null;
 };
 
+/** One site award as it appears on a ballot (heading + search / pick). */
+export function SiteCategoryBallotBlock({
+  category,
+  pick,
+  year,
+  onPick,
+  onClear,
+  onRemove,
+}: {
+  category: AwardCategoryOption;
+  pick?: CategoryVoteSelection | null;
+  year: number;
+  onPick: (hit: GameSearchHit) => void;
+  onClear: () => void;
+  /** Optional — personal GOTY lists can remove a category from the ballot. */
+  onRemove?: () => void;
+}) {
+  const group = parseAwardCategoryGroup(category.categoryGroup);
+  const eligibility = parseAwardCategoryEligibility(category.eligibility);
+  const hintParts = [AWARD_CATEGORY_GROUP_LABEL[group]];
+  if (eligibility !== "current_year") {
+    hintParts.push(AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility]);
+  }
+  const hint = hintParts.join(" · ");
+  const description = category.description ?? hint;
+
+  if (pick) {
+    return (
+      <CategoryPickCard
+        label={category.label}
+        description={description}
+        title={pick.title}
+        coverUrl={pick.coverUrl}
+        onClear={onClear}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <CategoryVoteHeading
+        label={category.label}
+        description={description}
+      />
+      <div className="mt-4">
+        <GameSearchField
+          year={year}
+          eligibility={eligibility}
+          allowEditions={category.allowEditions === true}
+          onSelect={onPick}
+          aria-label={`Search games for ${category.label}`}
+          placeholder={`Search games for ${category.label}`}
+        />
+      </div>
+      {onRemove ? (
+        <button
+          type="button"
+          className="mt-3 text-sm text-muted hover:text-ink"
+          onClick={onRemove}
+        >
+          Remove category
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 type Props = {
   categories: AwardCategoryOption[];
   value: CategoryVoteSelection[];
@@ -229,50 +296,18 @@ export function CategoryVotesEditor({
         <div className="mt-8 divide-y divide-line border-y border-line">
           {filteredAdded.map((cat) => {
             const selected = value.find((v) => v.categoryId === cat.id);
-            const group = parseAwardCategoryGroup(cat.categoryGroup);
-            const eligibility = parseAwardCategoryEligibility(cat.eligibility);
-            const hintParts = [AWARD_CATEGORY_GROUP_LABEL[group]];
-            if (eligibility !== "current_year") {
-              hintParts.push(AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility]);
-            }
-            const hint = hintParts.join(" · ");
             return (
               <div key={cat.id} className="py-6">
-                {selected ? (
-                  <CategoryPickCard
-                    label={cat.label}
-                    description={cat.description ?? hint}
-                    title={selected.title}
-                    coverUrl={selected.coverUrl}
-                    onClear={() => clear(cat.id)}
-                  />
-                ) : (
-                  <div>
-                    <CategoryVoteHeading
-                      label={cat.label}
-                      description={cat.description ?? hint}
-                    />
-                    <div className="mt-4">
-                      <GameSearchField
-                        year={year}
-                        eligibility={eligibility}
-                        allowEditions={cat.allowEditions === true}
-                        onSelect={(hit) => pick(cat.id, hit)}
-                        aria-label={`Search games for ${cat.label}`}
-                        placeholder={`Search games for ${cat.label}`}
-                      />
-                    </div>
-                    {fixedCatalog ? null : (
-                      <button
-                        type="button"
-                        className="mt-3 text-sm text-muted hover:text-ink"
-                        onClick={() => removeCategory(cat.id)}
-                      >
-                        Remove category
-                      </button>
-                    )}
-                  </div>
-                )}
+                <SiteCategoryBallotBlock
+                  category={cat}
+                  pick={selected}
+                  year={year}
+                  onPick={(hit) => pick(cat.id, hit)}
+                  onClear={() => clear(cat.id)}
+                  onRemove={
+                    fixedCatalog ? undefined : () => removeCategory(cat.id)
+                  }
+                />
               </div>
             );
           })}

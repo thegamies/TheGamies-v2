@@ -1,7 +1,10 @@
 import { and, asc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import {
   awardCategories,
+  communityCustomCategories,
+  communityCustomCategoryEntries,
   communityEditionBallotCategoryVotes,
+  communityEditionBallotCustomCategoryVotes,
   communityEditionBallotItems,
   communityEditionBallots,
   communityEditionCategories,
@@ -25,6 +28,7 @@ import {
   EDITION_BALLOT_MAX_ITEMS,
   filterCategoryVotesToEnabled,
   saveEditionBallotCategoryVotesSchema,
+  saveEditionBallotCustomVotesSchema,
   saveEditionBallotItemsSchema,
 } from "./ballot-schema";
 import type { CommunityRole } from "./schema";
@@ -52,12 +56,23 @@ export type EditionBallotCategoryVoteView = {
   coverUrl: string | null;
 };
 
+export type EditionBallotCustomCategoryVoteView = {
+  categoryId: string;
+  gameId: string | null;
+  entryId: string | null;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  coverUrl: string | null;
+};
+
 export type EditionBallotView = {
   ballotId: string;
   submittedAt: Date;
   updatedAt: Date;
   items: EditionBallotItemView[];
   categoryVotes: EditionBallotCategoryVoteView[];
+  customCategoryVotes: EditionBallotCustomCategoryVoteView[];
 };
 
 /** Writes only while the edition status is open. */
@@ -144,6 +159,42 @@ export async function getEditionBallotForProfile(
     .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .where(eq(communityEditionBallotCategoryVotes.ballotId, ballot.id));
 
+  const customVoteRows = await db
+    .select({
+      categoryId: communityEditionBallotCustomCategoryVotes.categoryId,
+      gameId: communityEditionBallotCustomCategoryVotes.gameId,
+      entryId: communityEditionBallotCustomCategoryVotes.entryId,
+      entryTitle: communityCustomCategoryEntries.title,
+      entryImageUrl: communityCustomCategoryEntries.imageUrl,
+      gameTitle: games.title,
+      coverImageId: covers.imageId,
+      answerType: communityCustomCategories.answerType,
+    })
+    .from(communityEditionBallotCustomCategoryVotes)
+    .innerJoin(
+      communityCustomCategories,
+      and(
+        eq(
+          communityCustomCategories.id,
+          communityEditionBallotCustomCategoryVotes.categoryId,
+        ),
+        eq(communityCustomCategories.editionId, editionId),
+      ),
+    )
+    .leftJoin(
+      communityCustomCategoryEntries,
+      eq(
+        communityCustomCategoryEntries.id,
+        communityEditionBallotCustomCategoryVotes.entryId,
+      ),
+    )
+    .leftJoin(
+      games,
+      eq(games.id, communityEditionBallotCustomCategoryVotes.gameId),
+    )
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(eq(communityEditionBallotCustomCategoryVotes.ballotId, ballot.id));
+
   return {
     ballotId: ballot.id,
     submittedAt: ballot.submittedAt,
@@ -164,6 +215,20 @@ export async function getEditionBallotForProfile(
       title: row.title,
       coverUrl: coverUrlFromImageId(row.coverImageId),
     })),
+    customCategoryVotes: customVoteRows.map((row) => {
+      const isEntry = Boolean(row.entryId);
+      return {
+        categoryId: row.categoryId,
+        gameId: row.gameId,
+        entryId: row.entryId,
+        title: isEntry
+          ? (row.entryTitle ?? "Entry")
+          : (row.gameTitle ?? "Game"),
+        subtitle: isEntry && row.gameTitle ? row.gameTitle : null,
+        imageUrl: row.entryImageUrl,
+        coverUrl: coverUrlFromImageId(row.coverImageId),
+      };
+    }),
   };
 }
 
@@ -377,6 +442,7 @@ export async function upsertEditionBallot(input: {
   profileId: string;
   items: unknown;
   categoryVotes: unknown;
+  customCategoryVotes?: unknown;
   db?: Db;
 }): Promise<EditionBallotView | { error: string }> {
   const db = input.db ?? getDb();
@@ -398,6 +464,16 @@ export async function upsertEditionBallot(input: {
     return {
       error:
         votesParsed.error.issues[0]?.message ?? "Only one game per category.",
+    };
+  }
+  const customVotesParsed = saveEditionBallotCustomVotesSchema.safeParse(
+    input.customCategoryVotes ?? [],
+  );
+  if (!customVotesParsed.success) {
+    return {
+      error:
+        customVotesParsed.error.issues[0]?.message ??
+        "Only one pick per community category.",
     };
   }
 
@@ -493,6 +569,91 @@ export async function upsertEditionBallot(input: {
     }
   }
 
+  const customCats = await db
+    .select({
+      id: communityCustomCategories.id,
+      answerType: communityCustomCategories.answerType,
+      eligibility: communityCustomCategories.eligibility,
+    })
+    .from(communityCustomCategories)
+    .where(eq(communityCustomCategories.editionId, edition.id));
+  const customCatById = new Map(customCats.map((c) => [c.id, c]));
+  const customVotes = filterCategoryVotesToEnabled(
+    customVotesParsed.data,
+    customCats.map((c) => c.id),
+  );
+
+  if (customVotes.length > 0) {
+    const entryIds = [
+      ...new Set(
+        customVotes
+          .map((v) => v.entryId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const entries =
+      entryIds.length > 0
+        ? await db
+            .select({
+              id: communityCustomCategoryEntries.id,
+              categoryId: communityCustomCategoryEntries.categoryId,
+              gameId: communityCustomCategoryEntries.gameId,
+            })
+            .from(communityCustomCategoryEntries)
+            .where(inArray(communityCustomCategoryEntries.id, entryIds))
+        : [];
+    const entryById = new Map(entries.map((e) => [e.id, e]));
+
+    const anyGameIds = [
+      ...new Set(
+        customVotes
+          .filter((v) => v.gameId)
+          .map((v) => v.gameId!)
+      ),
+    ];
+    const anyGames =
+      anyGameIds.length > 0
+        ? await db
+            .select({
+              id: games.id,
+              year: games.year,
+              firstReleaseDate: games.firstReleaseDate,
+              versionParentIgdbId: games.versionParentIgdbId,
+              isAdult: games.isAdult,
+              gameTypeIgdbId: games.gameTypeIgdbId,
+            })
+            .from(games)
+            .where(inArray(games.id, anyGameIds))
+        : [];
+    const anyGameById = new Map(anyGames.map((g) => [g.id, g]));
+
+    for (const vote of customVotes) {
+      const cat = customCatById.get(vote.categoryId);
+      if (!cat) return { error: "One or more community categories are not available." };
+      if (cat.answerType === "any_game") {
+        if (!vote.gameId || vote.entryId) {
+          return { error: "Any Game categories need a game pick." };
+        }
+        const game = anyGameById.get(vote.gameId);
+        if (!game) return { error: "One or more games could not be found." };
+        const err = categoryEligibilityError(
+          game,
+          year,
+          parseAwardCategoryEligibility(cat.eligibility),
+        );
+        if (err) return { error: err };
+      } else {
+        if (!vote.entryId || vote.gameId) {
+          return { error: "This community category needs an entry pick." };
+        }
+        const entry = entryById.get(vote.entryId);
+        if (!entry || entry.categoryId !== vote.categoryId) {
+          return { error: "One or more entries are not available." };
+        }
+      }
+    }
+  }
+
   const now = new Date();
   const existing = await db
     .select()
@@ -549,6 +710,20 @@ export async function upsertEditionBallot(input: {
         ballotId,
         categoryId: v.categoryId,
         gameId: v.gameId,
+      })),
+    );
+  }
+
+  await db
+    .delete(communityEditionBallotCustomCategoryVotes)
+    .where(eq(communityEditionBallotCustomCategoryVotes.ballotId, ballotId));
+  if (customVotes.length > 0) {
+    await db.insert(communityEditionBallotCustomCategoryVotes).values(
+      customVotes.map((v) => ({
+        ballotId,
+        categoryId: v.categoryId,
+        gameId: v.gameId ?? null,
+        entryId: v.entryId ?? null,
       })),
     );
   }

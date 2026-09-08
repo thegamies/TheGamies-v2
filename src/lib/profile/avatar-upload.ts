@@ -36,6 +36,46 @@ export function communityBannerObjectKey(communityId: string): string {
   return `communities/${communityId}/banner.jpg`;
 }
 
+export function customCategoryImageObjectKey(
+  communityId: string,
+  editionId: string,
+  categoryId: string,
+  ext: "jpg" | "webp" = "jpg",
+): string {
+  return `communities/${communityId}/editions/${editionId}/categories/${categoryId}.${ext}`;
+}
+
+export function customCategoryEntryImageObjectKey(
+  communityId: string,
+  editionId: string,
+  entryId: string,
+  ext: "jpg" | "webp" = "jpg",
+): string {
+  return `communities/${communityId}/editions/${editionId}/entries/${entryId}.${ext}`;
+}
+
+export function buildCustomCategoryImagePublicUrl(
+  publicBaseUrl: string,
+  communityId: string,
+  editionId: string,
+  categoryId: string,
+  ext: "jpg" | "webp" = "jpg",
+): string {
+  const base = publicBaseUrl.replace(/\/$/, "");
+  return `${base}/communities/${communityId}/editions/${editionId}/categories/${categoryId}.${ext}`;
+}
+
+export function buildCustomCategoryEntryImagePublicUrl(
+  publicBaseUrl: string,
+  communityId: string,
+  editionId: string,
+  entryId: string,
+  ext: "jpg" | "webp" = "jpg",
+): string {
+  const base = publicBaseUrl.replace(/\/$/, "");
+  return `${base}/communities/${communityId}/editions/${editionId}/entries/${entryId}.${ext}`;
+}
+
 export function userAvatarObjectKeys(profileId: string): string[] {
   return [
     `avatars/${profileId}/avatar.jpg`,
@@ -112,6 +152,39 @@ export function isPngBytePayload(body: ArrayBuffer): boolean {
     bytes[2] === 0x4e &&
     bytes[3] === 0x47
   );
+}
+
+/** RIFF....WEBP */
+export function isWebpBytePayload(body: ArrayBuffer): boolean {
+  const bytes = new Uint8Array(body);
+  return (
+    bytes.length >= 12 &&
+    bytes[0] === 0x52 &&
+    bytes[1] === 0x49 &&
+    bytes[2] === 0x46 &&
+    bytes[3] === 0x46 &&
+    bytes[8] === 0x57 &&
+    bytes[9] === 0x45 &&
+    bytes[10] === 0x42 &&
+    bytes[11] === 0x50
+  );
+}
+
+export type CustomCategoryImageKind = {
+  ext: "jpg" | "webp";
+  contentType: "image/jpeg" | "image/webp";
+};
+
+export function detectCustomCategoryImageKind(
+  body: ArrayBuffer,
+): CustomCategoryImageKind | null {
+  if (isJpegBytePayload(body)) {
+    return { ext: "jpg", contentType: "image/jpeg" };
+  }
+  if (isWebpBytePayload(body)) {
+    return { ext: "webp", contentType: "image/webp" };
+  }
+  return null;
 }
 
 export function validateAvatarUploadInput(input: {
@@ -303,6 +376,72 @@ export async function uploadCommunityImageObject(
 
   return {
     imageUrl: `${buildCommunityImagePublicUrl(config.publicBaseUrl, input.communityId, input.kind)}?v=${Date.now()}`,
+  };
+}
+
+export async function uploadCustomCategoryImageObject(
+  config: R2AvatarConfig,
+  input: {
+    communityId: string;
+    editionId: string;
+    categoryId: string;
+    body: ArrayBuffer;
+  },
+): Promise<{ imageUrl: string }> {
+  const kind = detectCustomCategoryImageKind(input.body);
+  if (!kind) {
+    throw new Error("Image must be a JPEG or WebP.");
+  }
+  if (input.body.byteLength > AVATAR_MAX_BYTES) {
+    throw new Error("Image must be 2MB or smaller.");
+  }
+  const objectKey = customCategoryImageObjectKey(
+    input.communityId,
+    input.editionId,
+    input.categoryId,
+    kind.ext,
+  );
+  await putR2Object(
+    config,
+    objectKey,
+    new Uint8Array(input.body),
+    kind.contentType,
+  );
+  return {
+    imageUrl: `${buildCustomCategoryImagePublicUrl(config.publicBaseUrl, input.communityId, input.editionId, input.categoryId, kind.ext)}?v=${Date.now()}`,
+  };
+}
+
+export async function uploadCustomCategoryEntryImageObject(
+  config: R2AvatarConfig,
+  input: {
+    communityId: string;
+    editionId: string;
+    entryId: string;
+    body: ArrayBuffer;
+  },
+): Promise<{ imageUrl: string }> {
+  const kind = detectCustomCategoryImageKind(input.body);
+  if (!kind) {
+    throw new Error("Image must be a JPEG or WebP.");
+  }
+  if (input.body.byteLength > AVATAR_MAX_BYTES) {
+    throw new Error("Image must be 2MB or smaller.");
+  }
+  const objectKey = customCategoryEntryImageObjectKey(
+    input.communityId,
+    input.editionId,
+    input.entryId,
+    kind.ext,
+  );
+  await putR2Object(
+    config,
+    objectKey,
+    new Uint8Array(input.body),
+    kind.contentType,
+  );
+  return {
+    imageUrl: `${buildCustomCategoryEntryImagePublicUrl(config.publicBaseUrl, input.communityId, input.editionId, input.entryId, kind.ext)}?v=${Date.now()}`,
   };
 }
 

@@ -91,6 +91,8 @@ import {
   listEditionAwardCategories,
   listEditionCategorySettings,
 } from "@/lib/communities/edition-categories";
+import { listCustomCategoriesForEdition } from "@/lib/communities/custom-categories";
+import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { getOwnedGotyItemsForYear } from "@/lib/lists/service";
 import { noIndexRobots } from "@/lib/seo/site";
@@ -244,6 +246,13 @@ export default async function CommunityEditionYearPage({
       ? await listEditionAwardCategories(edition.id).catch(() => [])
       : [];
 
+  const ballotCustomCategories =
+    edition.status === "open" ||
+    (profile && isMember && edition.status !== "scheduled") ||
+    (edition.status === "published" && voterUsername.length > 0)
+      ? await listCustomCategoriesForEdition(edition.id).catch(() => [])
+      : [];
+
   const requestedViewEarly = parseEditionResultsView(viewParam);
   const resolvedHost = resolveEditionHostSettings(
     requestedViewEarly,
@@ -380,6 +389,7 @@ export default async function CommunityEditionYearPage({
     ReturnType<typeof listEditionCategorySettings>
   > = [];
   let siteCategoryCatalog: AwardCategoryOption[] = [];
+  let customCategories: CustomCategoryView[] = [];
   let hostRevealTopTen: EditionGotyStandingRow[] = [];
   let hostRevealGotyBoard: EditionGotyStandingRow[] = [];
   let hostRevealGotyTotal = 0;
@@ -400,9 +410,10 @@ export default async function CommunityEditionYearPage({
 
   if (showEditionSettings) {
     try {
-      const [enabled, siteCats] = await Promise.all([
+      const [enabled, siteCats, customCats] = await Promise.all([
         listEditionCategorySettings(edition.id),
         listActiveAwardCategories(),
+        listCustomCategoriesForEdition(edition.id),
       ]);
       categoryOptions = enabled;
       siteCategoryCatalog = siteCats.map((c) => ({
@@ -414,9 +425,11 @@ export default async function CommunityEditionYearPage({
         eligibility: c.eligibility,
         allowEditions: c.allowEditions,
       }));
+      customCategories = customCats;
     } catch {
       categoryOptions = [];
       siteCategoryCatalog = [];
+      customCategories = [];
     }
   }
   if (showManageHosts) {
@@ -536,6 +549,7 @@ export default async function CommunityEditionYearPage({
             rankMode={edition.rankMode}
             categoryOptions={categoryOptions}
             siteCategoryCatalog={siteCategoryCatalog}
+            customCategories={customCategories}
           />
         </div>
       ) : showManageHosts ? (
@@ -600,6 +614,16 @@ export default async function CommunityEditionYearPage({
         coverUrl: string | null;
       }>;
       categories: Array<{ id: string; label: string }>;
+      customCategoryVotes?: Array<{
+        categoryId: string;
+        gameId: string | null;
+        entryId: string | null;
+        title: string;
+        subtitle: string | null;
+        imageUrl: string | null;
+        coverUrl: string | null;
+      }>;
+      customCategories?: CustomCategoryView[];
     } | null;
     standingsPage: Awaited<ReturnType<typeof getEditionGotyPage>> | null;
   } | null = null;
@@ -730,6 +754,16 @@ export default async function CommunityEditionYearPage({
               coverUrl: string | null;
             }>;
             categories: Array<{ id: string; label: string }>;
+            customCategoryVotes: Array<{
+              categoryId: string;
+              gameId: string | null;
+              entryId: string | null;
+              title: string;
+              subtitle: string | null;
+              imageUrl: string | null;
+              coverUrl: string | null;
+            }>;
+            customCategories: CustomCategoryView[];
           } | null = null;
           if (voterUsername) {
             const detail = await getEditionVoterDetailByUsername(
@@ -752,6 +786,8 @@ export default async function CommunityEditionYearPage({
                   coverUrl: p.coverUrl,
                 })),
                 categories: awardCategories,
+                customCategoryVotes: detail.customCategoryPicks,
+                customCategories: ballotCustomCategories,
               };
             }
           }
@@ -899,6 +935,8 @@ export default async function CommunityEditionYearPage({
                     items: ballot?.items ?? [],
                     categoryVotes: ballot?.categoryVotes ?? [],
                     categories: awardCategories,
+                    customCategoryVotes: ballot?.customCategoryVotes ?? [],
+                    customCategories: ballotCustomCategories,
                   }
                 : null
             }
@@ -1045,7 +1083,11 @@ export default async function CommunityEditionYearPage({
                     year={edition.year}
                     initialItems={ballot?.items ?? []}
                     initialCategoryVotes={ballot?.categoryVotes ?? []}
+                    initialCustomCategoryVotes={
+                      ballot?.customCategoryVotes ?? []
+                    }
                     awardCategories={awardCategories}
+                    customCategories={ballotCustomCategories}
                     siteGotyItems={siteGotyItems}
                   />
                 )
@@ -1057,7 +1099,9 @@ export default async function CommunityEditionYearPage({
                 <EditionBallotReadonly
                   items={ballot?.items ?? []}
                   categoryVotes={ballot?.categoryVotes ?? []}
+                  customCategoryVotes={ballot?.customCategoryVotes ?? []}
                   categories={awardCategories}
+                  customCategories={ballotCustomCategories}
                   emptyMessage="You did not submit a ballot for this event."
                 />
               )}

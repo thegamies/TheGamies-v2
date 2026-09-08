@@ -18,6 +18,10 @@ import { Button } from "@/components/ui/Button";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { saveEditionSettingsAction } from "@/app/communities/actions";
 import type { EditionAwardCategoryOption } from "@/lib/communities/edition-categories";
+import type {
+  CustomCategoryView,
+  EditionBallotCategoryRef,
+} from "@/lib/communities/custom-category-types";
 import {
   editionScheduleDateBounds,
   editionScheduleFieldNotice,
@@ -35,11 +39,37 @@ function fieldFromIso(iso: string | null): string {
   return formatEditionDateTimeInput(parsed);
 }
 
+function initialBallotOrder(
+  categoryOptions: EditionAwardCategoryOption[],
+  customCategories: CustomCategoryView[],
+): EditionBallotCategoryRef[] {
+  const items: Array<EditionBallotCategoryRef & { sortOrder: number }> = [
+    ...categoryOptions.map((c) => ({
+      kind: "site" as const,
+      id: c.id,
+      sortOrder: c.sortOrder,
+    })),
+    ...customCategories.map((c) => ({
+      kind: "custom" as const,
+      id: c.id,
+      sortOrder: c.sortOrder,
+    })),
+  ];
+  items.sort(
+    (a, b) =>
+      a.sortOrder - b.sortOrder ||
+      (a.kind === b.kind ? 0 : a.kind === "site" ? -1 : 1) ||
+      a.id.localeCompare(b.id),
+  );
+  return items.map(({ kind, id }) => ({ kind, id }));
+}
+
 function settingsDraftKey(input: {
   opens: string;
   closes: string;
   publishes: string;
   categoryIds: string[];
+  ballotOrder: EditionBallotCategoryRef[];
   rankMode: SharedRankMode;
 }): string {
   return JSON.stringify({
@@ -47,6 +77,7 @@ function settingsDraftKey(input: {
     closes: input.closes,
     publishes: input.publishes,
     categoryIds: input.categoryIds,
+    ballotOrder: input.ballotOrder,
     rankMode: input.rankMode,
   });
 }
@@ -57,13 +88,27 @@ function editionSettingsSyncKey(input: {
   publishesAt: string | null;
   rankMode: SharedRankMode;
   categoryOptions: EditionAwardCategoryOption[];
+  customCategories: CustomCategoryView[];
 }): string {
-  return settingsDraftKey({
-    opens: fieldFromIso(input.opensAt),
-    closes: fieldFromIso(input.closesAt),
-    publishes: fieldFromIso(input.publishesAt),
-    categoryIds: input.categoryOptions.map((c) => c.id),
-    rankMode: input.rankMode,
+  const ballotOrder = initialBallotOrder(
+    input.categoryOptions,
+    input.customCategories,
+  );
+  return JSON.stringify({
+    draft: settingsDraftKey({
+      opens: fieldFromIso(input.opensAt),
+      closes: fieldFromIso(input.closesAt),
+      publishes: fieldFromIso(input.publishesAt),
+      categoryIds: ballotOrder
+        .filter((r) => r.kind === "site")
+        .map((r) => r.id),
+      ballotOrder,
+      rankMode: input.rankMode,
+    }),
+    entryOrders: input.customCategories.map((c) => [
+      c.id,
+      c.entries.map((e) => e.id),
+    ]),
   });
 }
 
@@ -78,6 +123,7 @@ export function EditionYearSettings({
   rankMode,
   categoryOptions = [],
   siteCategoryCatalog = [],
+  customCategories = [],
   showHeading = true,
 }: {
   slug: string;
@@ -90,6 +136,7 @@ export function EditionYearSettings({
   categoryOptions?: EditionAwardCategoryOption[];
   /** Full active site award catalog for the Add category sheet. */
   siteCategoryCatalog?: AwardCategoryOption[];
+  customCategories?: CustomCategoryView[];
   showHeading?: boolean;
 }) {
   const syncKey = editionSettingsSyncKey({
@@ -98,6 +145,7 @@ export function EditionYearSettings({
     publishesAt,
     rankMode,
     categoryOptions,
+    customCategories,
   });
 
   return (
@@ -112,6 +160,7 @@ export function EditionYearSettings({
       rankMode={rankMode}
       categoryOptions={categoryOptions}
       siteCategoryCatalog={siteCategoryCatalog}
+      customCategories={customCategories}
       showHeading={showHeading}
     />
   );
@@ -127,6 +176,7 @@ function EditionYearSettingsForm({
   rankMode,
   categoryOptions,
   siteCategoryCatalog,
+  customCategories,
   showHeading,
 }: {
   slug: string;
@@ -138,9 +188,11 @@ function EditionYearSettingsForm({
   rankMode: SharedRankMode;
   categoryOptions: EditionAwardCategoryOption[];
   siteCategoryCatalog: AwardCategoryOption[];
+  customCategories: CustomCategoryView[];
   showHeading: boolean;
 }) {
-  const categoriesLocked = status === "closed" || status === "published";
+  const categoriesLocked =
+    status === "open" || status === "closed" || status === "published";
   const [state, formAction, pending] = useActionState(
     saveEditionSettingsAction,
     null,
@@ -149,28 +201,89 @@ function EditionYearSettingsForm({
   const [closes, setCloses] = useState(() => fieldFromIso(closesAt));
   const [publishes, setPublishes] = useState(() => fieldFromIso(publishesAt));
   const [selected, setSelected] = useState(categoryOptions);
+  const [ballotOrder, setBallotOrder] = useState(() =>
+    initialBallotOrder(categoryOptions, customCategories),
+  );
+  const [entryOrders, setEntryOrders] = useState<Record<string, string[]>>(
+    {},
+  );
   const [draftRankMode, setDraftRankMode] = useState(rankMode);
   const [clientError, setClientError] = useState<string | null>(null);
   const submittedKeyRef = useRef<string | null>(null);
+
+  const siteIdsInOrder = ballotOrder
+    .filter((r) => r.kind === "site")
+    .map((r) => r.id);
 
   const [savedKey, setSavedKey] = useState(() =>
     settingsDraftKey({
       opens: fieldFromIso(opensAt),
       closes: fieldFromIso(closesAt),
       publishes: fieldFromIso(publishesAt),
-      categoryIds: categoryOptions.map((c) => c.id),
+      categoryIds: initialBallotOrder(categoryOptions, customCategories)
+        .filter((r) => r.kind === "site")
+        .map((r) => r.id),
+      ballotOrder: initialBallotOrder(categoryOptions, customCategories),
       rankMode,
     }),
   );
+
+  function handleBallotOrderChange(refs: EditionBallotCategoryRef[]) {
+    setBallotOrder(refs);
+  }
+
+  function handleEntryOrderChange(categoryId: string, entryIds: string[]) {
+    const cat = customCategories.find((c) => c.id === categoryId);
+    const serverIds = cat?.entries.map((e) => e.id) ?? [];
+    const matchesServer =
+      entryIds.length === serverIds.length &&
+      entryIds.every((id, i) => id === serverIds[i]);
+    setEntryOrders((prev) => {
+      if (matchesServer) {
+        if (!(categoryId in prev)) return prev;
+        const next = { ...prev };
+        delete next[categoryId];
+        return next;
+      }
+      return { ...prev, [categoryId]: entryIds };
+    });
+  }
+
+  useEffect(() => {
+    setEntryOrders((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const categoryId of Object.keys(prev)) {
+        const cat = customCategories.find((c) => c.id === categoryId);
+        if (!cat) {
+          delete next[categoryId];
+          changed = true;
+          continue;
+        }
+        const serverSet = new Set(cat.entries.map((e) => e.id));
+        const ids = prev[categoryId]!;
+        if (
+          ids.length !== serverSet.size ||
+          ids.some((id) => !serverSet.has(id))
+        ) {
+          delete next[categoryId];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [customCategories]);
 
   const currentKey = settingsDraftKey({
     opens,
     closes,
     publishes,
-    categoryIds: selected.map((c) => c.id),
+    categoryIds: siteIdsInOrder,
+    ballotOrder,
     rankMode: draftRankMode,
   });
-  const dirty = currentKey !== savedKey;
+  const dirty =
+    currentKey !== savedKey || Object.keys(entryOrders).length > 0;
 
   const { dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
     message:
@@ -181,6 +294,7 @@ function EditionYearSettingsForm({
     if (!state) return;
     if ("ok" in state && state.ok && submittedKeyRef.current) {
       setSavedKey(submittedKeyRef.current);
+      setEntryOrders({});
       setClientError(null);
     }
     submittedKeyRef.current = null;
@@ -260,9 +374,19 @@ function EditionYearSettingsForm({
       >
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="year" value={year} />
-        {selected.map((c) => (
-          <input key={c.id} type="hidden" name="categoryIds" value={c.id} />
+        {siteIdsInOrder.map((id) => (
+          <input key={id} type="hidden" name="categoryIds" value={id} />
         ))}
+        <input
+          type="hidden"
+          name="ballotOrderJson"
+          value={JSON.stringify(ballotOrder)}
+        />
+        <input
+          type="hidden"
+          name="entryOrdersJson"
+          value={JSON.stringify(entryOrders)}
+        />
 
         <section className="space-y-3">
           <h4 className="font-display text-xl tracking-wide text-ink">
@@ -292,15 +416,22 @@ function EditionYearSettingsForm({
           </h4>
           <p className="text-sm text-muted">
             {categoriesLocked
-              ? "Category awards for this event are locked after voting closes."
-              : "Add site awards to this event’s ballot. Changes apply when you save."}
+              ? "Category awards for this event are locked once voting opens."
+              : "Site awards and community awards share one ballot order. Reorder and membership changes save with settings."}
           </p>
           <EditionCategoriesDraft
             catalog={siteCategoryCatalog}
             selected={selected}
+            customCategories={customCategories}
+            slug={slug}
+            year={year}
+            status={status}
             disabled={pending}
             locked={categoriesLocked}
             onChange={setSelected}
+            onBallotOrderChange={handleBallotOrderChange}
+            entryOrders={entryOrders}
+            onEntryOrderChange={handleEntryOrderChange}
           />
         </section>
 

@@ -22,6 +22,11 @@ export function capEditionBallotItems<T extends { rank: number }>(
 export function editionBallotDraftKey(input: {
   items: Array<{ gameId: string; rank: number; blurb?: string | null }>;
   categoryVotes: Array<{ categoryId: string; gameId: string }>;
+  customCategoryVotes?: Array<{
+    categoryId: string;
+    gameId?: string | null;
+    entryId?: string | null;
+  }>;
 }): string {
   return JSON.stringify({
     items: input.items.map((item) => ({
@@ -33,6 +38,13 @@ export function editionBallotDraftKey(input: {
       .map((vote) => ({
         categoryId: vote.categoryId,
         gameId: vote.gameId,
+      }))
+      .sort((a, b) => a.categoryId.localeCompare(b.categoryId)),
+    customCategoryVotes: [...(input.customCategoryVotes ?? [])]
+      .map((vote) => ({
+        categoryId: vote.categoryId,
+        gameId: vote.gameId ?? null,
+        entryId: vote.entryId ?? null,
       }))
       .sort((a, b) => a.categoryId.localeCompare(b.categoryId)),
   });
@@ -83,11 +95,46 @@ export const saveEditionBallotItemsSchema = z
 
 export const saveEditionBallotCategoryVotesSchema = replaceCategoryVotesSchema;
 
+export const saveEditionBallotCustomVoteSchema = z
+  .object({
+    categoryId: z.string().uuid(),
+    gameId: z.string().uuid().optional().nullable(),
+    entryId: z.string().uuid().optional().nullable(),
+  })
+  .superRefine((vote, ctx) => {
+    const hasGame = Boolean(vote.gameId);
+    const hasEntry = Boolean(vote.entryId);
+    if (hasGame === hasEntry) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Each community category pick needs a game or an entry.",
+      });
+    }
+  });
+
+export const saveEditionBallotCustomVotesSchema = z
+  .array(saveEditionBallotCustomVoteSchema)
+  .max(200)
+  .superRefine((votes, ctx) => {
+    const seen = new Set<string>();
+    for (const vote of votes) {
+      if (seen.has(vote.categoryId)) {
+        ctx.addIssue({
+          code: "custom",
+          message: "Only one pick per community category.",
+        });
+        return;
+      }
+      seen.add(vote.categoryId);
+    }
+  });
+
 export const saveEditionBallotInputSchema = z.object({
   slug: z.string().trim().min(1).max(64),
   year: z.coerce.number().int().min(1970).max(2100),
   items: saveEditionBallotItemsSchema,
   categoryVotes: saveEditionBallotCategoryVotesSchema,
+  customCategoryVotes: saveEditionBallotCustomVotesSchema.default([]),
 });
 
 export type SaveEditionBallotInput = z.infer<

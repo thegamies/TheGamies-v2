@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CategoryVotesEditorFixture,
+  CustomCategoryVotesEditorFixture,
   GameSearchFieldFixture,
 } from "@/app/design-system/BallotFixtures";
 import { DatePickerFixture } from "@/app/design-system/DatePickerFixture";
@@ -697,6 +698,12 @@ export default function DesignSystemPage() {
               Award picks editor
             </p>
             <CategoryVotesEditorFixture />
+          </div>
+          <div>
+            <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">
+              Community category picks
+            </p>
+            <CustomCategoryVotesEditorFixture />
           </div>
           <div>
             <p className="mb-3 text-[11px] font-extrabold tracking-[0.18em] text-muted uppercase">

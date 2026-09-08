@@ -33,7 +33,7 @@ Table `community_editions`: one row per `(communityId, year)` with `opensAt`, `c
 - before `publishesAt` → `closed` (results pending)
 - else → `published`
 
-Hosts create events from Overview (when none exist yet) or Settings → Events (**Create event** goes to `/create/event`): year, schedule, categories, and tie numbering (dense by default) in one submit. Leaving with a draft prompts to stay or leave. The open date may be in the past (voting already open). Close cannot precede open, and publish cannot precede close — including on the same day. Each schedule field is a split date + time picker with a **Set to now** shortcut. Order errors and status-change copy appear under the field that caused them; Create/Save is one click when the order is valid (status-change copy is informational, not a second confirm). New events always have a full schedule — not a draft. Hosts can **delete** an event after typing that year to confirm (ballots and results go with it). Public home and the Events tab both use **{year} Video Game Awards**. Overview lists up to **three** public events (open → coming soon → closed → results, then newest created) as `PromoBanner`s — year watermark, status, and a CTA (Cast your ballot / View event / See results). If the community is opted into an enabled Pick’em year, that banner sits above Events (promoted year first, else newest) and links into the community board. Nav: **Events** tab (year switcher inside) when any non-draft event exists — ballot and results share that surface. While voting is **open** or **closed**, Events also shows **Voters** (paginated names; picks stay hidden until publish) and the awards header shows how many ballots were submitted. Public UI says **Events** and **Live Rankings**; URLs stay `/edition` and `/live`.
+Hosts create events from Overview (when none exist yet) or Settings → Events (**Create event** goes to `/create/event`): year, schedule, categories (site awards and community awards in one ballot order), and tie numbering (dense by default) in one submit. Leaving with a draft prompts to stay or leave. The open date may be in the past (voting already open). Close cannot precede open, and publish cannot precede close — including on the same day. Each schedule field is a split date + time picker with a **Set to now** shortcut. Order errors and status-change copy appear under the field that caused them; Create/Save is one click when the order is valid (status-change copy is informational, not a second confirm). New events always have a full schedule — not a draft. Hosts can **delete** an event after typing that year to confirm (ballots and results go with it). Public home and the Events tab both use **{year} Video Game Awards**. Overview lists up to **three** public events (open → coming soon → closed → results, then newest created) as `PromoBanner`s — year watermark, status, and a CTA (Cast your ballot / View event / See results). If the community is opted into an enabled Pick’em year, that banner sits above Events (promoted year first, else newest) and links into the community board. Nav: **Events** tab (year switcher inside) when any non-draft event exists — ballot and results share that surface. While voting is **open** or **closed**, Events also shows **Voters** (paginated names; picks stay hidden until publish) and the awards header shows how many ballots were submitted. Public UI says **Events** and **Live Rankings**; URLs stay `/edition` and `/live`.
 
 ### URLs
 
@@ -55,7 +55,7 @@ Hosts create events from Overview (when none exist yet) or Settings → Events (
 - Weighted Combined (Host %)
 - Approval join, extra roles
 - Site-admin-only create gate
-- Per-community custom defs / multi / ranked edition category modes
+- Multi / ranked edition category modes (custom single-choice defs shipped)
 - Full all-member ballot matrix virtualization
 - Member activity feed (library/list ticks). **Later:** community **trending** board is independent of Live Rankings on/off — [activity-and-trending.md](./activity-and-trending.md)
 
@@ -88,7 +88,7 @@ Settings and event management live on a separate administrative surface. Communi
 ### Required states
 
 1. Coming soon (`scheduled`) — Events tab shows when voting opens. No ballot preview. Hosts still have Settings.
-2. Voting open (`open`) — members edit GOTY + site category picks
+2. Voting open (`open`) — members edit GOTY + site and community category picks; category definitions locked
 3. User actively completing ballot (`open` + editor)
 4. User submitted ballot (saved; still editable while `open`)
 5. Voting closed; results pending (`closed`) — member ballot read-only; Events heading shows the reveal datetime
@@ -102,8 +102,11 @@ Separate tables from personal lists / live contrib:
 
 - `community_edition_ballots` — one per `(editionId, profileId)`
 - `community_edition_ballot_items` — ranked GOTY (up to 10; scoring uses `pointsForRank`)
-- `community_edition_ballot_category_votes` — site `award_categories` **single-choice** only (enabled subset from `community_edition_categories`)
-- `community_edition_categories` — which site awards are on this event (+ order). Reveal / Results / Categories join freeze rows to this set so awards removed from settings no longer appear. Removing an award while voting is open also deletes that award’s ballot picks.
+- `community_edition_ballot_category_votes` — site `award_categories` **single-choice** game picks (enabled subset from `community_edition_categories`)
+- `community_edition_categories` — which site awards are on this event (+ order). Reveal / Results / Categories join freeze rows to this set so awards removed from settings no longer appear. Site enablement edits lock when voting **opens**.
+- `community_custom_categories` + `community_custom_category_entries` — per-edition community awards (answer types any_game / selected_games / text_game / text_only). Hosts manage entries before open; schema reserves nomination source fields for later.
+- `community_edition_ballot_custom_category_votes` — one pick per custom category (`gameId` or `entryId` by type)
+- `community_edition_result_custom_categories` — frozen custom category tallies (parallel to site `community_edition_result_categories`)
 
 **Eligibility:** signed-in profile that is a community member (including hosts). Non-members see a private notice and need an invite.
 
@@ -119,9 +122,9 @@ Does not write `live_*_contrib`. Does not feed live rankings.
 
 ### Hosts (shipped)
 
-**Admin** (`community_members.role = admin`) is not a Host. Hosts are a separate community roster (`community_hosts`, Promote / Retire under Settings → **Hosts**). Creating a community makes the founder an admin only.
+**Admin** (`community_members.role = admin`) is not a Host. Hosts are a separate community roster (`community_hosts`, Promote / Retire under Settings → **Hosts**), capped at **12**. Creating a community makes the founder an admin only.
 
-Open or draft GOTY events, and pick’em years that are not locked, stay in sync with current Hosts. Closed, published, or locked years keep that year’s snapshot until someone edits it by hand. Manage hosts on an event (`?view=settings&panel=hosts`, `community_edition_voices`) still adds or removes a member **for that year only** — including after close. That does not Promote or Retire them. Default list is **current community Hosts + this year’s Hosts** (SQL-capped). Search is a **server query** (name / @username, hit cap). Public UI says Host / Hosts; URLs stay `?mode=voices`. Schedule and categories live under Settings → **Edition settings**.
+Open or draft GOTY events, and pick’em years that are not locked, stay in sync with current Hosts. Closed, published, or locked years keep that year’s snapshot until someone edits it by hand. Manage hosts on an event (`?view=settings&panel=hosts`, `community_edition_voices`) still adds or removes a member **for that year only** — including after close — also capped at **12**. That does not Promote or Retire them. Default list is **current community Hosts + this year’s Hosts** (SQL-capped). Search is a **server query** (name / @username, hit cap). Public UI says Host / Hosts; URLs stay `?mode=voices`. Schedule and categories live under Settings → **Edition settings**.
 
 ### Results (shipped)
 

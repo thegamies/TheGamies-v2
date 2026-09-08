@@ -1,6 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   DndContext,
   closestCenter,
@@ -25,10 +32,15 @@ import {
 } from "@/app/communities/actions";
 import { type GameSearchHit } from "@/app/create/search-actions";
 import {
-  CategoryVotesEditor,
+  SiteCategoryBallotBlock,
   type AwardCategoryOption,
   type CategoryVoteSelection,
 } from "@/components/lists/CategoryVotesEditor";
+import {
+  CustomCategoryBallotBlock,
+  customVotesFromBallotView,
+  type CustomCategoryVoteSelection,
+} from "@/components/communities/CustomCategoryVotesEditor";
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
@@ -42,7 +54,9 @@ import {
   EDITION_BALLOT_MAX_ITEMS,
   filterCategoryVotesToEnabled,
 } from "@/lib/communities/ballot-schema";
-
+import { mergeEditionBallotCategories } from "@/lib/communities/edition-ballot-categories";
+import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
+import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
 export type EditionBallotEditorItem = {
   gameId: string;
   igdbId: number;
@@ -59,7 +73,9 @@ type Props = {
   year: number;
   initialItems: EditionBallotEditorItem[];
   initialCategoryVotes: CategoryVoteSelection[];
+  initialCustomCategoryVotes?: EditionBallotCustomCategoryVoteView[];
   awardCategories: AwardCategoryOption[];
+  customCategories?: CustomCategoryView[];
   /** Top 10 from the viewer's site GOTY list for this year, if one exists. */
   siteGotyItems?: EditionBallotEditorItem[] | null;
 };
@@ -71,12 +87,18 @@ function withRanks(items: EditionBallotEditorItem[]): EditionBallotEditorItem[] 
 function draftKey(
   items: EditionBallotEditorItem[],
   votes: CategoryVoteSelection[],
+  customVotes: CustomCategoryVoteSelection[],
 ): string {
   return editionBallotDraftKey({
     items,
     categoryVotes: votes.map((vote) => ({
       categoryId: vote.categoryId,
       gameId: vote.gameId,
+    })),
+    customCategoryVotes: customVotes.map((vote) => ({
+      categoryId: vote.categoryId,
+      gameId: vote.gameId,
+      entryId: vote.entryId,
     })),
   });
 }
@@ -86,7 +108,9 @@ export function EditionBallotEditor({
   year,
   initialItems,
   initialCategoryVotes,
+  initialCustomCategoryVotes = [],
   awardCategories,
+  customCategories = [],
   siteGotyItems = null,
 }: Props) {
   const dndId = useId();
@@ -99,6 +123,12 @@ export function EditionBallotEditor({
       awardCategories.map((category) => category.id),
     ),
   );
+  const [customCategoryVotes, setCustomCategoryVotes] = useState(() =>
+    filterCategoryVotesToEnabled(
+      customVotesFromBallotView(initialCustomCategoryVotes),
+      customCategories.map((c) => c.id),
+    ),
+  );
   const [confirmImport, setConfirmImport] = useState(false);
   const [savedKey, setSavedKey] = useState(() =>
     draftKey(
@@ -106,6 +136,10 @@ export function EditionBallotEditor({
       filterCategoryVotesToEnabled(
         initialCategoryVotes,
         awardCategories.map((category) => category.id),
+      ),
+      filterCategoryVotesToEnabled(
+        customVotesFromBallotView(initialCustomCategoryVotes),
+        customCategories.map((c) => c.id),
       ),
     ),
   );
@@ -115,7 +149,7 @@ export function EditionBallotEditor({
     null as SaveEditionBallotState,
   );
 
-  const currentKey = draftKey(items, categoryVotes);
+  const currentKey = draftKey(items, categoryVotes, customCategoryVotes);
   const dirty = currentKey !== savedKey;
   const { dialog: unsavedDialog } = useUnsavedChangesGuard(dirty, {
     message: "Leave without saving? Your latest edits won’t be kept on this ballot.",
@@ -133,9 +167,55 @@ export function EditionBallotEditor({
   const canImport = Boolean(siteGotyItems && siteGotyItems.length > 0);
   const addedIds = new Set(items.map((item) => item.gameId));
 
+  const ballotCategories = useMemo(
+    () =>
+      mergeEditionBallotCategories({
+        site: awardCategories.map((c) => ({
+          id: c.id,
+          label: c.label,
+          description: c.description,
+          sortOrder: c.sortOrder ?? 0,
+          categoryGroup: c.categoryGroup ?? "premier",
+          eligibility: c.eligibility ?? "current_year",
+          allowEditions: c.allowEditions === true,
+        })),
+        custom: customCategories,
+      }),
+    [awardCategories, customCategories],
+  );
+
   const sensors = useListCardDragSensors();
   const [dragging, setDragging] = useState(false);
   useDragBodyScrollLock(dragging);
+
+  function setSiteVote(categoryId: string, hit: GameSearchHit) {
+    setCategoryVotes((prev) => [
+      ...prev.filter((v) => v.categoryId !== categoryId),
+      {
+        categoryId,
+        gameId: hit.id,
+        title: hit.title,
+        coverUrl: hit.coverUrl,
+      },
+    ]);
+  }
+
+  function clearSiteVote(categoryId: string) {
+    setCategoryVotes((prev) => prev.filter((v) => v.categoryId !== categoryId));
+  }
+
+  function setCustomVote(next: CustomCategoryVoteSelection) {
+    setCustomCategoryVotes((prev) => [
+      ...prev.filter((v) => v.categoryId !== next.categoryId),
+      next,
+    ]);
+  }
+
+  function clearCustomVote(categoryId: string) {
+    setCustomCategoryVotes((prev) =>
+      prev.filter((v) => v.categoryId !== categoryId),
+    );
+  }
 
   function addGame(hit: GameSearchHit) {
     if (items.some((i) => i.gameId === hit.id)) return;
@@ -255,16 +335,55 @@ export function EditionBallotEditor({
         </p>
       </section>
 
-      {awardCategories.length > 0 ? (
-        <CategoryVotesEditor
-          key={year}
-          categories={awardCategories}
-          value={categoryVotes}
-          onChange={setCategoryVotes}
-          year={year}
-          catalogMode="fixed"
-          description="Choose one game per category for this event."
-        />
+      {ballotCategories.length > 0 ? (
+        <section>
+          <BallotChapterHeader
+            eyebrow="Categories"
+            title="Award picks"
+            description="Choose one pick per category for this event."
+          />
+          <ul className="mt-8 divide-y divide-line border-y border-line">
+            {ballotCategories.map((item) => {
+              if (item.kind === "site") {
+                const pick =
+                  categoryVotes.find((v) => v.categoryId === item.id) ?? null;
+                return (
+                  <li key={`site:${item.id}`} className="py-6">
+                    <SiteCategoryBallotBlock
+                      category={{
+                        id: item.id,
+                        label: item.label,
+                        description: item.description,
+                        sortOrder: item.sortOrder,
+                        categoryGroup: item.categoryGroup,
+                        eligibility: item.eligibility,
+                        allowEditions: item.allowEditions,
+                      }}
+                      pick={pick}
+                      year={year}
+                      onPick={(hit) => setSiteVote(item.id, hit)}
+                      onClear={() => clearSiteVote(item.id)}
+                    />
+                  </li>
+                );
+              }
+              const pick =
+                customCategoryVotes.find((v) => v.categoryId === item.id) ??
+                null;
+              return (
+                <li key={`custom:${item.id}`} className="py-6">
+                  <CustomCategoryBallotBlock
+                    category={item.category}
+                    pick={pick}
+                    year={year}
+                    onSelect={setCustomVote}
+                    onClear={() => clearCustomVote(item.id)}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        </section>
       ) : null}
 
       {dirty ? (
@@ -297,6 +416,20 @@ export function EditionBallotEditor({
               ).map((v) => ({
                 categoryId: v.categoryId,
                 gameId: v.gameId,
+              })),
+            )}
+          />
+          <input
+            type="hidden"
+            name="customCategoryVotesJson"
+            value={JSON.stringify(
+              filterCategoryVotesToEnabled(
+                customCategoryVotes,
+                customCategories.map((c) => c.id),
+              ).map((v) => ({
+                categoryId: v.categoryId,
+                gameId: v.gameId,
+                entryId: v.entryId,
               })),
             )}
           />

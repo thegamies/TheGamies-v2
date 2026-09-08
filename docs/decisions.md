@@ -65,7 +65,9 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-12 | Community edition schedule | **`community_editions`** with `opensAt` / `closesAt` / `publishesAt`. Status **computed** (draft → scheduled → open → closed → published). No stored status enum. |
 | 2026-08-12 | Edition ballot eligibility | **Community members** (signed-in profile + `community_members` row, including hosts). Private communities are invite-only; public communities also allow open join by slug. |
 | 2026-08-12 | Edition ballot edit window | **Editable while status is `open`** (until `closesAt`). No separate “submitted forever” freeze before close. Read-only after close/publish. |
-| 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. |
+| 2026-08-12 | Edition ballot categories (v1 slice) | **Site `award_categories` single-choice only** on the edition ballot. Per-community defs / multi / ranked modes deferred. *(Superseded 2026-09-08 for custom defs; multi/ranked still deferred.)* |
+| 2026-09-08 | Edition custom categories | Hosts may add **per-edition community categories** alongside site awards. Answer types: **any_game**, **selected_games**, **text_game**, **text_only**. Voting stays **single-choice plurality**. Entries are host-selected in v1; schema reserves `entry_source` / `nomination_id` for future nominations. Multi-select and ranked modes stay deferred. |
+| 2026-09-08 | Edition category definition lock | Site award enablement **and** custom category/entry edits lock when status is **`open` \| `closed` \| `published`**. Editable only in `draft` / `scheduled`. Moving `opensAt` back to the future unlocks via computed status. |
 | 2026-08-16 | Edition freeze compute | Freeze starts when voting **closes** (`closesAt`), via Cloudflare Worker Cron (`/api/cron/edition-freeze` + `CRON_SECRET`) and `after()` on schedule writes. Exclusive claim on `community_editions.freeze_status`. Reveal/results still gated by `publishesAt`. Edition page shows a calculating banner while pending/computing. No message queue — DB status + cron is enough. |
 | 2026-08-12 | Edition Voices | **Per-edition** host designation among community members (`community_edition_voices`). Year history retained. |
 | 2026-08-12 | Edition Combined scoring | **Deferred from public UI** until Voice weight exists. Results show **Community · Hosts** only. Combined ≡ Community under simple union is not shown as a third tab. |
@@ -95,6 +97,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-23 | TGA public name | User-facing copy is **Video Game Awards Pick’em**. Routes stay `/the-game-awards`. Refers to the external show; not affiliated branding. |
 | 2026-08-23 | TGA standings | **Competition** place (shared rank when points and World Premieres match). After lock, Standings names open that person’s sheet. |
 | 2026-08-23 | Community Hosts | **Admin ≠ Host.** Hosts live on `community_hosts` (Promote / Retire). Open/draft GOTY and unlocked pick’em years sync. Closed/locked years stay until edited by hand. Event Manage hosts stays writable after close; Hosts freeze rebuilds only (`mode = voices`). Community freeze stays write-once. |
+| 2026-09-08 | Hosts roster cap | Community Hosts, per-event Hosts, and pick’em year Hosts are each capped at **12**. |
 | 2026-08-24 | Site operators | **`profiles.is_site_admin`.** Site `/admin` is gated on a signed-in profile with this flag (not community Admin). Nav shows Admin only for operators. Non-operators get `notFound()`. First operator: signed-in profile claims with the admin code while none exist. After that, operators promote others on `/admin/operators`. Last operator cannot be removed. Account close clears the flag. `ADMIN_SYNC_SECRET` is not an app-session cookie. |
 | 2026-08-24 | Game catalog media | Sync **artworks, screenshots, game videos, and Image Types** (not deprecated Artwork Types). Game detail shows Videos (one in-page YouTube embed), **Images** (heading + secondary Image Type tabs; **Logo hidden**), then **Screenshots** as its own section. Browse stays cover-only. Capped SQL reads. |
 | 2026-08-24 | GOTY list eligibility | Personal GOTY + edition GOTY ballot: **no adult**; **exact catalog year** (unknown year ineligible); **known release date ≤ today**; no edition/version children; **no packs / DLC-addons / bundles / mods / episodes / seasons / ports / forks / updates**. **Expansions, standalone expansions, remakes, remasters, expanded games** are allowed. Search stays year + released + popularity, empty query = first 24. Award categories keep their own rules (DLC can still win Best Expansion). |
@@ -106,7 +109,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 ## Open (block dependent work until decided)
 
 - Exact degrading score curve when scoring expands beyond top 10
-- Edition / community category voting modes beyond site single-choice
+- Edition category modes beyond single-choice (multi / ranked)
 - Approval membership and extra eligibility beyond invite / public join
 - Ballot invalidation workflow (beyond kick/ban dropping unpublished ballots)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)
