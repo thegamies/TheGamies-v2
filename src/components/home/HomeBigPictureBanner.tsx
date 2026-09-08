@@ -1,5 +1,3 @@
-"use client";
-
 import Link from "next/link";
 import { GameCover } from "@/components/ui/GameCover";
 
@@ -36,19 +34,12 @@ function MarqueeRow({
             key={`${game.gameId}-${i}`}
             className="w-[4.5rem] shrink-0 sm:w-[5.25rem] md:w-24"
           >
-            <Link
-              href={`/games/${game.slug}`}
-              className="block opacity-90 transition-opacity hover:opacity-100"
-              tabIndex={i >= games.length ? -1 : undefined}
-              aria-hidden={i >= games.length ? true : undefined}
-            >
-              <GameCover
-                title={game.title}
-                imageUrl={game.coverUrl}
-                fluid
-                width={96}
-              />
-            </Link>
+            <GameCover
+              title={game.title}
+              imageUrl={game.coverUrl}
+              fluid
+              width={96}
+            />
           </li>
         ))}
       </ul>
@@ -84,12 +75,8 @@ export function HomeBigPictureBanner({
         >
           {/* Mask fades covers out; paper underneath is the true page color */}
           <div className="home-bp-wall absolute inset-x-0 top-0 flex flex-col gap-2 opacity-90 sm:gap-2.5">
-            <div className="pointer-events-auto">
-              <MarqueeRow games={top} direction="left" durationSec={80} />
-            </div>
-            <div className="pointer-events-auto">
-              <MarqueeRow games={bottom} direction="right" durationSec={95} />
-            </div>
+            <MarqueeRow games={top} direction="left" durationSec={80} />
+            <MarqueeRow games={bottom} direction="right" durationSec={95} />
           </div>
           <div className="home-bp-fade-x absolute inset-0" />
           <div className="home-bp-fade-y absolute inset-0" />
@@ -103,12 +90,14 @@ export function HomeBigPictureBanner({
         <div className="mt-4 flex flex-wrap gap-3">
           <Link
             href="/games"
+            prefetch={false}
             className="rounded-[var(--radius-control)] border border-line bg-paper/80 px-5 py-3 text-sm tracking-wide text-ink backdrop-blur-sm transition-colors hover:border-accent"
           >
             Browse games
           </Link>
           <Link
             href="/communities"
+            prefetch={false}
             className="rounded-[var(--radius-control)] border border-line bg-paper/80 px-5 py-3 text-sm tracking-wide text-ink backdrop-blur-sm transition-colors hover:border-accent"
           >
             Communities

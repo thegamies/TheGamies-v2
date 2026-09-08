@@ -53,6 +53,10 @@ A small mutation (add/remove one Host, one category) should not pay for a large 
 
 Neon HTTP is roughly **one round trip per query**. Serial `await`s stack. Don’t add extra community/edition/member fetches if you already have ids.
 
+## Link prefetch
+
+Next.js `<Link>` prefetch is **off** (`src/lib/next-link.tsx`, aliased over `next/link`). Prefetch is not a free hint: it runs the destination route on the Worker (same queries as a real visit) and ships the RSC payload. A homepage of game covers would otherwise prefetch many `/games/[slug]` pages. Opt in with `prefetch={true}` only when the destination is cheap and a click is likely. Decorative art is not a link.
+
 ## Freeze and snapshots
 
 Live lock and edition results freeze into **tables of rows**, not one giant JSON payload you parse to serve 50 standings. Page those rows in SQL. See [community.md](./features/community.md) and [engineering.md](./engineering.md).
