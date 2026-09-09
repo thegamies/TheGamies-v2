@@ -23,6 +23,7 @@ import {
   showEditionNav,
   editionUsesPublishedResultsNav,
   editionShowsVoterTurnout,
+  editionShowsHostBallotPreview,
   editionRevealsVoterBallots,
   validateEditionSchedule,
 } from "./edition-status";
@@ -103,6 +104,14 @@ describe("edition nav gates", () => {
     expect(editionRevealsVoterBallots("open")).toBe(false);
     expect(editionRevealsVoterBallots("closed")).toBe(false);
     expect(editionRevealsVoterBallots("published")).toBe(true);
+  });
+
+  it("lets hosts preview the ballot only while coming soon", () => {
+    expect(editionShowsHostBallotPreview("scheduled")).toBe(true);
+    expect(editionShowsHostBallotPreview("draft")).toBe(false);
+    expect(editionShowsHostBallotPreview("open")).toBe(false);
+    expect(editionShowsHostBallotPreview("closed")).toBe(false);
+    expect(editionShowsHostBallotPreview("published")).toBe(false);
   });
 });
 

@@ -20,6 +20,7 @@ import {
   normalizeRanks,
 } from "@/lib/lists/rules";
 import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
+import { parseCustomCategoryEligibility } from "./custom-category-types";
 import { categoryEligibilityError } from "@/lib/live-aggregate/category-eligibility";
 import type { EditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
@@ -64,12 +65,14 @@ export type EditionBallotCustomCategoryVoteView = {
   subtitle: string | null;
   imageUrl: string | null;
   coverUrl: string | null;
+  supportLinkUrl?: string | null;
 };
 
 export type EditionBallotView = {
   ballotId: string;
   submittedAt: Date;
   updatedAt: Date;
+  listCopyPromptedAt: Date | null;
   items: EditionBallotItemView[];
   categoryVotes: EditionBallotCategoryVoteView[];
   customCategoryVotes: EditionBallotCustomCategoryVoteView[];
@@ -166,6 +169,7 @@ export async function getEditionBallotForProfile(
       entryId: communityEditionBallotCustomCategoryVotes.entryId,
       entryTitle: communityCustomCategoryEntries.title,
       entryImageUrl: communityCustomCategoryEntries.imageUrl,
+      supportLinkUrl: communityCustomCategoryEntries.supportLinkUrl,
       gameTitle: games.title,
       coverImageId: covers.imageId,
       answerType: communityCustomCategories.answerType,
@@ -190,7 +194,10 @@ export async function getEditionBallotForProfile(
     )
     .leftJoin(
       games,
-      eq(games.id, communityEditionBallotCustomCategoryVotes.gameId),
+      eq(
+        games.id,
+        sql`coalesce(${communityEditionBallotCustomCategoryVotes.gameId}, ${communityCustomCategoryEntries.gameId})`,
+      ),
     )
     .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .where(eq(communityEditionBallotCustomCategoryVotes.ballotId, ballot.id));
@@ -199,6 +206,7 @@ export async function getEditionBallotForProfile(
     ballotId: ballot.id,
     submittedAt: ballot.submittedAt,
     updatedAt: ballot.updatedAt,
+    listCopyPromptedAt: ballot.listCopyPromptedAt ?? null,
     items: itemRows.map((row) => ({
       gameId: row.gameId,
       igdbId: row.igdbId,
@@ -227,6 +235,7 @@ export async function getEditionBallotForProfile(
         subtitle: isEntry && row.gameTitle ? row.gameTitle : null,
         imageUrl: row.entryImageUrl,
         coverUrl: coverUrlFromImageId(row.coverImageId),
+        supportLinkUrl: row.supportLinkUrl,
       };
     }),
   };
@@ -639,7 +648,7 @@ export async function upsertEditionBallot(input: {
         const err = categoryEligibilityError(
           game,
           year,
-          parseAwardCategoryEligibility(cat.eligibility),
+          parseCustomCategoryEligibility(cat.eligibility),
         );
         if (err) return { error: err };
       } else {

@@ -1,7 +1,7 @@
 import {
-  AWARD_CATEGORY_ELIGIBILITY_LABEL,
   AWARD_CATEGORY_GROUP_LABEL,
   AWARD_CATEGORY_GROUPS,
+  awardEligibilityCaption,
   parseAwardCategoryEligibility,
   parseAwardCategoryGroup,
   type StandingsCategoryGroupFilter,
@@ -40,9 +40,7 @@ export function filterAwardCategories<T extends FilterableAwardCategory>(
       cat.label,
       cat.description ?? "",
       AWARD_CATEGORY_GROUP_LABEL[group],
-      eligibility === "current_year"
-        ? ""
-        : AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility],
+      awardEligibilityCaption(eligibility) ?? "",
     ]
       .join(" ")
       .toLowerCase();

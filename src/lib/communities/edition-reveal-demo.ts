@@ -16,6 +16,7 @@ export type EditionRevealDemoCategory = {
   id: string;
   label: string;
   description: string | null;
+  isCommunity?: boolean;
 };
 
 /** Placeholder cover art for host results preview (neutral tile, not a real game). */
@@ -234,8 +235,9 @@ export function buildEditionRevealDemoStandings(
   const categoryPodiums: EditionCategoryStandingBlock[] = categories.map(
     (cat, catIndex) => ({
       categoryId: cat.id,
-      label: cat.label,
+      label: cat.isCommunity ? `${cat.label} · Community` : cat.label,
       description: cat.description,
+      isCommunity: cat.isCommunity,
       rows: [1, 2, 3].map((place) => {
         const n = catIndex * 3 + place;
         const game = demoGame(n);

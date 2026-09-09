@@ -29,19 +29,36 @@ describe("EditionEventTabs", () => {
     expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
   });
 
-  it("hides Ballot while scheduled and still offers Settings to hosts", () => {
+  it("shows Ballot and Settings to hosts while scheduled", () => {
     render(
       <EditionEventTabs
         slug="eric"
         year={2026}
         canManage
+        includeBallot
+        includeVoters={false}
+        active="ballot"
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Ballot" }).getAttribute("href")).toBe(
+      "/communities/eric/edition/2026",
+    );
+    expect(screen.queryByRole("link", { name: "Voters" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Settings" })).toBeTruthy();
+  });
+
+  it("hides Ballot from members while scheduled", () => {
+    render(
+      <EditionEventTabs
+        slug="eric"
+        year={2026}
+        canManage={false}
         includeBallot={false}
         includeVoters={false}
-        active="settings"
+        active="ballot"
       />,
     );
     expect(screen.queryByRole("link", { name: "Ballot" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "Voters" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Settings" })).toBeTruthy();
+    expect(screen.queryByRole("navigation")).toBeNull();
   });
 });

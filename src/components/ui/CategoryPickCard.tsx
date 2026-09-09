@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
+import { SupportWatchLink } from "@/components/media/SupportWatchLink";
 
 export function CategoryVoteHeading({
   label,
@@ -24,12 +25,14 @@ export function CategoryPickCard({
   description,
   title,
   coverUrl,
+  watchUrl,
   onClear,
 }: {
   label: string;
   description?: string | null;
   title: string;
   coverUrl: string | null;
+  watchUrl?: string | null;
   onClear?: () => void;
 }) {
   return (
@@ -40,6 +43,7 @@ export function CategoryPickCard({
       <div className="min-w-0 flex-1">
         <CategoryVoteHeading label={label} description={description} />
         <p className="mt-3 text-ink">{title}</p>
+        {watchUrl ? <SupportWatchLink url={watchUrl} /> : null}
         {onClear ? (
           <Button
             type="button"

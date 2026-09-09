@@ -80,6 +80,14 @@ import { communitySettingsHref } from "@/lib/communities/community-settings-href
 import { editionHostSettingsHref } from "@/lib/communities/edition-results-href";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveEditionBallotInputSchema } from "@/lib/communities/ballot-schema";
+import type { BallotListCopyMode, BallotListCopyPreview } from "@/lib/communities/ballot-list-copy";
+import {
+  applyEditionBallotListCopy,
+  dismissEditionBallotListCopy,
+  previewEditionBallotListCopy,
+  previewEditionBallotListExport,
+} from "@/lib/communities/copy-ballot-to-goty";
+import { parseStoredRankVisibility } from "@/lib/lists/schema";
 import {
   searchEditionHostMembers,
   setEditionVoice,
@@ -123,6 +131,7 @@ function revalidateCommunity(slug: string, username?: string) {
 export type SaveEditionBallotState = {
   error?: string;
   saved?: boolean;
+  copyPrompt?: BallotListCopyPreview | null;
 } | null;
 
 export async function saveEditionBallotAction(
@@ -175,7 +184,83 @@ export async function saveEditionBallotAction(
   const year = parsed.data.year;
   revalidateCommunity(slug, gate.profile.username);
   revalidatePath(`/communities/${slug}/edition/${year}`);
-  return { saved: true };
+  let copyPrompt = null;
+  try {
+    copyPrompt = await previewEditionBallotListCopy({
+      slug,
+      year,
+      profileId: gate.profile.id,
+    });
+  } catch {
+    copyPrompt = null;
+  }
+  return { saved: true, copyPrompt };
+}
+
+function revalidateGotyAfterBallotCopy(year: number, username?: string) {
+  revalidatePath("/create/goty");
+  revalidatePath("/game-of-the-year");
+  revalidatePath(`/game-of-the-year/${year}`);
+  revalidatePath("/");
+  if (username) revalidatePath(`/u/${username}`);
+}
+
+export async function copyEditionBallotToGotyAction(
+  slug: string,
+  year: number,
+  rankVisibility?: string,
+  mode: BallotListCopyMode = "missing",
+  manual = false,
+): Promise<{ ok: true } | { error: string }> {
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+  try {
+    const result = await applyEditionBallotListCopy({
+      slug,
+      year,
+      profileId: gate.profile.id,
+      rankVisibility: parseStoredRankVisibility(rankVisibility),
+      mode,
+      manual,
+    });
+    if ("error" in result) return result;
+    revalidateGotyAfterBallotCopy(year, gate.profile.username);
+    return result;
+  } catch {
+    return { error: "Could not add those picks to your list." };
+  }
+}
+
+export async function previewEditionBallotListExportAction(
+  slug: string,
+  year: number,
+): Promise<{ preview: BallotListCopyPreview } | { error: string }> {
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+  const result = await previewEditionBallotListExport({
+    slug,
+    year,
+    profileId: gate.profile.id,
+  });
+  if ("error" in result) return result;
+  return { preview: result };
+}
+
+export async function dismissEditionBallotListCopyAction(
+  slug: string,
+  year: number,
+): Promise<{ ok: true } | { error: string }> {
+  const gate = await requireProfile();
+  if (!gate.ok) return { error: gate.error };
+  try {
+    return await dismissEditionBallotListCopy({
+      slug,
+      year,
+      profileId: gate.profile.id,
+    });
+  } catch {
+    return { ok: true };
+  }
 }
 
 export async function createCommunityAction(
@@ -934,13 +1019,37 @@ export async function setCommunityEditionCategoriesAction(
   const result = await setCommunityEditionCategories(slug, gate.profile.id, {
     year: formData.get("year"),
     categoryIds,
+    ballotOrder: parseBallotOrderJson(formData.get("ballotOrderJson")) ?? undefined,
   });
   if ("error" in result) return { error: result.error };
 
   const year = Number(formData.get("year"));
+  const entryOrders = parseEntryOrdersJson(formData.get("entryOrdersJson"));
+  if (Number.isFinite(year) && entryOrders && entryOrders.length > 0) {
+    try {
+      for (const row of entryOrders) {
+        await reorderCustomCategoryEntries({
+          slug,
+          year: Math.floor(year),
+          profileId: gate.profile.id,
+          categoryId: row.categoryId,
+          entryIds: row.entryIds,
+        });
+      }
+    } catch (err) {
+      return {
+        error: clientSafeCustomCategoryError(
+          err,
+          "Could not reorder category entries.",
+        ),
+      };
+    }
+    revalidateCustomCategories(slug, Math.floor(year));
+  }
+
   revalidateCommunity(slug, gate.profile.username);
   if (Number.isFinite(year)) {
-    revalidatePath(`/communities/${slug}/edition/${Math.floor(year)}`);
+    revalidateEditionCategories(slug, Math.floor(year));
   }
   return { ok: true };
 }
@@ -976,6 +1085,7 @@ export async function searchEditionCategoriesAction(input: {
     q: input.q,
     excludeIds: input.excludeIds,
     limit: 20,
+    year: input.year,
   });
   return { ok: true, results };
 }

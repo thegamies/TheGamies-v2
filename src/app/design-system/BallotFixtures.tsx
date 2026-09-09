@@ -52,7 +52,7 @@ export function CategoryVotesEditorFixture() {
           description: null,
           sortOrder: 8,
           categoryGroup: "major",
-          eligibility: "current_or_active",
+          eligibility: "current_year",
         },
         {
           id: "best-rpg",

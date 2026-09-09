@@ -1,6 +1,7 @@
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { CategoryPickCard, CategoryVoteHeading } from "@/components/ui/CategoryPickCard";
 import { BallotRankGrid } from "@/components/communities/BallotRankGrid";
+import { EditionBallotListExport } from "@/components/communities/EditionBallotListExport";
 import { StandingGameCard } from "@/components/communities/StandingGameCard";
 import { mergeEditionBallotCategories } from "@/lib/communities/edition-ballot-categories";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
@@ -38,6 +39,8 @@ type Props = {
   customCategoryVotes?: EditionBallotCustomCategoryVoteView[];
   customCategories?: CustomCategoryView[];
   emptyMessage: string;
+  /** Your ballot only — never on someone else’s published ballot. */
+  exportToList?: { slug: string; year: number } | null;
 };
 
 export function EditionBallotReadonly({
@@ -47,6 +50,7 @@ export function EditionBallotReadonly({
   customCategoryVotes = [],
   customCategories = [],
   emptyMessage,
+  exportToList = null,
 }: Props) {
   if (
     items.length === 0 &&
@@ -63,6 +67,15 @@ export function EditionBallotReadonly({
     customCategoryVotes.map((v) => [v.categoryId, v]),
   );
   const ranked = [...items].sort((a, b) => a.rank - b.rank);
+  const canExport = ranked.length > 0 || categoryVotes.length > 0;
+  const exportAction =
+    exportToList && canExport ? (
+      <EditionBallotListExport
+        slug={exportToList.slug}
+        year={exportToList.year}
+        canExport
+      />
+    ) : null;
   const ballotCategories = mergeEditionBallotCategories({
     site: categories.map((c) => ({
       id: c.id,
@@ -78,22 +91,32 @@ export function EditionBallotReadonly({
 
   return (
     <div className="mt-8 space-y-10">
-      {ranked.length > 0 ? (
+      {ranked.length > 0 || exportAction ? (
         <section>
-          <BallotChapterHeader eyebrow="Top 10" title="Game of the Year" />
-          <BallotRankGrid>
-            {ranked.map((item) => (
-              <li key={item.gameId} className="min-w-0">
-                <StandingGameCard
-                  place={item.rank}
-                  slug={item.slug ?? item.gameId}
-                  title={item.title}
-                  coverUrl={item.coverUrl}
-                  priority={item.rank <= 3}
-                />
-              </li>
-            ))}
-          </BallotRankGrid>
+          <BallotChapterHeader
+            eyebrow="Top 10"
+            title="Game of the Year"
+            actions={exportAction}
+          />
+          {ranked.length > 0 ? (
+            <BallotRankGrid>
+              {ranked.map((item) => (
+                <li key={item.gameId} className="min-w-0">
+                  <StandingGameCard
+                    place={item.rank}
+                    slug={item.slug ?? item.gameId}
+                    title={item.title}
+                    coverUrl={item.coverUrl}
+                    priority={item.rank <= 3}
+                  />
+                </li>
+              ))}
+            </BallotRankGrid>
+          ) : (
+            <p className="mt-6 text-muted">
+              No Game of the Year ranking on this ballot.
+            </p>
+          )}
         </section>
       ) : (
         <p className="text-muted">No Game of the Year ranking on this ballot.</p>
@@ -136,16 +159,17 @@ export function EditionBallotReadonly({
               return (
                 <li key={`custom:${item.id}`} className="py-6">
                   {vote ? (
-                    <CategoryPickCard
-                      label={`${item.label} · Community`}
-                      description={item.description}
-                      title={
-                        vote.subtitle
-                          ? `${vote.title} — ${vote.subtitle}`
-                          : vote.title
-                      }
-                      coverUrl={cover}
-                    />
+                      <CategoryPickCard
+                        label={`${item.label} · Community`}
+                        description={item.description}
+                        title={
+                          vote.subtitle
+                            ? `${vote.title} — ${vote.subtitle}`
+                            : vote.title
+                        }
+                        coverUrl={cover}
+                        watchUrl={vote.supportLinkUrl}
+                      />
                   ) : (
                     <div>
                       <CategoryVoteHeading

@@ -603,6 +603,8 @@ export const communityEditionBallots = pgTable(
       .defaultNow()
       .notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+    /** Set after this event's GOTY-list copy prompt is accepted or dismissed. */
+    listCopyPromptedAt: timestamp("list_copy_prompted_at", { mode: "date" }),
   },
   (t) => [
     uniqueIndex("community_edition_ballots_edition_profile_uidx").on(
@@ -830,8 +832,6 @@ export type CommunityCustomAnswerType =
 
 export type CommunityCustomEligibility =
   | "current_year"
-  | "current_or_active"
-  | "active_in_year"
   | "upcoming"
   | "any_year";
 
@@ -856,7 +856,7 @@ export const communityCustomCategories = pgTable(
     answerType: text("answer_type")
       .notNull()
       .$type<CommunityCustomAnswerType>(),
-    /** Game eligibility for any_game / selected_games (same modes as site awards). */
+    /** Game eligibility for any_game / selected_games / text_game (same modes as site awards). */
     eligibility: text("eligibility")
       .notNull()
       .default("current_year")

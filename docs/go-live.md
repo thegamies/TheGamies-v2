@@ -175,7 +175,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Edition category modes: multi / ranked (open; custom single-choice shipped)
 - Approval join, bans, extra roles (open)
 - Full all-member ballot matrix virtualization (Hosts-only comparison is shipped)
-- Live-ops catalog flag for “current/active” eligibility (prior-year released titles currently count)
+- Live-ops catalog flag if Best Ongoing should exclude dead single-player titles (any already-released, list-year-or-earlier game currently counts)
 - R2 incremental cache (`NEXT_INC_CACHE_R2_BUCKET`)
 - `<Suspense>` streaming of heavy page sections
 - Expo / native

@@ -372,6 +372,20 @@
       "when": 1789689600000,
       "tag": "0052_custom_category_eligibility",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1789776000000,
+      "tag": "0053_ballot_copy_prompted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1789862400000,
+      "tag": "0054_edition_ballot_list_copy_prompt",
+      "breakpoints": true
     }
   ]
 }

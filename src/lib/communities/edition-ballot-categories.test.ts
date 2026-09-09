@@ -64,13 +64,15 @@ describe("mergeEditionBallotCategories", () => {
 describe("custom category eligibility helpers", () => {
   it("parses known modes and defaults unknown", () => {
     expect(parseCustomCategoryEligibility("upcoming")).toBe("upcoming");
+    expect(parseCustomCategoryEligibility("current_or_active")).toBe("any_year");
+    expect(parseCustomCategoryEligibility("active_in_year")).toBe("any_year");
     expect(parseCustomCategoryEligibility("nope")).toBe("current_year");
   });
 
-  it("only any_game and selected_games use eligibility UI", () => {
+  it("uses eligibility for any_game, selected_games, and text_game", () => {
     expect(customAnswerTypeUsesEligibility("any_game")).toBe(true);
     expect(customAnswerTypeUsesEligibility("selected_games")).toBe(true);
-    expect(customAnswerTypeUsesEligibility("text_game")).toBe(false);
+    expect(customAnswerTypeUsesEligibility("text_game")).toBe(true);
     expect(customAnswerTypeUsesEligibility("text_only")).toBe(false);
   });
 });

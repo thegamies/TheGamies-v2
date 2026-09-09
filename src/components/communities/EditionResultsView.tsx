@@ -347,6 +347,11 @@ export function EditionResultsView({
             customCategoryVotes={publicBallot.customCategoryVotes}
             customCategories={publicBallot.customCategories}
             emptyMessage="This voter did not submit a ballot for this edition."
+            exportToList={
+              yourProfileId && publicBallot.voter.profileId === yourProfileId
+                ? { slug, year }
+                : null
+            }
           />
         </section>
       ) : viewingMissingVoter ? (
@@ -368,6 +373,7 @@ export function EditionResultsView({
           customCategoryVotes={yourBallot.customCategoryVotes}
           customCategories={yourBallot.customCategories}
           emptyMessage="You did not submit a ballot for this edition."
+          exportToList={{ slug, year }}
         />
       ) : view === "voters" ? (
         <EditionVotersList

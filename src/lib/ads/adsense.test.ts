@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ADSENSE_BANNER_SLOT,
@@ -113,5 +115,10 @@ describe("adsTxtBody", () => {
     expect(adsTxtBody()).toBe(
       "google.com, pub-9835884276920090, DIRECT, f08c47fec0942fa0\n",
     );
+  });
+
+  it("matches public/ads.txt", () => {
+    const file = readFileSync(join(process.cwd(), "public", "ads.txt"), "utf8");
+    expect(file.replace(/\r\n/g, "\n").trim()).toBe(adsTxtBody().trim());
   });
 });

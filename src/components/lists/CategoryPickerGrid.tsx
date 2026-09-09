@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
-  AWARD_CATEGORY_ELIGIBILITY_LABEL,
   AWARD_CATEGORY_GROUP_LABEL,
   STANDINGS_CATEGORY_GROUP_LABEL,
+  awardEligibilityCaption,
   parseAwardCategoryEligibility,
   parseAwardCategoryGroup,
   type StandingsCategoryGroupFilter,
@@ -27,6 +27,7 @@ export function CategoryPickerGrid({
   categories,
   selectedIds,
   onSelect,
+  year,
   className = "mt-4",
   stickyToolbar = false,
   onCreateCommunity,
@@ -35,6 +36,8 @@ export function CategoryPickerGrid({
   /** When set, selected tiles stay in the grid and show Added. */
   selectedIds?: ReadonlySet<string>;
   onSelect: (id: string) => void;
+  /** List / event year — used for eligibility captions. */
+  year?: number;
   className?: string;
   /** Pin search/filter while the grid scrolls (contained dialog). */
   stickyToolbar?: boolean;
@@ -106,10 +109,7 @@ export function CategoryPickerGrid({
           {filtered.map((cat) => {
             const catGroup = parseAwardCategoryGroup(cat.categoryGroup);
             const eligibility = parseAwardCategoryEligibility(cat.eligibility);
-            const extra =
-              eligibility === "current_year"
-                ? null
-                : AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility];
+            const extra = awardEligibilityCaption(eligibility, year);
             const selected = selectedIds?.has(cat.id) ?? false;
             return (
               <li key={cat.id}>

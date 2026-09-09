@@ -5,6 +5,7 @@ import {
   EditionBallotEditor,
   type EditionBallotEditorItem,
 } from "@/components/communities/EditionBallotEditor";
+import { EditionBallotPreview } from "@/components/communities/EditionBallotPreview";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import { EditionEventTabs } from "@/components/communities/EditionEventTabs";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";
@@ -82,7 +83,7 @@ import {
   isEditionResultsEntranceOpen,
 } from "@/lib/communities/edition-results-entrance";
 import type { EditionResultsViewId } from "@/lib/communities/edition-results-scoring";
-import { editionRevealsVoterBallots, editionShowsVoterTurnout, editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
+import { editionRevealsVoterBallots, editionShowsHostBallotPreview, editionShowsVoterTurnout, editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
@@ -92,6 +93,7 @@ import {
   listEditionCategorySettings,
 } from "@/lib/communities/edition-categories";
 import { listCustomCategoriesForEdition } from "@/lib/communities/custom-categories";
+import { listEditionBallotCategories } from "@/lib/communities/edition-ballot-categories";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { getOwnedGotyItemsForYear } from "@/lib/lists/service";
@@ -202,6 +204,8 @@ export default async function CommunityEditionYearPage({
   const yearOptions = publicEditions.map((e) => e.year).sort((a, b) => b - a);
 
   const isMember = canSubmitEditionBallot(community.viewerRole);
+  const showHostBallotPreview =
+    canManage && editionShowsHostBallotPreview(edition.status);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}/edition/${y}`;
 
   let ballot = null;
@@ -241,6 +245,7 @@ export default async function CommunityEditionYearPage({
 
   const awardCategories =
     edition.status === "open" ||
+    showHostBallotPreview ||
     (profile && isMember && edition.status !== "scheduled") ||
     (edition.status === "published" && voterUsername.length > 0)
       ? await listEditionAwardCategories(edition.id).catch(() => [])
@@ -248,6 +253,7 @@ export default async function CommunityEditionYearPage({
 
   const ballotCustomCategories =
     edition.status === "open" ||
+    showHostBallotPreview ||
     (profile && isMember && edition.status !== "scheduled") ||
     (edition.status === "published" && voterUsername.length > 0)
       ? await listCustomCategoriesForEdition(edition.id).catch(() => [])
@@ -408,7 +414,7 @@ export default async function CommunityEditionYearPage({
   };
   let hostRevealLiveReady = false;
 
-  if (showEditionSettings) {
+  if (showEditionSettings || showHostBallotPreview) {
     try {
       const [enabled, siteCats, customCats] = await Promise.all([
         listEditionCategorySettings(edition.id),
@@ -499,12 +505,13 @@ export default async function CommunityEditionYearPage({
       }
     } else {
       try {
-        const cats = await listEditionAwardCategories(edition.id);
+        const cats = await listEditionBallotCategories(edition.id);
         const demo = buildEditionRevealDemoStandings(
           cats.map((c) => ({
             id: c.id,
             label: c.label,
             description: c.description,
+            isCommunity: c.kind === "custom",
           })),
         );
         hostRevealTopTen = demo.topTen;
@@ -762,6 +769,7 @@ export default async function CommunityEditionYearPage({
               subtitle: string | null;
               imageUrl: string | null;
               coverUrl: string | null;
+              supportLinkUrl?: string | null;
             }>;
             customCategories: CustomCategoryView[];
           } | null = null;
@@ -1002,7 +1010,9 @@ export default async function CommunityEditionYearPage({
                 year={edition.year}
                 canManage={canManage}
                 includeBallot={
-                  edition.status === "open" || edition.status === "closed"
+                  edition.status === "open" ||
+                  edition.status === "closed" ||
+                  showHostBallotPreview
                 }
                 includeVoters={showLiveVoters}
                 includeRevealShow={includeRevealShowTab}
@@ -1054,7 +1064,26 @@ export default async function CommunityEditionYearPage({
                     showBoardModes
                   />
                 </div>
-              ) : edition.status === "scheduled" ? null : edition.status === "open" ? (
+              ) : edition.status === "scheduled" ? (
+                showHostBallotPreview ? (
+                  <EditionBallotPreview
+                    slug={community.slug}
+                    year={edition.year}
+                    status={edition.status}
+                    categories={
+                      categoryOptions.length > 0
+                        ? categoryOptions
+                        : awardCategories
+                    }
+                    customCategories={
+                      customCategories.length > 0
+                        ? customCategories
+                        : ballotCustomCategories
+                    }
+                    siteCategoryCatalog={siteCategoryCatalog}
+                  />
+                ) : null
+              ) : edition.status === "open" ? (
                 !user ? (
                   <p className="mt-6 max-w-xl text-muted">
                     <Link
@@ -1103,6 +1132,10 @@ export default async function CommunityEditionYearPage({
                   categories={awardCategories}
                   customCategories={ballotCustomCategories}
                   emptyMessage="You did not submit a ballot for this event."
+                  exportToList={{
+                    slug: community.slug,
+                    year: edition.year,
+                  }}
                 />
               )}
             </>

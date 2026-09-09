@@ -55,7 +55,10 @@ import {
   customAnswerTypeUsesEligibility,
   parseCustomCategoryEligibility,
 } from "@/lib/communities/custom-category-types";
-import { AWARD_CATEGORY_ELIGIBILITY_LABEL } from "@/lib/live-aggregate/award-category-defs";
+import {
+  AWARD_CATEGORY_ELIGIBILITY_LABEL,
+  awardEligibilityDescription,
+} from "@/lib/live-aggregate/award-category-defs";
 import type { CommunityCustomAnswerType } from "@thegamies/db";
 
 export const CUSTOM_ANSWER_TYPE_LABELS: Record<
@@ -73,7 +76,8 @@ const ANSWER_TYPE_LABELS = CUSTOM_ANSWER_TYPE_LABELS;
 const ANSWER_TYPE_HINTS: Record<(typeof CUSTOM_ANSWER_TYPES)[number], string> = {
   any_game: "Members pick any eligible game. No fixed entry list.",
   selected_games: "You choose the nominee games members can pick from.",
-  text_game: "Each entry is a titled option tied to a game.",
+  text_game:
+    "Each entry is a titled option tied to a game. Associated games follow eligibility.",
   text_only: "Each entry is a titled option with no required game.",
 };
 
@@ -504,6 +508,7 @@ export function CategorySheet({
             description={description}
             answerType={answerType}
             eligibility={eligibility}
+            year={year}
             answerTypeEditable
             onNameChange={setName}
             onDescriptionChange={setDescription}
@@ -620,6 +625,7 @@ function CategoryFields({
   answerType,
   eligibility,
   answerTypeEditable,
+  year,
   onNameChange,
   onDescriptionChange,
   onAnswerTypeChange,
@@ -630,6 +636,7 @@ function CategoryFields({
   answerType: CommunityCustomAnswerType;
   eligibility: CustomCategoryEligibility;
   answerTypeEditable: boolean;
+  year: number;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onAnswerTypeChange?: (next: CommunityCustomAnswerType) => void;
@@ -716,8 +723,13 @@ function CategoryFields({
                   onChange={() => onEligibilityChange?.(mode)}
                   className="mt-1"
                 />
-                <span className="font-semibold text-ink">
-                  {AWARD_CATEGORY_ELIGIBILITY_LABEL[mode]}
+                <span>
+                  <span className="font-semibold text-ink">
+                    {AWARD_CATEGORY_ELIGIBILITY_LABEL[mode]}
+                  </span>
+                  <span className="mt-0.5 block text-muted">
+                    {awardEligibilityDescription(mode, year)}
+                  </span>
                 </span>
               </label>
             ))}
@@ -1041,6 +1053,7 @@ function EditCategorySheet({
             description={description}
             answerType={category.answerType}
             eligibility={eligibility}
+            year={year}
             answerTypeEditable={false}
             onNameChange={onNameChange}
             onDescriptionChange={onDescriptionChange}

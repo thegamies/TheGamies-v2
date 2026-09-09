@@ -61,6 +61,12 @@ Rules:
 - `.env.example` documents required variables; real secrets stay in host dashboards / GitHub Actions / local env only.
 - Deploy details: [deployment.md](./deployment.md).
 
+### Abandoned-branch migrations (personal Neon only)
+
+Drizzle applies a file only when its journal `when` is **newer than the latest row** in `drizzle.__drizzle_migrations`. If you migrated an abandoned PR onto a personal branch, those later rows make this branch’s files look already applied (success, zero SQL).
+
+On that personal branch only: delete the extra journal rows whose `created_at` is at or after the abandoned files, then migrate again. Leave unused leftover tables unless they collide with this branch’s schema. Never do this on staging or production.
+
 ## Request cost (compute · egress · scale)
 
 Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`.

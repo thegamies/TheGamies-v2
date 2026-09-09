@@ -28,7 +28,10 @@ import {
   useDragBodyScrollLock,
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
-import type { AwardCategoryOption } from "@/components/lists/CategoryVotesEditor";
+import {
+  SiteCategoryBallotBlock,
+  type AwardCategoryOption,
+} from "@/components/lists/CategoryVotesEditor";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
 import type { EditionAwardCategoryOption } from "@/lib/communities/edition-categories";
@@ -41,12 +44,28 @@ import {
   parseCustomCategoryEligibility,
 } from "@/lib/communities/custom-category-types";
 import type { EditionStatus } from "@/lib/communities/edition-status";
-import { AWARD_CATEGORY_ELIGIBILITY_LABEL } from "@/lib/live-aggregate/award-category-defs";
+import { awardEligibilityCaption, filterAwardsOfferedOnListYear } from "@/lib/live-aggregate/award-category-defs";
 import { sortedAwardCategories } from "@/lib/lists/category-filter";
 
 type OrderRow =
   | { kind: "site"; id: string; site: EditionAwardCategoryOption }
   | { kind: "custom"; id: string; custom: CustomCategoryView };
+
+function siteBlockCategory(
+  site: EditionAwardCategoryOption,
+  catalog: AwardCategoryOption[],
+): AwardCategoryOption {
+  const hit = catalog.find((c) => c.id === site.id);
+  return {
+    id: site.id,
+    label: site.label,
+    description: site.description,
+    sortOrder: site.sortOrder,
+    categoryGroup: hit?.categoryGroup,
+    eligibility: hit?.eligibility,
+    allowEditions: hit?.allowEditions,
+  };
+}
 
 function rowKey(row: OrderRow): string {
   return `${row.kind}:${row.id}`;
@@ -118,11 +137,13 @@ function propsSyncKey(
   });
 }
 
-function eligibilityHint(category: CustomCategoryView): string | null {
+function eligibilityHint(
+  category: CustomCategoryView,
+  year?: number,
+): string | null {
   if (!customAnswerTypeUsesEligibility(category.answerType)) return null;
   const eligibility = parseCustomCategoryEligibility(category.eligibility);
-  if (eligibility === "current_year") return null;
-  return AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility];
+  return awardEligibilityCaption(eligibility, year);
 }
 
 function entryCountLabel(category: CustomCategoryView): string {
@@ -147,6 +168,7 @@ export function EditionCategoriesDraft({
   entryOrders,
   onEntryOrderChange,
   onCustomCategoriesChange,
+  layout = "list",
 }: {
   catalog: AwardCategoryOption[];
   selected: EditionAwardCategoryOption[];
@@ -157,6 +179,8 @@ export function EditionCategoriesDraft({
   slug?: string;
   year?: number;
   status?: EditionStatus;
+  /** `ballot` keeps full award blocks; `list` is the compact Event Settings rows. */
+  layout?: "list" | "ballot";
   onBallotOrderChange?: (refs: EditionBallotCategoryRef[]) => void;
   entryOrders?: Readonly<Record<string, string[]>>;
   onEntryOrderChange?: (categoryId: string, entryIds: string[]) => void;
@@ -168,6 +192,12 @@ export function EditionCategoriesDraft({
     () => new Set(selected.map((c) => c.id)),
     [selected],
   );
+  const pickerCatalog = useMemo(() => {
+    if (year == null) return sorted;
+    return filterAwardsOfferedOnListYear(sorted, year, {
+      keepIds: selectedIds,
+    });
+  }, [sorted, year, selectedIds]);
 
   const syncKey = propsSyncKey(selected, customCategories);
   const [order, setOrder] = useState<OrderRow[]>(() =>
@@ -307,24 +337,49 @@ export function EditionCategoriesDraft({
         {order.length === 0 ? (
           <p className="text-sm text-muted">No categories on this ballot yet.</p>
         ) : locked ? (
-          <ul className="space-y-0 border-t border-line">
+          <ul
+            className={
+              layout === "ballot"
+                ? "divide-y divide-line border-y border-line"
+                : "space-y-0 border-t border-line"
+            }
+          >
             {order.map((row) =>
               row.kind === "site" ? (
-                <li
-                  key={rowKey(row)}
-                  className="border-b border-line py-3 text-sm text-ink"
-                >
-                  <span className="font-semibold">{row.site.label}</span>
-                  {row.site.description ? (
-                    <span className="mt-0.5 block text-muted">
-                      {row.site.description}
-                    </span>
-                  ) : null}
+                layout === "ballot" ? (
+                  <li key={rowKey(row)} className="py-6">
+                    <SiteCategoryBallotBlock
+                      category={siteBlockCategory(row.site, sorted)}
+                      year={year}
+                      interactive={false}
+                    />
+                  </li>
+                ) : (
+                  <li
+                    key={rowKey(row)}
+                    className="border-b border-line py-3 text-sm text-ink"
+                  >
+                    <span className="font-semibold">{row.site.label}</span>
+                    {row.site.description ? (
+                      <span className="mt-0.5 block text-muted">
+                        {row.site.description}
+                      </span>
+                    ) : null}
+                  </li>
+                )
+              ) : layout === "ballot" ? (
+                <li key={rowKey(row)} className="py-6">
+                  <CustomCategoryBallotBlock
+                    category={row.custom}
+                    year={year}
+                    interactive={false}
+                  />
                 </li>
               ) : (
                 <LockedCustomRow
                   key={rowKey(row)}
                   category={row.custom}
+                  year={year}
                   previewOpen={previewId === row.custom.id}
                   onTogglePreview={() =>
                     setPreviewId((cur) =>
@@ -348,13 +403,22 @@ export function EditionCategoriesDraft({
               items={sortableIds}
               strategy={verticalListSortingStrategy}
             >
-              <ul className="space-y-0 border-t border-line">
+              <ul
+                className={
+                  layout === "ballot"
+                    ? "divide-y divide-line border-y border-line"
+                    : "space-y-0 border-t border-line"
+                }
+              >
                 {order.map((row) =>
                   row.kind === "site" ? (
                     <SortableSiteRow
                       key={rowKey(row)}
                       id={rowKey(row)}
                       category={row.site}
+                      catalog={sorted}
+                      year={year}
+                      layout={layout}
                       disabled={disabled}
                       onRemove={() => removeSite(row.site.id)}
                     />
@@ -363,6 +427,8 @@ export function EditionCategoriesDraft({
                       key={rowKey(row)}
                       id={rowKey(row)}
                       category={row.custom}
+                      year={year}
+                      layout={layout}
                       disabled={disabled}
                       canManage={canManageCustom}
                       previewOpen={previewId === row.custom.id}
@@ -387,7 +453,10 @@ export function EditionCategoriesDraft({
         )}
         {order.length > 0 && !locked ? (
           <p className="mt-2 text-xs text-muted">
-            Hold the handle to reorder. Changes save with settings.
+            Hold the handle to reorder.
+            {layout === "ballot"
+              ? " Changes save with Save awards."
+              : " Changes save with settings."}
           </p>
         ) : null}
       </div>
@@ -419,8 +488,9 @@ export function EditionCategoriesDraft({
         onClose={() => setPickerOpen(false)}
       >
         <CategoryPickerGrid
-          categories={sorted}
+          categories={pickerCatalog}
           selectedIds={selectedIds}
+          year={year}
           onSelect={toggleCategory}
           stickyToolbar
           className=""
@@ -503,14 +573,16 @@ export function EditionCategoriesDraft({
 
 function LockedCustomRow({
   category,
+  year,
   previewOpen,
   onTogglePreview,
 }: {
   category: CustomCategoryView;
+  year?: number;
   previewOpen: boolean;
   onTogglePreview: () => void;
 }) {
-  const hint = eligibilityHint(category);
+  const hint = eligibilityHint(category, year);
   return (
     <li className="border-b border-line">
       <button
@@ -534,6 +606,7 @@ function LockedCustomRow({
           </p>
           <CustomCategoryBallotBlock
             category={category}
+            year={year}
             interactive={false}
           />
         </div>
@@ -545,11 +618,17 @@ function LockedCustomRow({
 function SortableSiteRow({
   id,
   category,
+  catalog,
+  year,
+  layout,
   disabled,
   onRemove,
 }: {
   id: UniqueIdentifier;
   category: EditionAwardCategoryOption;
+  catalog: AwardCategoryOption[];
+  year?: number;
+  layout: "list" | "ballot";
   disabled: boolean;
   onRemove: () => void;
 }) {
@@ -569,29 +648,50 @@ function SortableSiteRow({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`flex items-stretch border-b border-line text-sm text-ink ${cardTouchLockClassName} ${
-        isDragging ? "z-10 bg-panel opacity-90 shadow-lg" : ""
-      }`}
+      className={`flex items-stretch text-ink ${cardTouchLockClassName} ${
+        layout === "ballot" ? "" : "border-b border-line text-sm"
+      } ${isDragging ? "z-10 bg-panel opacity-90 shadow-lg" : ""}`}
     >
-      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3 py-3 pr-2">
-        <span className="min-w-0 flex-1">
-          <span className="font-semibold">{category.label}</span>
-          {category.description ? (
-            <span className="mt-0.5 block text-muted">
-              {category.description}
-            </span>
-          ) : null}
-        </span>
-        <Button
-          type="button"
-          variant="bordered"
-          size="sm"
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          Remove
-        </Button>
-      </div>
+      {layout === "ballot" ? (
+        <div className="min-w-0 flex-1 py-6 pr-2">
+          <SiteCategoryBallotBlock
+            category={siteBlockCategory(category, catalog)}
+            year={year}
+            interactive={false}
+          />
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              disabled={disabled}
+              onClick={onRemove}
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3 py-3 pr-2">
+          <span className="min-w-0 flex-1">
+            <span className="font-semibold">{category.label}</span>
+            {category.description ? (
+              <span className="mt-0.5 block text-muted">
+                {category.description}
+              </span>
+            ) : null}
+          </span>
+          <Button
+            type="button"
+            variant="bordered"
+            size="sm"
+            disabled={disabled}
+            onClick={onRemove}
+          >
+            Remove
+          </Button>
+        </div>
+      )}
       <div className="flex shrink-0 items-center border-l border-line">
         <ListDragHandle attributes={attributes} listeners={listeners} />
       </div>
@@ -602,6 +702,8 @@ function SortableSiteRow({
 function SortableCustomRow({
   id,
   category,
+  year,
+  layout,
   disabled,
   canManage,
   previewOpen,
@@ -611,6 +713,8 @@ function SortableCustomRow({
 }: {
   id: UniqueIdentifier;
   category: CustomCategoryView;
+  year?: number;
+  layout: "list" | "ballot";
   disabled: boolean;
   canManage: boolean;
   previewOpen: boolean;
@@ -626,7 +730,7 @@ function SortableCustomRow({
     transition,
     isDragging,
   } = useSortable({ id, disabled });
-  const hint = eligibilityHint(category);
+  const hint = eligibilityHint(category, year);
 
   return (
     <li
@@ -635,60 +739,93 @@ function SortableCustomRow({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`border-b border-line ${cardTouchLockClassName} ${
-        isDragging ? "z-10 bg-panel opacity-90 shadow-lg" : ""
-      }`}
+      className={`${cardTouchLockClassName} ${
+        layout === "ballot" ? "" : "border-b border-line"
+      } ${isDragging ? "z-10 bg-panel opacity-90 shadow-lg" : ""}`}
     >
       <div className="flex items-stretch">
-        <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3 py-3 pr-2">
-          <button
-            type="button"
-            className="min-w-0 flex-1 text-left"
-            aria-expanded={previewOpen}
-            onClick={onTogglePreview}
-          >
-            <p className="font-semibold text-ink">{category.name}</p>
-            <p className="mt-0.5 text-sm text-muted">
-              {CUSTOM_ANSWER_TYPE_LABELS[category.answerType]} ·{" "}
-              {entryCountLabel(category)}
-              {hint ? ` · ${hint}` : null}
-              {previewOpen ? " · Hide preview" : " · Preview"}
-            </p>
-          </button>
-          {canManage ? (
-            <div className="flex flex-wrap gap-1">
-              <Button
-                type="button"
-                variant="bordered"
-                size="sm"
-                disabled={disabled}
-                onClick={onEdit}
-              >
-                Edit
-              </Button>
-              <Button
-                type="button"
-                variant="danger-bordered"
-                size="sm"
-                disabled={disabled}
-                onClick={onDelete}
-              >
-                Delete
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        {layout === "ballot" ? (
+          <div className="min-w-0 flex-1 py-6 pr-2">
+            <CustomCategoryBallotBlock
+              category={category}
+              year={year}
+              interactive={false}
+            />
+            {canManage ? (
+              <div className="mt-4 flex flex-wrap gap-1">
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={onEdit}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger-bordered"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={onDelete}
+                >
+                  Delete
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3 py-3 pr-2">
+            <button
+              type="button"
+              className="min-w-0 flex-1 text-left"
+              aria-expanded={previewOpen}
+              onClick={onTogglePreview}
+            >
+              <p className="font-semibold text-ink">{category.name}</p>
+              <p className="mt-0.5 text-sm text-muted">
+                {CUSTOM_ANSWER_TYPE_LABELS[category.answerType]} ·{" "}
+                {entryCountLabel(category)}
+                {hint ? ` · ${hint}` : null}
+                {previewOpen ? " · Hide preview" : " · Preview"}
+              </p>
+            </button>
+            {canManage ? (
+              <div className="flex flex-wrap gap-1">
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={onEdit}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger-bordered"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={onDelete}
+                >
+                  Delete
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
         <div className="flex shrink-0 items-center border-l border-line">
           <ListDragHandle attributes={attributes} listeners={listeners} />
         </div>
       </div>
-      {previewOpen ? (
+      {layout === "list" && previewOpen ? (
         <div className="border-t border-line bg-panel/30 px-3 py-4">
           <p className="mb-3 text-xs uppercase tracking-wide text-muted">
             Ballot preview
           </p>
           <CustomCategoryBallotBlock
             category={category}
+            year={year}
             interactive={false}
           />
         </div>
@@ -696,3 +833,4 @@ function SortableCustomRow({
     </li>
   );
 }
+

@@ -13,6 +13,10 @@ import {
   ensureAwardCategories,
   listActiveAwardCategories,
 } from "@/lib/live-aggregate/categories";
+import {
+  awardOfferedOnListYear,
+  filterAwardsOfferedOnListYear,
+} from "@/lib/live-aggregate/award-category-defs";
 import { computeEditionStatus, type EditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
 import { canManageCommunity } from "./rules";
@@ -52,10 +56,20 @@ export async function seedEditionCategories(
   await ensureAwardCategories(db);
   const active = await listActiveAwardCategories(db);
   if (active.length === 0) return;
+  const [edition] = await db
+    .select({ year: communityEditions.year })
+    .from(communityEditions)
+    .where(eq(communityEditions.id, editionId))
+    .limit(1);
+  const offered =
+    edition != null
+      ? filterAwardsOfferedOnListYear(active, edition.year)
+      : active;
+  if (offered.length === 0) return;
   await db
     .insert(communityEditionCategories)
     .values(
-      active.map((c) => ({
+      offered.map((c) => ({
         editionId,
         categoryId: c.id,
         sortOrder: c.sortOrder,
@@ -218,6 +232,7 @@ export async function searchSiteAwardCategories(
     q: string;
     excludeIds?: string[];
     limit?: number;
+    year?: number;
   },
   db?: Db,
 ): Promise<
@@ -270,7 +285,9 @@ export async function searchSiteAwardCategories(
     }
   }
 
-  return rows;
+  return opts.year == null
+    ? rows
+    : filterAwardsOfferedOnListYear(rows, opts.year);
 }
 
 async function requireEditableEdition(
@@ -330,6 +347,18 @@ export async function addEditionCategory(
     .limit(1);
   if (!siteCat) return { error: "That category was not found." };
 
+  if (!awardOfferedOnListYear(categoryId, gate.year)) {
+    const previousIds = await listEditionEnabledCategoryIds(
+      gate.edition.id,
+      db,
+    );
+    if (!previousIds.includes(categoryId)) {
+      return {
+        error:
+          "This award is only available on current and previous year events.",
+      };
+    }
+  }
   await db
     .insert(communityEditionCategories)
     .values({
@@ -399,12 +428,17 @@ export async function setCommunityEditionCategories(
     active = await listActiveAwardCategories(db);
   }
   const activeIds = new Set(active.map((c) => c.id));
+  const previousIds = await listEditionEnabledCategoryIds(gate.edition.id, db);
+  const previousSet = new Set(previousIds);
+  const allowSite = (id: string) =>
+    activeIds.has(id) &&
+    (awardOfferedOnListYear(id, gate.year) || previousSet.has(id));
 
   const uniqueFromForm = [
     ...new Set(
       input.categoryIds
         .map((id) => id.trim())
-        .filter((id) => id.length > 0 && activeIds.has(id)),
+        .filter((id) => id.length > 0 && allowSite(id)),
     ),
   ];
 
@@ -414,11 +448,10 @@ export async function setCommunityEditionCategories(
     const fromOrder = input.ballotOrder
       .filter((r) => r.kind === "site")
       .map((r) => r.id)
-      .filter((id) => activeIds.has(id));
+      .filter((id) => allowSite(id));
     siteIdsInOrder = [...new Set(fromOrder)];
   }
 
-  const previousIds = await listEditionEnabledCategoryIds(gate.edition.id, db);
   const nextIds = new Set(siteIdsInOrder);
   const removedIds = previousIds.filter((id) => !nextIds.has(id));
 
@@ -436,7 +469,7 @@ export async function setCommunityEditionCategories(
     for (let i = 0; i < input.ballotOrder.length; i++) {
       const item = input.ballotOrder[i]!;
       if (item.kind === "site") {
-        if (!activeIds.has(item.id)) continue;
+        if (!allowSite(item.id)) continue;
         await db.insert(communityEditionCategories).values({
           editionId: gate.edition.id,
           categoryId: item.id,

@@ -131,12 +131,23 @@ describe("GOTY category vote eligibility", () => {
     ).toBeNull();
   });
 
-  it("allows earlier released titles for current-or-active", () => {
+  it("allows earlier released titles for any-year, not later years", () => {
     expect(
-      categoryEligibilityError({ ...base, year: 2024 }, year, "current_or_active", {
+      categoryEligibilityError({ ...base, year: 2024 }, year, "any_year", {
         now,
       }),
     ).toBeNull();
+    expect(
+      categoryEligibilityError(
+        { ...base, year: 2027, firstReleaseDate: new Date("2026-03-01") },
+        year,
+        "any_year",
+        { now },
+      ),
+    ).toMatch(/2026 or earlier/);
+    expect(browseInputForCategoryEligibility(year, "any_year", false)).toEqual(
+      expect.objectContaining({ yearAtMost: 2026, releaseStatus: "released" }),
+    );
   });
 
   it("allows remake editions when the category permits them", () => {

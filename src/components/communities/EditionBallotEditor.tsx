@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useTransition,
 } from "react";
 import {
   DndContext,
@@ -27,6 +28,8 @@ import {
   useListCardDragSensors,
 } from "@/components/lists/cardChrome";
 import {
+  copyEditionBallotToGotyAction,
+  dismissEditionBallotListCopyAction,
   saveEditionBallotAction,
   type SaveEditionBallotState,
 } from "@/app/communities/actions";
@@ -47,6 +50,8 @@ import { GameCover } from "@/components/ui/GameCover";
 import { GameSearchField } from "@/components/ui/GameSearchField";
 import { PinnedSaveBar } from "@/components/ui/PinnedSaveBar";
 import { BallotRankGrid } from "@/components/communities/BallotRankGrid";
+import { EditionBallotListCopyDialog } from "@/components/communities/EditionBallotListCopyDialog";
+import { EditionBallotListExport } from "@/components/communities/EditionBallotListExport";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
 import {
   capEditionBallotItems,
@@ -57,6 +62,8 @@ import {
 import { mergeEditionBallotCategories } from "@/lib/communities/edition-ballot-categories";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
+import type { BallotListCopyMode, BallotListCopyPreview } from "@/lib/communities/ballot-list-copy";
+import type { ListRankVisibility } from "@/lib/activity/kinds";
 export type EditionBallotEditorItem = {
   gameId: string;
   igdbId: number;
@@ -148,6 +155,11 @@ export function EditionBallotEditor({
     saveEditionBallotAction,
     null as SaveEditionBallotState,
   );
+  const [copyPrompt, setCopyPrompt] = useState<BallotListCopyPreview | null>(
+    null,
+  );
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const [copyPending, startCopy] = useTransition();
 
   const currentKey = draftKey(items, categoryVotes, customCategoryVotes);
   const dirty = currentKey !== savedKey;
@@ -161,10 +173,15 @@ export function EditionBallotEditor({
       setSavedKey(submittedKeyRef.current);
     }
     submittedKeyRef.current = null;
+    if (state.copyPrompt) {
+      setCopyPrompt(state.copyPrompt);
+      setCopyError(null);
+    }
   }, [state]);
 
   const isFull = items.length >= EDITION_BALLOT_MAX_ITEMS;
   const canImport = Boolean(siteGotyItems && siteGotyItems.length > 0);
+  const canExport = items.length > 0 || categoryVotes.length > 0;
   const addedIds = new Set(items.map((item) => item.gameId));
 
   const ballotCategories = useMemo(
@@ -248,6 +265,35 @@ export function EditionBallotEditor({
     setConfirmImport(false);
   }
 
+  function dismissCopyPrompt() {
+    setCopyPrompt(null);
+    setCopyError(null);
+    startCopy(async () => {
+      await dismissEditionBallotListCopyAction(slug, year);
+    });
+  }
+
+  function confirmCopyPrompt(opts: {
+    rankVisibility?: ListRankVisibility;
+    mode: BallotListCopyMode;
+  }) {
+    startCopy(async () => {
+      const result = await copyEditionBallotToGotyAction(
+        slug,
+        year,
+        opts.rankVisibility,
+        opts.mode,
+        false,
+      );
+      if ("error" in result) {
+        setCopyError(result.error);
+        return;
+      }
+      setCopyPrompt(null);
+      setCopyError(null);
+    });
+  }
+
   function onImportClick() {
     if (!canImport) return;
     if (items.length > 0) {
@@ -277,16 +323,25 @@ export function EditionBallotEditor({
           title="Game of the Year"
           description={`Rank up to ${EDITION_BALLOT_MAX_ITEMS} games from ${year}. Hold to reorder.`}
           actions={
-            canImport ? (
-              <Button
-                type="button"
-                variant="bordered"
-                size="sm"
-                onClick={onImportClick}
-              >
-                Import your Game of the Year list
-              </Button>
-            ) : null
+            <div className="flex flex-wrap justify-end gap-2">
+              {canImport ? (
+                <Button
+                  type="button"
+                  variant="bordered"
+                  size="sm"
+                  onClick={onImportClick}
+                >
+                  Import your Game of the Year list
+                </Button>
+              ) : null}
+              <EditionBallotListExport
+                slug={slug}
+                year={year}
+                canExport={canExport}
+                disabled={dirty}
+                disabledTitle="Save the ballot to export it."
+              />
+            </div>
           }
         />
         <div className="mt-6">
@@ -456,6 +511,17 @@ export function EditionBallotEditor({
           confirmLabel="Import anyway"
           onCancel={() => setConfirmImport(false)}
           onConfirm={applyImport}
+        />
+      ) : null}
+
+      {copyPrompt ? (
+        <EditionBallotListCopyDialog
+          preview={copyPrompt}
+          pending={copyPending}
+          error={copyError}
+          source="prompt"
+          onDismiss={dismissCopyPrompt}
+          onConfirm={confirmCopyPrompt}
         />
       ) : null}
 

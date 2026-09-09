@@ -4,11 +4,16 @@ import type { AwardCategoryEligibility } from "./award-category-defs";
 
 export type CategoryGameCandidate = GotyGameCandidate;
 
+function releaseYear(game: CategoryGameCandidate): number | null {
+  if (game.year != null) return game.year;
+  if (game.firstReleaseDate) return game.firstReleaseDate.getUTCFullYear();
+  return null;
+}
+
 /**
  * Category pick eligibility for a list/ballot year.
- * Current/active and active-in-year treat prior-year *released* titles as
- * eligible (no live-ops flag in the catalog yet). Upcoming is later years
- * only — not the list year, even if still unreleased.
+ * Any-year means already released and not later than the list year.
+ * Upcoming is later years only — not the list year, even if still unreleased.
  */
 export function categoryEligibilityError(
   game: CategoryGameCandidate,
@@ -44,15 +49,8 @@ export function categoryEligibilityError(
     return "Only titles from later years belong in this category.";
   }
 
-  if (eligibility === "any_year") {
-    if (game.firstReleaseDate && game.firstReleaseDate > now) {
-      return "Upcoming titles cannot be added to this category.";
-    }
-    return null;
-  }
-
-  // current_or_active + active_in_year: this year, or an earlier released game.
-  if (game.year != null && game.year > year) {
+  const catalogYear = releaseYear(game);
+  if (catalogYear != null && catalogYear > year) {
     return `Only ${year} or earlier releases belong in this category.`;
   }
   if (game.firstReleaseDate && game.firstReleaseDate > now) {
@@ -87,9 +85,6 @@ export function browseInputForCategoryEligibility(
       releaseStatus: "upcoming",
       excludeEditions,
     };
-  }
-  if (eligibility === "any_year") {
-    return { releaseStatus: "released", excludeEditions };
   }
   return {
     yearAtMost: year,

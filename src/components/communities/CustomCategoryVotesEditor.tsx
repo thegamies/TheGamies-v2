@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
 import { GameSearchField } from "@/components/ui/GameSearchField";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
-import { parseCustomCategoryEligibility } from "@/lib/communities/custom-category-types";
-import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
 import {
-  isSupportVideoParseOk,
-  parseSupportVideoLink,
-} from "@/lib/media/support-video-link";
+  customAnswerTypeUsesEligibility,
+  parseCustomCategoryEligibility,
+} from "@/lib/communities/custom-category-types";
+import { awardEligibilityCaption } from "@/lib/live-aggregate/award-category-defs";
+import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
+import { SupportWatchLink } from "@/components/media/SupportWatchLink";
 
 /** Same density as TGA nominee / standings cover grids. */
 export const customCategoryEntryGridClass =
@@ -93,6 +94,12 @@ export function CustomCategoryBallotBlock({
   /** When false, entries are display-only (settings preview). */
   interactive?: boolean;
 }) {
+  const eligibility = parseCustomCategoryEligibility(category.eligibility);
+  const eligibilityCaption =
+    customAnswerTypeUsesEligibility(category.answerType)
+      ? awardEligibilityCaption(eligibility, year)
+      : null;
+
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -104,6 +111,9 @@ export function CustomCategoryBallotBlock({
         </span>
       </div>
       <p className="mt-2 max-w-2xl text-sm text-muted">{category.description}</p>
+      {eligibilityCaption ? (
+        <p className="mt-1 text-sm text-muted">{eligibilityCaption}</p>
+      ) : null}
 
       {category.answerType === "any_game" ? (
         interactive && pick?.gameId ? (
@@ -230,22 +240,6 @@ export function CustomCategoryBallotBlock({
         </Button>
       ) : null}
     </div>
-  );
-}
-
-function SupportWatchLink({ url }: { url: string }) {
-  const parsed = parseSupportVideoLink(url);
-  if (!isSupportVideoParseOk(parsed)) return null;
-  return (
-    <a
-      href={parsed.canonicalUrl}
-      target="_blank"
-      rel="noreferrer"
-      className="mt-2 inline-block text-sm text-ink underline-offset-4 hover:underline"
-      onClick={(e) => e.stopPropagation()}
-    >
-      Watch
-    </a>
   );
 }
 
