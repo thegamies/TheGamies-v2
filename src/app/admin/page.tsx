@@ -52,9 +52,9 @@ const ADMIN_LINKS = [
   },
   {
     href: "/admin/communities",
-    title: "Community seed",
+    title: "Communities",
     description:
-      "Seed community members, Hosts, and edition ballots for ceremony QA.",
+      "Feature public communities, close joins, and seed members and ballots.",
   },
   {
     href: "/admin/the-game-awards/seed",

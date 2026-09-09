@@ -12,6 +12,7 @@ import {
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { canManageCommunity } from "@/lib/communities/rules";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
 import { noIndexRobots } from "@/lib/seo/site";
@@ -66,7 +67,13 @@ export default async function CommunityTrendingPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
     return <CommunityPrivateView name={community.name} />;
   }
 
@@ -107,7 +114,10 @@ export default async function CommunityTrendingPage({
             : null
         }
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={
+          Boolean(community.viewerRole) &&
+          (await communityTgaNavVisible(community.id).catch(() => false))
+        }
         active="trending"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

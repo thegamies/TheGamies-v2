@@ -17,10 +17,14 @@ import {
   setCommunityRoleBlockedReason,
 } from "./rules";
 import {
+  canBrowseCommunityBoards,
   canBrowseCommunityHome,
+  communityLeaveRejoinCopy,
   communitySlugSchema,
   communitySlugWithSuffix,
   createCommunitySchema,
+  FEATURED_COMMUNITIES_LIMIT,
+  featuredCommunitySaveBlockedReason,
   isCommunityPublic,
   normalizeCommunitySlug,
   parseCreateCommunityInput,
@@ -114,6 +118,54 @@ describe("community visibility helpers", () => {
     expect(canBrowseCommunityHome("private", null)).toBe(false);
     expect(canBrowseCommunityHome("public", null)).toBe(true);
   });
+
+  it("lets guests browse boards only when public and joins are closed", () => {
+    expect(canBrowseCommunityBoards("public", true, null)).toBe(true);
+    expect(canBrowseCommunityBoards("public", false, null)).toBe(false);
+    expect(canBrowseCommunityBoards("private", true, null)).toBe(false);
+    expect(canBrowseCommunityBoards("private", true, "member")).toBe(true);
+  });
+
+  it("blocks featuring private communities and a 13th slot", () => {
+    expect(
+      featuredCommunitySaveBlockedReason({
+        featured: true,
+        visibility: "private",
+        alreadyFeatured: false,
+        featuredCount: 0,
+      }),
+    ).toMatch(/public/i);
+    expect(
+      featuredCommunitySaveBlockedReason({
+        featured: true,
+        visibility: "public",
+        alreadyFeatured: false,
+        featuredCount: FEATURED_COMMUNITIES_LIMIT,
+      }),
+    ).toMatch(/12/i);
+    expect(
+      featuredCommunitySaveBlockedReason({
+        featured: true,
+        visibility: "public",
+        alreadyFeatured: true,
+        featuredCount: FEATURED_COMMUNITIES_LIMIT,
+      }),
+    ).toBeNull();
+    expect(
+      featuredCommunitySaveBlockedReason({
+        featured: false,
+        visibility: "private",
+        alreadyFeatured: false,
+        featuredCount: FEATURED_COMMUNITIES_LIMIT,
+      }),
+    ).toBeNull();
+  });
+
+  it("warns leavers they cannot rejoin when joins are closed", () => {
+    expect(communityLeaveRejoinCopy(true, true)).toMatch(/not be able to rejoin/i);
+    expect(communityLeaveRejoinCopy(true, false)).toMatch(/join again from this page/i);
+    expect(communityLeaveRejoinCopy(false, false)).toMatch(/invite/i);
+  });
 });
 
 describe("leaveBlockedReason", () => {
@@ -146,6 +198,11 @@ describe("canSeeCommunityInvite", () => {
     expect(canSeeCommunityInvite("member", true)).toBe(true);
     expect(canSeeCommunityInvite("member", false)).toBe(false);
     expect(canSeeCommunityInvite(null, true)).toBe(false);
+  });
+
+  it("hides invites when joins are closed", () => {
+    expect(canSeeCommunityInvite("admin", true, true)).toBe(false);
+    expect(canSeeCommunityInvite("member", true, true)).toBe(false);
   });
 });
 

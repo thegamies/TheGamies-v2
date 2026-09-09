@@ -341,8 +341,13 @@ export const communities = pgTable(
     avatarUrl: text("avatar_url"),
     bannerUrl: text("banner_url"),
     socialLinks: jsonb("social_links").$type<Record<string, string>>(),
-    /** `private` (invite) or `public` (discoverable + open join). */
+    /** `private` (invite) or `public` (listed on profiles; join unless joinsClosed). */
     visibility: text("visibility").notNull().default("private"),
+    /** Site operators. Public featured communities appear on `/communities`. */
+    featured: boolean("featured").notNull().default(false),
+    featuredAt: timestamp("featured_at", { mode: "date" }),
+    /** When true, public join and invite join both fail. Existing members stay. */
+    joinsClosed: boolean("joins_closed").notNull().default(false),
     createdByProfileId: uuid("created_by_profile_id").references(
       () => profiles.id,
       { onDelete: "set null" },
@@ -365,6 +370,9 @@ export const communities = pgTable(
   },
   (t) => [
     index("communities_visibility_name_idx").on(t.visibility, t.name),
+    index("communities_featured_at_idx")
+      .on(t.featuredAt, t.name)
+      .where(sql`${t.featured} = true`),
   ],
 );
 

@@ -85,6 +85,10 @@ import {
 import type { EditionResultsViewId } from "@/lib/communities/edition-results-scoring";
 import { editionRevealsVoterBallots, editionShowsHostBallotPreview, editionShowsVoterTurnout, editionUsesPublishedResultsNav, showEditionNav } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
+import {
+  canBrowseCommunityBoards,
+  COMMUNITY_JOINS_CLOSED_MESSAGE,
+} from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { listEditionHostRoster } from "@/lib/communities/voices";
@@ -178,7 +182,13 @@ export default async function CommunityEditionYearPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
     return <CommunityPrivateView name={community.name} />;
   }
 
@@ -872,7 +882,10 @@ export default async function CommunityEditionYearPage({
         editionStatus={navStatus}
         editionYear={featured?.year ?? edition.year}
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={
+          Boolean(community.viewerRole) &&
+          (await communityTgaNavVisible(community.id).catch(() => false))
+        }
         active="edition"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
@@ -1084,7 +1097,11 @@ export default async function CommunityEditionYearPage({
                   />
                 ) : null
               ) : edition.status === "open" ? (
-                !user ? (
+                community.joinsClosed && !isMember ? (
+                  <p className="mt-6 max-w-xl text-muted">
+                    {COMMUNITY_JOINS_CLOSED_MESSAGE}
+                  </p>
+                ) : !user ? (
                   <p className="mt-6 max-w-xl text-muted">
                     <Link
                       href={signInHref}

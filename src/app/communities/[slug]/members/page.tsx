@@ -10,6 +10,7 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { canManageCommunity } from "@/lib/communities/rules";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
@@ -79,7 +80,13 @@ export default async function CommunityMembersPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
     return <CommunityPrivateView name={community.name} />;
   }
 
@@ -129,7 +136,10 @@ export default async function CommunityMembersPage({
         editionStatus={publicEdition?.status ?? null}
         editionYear={publicEdition?.year ?? null}
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={
+          Boolean(community.viewerRole) &&
+          (await communityTgaNavVisible(community.id).catch(() => false))
+        }
         active="members"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}
