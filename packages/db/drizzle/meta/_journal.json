@@ -393,6 +393,13 @@
       "when": 1789948800000,
       "tag": "0055_trending_kind_weights",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790035200000,
+      "tag": "0056_community_featured_joins_closed",
+      "breakpoints": true
     }
   ]
 }

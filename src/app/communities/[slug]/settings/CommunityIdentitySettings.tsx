@@ -31,6 +31,7 @@ export function CommunityIdentitySettings({
   name,
   description,
   visibility,
+  joinsClosed = false,
   socialLinks,
   avatarUrl: initialAvatarUrl,
   bannerUrl: initialBannerUrl,
@@ -39,6 +40,7 @@ export function CommunityIdentitySettings({
   name: string;
   description: string;
   visibility: CommunityVisibility;
+  joinsClosed?: boolean;
   socialLinks: unknown;
   avatarUrl: string | null;
   bannerUrl: string | null;
@@ -176,7 +178,11 @@ export function CommunityIdentitySettings({
             name="visibility"
             value="private"
             defaultChecked={visibility === "private"}
-            hint="Invite only. Not listed on member profiles."
+            hint={
+              joinsClosed
+                ? "This community isn’t taking new members."
+                : "Invite only. Not listed on member profiles."
+            }
           >
             Private
           </RadioOption>
@@ -184,7 +190,11 @@ export function CommunityIdentitySettings({
             name="visibility"
             value="public"
             defaultChecked={visibility === "public"}
-            hint="Anyone can join, and the community appears on member profiles."
+            hint={
+              joinsClosed
+                ? "Listed on member profiles. This community isn’t taking new members."
+                : "Anyone can join, and the community appears on member profiles."
+            }
           >
             Public
           </RadioOption>

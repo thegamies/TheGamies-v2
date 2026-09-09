@@ -4,16 +4,19 @@ import { useActionState, useState } from "react";
 import { leaveCommunityAction } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { communityLeaveRejoinCopy } from "@/lib/communities/schema";
 import { LAST_ADMIN_LEAVE_NOTE } from "@/lib/communities/rules";
 
 export function CommunityLeaveForm({
   slug,
   canLeave,
   isPublic = false,
+  joinsClosed = false,
 }: {
   slug: string;
   canLeave: boolean;
   isPublic?: boolean;
+  joinsClosed?: boolean;
 }) {
   const [state, formAction, pending] = useActionState(
     leaveCommunityAction,
@@ -44,9 +47,7 @@ export function CommunityLeaveForm({
             className="w-full max-w-md"
           >
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              {isPublic
-                ? "You will leave this community. You can join again from this page anytime."
-                : "You will leave this community. You can join again later with an invite."}
+              {communityLeaveRejoinCopy(isPublic, joinsClosed)}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <form action={formAction}>

@@ -103,11 +103,14 @@ export function canManageCommunity(role: CommunityRole | null): boolean {
 /**
  * Admins always see Copy invite in the community header.
  * Other members see it only when open invites is on.
+ * Hidden when joins are closed — the link would not work.
  */
 export function canSeeCommunityInvite(
   role: CommunityRole | null,
   openInvites: boolean,
+  joinsClosed = false,
 ): boolean {
+  if (joinsClosed) return false;
   if (role === "admin") return true;
   return role != null && openInvites;
 }

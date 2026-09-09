@@ -25,6 +25,12 @@ export function isCommunityPublic(visibility: string): boolean {
   return visibility === "public";
 }
 
+/** Cap for `/communities` featured cards. SQL LIMIT, not a client filter. */
+export const FEATURED_COMMUNITIES_LIMIT = 12;
+
+export const COMMUNITY_JOINS_CLOSED_MESSAGE =
+  "This community isn’t taking new members.";
+
 /** Members always; non-members only when the community is public. */
 export function canBrowseCommunityHome(
   visibility: string,
@@ -32,6 +38,51 @@ export function canBrowseCommunityHome(
 ): boolean {
   if (viewerRole) return true;
   return isCommunityPublic(visibility);
+}
+
+/**
+ * Members always. Guests may open boards only when the community is public
+ * and joins are closed (showcase / demo). Regular public communities still
+ * keep interiors members-only.
+ */
+export function canBrowseCommunityBoards(
+  visibility: string,
+  joinsClosed: boolean,
+  viewerRole: CommunityRole | null,
+): boolean {
+  if (viewerRole) return true;
+  return isCommunityPublic(visibility) && joinsClosed;
+}
+
+export function featuredCommunitySaveBlockedReason(input: {
+  featured: boolean;
+  visibility: CommunityVisibility;
+  alreadyFeatured: boolean;
+  featuredCount: number;
+}): string | null {
+  if (!input.featured) return null;
+  if (input.visibility !== "public") {
+    return "Only public communities can be featured.";
+  }
+  if (
+    !input.alreadyFeatured &&
+    input.featuredCount >= FEATURED_COMMUNITIES_LIMIT
+  ) {
+    return `Already featuring ${FEATURED_COMMUNITIES_LIMIT} communities.`;
+  }
+  return null;
+}
+
+export function communityLeaveRejoinCopy(
+  isPublic: boolean,
+  joinsClosed: boolean,
+): string {
+  if (joinsClosed) {
+    return "You will leave this community. You will not be able to rejoin.";
+  }
+  return isPublic
+    ? "You will leave this community. You can join again from this page anytime."
+    : "You will leave this community. You can join again later with an invite.";
 }
 
 export function normalizeCommunitySlug(raw: string): string {

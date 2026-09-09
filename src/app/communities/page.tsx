@@ -8,7 +8,7 @@ import { CommunityListCard } from "@/components/communities/CommunityListCard";
 import { Button } from "@/components/ui/Button";
 import { ProfilePager } from "@/components/profile/ProfilePager";
 import { parseProfilePage } from "@/lib/profile/profile-page";
-import { listMembershipCommunitiesPage } from "@/lib/communities/service";
+import { listMembershipCommunitiesPage, listFeaturedCommunities } from "@/lib/communities/service";
 import { communitiesIndexHref } from "@/lib/communities/invite-code";
 
 export const metadata: Metadata = {
@@ -40,6 +40,7 @@ export default async function CommunitiesPage({
         () => null,
       )
     : null;
+  const featured = await listFeaturedCommunities().catch(() => []);
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
@@ -69,9 +70,30 @@ export default async function CommunitiesPage({
         )}
       </div>
       <p className="mt-3 max-w-2xl text-muted">
-        Private crews for Game of the Year lists and awards. Join with an
-        invite.
+        Crews for Game of the Year lists and awards. Join with an invite, or
+        browse a featured community.
       </p>
+
+      {featured.length > 0 ? (
+        <>
+          <h2 className="mt-12 font-display text-3xl tracking-wide text-ink">
+            Featured
+          </h2>
+          <ul className="mt-6 grid gap-x-6 gap-y-5 border-y border-line py-4 sm:grid-cols-2">
+            {featured.map((community) => (
+              <CommunityListCard
+                key={community.id}
+                slug={community.slug}
+                name={community.name}
+                description={community.description}
+                avatarUrl={community.avatarUrl}
+                bannerUrl={community.bannerUrl}
+                memberCount={community.memberCount}
+              />
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       <h2 className="mt-12 font-display text-3xl tracking-wide text-ink">
         My Communities
