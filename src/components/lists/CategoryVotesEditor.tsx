@@ -17,6 +17,7 @@ import {
 } from "@/components/lists/CategoryPickerGrid";
 import {
   AWARD_CATEGORY_GROUP_LABEL,
+  awardAllowsDlcAddon,
   awardEligibilityCaption,
   filterAwardsOfferedOnListYear,
   parseAwardCategoryEligibility,
@@ -99,6 +100,7 @@ export function SiteCategoryBallotBlock({
             year={year}
             eligibility={eligibility}
             allowEditions={category.allowEditions === true}
+            allowDlcAddon={awardAllowsDlcAddon(category.id)}
             onSelect={onPick}
             aria-label={`Search games for ${category.label}`}
             placeholder={`Search games for ${category.label}`}

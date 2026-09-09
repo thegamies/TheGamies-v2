@@ -63,7 +63,7 @@ Create UI mirrors the Social Gamer Card prototype:
 ## Rules
 
 - Up to **100** ranked games; ranks are contiguous 1..n.
-- GOTY ranking: exact catalog year, known release date already out, not adult, not an edition/version child, not pack/DLC-addon/bundle-style IGDB types. Expansions, remakes, remasters, and expanded games are allowed. Award category picks use category eligibility (DLC can sit on Best Expansion / DLC).
+- GOTY ranking: exact catalog year, known release date already out, not adult, not an edition/version child, not pack/DLC-addon/bundle-style IGDB types. Expansions, remakes, remasters, and expanded games are allowed. Award category picks use the same type filter; **Best Expansion / DLC** also allows DLC add-ons.
 - One **owned** GOTY list per profile per year (year picker stays put and shows top 5 + Edit list when that year already exists; claim/save fail clearly otherwise).
 - Default aggregate scoring uses **top 10 only** (`pointsForRank`); owned GOTY lists feed the site live board via `live_goty_contrib` (see [live-aggregate.md](./live-aggregate.md)). **Later:** `rank_visibility` does **not** stop contrib — hidden and games-only lists still score.
 - Cookie drafts store **IGDB ids**; Postgres keeps uuid game PKs.

@@ -13,6 +13,7 @@ export async function searchGamesForList(
   if (input.gotyMode) params.set("gotyMode", "1");
   if (input.eligibility) params.set("eligibility", input.eligibility);
   if (input.allowEditions) params.set("allowEditions", "1");
+  if (input.allowDlcAddon) params.set("allowDlcAddon", "1");
 
   const res = await fetch(`/api/games/search?${params.toString()}`);
   if (!res.ok) return [];

@@ -108,7 +108,7 @@ describe("GOTY category vote eligibility", () => {
     isAdult: false,
   };
 
-  it("reuses year and release rules for current-year categories, not GOTY type bans", () => {
+  it("reuses year and release rules for current-year categories, and bans DLC add-ons unless allowed", () => {
     expect(gotyEligibilityError(base, year, now)).toBeNull();
     expect(
       categoryEligibilityError(base, year, "current_year", { now }),
@@ -124,6 +124,30 @@ describe("GOTY category vote eligibility", () => {
     expect(
       categoryEligibilityError(
         { ...base, gameTypeIgdbId: 1 },
+        year,
+        "current_year",
+        { now },
+      ),
+    ).toMatch(/add-ons/);
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 1 },
+        year,
+        "current_year",
+        { now, allowDlcAddon: true },
+      ),
+    ).toBeNull();
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 13 },
+        year,
+        "current_year",
+        { now, allowDlcAddon: true },
+      ),
+    ).toMatch(/Packs/);
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 2 },
         year,
         "current_year",
         { now },
@@ -146,7 +170,12 @@ describe("GOTY category vote eligibility", () => {
       ),
     ).toMatch(/2026 or earlier/);
     expect(browseInputForCategoryEligibility(year, "any_year", false)).toEqual(
-      expect.objectContaining({ yearAtMost: 2026, releaseStatus: "released" }),
+      expect.objectContaining({
+        yearAtMost: 2026,
+        releaseStatus: "released",
+        gotyEligibleTypes: true,
+        includeDlcAddonType: false,
+      }),
     );
   });
 
@@ -185,7 +214,20 @@ describe("GOTY category vote eligibility", () => {
       ),
     ).toBeNull();
     expect(browseInputForCategoryEligibility(year, "upcoming", false)).toEqual(
-      expect.objectContaining({ yearKnownAtLeast: 2027 }),
+      expect.objectContaining({
+        yearKnownAtLeast: 2027,
+        gotyEligibleTypes: true,
+        includeDlcAddonType: false,
+      }),
+    );
+    expect(
+      browseInputForCategoryEligibility(year, "current_year", true, true),
+    ).toEqual(
+      expect.objectContaining({
+        gotyEligibleTypes: true,
+        includeDlcAddonType: true,
+        excludeEditions: false,
+      }),
     );
   });
 });

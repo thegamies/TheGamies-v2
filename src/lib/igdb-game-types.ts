@@ -18,10 +18,11 @@ export const IGDB_GAME_TYPE = {
 } as const;
 
 /**
- * GOTY ranking (personal list + edition GOTY ballot): full games and
- * expansions. Packs, DLC/addons, bundles, mods, episodes, seasons, ports,
- * forks, and updates stay off the ranking (award categories can still use them).
- * Null catalog type is allowed so unsynced main-game rows are not blocked.
+ * GOTY ranking (personal list + edition GOTY ballot) and default award
+ * category search/save: full games and expansions. Packs, DLC/addons,
+ * bundles, mods, episodes, seasons, ports, forks, and updates stay off.
+ * Best Expansion / DLC also allows DLC add-ons. Null catalog type is
+ * allowed so unsynced main-game rows are not blocked.
  */
 export const GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS: readonly number[] = [
   IGDB_GAME_TYPE.mainGame,
@@ -37,4 +38,24 @@ export function isGotyEligibleGameType(
 ): boolean {
   if (gameTypeIgdbId == null) return true;
   return GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS.includes(gameTypeIgdbId);
+}
+
+/** Award-category search/save: same as GOTY, plus DLC add-ons on Best Expansion / DLC. */
+export function isCategoryEligibleGameType(
+  gameTypeIgdbId: number | null | undefined,
+  opts?: { allowDlcAddon?: boolean },
+): boolean {
+  if (opts?.allowDlcAddon && gameTypeIgdbId === IGDB_GAME_TYPE.dlcAddon) {
+    return true;
+  }
+  return isGotyEligibleGameType(gameTypeIgdbId);
+}
+
+export function categoryEligibleGameTypeIgdbIds(opts?: {
+  allowDlcAddon?: boolean;
+}): number[] {
+  if (opts?.allowDlcAddon) {
+    return [...GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS, IGDB_GAME_TYPE.dlcAddon];
+  }
+  return [...GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS];
 }

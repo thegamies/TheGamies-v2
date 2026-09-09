@@ -21,12 +21,13 @@ Tables `community_edition_ballots` + `community_edition_ballot_items` — **not*
 - **Edit:** allowed while edition status is `open` (until `closesAt`); read-only after close/publish
 - **Host preview:** while `scheduled`, community admins (event Hosts) can open **Ballot** to inspect GOTY layout and **add, edit, and reorder** awards (same category tools as Event Settings). Site award order saves from that preview. Members still only see the coming-soon deck.
 - GOTY eligibility matches personal GOTY helpers (`gotyEligibilityError`): year, released date, no editions, no adult, no pack/DLC-addon types; expansions allowed
+- Site award and community Any Game search/save use the same type list. **Best Expansion / DLC** also allows DLC add-ons (not packs or bundles).
 
 ## Categories
 
 - Live alongside the main GOTY ballot; remain conceptually separate from the Top 10
 - **Edition ballots — one Categories list:** site awards and community (custom) awards share a single **Categories / Award picks** chapter, ordered by the event’s interleaved `sortOrder` (hosts reorder site + custom together in Event Settings). Community awards still show a **Community** tag on each block.
-- **Site awards:** hosts enable a **subset** (and order) of site `award_categories` in Event Settings. Single-choice game picks. Every enabled award is always on the ballot (no Add category). Submit keeps GOTY ranks and drops picks outside that subset. Search respects each award’s eligibility.
+- **Site awards:** hosts enable a **subset** (and order) of site `award_categories` in Event Settings. Single-choice game picks. Every enabled award is always on the ballot (no Add category). Submit keeps GOTY ranks and drops picks outside that subset. Search respects each award’s eligibility and GOTY game types (DLC add-ons only on Best Expansion / DLC).
 - **Community categories:** hosts may add custom awards per event (name, short description, answer type). Answer types:
   - **Any Game** — free game search filtered by the category’s eligibility (same modes as site awards: current year, any year released, upcoming). Any year released means already out, that event year or earlier.
   - **Selected Games** — pick from host-defined entries (each tied to one game; game unique in the category). Entry games follow the category’s eligibility when hosts add them.

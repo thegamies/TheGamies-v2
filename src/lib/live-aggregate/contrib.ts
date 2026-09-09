@@ -19,6 +19,7 @@ import {
   type Db,
 } from "@thegamies/db";
 import {
+  awardAllowsDlcAddon,
   awardOfferedOnListYear,
   parseAwardCategoryEligibility,
 } from "./award-category-defs";
@@ -156,6 +157,7 @@ export async function syncOwnedGotyContribFromList(
       firstReleaseDate: games.firstReleaseDate,
       versionParentIgdbId: games.versionParentIgdbId,
       isAdult: games.isAdult,
+      gameTypeIgdbId: games.gameTypeIgdbId,
     })
     .from(listCategoryVotes)
     .innerJoin(games, eq(games.id, listCategoryVotes.gameId))
@@ -190,10 +192,14 @@ export async function syncOwnedGotyContribFromList(
           firstReleaseDate: v.firstReleaseDate,
           versionParentIgdbId: v.versionParentIgdbId,
           isAdult: v.isAdult,
+          gameTypeIgdbId: v.gameTypeIgdbId,
         },
         list.year!,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions },
+        {
+          allowEditions: cat.allowEditions,
+          allowDlcAddon: awardAllowsDlcAddon(cat.id),
+        },
       ) == null
     );
   });
@@ -348,6 +354,7 @@ export async function replaceCategoryVotesForList(
         firstReleaseDate: games.firstReleaseDate,
         versionParentIgdbId: games.versionParentIgdbId,
         isAdult: games.isAdult,
+        gameTypeIgdbId: games.gameTypeIgdbId,
       })
       .from(games)
       .where(inArray(games.id, gameIds));
@@ -369,7 +376,7 @@ export async function replaceCategoryVotesForList(
         game,
         year,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions },
+        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat.id) },
       );
       if (err) return { error: err };
     }

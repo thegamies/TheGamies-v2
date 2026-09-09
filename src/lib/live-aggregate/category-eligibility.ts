@@ -1,5 +1,6 @@
 import type { GotyGameCandidate } from "@/lib/lists/rules";
 import { gotyYearAndReleaseError } from "@/lib/lists/rules";
+import { isCategoryEligibleGameType } from "@/lib/igdb-game-types";
 import type { AwardCategoryEligibility } from "./award-category-defs";
 
 export type CategoryGameCandidate = GotyGameCandidate;
@@ -19,7 +20,11 @@ export function categoryEligibilityError(
   game: CategoryGameCandidate,
   year: number,
   eligibility: AwardCategoryEligibility,
-  opts: { allowEditions?: boolean; now?: Date } = {},
+  opts: {
+    allowEditions?: boolean;
+    allowDlcAddon?: boolean;
+    now?: Date;
+  } = {},
 ): string | null {
   const now = opts.now ?? new Date();
   const allowEditions = opts.allowEditions === true;
@@ -29,6 +34,13 @@ export function categoryEligibilityError(
   }
   if (!allowEditions && game.versionParentIgdbId != null) {
     return "Edition or version titles cannot be added to this category.";
+  }
+  if (
+    !isCategoryEligibleGameType(game.gameTypeIgdbId, {
+      allowDlcAddon: opts.allowDlcAddon === true,
+    })
+  ) {
+    return "Packs, add-ons, and bundles cannot be added to this category.";
   }
 
   if (eligibility === "current_year") {
@@ -63,6 +75,7 @@ export function browseInputForCategoryEligibility(
   year: number,
   eligibility: AwardCategoryEligibility,
   allowEditions: boolean,
+  allowDlcAddon = false,
 ): {
   year?: number;
   yearAtMost?: number;
@@ -70,13 +83,18 @@ export function browseInputForCategoryEligibility(
   yearKnownAtLeast?: number;
   releaseStatus: "released" | "upcoming" | "all";
   excludeEditions: boolean;
+  gotyEligibleTypes: true;
+  includeDlcAddonType: boolean;
 } {
   const excludeEditions = !allowEditions;
+  const includeDlcAddonType = allowDlcAddon === true;
   if (eligibility === "current_year") {
     return {
       year,
       releaseStatus: "released",
       excludeEditions,
+      gotyEligibleTypes: true,
+      includeDlcAddonType,
     };
   }
   if (eligibility === "upcoming") {
@@ -84,11 +102,15 @@ export function browseInputForCategoryEligibility(
       yearKnownAtLeast: year + 1,
       releaseStatus: "upcoming",
       excludeEditions,
+      gotyEligibleTypes: true,
+      includeDlcAddonType,
     };
   }
   return {
     yearAtMost: year,
     releaseStatus: "released",
     excludeEditions,
+    gotyEligibleTypes: true,
+    includeDlcAddonType,
   };
 }

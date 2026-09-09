@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AWARD_CATEGORY_DEFS,
+  awardAllowsDlcAddon,
   awardEligibilityCaption,
   awardEligibilityDescription,
   awardOfferedOnListYear,
@@ -30,6 +31,9 @@ describe("AWARD_CATEGORY_DEFS", () => {
     expect(AWARD_CATEGORY_DEFS.map((d) => d.id)).not.toContain(
       "best-game-design",
     );
+    expect(awardAllowsDlcAddon("best-expansion-dlc")).toBe(true);
+    expect(awardAllowsDlcAddon("best-gameplay")).toBe(false);
+    expect(awardAllowsDlcAddon("best-remake-remaster")).toBe(false);
   });
 
   it("uses three eligibility modes and maps legacy site values", () => {

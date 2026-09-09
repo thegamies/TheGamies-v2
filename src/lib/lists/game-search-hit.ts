@@ -13,4 +13,5 @@ export type SearchGamesForListInput = {
   gotyMode?: boolean;
   eligibility?: string;
   allowEditions?: boolean;
+  allowDlcAddon?: boolean;
 };

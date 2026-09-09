@@ -94,6 +94,13 @@ export const CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS = [
   "most-anticipated-game",
 ] as const;
 
+/** DLC add-ons are eligible here; packs, bundles, and other SKU types still are not. */
+export const DLC_ADDON_AWARD_ID = "best-expansion-dlc";
+
+export function awardAllowsDlcAddon(categoryId: string): boolean {
+  return categoryId === DLC_ADDON_AWARD_ID;
+}
+
 export function awardOfferedOnListYear(
   categoryId: string,
   listYear: number,

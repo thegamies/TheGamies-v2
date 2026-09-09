@@ -19,7 +19,7 @@ import {
   gotyEligibilityError,
   normalizeRanks,
 } from "@/lib/lists/rules";
-import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
+import { awardAllowsDlcAddon, parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
 import { parseCustomCategoryEligibility } from "./custom-category-types";
 import { categoryEligibilityError } from "@/lib/live-aggregate/category-eligibility";
 import type { EditionStatus } from "./edition-status";
@@ -556,6 +556,7 @@ export async function upsertEditionBallot(input: {
         firstReleaseDate: games.firstReleaseDate,
         versionParentIgdbId: games.versionParentIgdbId,
         isAdult: games.isAdult,
+        gameTypeIgdbId: games.gameTypeIgdbId,
       })
       .from(games)
       .where(inArray(games.id, gameIds));
@@ -572,7 +573,7 @@ export async function upsertEditionBallot(input: {
         game,
         year,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions },
+        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat.id) },
       );
       if (err) return { error: err };
     }
