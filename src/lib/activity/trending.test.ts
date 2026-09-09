@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   isPublicTrendingReady,
+  kindWeightForTrending,
+  countingKindsFromWeights,
   parsePublicTrendingMinPeople,
+  parseTrendingKindWeights,
   parseTrendingRecencyWeight,
   parseTrendingRecencyWeights,
   parseTrendingWindowHours,
   recencyWeightForAgeMs,
   scoreTrending,
   DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+  DEFAULT_TRENDING_KIND_WEIGHTS,
   DEFAULT_TRENDING_RECENCY_WEIGHTS,
   DEFAULT_TRENDING_WINDOW_HOURS,
+  TRENDING_PLAYING_KIND_WEIGHT,
 } from "./trending";
+import { TRENDING_KINDS } from "./kinds";
 
 const hour = 60 * 60 * 1000;
 const now = new Date("2026-09-07T18:00:00.000Z");
@@ -26,7 +32,7 @@ describe("scoreTrending", () => {
       ]),
     ).toEqual([
       { gameId: "g1", people: 2, score: 2 },
-      { gameId: "g2", people: 1, score: 1 },
+      { gameId: "g2", people: 1, score: TRENDING_PLAYING_KIND_WEIGHT },
     ]);
   });
 
@@ -85,8 +91,76 @@ describe("scoreTrending", () => {
         { now },
       ),
     ).toEqual([
-      { gameId: "hot", people: 2, score: 2 },
+      { gameId: "hot", people: 2, score: 1 + TRENDING_PLAYING_KIND_WEIGHT },
       { gameId: "old", people: 4, score: 1 },
+    ]);
+  });
+
+  it("ranks Playing above the same recency from other counting kinds", () => {
+    expect(
+      scoreTrending(
+        [
+          {
+            profileId: "a",
+            gameId: "playing",
+            kind: "library_playing",
+            createdAt: new Date(now.getTime() - 2 * hour),
+          },
+          {
+            profileId: "b",
+            gameId: "backlog",
+            kind: "library_backlog",
+            createdAt: new Date(now.getTime() - 2 * hour),
+          },
+        ],
+        { now },
+      ).map((row) => row.gameId),
+    ).toEqual(["playing", "backlog"]);
+  });
+
+  it("lets recency beat an older Playing event", () => {
+    expect(
+      scoreTrending(
+        [
+          {
+            profileId: "a",
+            gameId: "fresh",
+            kind: "library_wishlist",
+            createdAt: new Date(now.getTime() - 2 * hour),
+          },
+          {
+            profileId: "b",
+            gameId: "playing",
+            kind: "library_playing",
+            createdAt: new Date(now.getTime() - 5 * 24 * hour),
+          },
+        ],
+        { now },
+      ).map((row) => row.gameId),
+    ).toEqual(["fresh", "playing"]);
+  });
+
+  it("prefers Playing when two counting events share a timestamp", () => {
+    expect(
+      scoreTrending(
+        [
+          {
+            profileId: "a",
+            gameId: "g1",
+            kind: "list_add",
+            createdAt: now,
+          },
+          {
+            profileId: "a",
+            gameId: "g1",
+            kind: "library_playing",
+            createdAt: now,
+          },
+        ],
+        { now },
+      ),
+    ).toEqual([
+      { gameId: "g1", people: 1, score: TRENDING_PLAYING_KIND_WEIGHT },
     ]);
   });
 
@@ -109,7 +183,49 @@ describe("scoreTrending", () => {
         ],
         { now },
       ),
-    ).toEqual([{ gameId: "g1", people: 1, score: 1 }]);
+    ).toEqual([
+      { gameId: "g1", people: 1, score: TRENDING_PLAYING_KIND_WEIGHT },
+    ]);
+  });
+});
+
+describe("kindWeightForTrending", () => {
+  it("boosts Playing, leaves other counting kinds at 1, and zeros the rest", () => {
+    expect(kindWeightForTrending("library_playing")).toBe(
+      TRENDING_PLAYING_KIND_WEIGHT,
+    );
+    expect(kindWeightForTrending("library_wishlist")).toBe(1);
+    expect(kindWeightForTrending("library_backlog")).toBe(1);
+    expect(kindWeightForTrending("library_beat")).toBe(1);
+    expect(kindWeightForTrending("list_add")).toBe(1);
+    expect(kindWeightForTrending("library_paused")).toBe(0);
+    expect(kindWeightForTrending("library_dropped")).toBe(0);
+    expect(kindWeightForTrending("unknown")).toBe(0);
+    expect(countingKindsFromWeights()).toEqual([...TRENDING_KINDS]);
+  });
+
+  it("lets a custom weight count dropped and omit wishlist", () => {
+    const kindWeights = parseTrendingKindWeights({
+      library_dropped: 0.5,
+      library_wishlist: 0,
+    });
+    expect(
+      scoreTrending(
+        [
+          {
+            profileId: "a",
+            gameId: "g1",
+            kind: "library_dropped",
+          },
+          {
+            profileId: "b",
+            gameId: "g2",
+            kind: "library_wishlist",
+          },
+        ],
+        { kindWeights },
+      ),
+    ).toEqual([{ gameId: "g1", people: 1, score: 0.5 }]);
   });
 });
 
@@ -134,6 +250,10 @@ describe("parseTrendingRecencyWeights", () => {
     expect(parseTrendingRecencyWeights({ hours24: 2 })).toEqual({
       ...DEFAULT_TRENDING_RECENCY_WEIGHTS,
       hours24: 2,
+    });
+    expect(parseTrendingKindWeights({ library_playing: 2 })).toEqual({
+      ...DEFAULT_TRENDING_KIND_WEIGHTS,
+      library_playing: 2,
     });
   });
 });

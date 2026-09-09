@@ -144,3 +144,16 @@ export const LIST_RANK_VISIBILITY_LABELS: Record<ListRankVisibility, string> = {
   games_only: "Games only",
   hidden: "Hidden",
 };
+
+export const ACTIVITY_KIND_LABELS: Record<ActivityKind, string> = {
+  library_wishlist: "Wishlist",
+  library_backlog: "Backlog",
+  library_playing: "Playing",
+  library_paused: "Paused",
+  library_beat: "Beat",
+  library_dropped: "Dropped",
+  library_cleared: "Removed from library",
+  list_add: "Added to Game of the Year",
+  list_remove: "Removed from Game of the Year",
+  list_reveal: "Ranked a Game of the Year list",
+};

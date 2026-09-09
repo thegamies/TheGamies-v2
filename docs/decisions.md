@@ -17,6 +17,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-09 | Visual direction | Editorial Standings + editorial minimalism + soft brutalism |
 | 2026-08-09 | Library / played status | Out of v1 |
 | 2026-09-06 | Library / follow / feed / trending | **Later than v1**, not launch-branch. Want / Playing / Played / Dropped; no play cap. Open follow of public profiles only; counts + rosters public on public profiles. Home feed from follows, grouped; **no community member feed**. Trending = distinct people per game in 7d; community trending independent of live on/off; site floor default 5 people. List `rank_visibility` ranked / games_only / hidden applies to Categories too; **contrib still scores**. Retract private library on read. GOTY-only list events + `list_reveal`. Details in `docs/features/library.md`, `follow.md`, `activity-and-trending.md`. |
+| 2026-09-09 | Trending Playing weight | Playing counting events default to **1.25×** kind weight on recency so those games sort above equal recency from other counting kinds. Recency buckets still dominate. All event-kind weights are admin-editable on `/admin/rankings`; zero omits a kind. |
 | 2026-08-10 | Engineering operating system | `docs/engineering.md` |
 | 2026-08-10 | Integration branch | Day-to-day work targets `develop`; `main` production via promote PRs |
 | 2026-08-10 | Fonts | Display: Bebas Neue; body: Archivo; deck/serif: Source Serif 4 |

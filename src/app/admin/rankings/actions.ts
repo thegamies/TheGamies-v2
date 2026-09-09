@@ -14,6 +14,7 @@ import {
   setPublicTrendingMinPeople,
   setSiteRankMode,
   setStandingFillMinVisible,
+  setTrendingKindWeights,
   setTrendingRecencyWeights,
 } from "@/lib/site-settings/service";
 import { parseSharedRankMode } from "@/lib/standings/shared-rank";
@@ -279,6 +280,37 @@ export async function saveTrendingRecencyWeightsAction(raw: {
         err instanceof Error
           ? err.message
           : "Could not save trending recency weights.",
+    };
+  }
+}
+
+export async function saveTrendingKindWeightsAction(raw: Record<string, string>): Promise<{
+  error?: string;
+  ok?: boolean;
+  trendingKindWeights?: Record<string, number>;
+}> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const values = Object.values(raw);
+  if (values.length === 0 || values.some((value) => !Number.isFinite(Number(value)))) {
+    return { error: "Enter a number for each event weight." };
+  }
+  try {
+    const saved = await setTrendingKindWeights(raw);
+    revalidatePath("/");
+    revalidatePath("/games");
+    revalidatePath("/following");
+    revalidatePath("/admin/rankings");
+    return {
+      ok: true,
+      trendingKindWeights: saved.trendingKindWeights,
+    };
+  } catch (err) {
+    return {
+      error:
+        err instanceof Error
+          ? err.message
+          : "Could not save trending event weights.",
     };
   }
 }

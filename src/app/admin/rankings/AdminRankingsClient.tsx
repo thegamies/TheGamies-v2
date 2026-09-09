@@ -4,6 +4,11 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import { RadioOption } from "@/components/ui/Radio";
+import {
+  ACTIVITY_KIND_LABELS,
+  ACTIVITY_KINDS,
+} from "@/lib/activity/kinds";
+import type { TrendingKindWeights } from "@/lib/activity/trending";
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import {
   loadYearStatsAction,
@@ -15,6 +20,7 @@ import {
   savePublicTrendingMinPeopleAction,
   saveRankModeAction,
   saveStandingFillMinVisibleAction,
+  saveTrendingKindWeightsAction,
   saveTrendingRecencyWeightsAction,
   setRevealAction,
 } from "./actions";
@@ -60,6 +66,7 @@ type Props = {
     restOf7d: number;
     days7to30: number;
   };
+  initialTrendingKindWeights: TrendingKindWeights;
   initialStandingFillMinVisible: number;
 };
 
@@ -72,6 +79,7 @@ export function AdminRankingsClient({
   initialPublicBoardMinCategoryVotes,
   initialPublicTrendingMinPeople,
   initialTrendingRecencyWeights,
+  initialTrendingKindWeights,
   initialStandingFillMinVisible,
 }: Props) {
   const [year, setYear] = useState(initialYear);
@@ -115,6 +123,19 @@ export function AdminRankingsClient({
   );
   const [recencySaved, setRecencySaved] = useState(
     initialTrendingRecencyWeights,
+  );
+  const [kindWeightInputs, setKindWeightInputs] = useState<
+    Record<string, string>
+  >(() =>
+    Object.fromEntries(
+      ACTIVITY_KINDS.map((kind) => [
+        kind,
+        String(initialTrendingKindWeights[kind]),
+      ]),
+    ),
+  );
+  const [kindWeightsSaved, setKindWeightsSaved] = useState(
+    initialTrendingKindWeights,
   );
   const [minVisibleInput, setMinVisibleInput] = useState(
     String(initialStandingFillMinVisible),
@@ -437,6 +458,75 @@ export function AdminRankingsClient({
         <p className="text-xs text-muted">
           Current weights: {recencySaved.hours24} / {recencySaved.days1to3} /{" "}
           {recencySaved.restOf7d} / {recencySaved.days7to30}
+        </p>
+      </section>
+
+      <section className="space-y-4 border-b border-line pb-10">
+        <h2 className="font-display text-2xl tracking-wide text-ink">
+          Trending events
+        </h2>
+        <p className="text-sm text-muted">
+          How strongly each event type pulls a game up. Each person still
+          counts once, from their most recent counting event. Zero keeps that
+          event off the board. Playing starts a little above the others.
+          Ranking a Game of the Year list is not tied to a title, so it never
+          appears on the board.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {ACTIVITY_KINDS.map((kind) => (
+            <label key={kind} className="block text-sm text-muted">
+              {ACTIVITY_KIND_LABELS[kind]}
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step={0.001}
+                className={`${fieldInputClass} mt-1`}
+                value={kindWeightInputs[kind] ?? ""}
+                onChange={(e) =>
+                  setKindWeightInputs((current) => ({
+                    ...current,
+                    [kind]: e.target.value,
+                  }))
+                }
+                autoComplete="off"
+              />
+            </label>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="bordered"
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const result =
+                await saveTrendingKindWeightsAction(kindWeightInputs);
+              if (result.error) {
+                setMessage(result.error);
+                return;
+              }
+              if (result.trendingKindWeights) {
+                const saved = result.trendingKindWeights as TrendingKindWeights;
+                setKindWeightsSaved(saved);
+                setKindWeightInputs(
+                  Object.fromEntries(
+                    ACTIVITY_KINDS.map((kind) => [kind, String(saved[kind])]),
+                  ),
+                );
+              }
+              setMessage("Trending event weights saved.");
+            })
+          }
+        >
+          Save event weights
+        </Button>
+        <p className="text-xs text-muted">
+          Current weights:{" "}
+          {ACTIVITY_KINDS.map(
+            (kind) =>
+              `${ACTIVITY_KIND_LABELS[kind]} ${kindWeightsSaved[kind]}`,
+          ).join(" · ")}
         </p>
       </section>
 

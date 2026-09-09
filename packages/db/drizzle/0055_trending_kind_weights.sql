@@ -1,0 +1,1 @@
+ALTER TABLE "site_settings" ADD COLUMN "trending_kind_weights" jsonb DEFAULT '{"library_wishlist":1,"library_backlog":1,"library_playing":1.25,"library_paused":0,"library_beat":1,"library_dropped":0,"library_cleared":0,"list_add":1,"list_remove":0,"list_reveal":0}'::jsonb NOT NULL;

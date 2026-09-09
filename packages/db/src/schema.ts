@@ -1313,6 +1313,7 @@ export const liveCategoryDirty = pgTable(
  * `publicBoardMinCategoryVotes` — a category board stays hidden until that award has this many votes.
  * `standingFillMinVisible` — temporary: covers in view on homepage / all-years strips (decimals peek).
  * Trending recency weights order Games / Following / community boards; people count stays a headcount.
+ * `trendingKindWeights` multiplies recency per event kind; zero omits that kind.
  */
 export const siteSettings = pgTable("site_settings", {
   id: text("id").primaryKey().default("default"),
@@ -1341,6 +1342,12 @@ export const siteSettings = pgTable("site_settings", {
   trendingRecencyWeight7To30d: real("trending_recency_weight_7_30d")
     .notNull()
     .default(0.125),
+  trendingKindWeights: jsonb("trending_kind_weights")
+    .$type<Record<string, number>>()
+    .notNull()
+    .default(
+      sql`'{"library_wishlist":1,"library_backlog":1,"library_playing":1.25,"library_paused":0,"library_beat":1,"library_dropped":0,"library_cleared":0,"list_add":1,"list_remove":0,"list_reveal":0}'::jsonb`,
+    ),
   standingFillMinVisible: real("standing_fill_min_visible")
     .notNull()
     .default(2.2),

@@ -1,4 +1,7 @@
-import { isTrendingKind } from "./kinds";
+import {
+  ACTIVITY_KINDS,
+  type ActivityKind,
+} from "./kinds";
 
 export type TrendingEventInput = {
   profileId: string;
@@ -32,7 +35,42 @@ export const DEFAULT_TRENDING_RECENCY_WEIGHTS: TrendingRecencyWeights = {
 export const TRENDING_RECENCY_WEIGHT_MIN = 0;
 export const TRENDING_RECENCY_WEIGHT_MAX = 10;
 
+/** Playing is slightly more hype than wishlist / backlog / beat / GOTY-add. */
+export const TRENDING_PLAYING_KIND_WEIGHT = 1.25;
+
+/** Sort multiplier for the person's most recent counting event kind. Zero omits. */
+export type TrendingKindWeights = Record<ActivityKind, number>;
+
+export const DEFAULT_TRENDING_KIND_WEIGHTS: TrendingKindWeights = {
+  library_wishlist: 1,
+  library_backlog: 1,
+  library_playing: TRENDING_PLAYING_KIND_WEIGHT,
+  library_paused: 0,
+  library_beat: 1,
+  library_dropped: 0,
+  library_cleared: 0,
+  list_add: 1,
+  list_remove: 0,
+  list_reveal: 0,
+};
+
 const MS_PER_HOUR = 60 * 60 * 1000;
+
+/** Extra sort weight for the person's most recent counting event kind. */
+export function kindWeightForTrending(
+  kind: string,
+  weights: TrendingKindWeights = DEFAULT_TRENDING_KIND_WEIGHTS,
+): number {
+  if (!(ACTIVITY_KINDS as readonly string[]).includes(kind)) return 0;
+  return weights[kind as ActivityKind];
+}
+
+/** Event kinds whose weight is above zero — those count on trending boards. */
+export function countingKindsFromWeights(
+  weights: TrendingKindWeights = DEFAULT_TRENDING_KIND_WEIGHTS,
+): ActivityKind[] {
+  return ACTIVITY_KINDS.filter((kind) => weights[kind] > 0);
+}
 
 export function parseTrendingRecencyWeight(
   raw: unknown,
@@ -68,6 +106,21 @@ export function parseTrendingRecencyWeights(
   };
 }
 
+export function parseTrendingKindWeights(
+  raw?: Partial<Record<string, unknown>> | null,
+): TrendingKindWeights {
+  const parsed = { ...DEFAULT_TRENDING_KIND_WEIGHTS };
+  if (!raw || typeof raw !== "object") return parsed;
+  for (const kind of ACTIVITY_KINDS) {
+    if (raw[kind] === undefined) continue;
+    parsed[kind] = parseTrendingRecencyWeight(
+      raw[kind],
+      DEFAULT_TRENDING_KIND_WEIGHTS[kind],
+    );
+  }
+  return parsed;
+}
+
 /** Bucket weight from how long ago the person's last counting event was. */
 export function recencyWeightForAgeMs(
   ageMs: number,
@@ -80,25 +133,30 @@ export function recencyWeightForAgeMs(
   return weights.days7to30;
 }
 
+type LatestCountingEvent = { lastMs: number; kind: string };
+
 /**
- * Distinct people per game. Sort by recency-weighted score; `people` stays a
- * real headcount. Adult / dropped / missing game_id do not count. One person
- * per game uses their most recent counting event.
+ * Distinct people per game. Sort by recency × kind weight; `people` stays a
+ * real headcount. Adult / missing game_id / weight-zero kinds do not count.
+ * One person per game uses their most recent counting event (higher kind
+ * weight wins timestamp ties).
  */
 export function scoreTrending(
   rows: readonly TrendingEventInput[],
   opts: {
     now?: Date;
     weights?: Partial<TrendingRecencyWeights> | null;
+    kindWeights?: Partial<Record<string, unknown>> | null;
   } = {},
 ): TrendingScore[] {
   const nowMs = (opts.now ?? new Date()).getTime();
   const weights = parseTrendingRecencyWeights(opts.weights);
-  const latest = new Map<string, Map<string, number>>();
+  const kindWeights = parseTrendingKindWeights(opts.kindWeights);
+  const latest = new Map<string, Map<string, LatestCountingEvent>>();
   for (const row of rows) {
     if (!row.gameId) continue;
     if (row.isAdult) continue;
-    if (!isTrendingKind(row.kind)) continue;
+    if (kindWeightForTrending(row.kind, kindWeights) <= 0) continue;
     const t = row.createdAt?.getTime();
     const lastMs = Number.isFinite(t) ? (t as number) : nowMs;
     let byPerson = latest.get(row.gameId);
@@ -107,13 +165,23 @@ export function scoreTrending(
       latest.set(row.gameId, byPerson);
     }
     const prev = byPerson.get(row.profileId);
-    if (prev == null || lastMs > prev) byPerson.set(row.profileId, lastMs);
+    if (
+      prev == null ||
+      lastMs > prev.lastMs ||
+      (lastMs === prev.lastMs &&
+        kindWeightForTrending(row.kind, kindWeights) >
+          kindWeightForTrending(prev.kind, kindWeights))
+    ) {
+      byPerson.set(row.profileId, { lastMs, kind: row.kind });
+    }
   }
   return [...latest.entries()]
     .map(([gameId, byPerson]) => {
       let score = 0;
-      for (const lastMs of byPerson.values()) {
-        score += recencyWeightForAgeMs(nowMs - lastMs, weights);
+      for (const event of byPerson.values()) {
+        score +=
+          recencyWeightForAgeMs(nowMs - event.lastMs, weights) *
+          kindWeightForTrending(event.kind, kindWeights);
       }
       return { gameId, people: byPerson.size, score };
     })
