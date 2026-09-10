@@ -8,7 +8,7 @@ See [product.md](../product.md) and [terminology.md](../terminology.md).
 
 - Public: `/the-game-awards`, `/the-game-awards/[year]` (`Your ballot` default, `?view=standings`, locked `?view=sheet&u=`)
 - Admin: `/admin/the-game-awards`, `/admin/the-game-awards/[year]`, `/admin/the-game-awards/[year]/show`, `/admin/the-game-awards/seed` (fills leftover site sheets for `is_seed` standings/community accounts; optional community slug fills leftover community sheets for members already in that community)
-- Community (members, create a year): `/communities/[slug]/the-game-awards` (`Your ballot`, `?view=standings`, `?mode=voices` Hosts board, hosts `?view=settings`). Create at `/communities/[slug]/create/the-game-awards`.
+- Community (members create a year; closed-join public guests may browse Standings): `/communities/[slug]/the-game-awards` (`Your ballot` members only, `?view=standings`, locked `?view=sheet&u=`, hosts `?view=settings`). Create at `/communities/[slug]/create/the-game-awards`.
 
 ## Year controls
 
@@ -40,7 +40,7 @@ Picks lock at **show start**. The nominee ballot is hidden while the year is sch
 
 ## Community
 
-Same official slate and winners. Separate sheets. Import from the global sheet (warns before replacing picks already on the community ballot). After a complete community save, if they have no site sheet yet, prompt to copy that entry to the global game and open it. Opens when the community creates that year and the site year is On with picks open. Closes at the same show start.
+Same official slate and winners. Separate sheets. Import from the global sheet (warns before replacing picks already on the community ballot). After a complete community save, if they have no site sheet yet, prompt to copy that entry to the global game and open it. Opens when the community creates that year and the site year is On with picks open. Closes at the same show start. On **public + joins closed** communities, guests land on Standings (no Your ballot tab); locked sheets stay readable. Regular public and private interiors stay members-only.
 
 Community Settings lists created years (including locked). **Create** only offers a site-On year that has not locked (promoted first, else newest). Delete is on Pick’em **Settings** (`?view=settings`); type the year to confirm. Delete removes that community’s sheets, standings, and Host snapshot.
 

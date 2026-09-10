@@ -11,6 +11,20 @@ export function parseTgaYearView(raw: unknown): TgaYearView {
   return "ballot";
 }
 
+/**
+ * Guests on a closed-join showcase see Standings (and locked public sheets).
+ * Your ballot and Settings stay members-only.
+ */
+export function resolveCommunityTgaYearView(
+  raw: unknown,
+  opts: { isMember: boolean; revealWinners: boolean },
+): TgaYearView {
+  const view = parseTgaYearView(raw);
+  if (opts.isMember) return view;
+  if (view === "sheet" && opts.revealWinners) return "sheet";
+  return "standings";
+}
+
 export function parseTgaBoardMode(raw: unknown): TgaBoardMode {
   return raw === "voices" ? "voices" : "community";
 }

@@ -3,6 +3,7 @@ import {
   parseTgaBoardMode,
   parseTgaSheetUsername,
   parseTgaYearView,
+  resolveCommunityTgaYearView,
   tgaYearHref,
 } from "./year-href";
 
@@ -57,5 +58,55 @@ describe("tgaYearHref", () => {
         view: "settings",
       }),
     ).toBe("/communities/eric/the-game-awards/2025?view=settings");
+  });
+});
+
+describe("resolveCommunityTgaYearView", () => {
+  it("keeps member ballot and settings", () => {
+    expect(
+      resolveCommunityTgaYearView(undefined, {
+        isMember: true,
+        revealWinners: false,
+      }),
+    ).toBe("ballot");
+    expect(
+      resolveCommunityTgaYearView("settings", {
+        isMember: true,
+        revealWinners: true,
+      }),
+    ).toBe("settings");
+  });
+
+  it("sends guests to standings except locked public sheets", () => {
+    expect(
+      resolveCommunityTgaYearView(undefined, {
+        isMember: false,
+        revealWinners: false,
+      }),
+    ).toBe("standings");
+    expect(
+      resolveCommunityTgaYearView("ballot", {
+        isMember: false,
+        revealWinners: true,
+      }),
+    ).toBe("standings");
+    expect(
+      resolveCommunityTgaYearView("settings", {
+        isMember: false,
+        revealWinners: true,
+      }),
+    ).toBe("standings");
+    expect(
+      resolveCommunityTgaYearView("sheet", {
+        isMember: false,
+        revealWinners: false,
+      }),
+    ).toBe("standings");
+    expect(
+      resolveCommunityTgaYearView("sheet", {
+        isMember: false,
+        revealWinners: true,
+      }),
+    ).toBe("sheet");
   });
 });

@@ -115,8 +115,7 @@ export default async function CommunityTrendingPage({
         }
         communityId={community.id}
         tgaEnabled={
-          Boolean(community.viewerRole) &&
-          (await communityTgaNavVisible(community.id).catch(() => false))
+          await communityTgaNavVisible(community.id).catch(() => false)
         }
         active="trending"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}

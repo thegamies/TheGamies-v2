@@ -114,7 +114,7 @@ export default async function CommunityHomePage({
       ? featuredEdition.status
       : (overviewEditions[0]?.status ?? null);
   const showCreateEvent = canManage && editions.length === 0;
-  const tgaPromo = isMember
+  const tgaPromo = showBoards
     ? await getCommunityTgaPromoYear(community.id).catch(() => null)
     : null;
   const tgaEnabled = Boolean(tgaPromo);

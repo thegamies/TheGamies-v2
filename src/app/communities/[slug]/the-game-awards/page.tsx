@@ -3,6 +3,7 @@ import {
   communityTgaNavVisible,
   resolveTgaLandingYear,
 } from "@/lib/tga-pickem/service";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import {
   getRequestProfileByAuthUserId,
@@ -25,6 +26,15 @@ export default async function CommunityTgaIndexPage({
     () => null,
   );
   if (!community) redirect(`/communities/${slug}`);
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
+    redirect(`/communities/${encodeURIComponent(community.slug)}`);
+  }
   const visible = await communityTgaNavVisible(community.id).catch(() => false);
   if (!visible) redirect(`/communities/${slug}`);
   const year = await resolveTgaLandingYear().catch(() => null);
