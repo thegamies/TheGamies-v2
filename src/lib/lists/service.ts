@@ -160,6 +160,9 @@ export async function createDraft(
         // Every DB list is shareable from creation.
         publishedAt: now,
         slug,
+        ...(data.listType === "goty" && data.rankVisibility
+          ? { rankVisibility: data.rankVisibility }
+          : {}),
       })
       .returning();
 

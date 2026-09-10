@@ -15,10 +15,10 @@ Multi-year switching is a pop-open year control beside the Results heading (2+ p
 
 Calm sticky-scroll ceremony (not standings cards). **One sticky viewport per chapter** (title + stage together — nested sticky breaks iOS Safari) so place/award handoffs are horizontal (left in / right out at the same time). Long scrub distance keeps the pace deliberate. Respects `prefers-reduced-motion`.
 
-1. **Opener** — compact centered welcome (`Welcome to the {community} community {year} Video Game Awards` / countdown of the top 10, then category awards) with a dotted accent wash; **Scroll to reveal** plus a short accent line under it. GOTY chapter header (with its rule) fades in from the first scroll  
-2. **Chapter titles** pin with the stage at full size at the top. Eyebrow is `{year} {community} community` (uppercase); titles are `{year} Game of the Year` / `{year} Categories`. GOTY ranks sit in the stage *below* the header. Short viewports raise the parked rank/Tied and scale covers so the board stays below that header.  
-3. **Game of the Year** — single stage cycles **#10 → #1**. Each rank: the number slides in, grows in the center, then parks on the **right, inset, on the same row as Tied** and **stays through every cover**. Ties: **Tied** lands in the middle, lifts, then each tied game’s cover gets its own beat. Solo ranks skip Tied and bring in that cover. The number only leaves when the next rank takes over.  
-4. **Categories** — single stage cycles awards. Each award is one **CategoryRevealBoard** of `#1 · #2 · #3` columns. Columns stay full-size in layout; each **slides in from off-screen left** via `translate3d` and packs stage-left (**#3 → #2 → #1**, earlier ranks push right). Every derived-rank ≤ 3 game is shown; ties use multi-row mosaics with titles. Competition numbering can skip a slot (1–1–3: no #2); dense fills 1 then 2 — follows the event setting  
+1. **Opener** — compact centered welcome (`Welcome to the {community} community {year} Video Game Awards` / the category awards, then a countdown of the top 10) with a dotted accent wash; **Scroll to reveal** plus a short accent line under it. The first chapter header (with its rule) fades in from the first scroll  
+2. **Chapter titles** pin with the stage at full size at the top. Eyebrow is `{year} {community} community` (uppercase); titles are `{year} Categories` / `{year} Game of the Year`. GOTY ranks sit in the stage *below* the header. Short viewports raise the parked rank/Tied and scale covers so the board stays below that header.  
+3. **Categories** — first. Single stage cycles awards. Each award is one **CategoryRevealBoard** of `#1 · #2 · #3` columns. Columns stay full-size in layout; each **slides in from off-screen left** via `translate3d` and packs stage-left (**#3 → #2 → #1**, earlier ranks push right). Every derived-rank ≤ 3 game is shown; ties use multi-row mosaics with titles. Competition numbering can skip a slot (1–1–3: no #2); dense fills 1 then 2 — follows the event setting  
+4. **Game of the Year** — after categories. Single stage cycles **#10 → #1**. Each rank: the number slides in, grows in the center, then parks on the **right, inset, on the same row as Tied** and **stays through every cover**. Ties: **Tied** lands in the middle, lifts, then each tied game’s cover gets its own beat. Solo ranks skip Tied and bring in that cover. The number only leaves when the next rank takes over.  
 5. **Summary** — sticky chapter header (`{year} Summary`) with Top 10 + category #1 boards; tied category winners use the rotating stack  
 6. **Continue to full results** + **Return to top**
 
@@ -43,7 +43,7 @@ Sections use the accent-tick `SectionRule` between later blocks.
 
 **Voters** (`?view=voters`) — SQL-paginated voter list (50) with name/@username search. While voting is **open or closed**, this is turnout only: names, no ballot links (`?voter=` is ignored until publish). After results publish, **display name** opens that voter’s ballot (from ballot tables, read-only after close); **@username** opens their profile. Community · Hosts filters Hosts-only when on Hosts.
 
-**Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Hosts toggle is hidden here.
+**Your ballot** (`?view=ballot`) — member-only read-only view of the signed-in member’s submitted ballot for this edition. Community · Hosts toggle is hidden here. **Export to my list** is available here (same add-missing / replace flow as the open ballot). Other voters’ ballots do not offer export.
 
 **Debug (local `next dev` only):** on the board row, open **Debug** for **Repeat** (Off · ×2 · …) and **Cap** (− / Off / +) to stress category Reveal mosaics — cap truncates each derived-rank group first, then repeat clones each rank. No URL params; hidden in production.
 
@@ -77,3 +77,5 @@ Tie stacks fit one card footprint (overlapping covers, auto-rotate + click to cy
 ## Category results
 
 Results: **Ranked / Comparison** on the board row (shared for GOTY and Categories). Ranked GOTY is a wrapping Top 10; Ranked Categories is displayed rank ≤ 3 on one line with horizontal scroll (full ties). Comparison keeps per-award / per-rank chapters; each shows You · Community (#1, stacked if tied) · Hosts (#1) · each Host pick. Categories tab mirrors top 3 strips; full tallies live on `?view=category&category=` (SQL-paginated cover cards, 10 per page).
+
+**Community categories** appear alongside site awards, labeled **Community**. Tallies freeze into `community_edition_result_custom_categories`. Winners may be a game (Any Game / Selected Games) or an entry title (Text + Game / Text Only), with optional entry image and support video (Watch / embed, no autoplay). If a published event froze before those votes existed, the custom freeze slice is filled on the next Reveal or Results load — GOTY rows stay write-once.

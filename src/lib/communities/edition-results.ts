@@ -4,11 +4,15 @@ import {
   listEditionEnabledCategoryIds,
 } from "@/lib/communities/edition-categories";
 import {
+  communityCustomCategories,
+  communityCustomCategoryEntries,
   communityEditionBallotCategoryVotes,
+  communityEditionBallotCustomCategoryVotes,
   communityEditionBallotItems,
   communityEditionBallots,
   communityEditionCategories,
   communityEditionResultCategories,
+  communityEditionResultCustomCategories,
   communityEditionResultGoty,
   communityEditionResultMeta,
   communityEditionResultVoterCategoryPicks,
@@ -20,9 +24,15 @@ import {
   createDb,
   games,
   profiles,
+  type CommunityCustomAnswerType,
+  type CommunityCustomSupportLinkKind,
   type Db,
 } from "@thegamies/db";
 import { insertInChunks } from "@/lib/db/insert-chunks";
+import {
+  customResultDisplayTitle,
+  customResultTallyKind,
+} from "@/lib/communities/custom-category-types";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
   assembleBallotMatrixRows,
@@ -99,14 +109,18 @@ export type EditionCategoryStandingBlock = {
   categoryId: string;
   label: string;
   description: string | null;
+  /** Community-created award (not a site catalog category). */
+  isCommunity?: boolean;
   rows: Array<{
     place: number;
     rank: number;
     gameId: string;
     slug: string;
     title: string;
+    subtitle?: string | null;
     coverUrl: string | null;
     votes: number;
+    supportLinkUrl?: string | null;
   }>;
 };
 
@@ -184,11 +198,13 @@ export async function rebuildEditionHostsResultsFrozen(
     .where(eq(communityEditionBallots.editionId, editionId));
 
   const voiceIds = await listEditionVoiceProfileIds(editionId, db);
-  const [voicesGoty, voicesCats, editionCats] = await Promise.all([
-    sqlAggregateEditionGoty(editionId, true, db),
-    sqlAggregateEditionCategories(editionId, true, db),
-    listEditionAwardCategories(editionId, db),
-  ]);
+  const [voicesGoty, voicesCats, editionCats, customFreezeRows] =
+    await Promise.all([
+      sqlAggregateEditionGoty(editionId, true, db),
+      sqlAggregateEditionCategories(editionId, true, db),
+      listEditionAwardCategories(editionId, db),
+      loadCustomCategoryFreezeRows(editionId, db),
+    ]);
 
   const catDefById = new Map(editionCats.map((c) => [c.id, c]));
   const enabledCategoryIds = new Set(editionCats.map((c) => c.id));
@@ -230,6 +246,10 @@ export async function rebuildEditionHostsResultsFrozen(
       };
     });
 
+  const customCategoryRows = customFreezeRows.filter(
+    (row) => row.mode === "voices",
+  );
+
   try {
     await db
       .delete(communityEditionResultGoty)
@@ -247,6 +267,14 @@ export async function rebuildEditionHostsResultsFrozen(
           eq(communityEditionResultCategories.mode, "voices"),
         ),
       );
+    await db
+      .delete(communityEditionResultCustomCategories)
+      .where(
+        and(
+          eq(communityEditionResultCustomCategories.editionId, editionId),
+          eq(communityEditionResultCustomCategories.mode, "voices"),
+        ),
+      );
 
     if (gotyRows.length > 0) {
       await insertInChunks(
@@ -259,6 +287,14 @@ export async function rebuildEditionHostsResultsFrozen(
       await insertInChunks(
         categoryRows,
         (chunk) => db.insert(communityEditionResultCategories).values(chunk),
+        100,
+      );
+    }
+    if (customCategoryRows.length > 0) {
+      await insertInChunks(
+        customCategoryRows,
+        (chunk) =>
+          db.insert(communityEditionResultCustomCategories).values(chunk),
         100,
       );
     }
@@ -337,6 +373,9 @@ async function clearEditionResultTables(editionId: string, db: Db) {
   await db
     .delete(communityEditionResultCategories)
     .where(eq(communityEditionResultCategories.editionId, editionId));
+  await db
+    .delete(communityEditionResultCustomCategories)
+    .where(eq(communityEditionResultCustomCategories.editionId, editionId));
   await db
     .delete(communityEditionResultGoty)
     .where(eq(communityEditionResultGoty.editionId, editionId));
@@ -440,6 +479,122 @@ async function loadBallotVoterCategoryPicks(
     title: r.title,
     coverUrl: coverUrlFrom(r.coverImageId),
   }));
+}
+
+async function loadBallotVoterCustomCategoryPicks(
+  editionId: string,
+  profileIds: string[],
+  db: Db,
+): Promise<
+  Array<{
+    profileId: string;
+    categoryId: string;
+    gameId: string | null;
+    entryId: string | null;
+    title: string;
+    subtitle: string | null;
+    imageUrl: string | null;
+    coverUrl: string | null;
+    slug: string | null;
+    supportLinkUrl: string | null;
+  }>
+> {
+  if (profileIds.length === 0) return [];
+  const rows = await db
+    .select({
+      profileId: communityEditionBallots.profileId,
+      categoryId: communityEditionBallotCustomCategoryVotes.categoryId,
+      gameId: communityEditionBallotCustomCategoryVotes.gameId,
+      entryId: communityEditionBallotCustomCategoryVotes.entryId,
+      entryTitle: communityCustomCategoryEntries.title,
+      entryImageUrl: communityCustomCategoryEntries.imageUrl,
+      supportLinkUrl: communityCustomCategoryEntries.supportLinkUrl,
+      gameTitle: games.title,
+      gameSlug: games.slug,
+      resolvedGameId: games.id,
+      coverImageId: covers.imageId,
+    })
+    .from(communityEditionBallotCustomCategoryVotes)
+    .innerJoin(
+      communityEditionBallots,
+      eq(
+        communityEditionBallots.id,
+        communityEditionBallotCustomCategoryVotes.ballotId,
+      ),
+    )
+    .innerJoin(
+      communityCustomCategories,
+      and(
+        eq(
+          communityCustomCategories.id,
+          communityEditionBallotCustomCategoryVotes.categoryId,
+        ),
+        eq(communityCustomCategories.editionId, editionId),
+      ),
+    )
+    .leftJoin(
+      communityCustomCategoryEntries,
+      eq(
+        communityCustomCategoryEntries.id,
+        communityEditionBallotCustomCategoryVotes.entryId,
+      ),
+    )
+    .leftJoin(
+      games,
+      eq(
+        games.id,
+        sql`coalesce(${communityEditionBallotCustomCategoryVotes.gameId}, ${communityCustomCategoryEntries.gameId})`,
+      ),
+    )
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, editionId),
+        inArray(communityEditionBallots.profileId, profileIds),
+      ),
+    );
+
+  return rows.map((r) => {
+    const isEntry = Boolean(r.entryId);
+    return {
+      profileId: r.profileId,
+      categoryId: r.categoryId,
+      gameId: r.gameId ?? r.resolvedGameId,
+      entryId: r.entryId,
+      title: isEntry ? (r.entryTitle ?? "Entry") : (r.gameTitle ?? "Game"),
+      subtitle: isEntry && r.gameTitle ? r.gameTitle : null,
+      imageUrl: r.entryImageUrl,
+      coverUrl: coverUrlFrom(r.coverImageId),
+      slug: r.gameSlug,
+      supportLinkUrl: r.supportLinkUrl,
+    };
+  });
+}
+
+function customPicksToComparisonLines(
+  picks: Awaited<ReturnType<typeof loadBallotVoterCustomCategoryPicks>>,
+): Array<BallotVoterGameRow & { categoryId: string }> {
+  return picks.map((pick) => ({
+    profileId: pick.profileId,
+    categoryId: pick.categoryId,
+    gameId: pick.gameId ?? pick.entryId ?? pick.categoryId,
+    slug: pick.slug ?? "",
+    title: customResultDisplayTitle(pick.title, pick.subtitle),
+    coverUrl: pick.imageUrl || pick.coverUrl,
+  }));
+}
+
+async function loadBallotCategoryComparisonPicks(
+  editionId: string,
+  profileIds: string[],
+  db: Db,
+): Promise<Array<BallotVoterGameRow & { categoryId: string }>> {
+  if (profileIds.length === 0) return [];
+  const [site, custom] = await Promise.all([
+    loadBallotVoterCategoryPicks(editionId, profileIds, db),
+    loadBallotVoterCustomCategoryPicks(editionId, profileIds, db),
+  ]);
+  return [...site, ...customPicksToComparisonLines(custom)];
 }
 
 /**
@@ -590,6 +745,248 @@ async function sqlAggregateEditionCategories(
   );
 }
 
+type AggregatedCustomCategoryRow = {
+  categoryId: string;
+  place: number;
+  votes: number;
+  entryId: string | null;
+  gameId: string | null;
+  slug: string | null;
+  title: string;
+  subtitle: string | null;
+  imageUrl: string | null;
+  coverUrl: string | null;
+  supportLinkUrl: string | null;
+  supportLinkKind: CommunityCustomSupportLinkKind | null;
+};
+
+async function sqlAggregateEditionCustomCategories(
+  editionId: string,
+  voicesOnly: boolean,
+  db: Db,
+): Promise<AggregatedCustomCategoryRow[]> {
+  const votesExpr = sql<number>`count(*)::int`;
+
+  const base = db
+    .select({
+      categoryId: communityEditionBallotCustomCategoryVotes.categoryId,
+      gameId: communityEditionBallotCustomCategoryVotes.gameId,
+      entryId: communityEditionBallotCustomCategoryVotes.entryId,
+      entryTitle: communityCustomCategoryEntries.title,
+      entryImageUrl: communityCustomCategoryEntries.imageUrl,
+      supportLinkUrl: communityCustomCategoryEntries.supportLinkUrl,
+      supportLinkKind: communityCustomCategoryEntries.supportLinkKind,
+      gameTitle: games.title,
+      gameSlug: games.slug,
+      resolvedGameId: games.id,
+      coverImageId: covers.imageId,
+      votes: votesExpr,
+    })
+    .from(communityEditionBallotCustomCategoryVotes)
+    .innerJoin(
+      communityEditionBallots,
+      eq(
+        communityEditionBallots.id,
+        communityEditionBallotCustomCategoryVotes.ballotId,
+      ),
+    )
+    .innerJoin(
+      communityCustomCategories,
+      and(
+        eq(
+          communityCustomCategories.id,
+          communityEditionBallotCustomCategoryVotes.categoryId,
+        ),
+        eq(communityCustomCategories.editionId, editionId),
+      ),
+    )
+    .leftJoin(
+      communityCustomCategoryEntries,
+      eq(
+        communityCustomCategoryEntries.id,
+        communityEditionBallotCustomCategoryVotes.entryId,
+      ),
+    )
+    .leftJoin(
+      games,
+      eq(
+        games.id,
+        sql`coalesce(${communityEditionBallotCustomCategoryVotes.gameId}, ${communityCustomCategoryEntries.gameId})`,
+      ),
+    )
+    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
+
+  const withVoices = voicesOnly
+    ? base.innerJoin(
+        communityEditionVoices,
+        and(
+          eq(
+            communityEditionVoices.editionId,
+            communityEditionBallots.editionId,
+          ),
+          eq(
+            communityEditionVoices.profileId,
+            communityEditionBallots.profileId,
+          ),
+        ),
+      )
+    : base;
+
+  const rows = await withVoices
+    .where(eq(communityEditionBallots.editionId, editionId))
+    .groupBy(
+      communityEditionBallotCustomCategoryVotes.categoryId,
+      communityEditionBallotCustomCategoryVotes.gameId,
+      communityEditionBallotCustomCategoryVotes.entryId,
+      communityCustomCategoryEntries.title,
+      communityCustomCategoryEntries.imageUrl,
+      communityCustomCategoryEntries.supportLinkUrl,
+      communityCustomCategoryEntries.supportLinkKind,
+      games.title,
+      games.slug,
+      games.id,
+      covers.imageId,
+    );
+
+  type Tally = Omit<AggregatedCustomCategoryRow, "place">;
+  const byCategory = new Map<string, Tally[]>();
+  for (const r of rows) {
+    const votes = Number(r.votes);
+    if (votes <= 0) continue;
+    const isEntry = Boolean(r.entryId);
+    const tally: Tally = {
+      categoryId: r.categoryId,
+      votes,
+      entryId: r.entryId,
+      gameId: r.gameId ?? r.resolvedGameId,
+      slug: r.gameSlug,
+      title: isEntry ? (r.entryTitle ?? "Entry") : (r.gameTitle ?? "Game"),
+      subtitle: isEntry && r.gameTitle ? r.gameTitle : null,
+      imageUrl: r.entryImageUrl,
+      coverUrl: coverUrlFrom(r.coverImageId),
+      supportLinkUrl: r.supportLinkUrl,
+      supportLinkKind: r.supportLinkKind,
+    };
+    const list = byCategory.get(r.categoryId) ?? [];
+    list.push(tally);
+    byCategory.set(r.categoryId, list);
+  }
+
+  const out: AggregatedCustomCategoryRow[] = [];
+  for (const list of byCategory.values()) {
+    list.sort((a, b) => {
+      if (b.votes !== a.votes) return b.votes - a.votes;
+      const aKey = a.entryId ?? a.gameId ?? "";
+      const bKey = b.entryId ?? b.gameId ?? "";
+      return aKey.localeCompare(bKey);
+    });
+    list.forEach((row, i) => {
+      out.push({ ...row, place: i + 1 });
+    });
+  }
+  return out;
+}
+
+async function loadCustomCategoryFreezeRows(
+  editionId: string,
+  db: Db,
+): Promise<
+  Array<{
+    editionId: string;
+    mode: "community" | "voices";
+    categoryId: string;
+    label: string;
+    description: string | null;
+    answerType: CommunityCustomAnswerType;
+    sortOrder: number;
+    place: number;
+    entryId: string | null;
+    gameId: string | null;
+    slug: string | null;
+    title: string;
+    subtitle: string | null;
+    imageUrl: string | null;
+    coverUrl: string | null;
+    supportLinkUrl: string | null;
+    supportLinkKind: CommunityCustomSupportLinkKind | null;
+    votes: number;
+  }>
+> {
+  const [communityCustom, voicesCustom, customDefs] = await Promise.all([
+    sqlAggregateEditionCustomCategories(editionId, false, db),
+    sqlAggregateEditionCustomCategories(editionId, true, db),
+    db
+      .select()
+      .from(communityCustomCategories)
+      .where(eq(communityCustomCategories.editionId, editionId)),
+  ]);
+  const customDefById = new Map(customDefs.map((c) => [c.id, c]));
+  const enabledCustomIds = new Set(customDefs.map((c) => c.id));
+  return (["community", "voices"] as const).flatMap((mode) => {
+    const rows = mode === "community" ? communityCustom : voicesCustom;
+    return rows
+      .filter((row) => enabledCustomIds.has(row.categoryId))
+      .map((row) => {
+        const def = customDefById.get(row.categoryId);
+        return {
+          editionId,
+          mode,
+          categoryId: row.categoryId,
+          label: def?.name ?? row.categoryId,
+          description: def?.description ?? null,
+          answerType: (def?.answerType ??
+            "any_game") as CommunityCustomAnswerType,
+          sortOrder: def?.sortOrder ?? 0,
+          place: row.place,
+          entryId: row.entryId,
+          gameId: row.gameId,
+          slug: row.slug,
+          title: row.title,
+          subtitle: row.subtitle,
+          imageUrl: row.imageUrl,
+          coverUrl: row.coverUrl,
+          supportLinkUrl: row.supportLinkUrl,
+          supportLinkKind: row.supportLinkKind,
+          votes: row.votes,
+        };
+      });
+  });
+}
+
+/**
+ * Write-once freeze can omit community awards if it ran before those votes
+ * existed. Fill only the missing custom freeze slice — do not rebuild GOTY.
+ */
+export async function ensureCustomCategoryFreezeComplete(
+  editionId: string,
+  db: Db = getDb(),
+): Promise<void> {
+  try {
+    const [def] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityCustomCategories)
+      .where(eq(communityCustomCategories.editionId, editionId));
+    if (Number(def?.n ?? 0) === 0) return;
+    const meta = await getEditionResultsMeta(editionId, db);
+    if (!meta) return;
+    const [frozen] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityEditionResultCustomCategories)
+      .where(eq(communityEditionResultCustomCategories.editionId, editionId));
+    if (Number(frozen?.n ?? 0) > 0) return;
+    const rows = await loadCustomCategoryFreezeRows(editionId, db);
+    if (rows.length === 0) return;
+    await insertInChunks(
+      rows,
+      (chunk) =>
+        db.insert(communityEditionResultCustomCategories).values(chunk),
+      100,
+    );
+  } catch (err) {
+    console.error("ensureCustomCategoryFreezeComplete failed", err);
+  }
+}
+
 async function freezeEditionResults(
   editionId: string,
   db: Db,
@@ -610,13 +1007,14 @@ async function freezeEditionResults(
 
   const voiceIds = await listEditionVoiceProfileIds(editionId, db);
 
-  const [communityGoty, voicesGoty, communityCats, voicesCats, editionCats] =
+  const [communityGoty, voicesGoty, communityCats, voicesCats, editionCats, customCategoryRows] =
     await Promise.all([
       sqlAggregateEditionGoty(editionId, false, db),
       sqlAggregateEditionGoty(editionId, true, db),
       sqlAggregateEditionCategories(editionId, false, db),
       sqlAggregateEditionCategories(editionId, true, db),
       listEditionAwardCategories(editionId, db),
+      loadCustomCategoryFreezeRows(editionId, db),
     ]);
 
   const catDefById = new Map(editionCats.map((c) => [c.id, c]));
@@ -710,6 +1108,14 @@ async function freezeEditionResults(
         100,
       );
     }
+    if (customCategoryRows.length > 0) {
+      await insertInChunks(
+        customCategoryRows,
+        (chunk) =>
+          db.insert(communityEditionResultCustomCategories).values(chunk),
+        100,
+      );
+    }
     if (voterRows.length > 0) {
       await insertInChunks(
         voterRows,
@@ -753,6 +1159,7 @@ export async function ensurePublishedEditionResults(
       const { markEditionFreezeReady } = await import("./edition-freeze");
       await markEditionFreezeReady(edition.id, db);
     }
+    await ensureCustomCategoryFreezeComplete(edition.id, db);
     return existing;
   }
 
@@ -954,6 +1361,7 @@ export async function getEditionCategoryResults(
   opts: { maxRank?: number; rankMode?: SharedRankMode } = {},
   db: Db = getDb(),
 ): Promise<EditionCategoryStandingBlock[]> {
+  await ensureCustomCategoryFreezeComplete(editionId, db);
   const storage = storageModeFor(mode);
   const maxRank =
     opts.maxRank != null && Number.isFinite(opts.maxRank)
@@ -1089,7 +1497,10 @@ export async function getEditionCategoryResults(
     }));
   }
 
-  const byId = new Map<string, EditionCategoryStandingBlock>();
+  const byId = new Map<
+    string,
+    EditionCategoryStandingBlock & { sortOrder: number }
+  >();
   for (const row of mapped) {
     let block = byId.get(row.categoryId);
     if (!block) {
@@ -1097,6 +1508,7 @@ export async function getEditionCategoryResults(
         categoryId: row.categoryId,
         label: row.label,
         description: row.description,
+        sortOrder: row.sortOrder,
         rows: [],
       };
       byId.set(row.categoryId, block);
@@ -1111,7 +1523,7 @@ export async function getEditionCategoryResults(
       votes: row.votes,
     });
   }
-  return [...byId.values()].map((block) => {
+  const siteBlocks = [...byId.values()].map((block) => {
     const ranked = withDisplayRanks(block.rows, (r) => r.votes, rankMode);
     return {
       ...block,
@@ -1119,6 +1531,66 @@ export async function getEditionCategoryResults(
         maxRank != null ? ranked.filter((r) => r.rank <= maxRank) : ranked,
     };
   });
+
+  const customRows = await db
+    .select()
+    .from(communityEditionResultCustomCategories)
+    .where(
+      and(
+        eq(communityEditionResultCustomCategories.editionId, editionId),
+        eq(communityEditionResultCustomCategories.mode, storage),
+      ),
+    )
+    .orderBy(
+      asc(communityEditionResultCustomCategories.sortOrder),
+      asc(communityEditionResultCustomCategories.place),
+    );
+
+  const customById = new Map<
+    string,
+    EditionCategoryStandingBlock & { sortOrder: number }
+  >();
+  for (const row of customRows) {
+    let block = customById.get(row.categoryId);
+    if (!block) {
+      block = {
+        categoryId: row.categoryId,
+        label: `${row.label} · Community`,
+        description: row.description,
+        isCommunity: true,
+        sortOrder: row.sortOrder,
+        rows: [],
+      };
+      customById.set(row.categoryId, block);
+    }
+    block.rows.push({
+      place: row.place,
+      rank: row.place,
+      gameId: row.gameId ?? row.entryId ?? row.categoryId,
+      slug: row.slug ?? "",
+      title: customResultDisplayTitle(row.title, row.subtitle),
+      subtitle: row.subtitle,
+      coverUrl: row.imageUrl || row.coverUrl,
+      votes: row.votes,
+      supportLinkUrl: row.supportLinkUrl,
+    });
+  }
+  const customBlocks = [...customById.values()].map((block) => {
+    const ranked = withDisplayRanks(block.rows, (r) => r.votes, rankMode);
+    return {
+      ...block,
+      rows:
+        maxRank != null ? ranked.filter((r) => r.rank <= maxRank) : ranked,
+    };
+  });
+
+  return [...siteBlocks, ...customBlocks]
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder ||
+        a.categoryId.localeCompare(b.categoryId),
+    )
+    .map(({ sortOrder: _sortOrder, ...block }) => block);
 }
 
 export const CATEGORY_RANKED_TOP = 3;
@@ -1130,6 +1602,8 @@ export type EditionCategoryMeta = {
   description: string | null;
   sortOrder: number;
   total: number;
+  isCommunity?: boolean;
+  tallyKind?: "game" | "entry";
 };
 
 export async function listEditionCategoryMeta(
@@ -1137,6 +1611,7 @@ export async function listEditionCategoryMeta(
   mode: EditionResultMode,
   db: Db = getDb(),
 ): Promise<EditionCategoryMeta[]> {
+  await ensureCustomCategoryFreezeComplete(editionId, db);
   const storage = storageModeFor(mode);
   const rows = await db
     .select({
@@ -1174,13 +1649,53 @@ export async function listEditionCategoryMeta(
     )
     .orderBy(asc(communityEditionResultCategories.sortOrder));
 
-  return rows.map((r) => ({
+  const siteMeta = rows.map((r) => ({
     categoryId: r.categoryId,
     label: r.label,
     description: r.description,
     sortOrder: r.sortOrder,
     total: Number(r.total),
   }));
+  const customMeta = (
+    await db
+      .select({
+        categoryId: communityEditionResultCustomCategories.categoryId,
+        label: communityEditionResultCustomCategories.label,
+        description: communityEditionResultCustomCategories.description,
+        sortOrder: communityEditionResultCustomCategories.sortOrder,
+        answerType: communityEditionResultCustomCategories.answerType,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(communityEditionResultCustomCategories)
+      .where(
+        and(
+          eq(communityEditionResultCustomCategories.editionId, editionId),
+          eq(communityEditionResultCustomCategories.mode, storage),
+        ),
+      )
+      .groupBy(
+        communityEditionResultCustomCategories.categoryId,
+        communityEditionResultCustomCategories.label,
+        communityEditionResultCustomCategories.description,
+        communityEditionResultCustomCategories.sortOrder,
+        communityEditionResultCustomCategories.answerType,
+      )
+      .orderBy(asc(communityEditionResultCustomCategories.sortOrder))
+  ).map((r) => ({
+    categoryId: r.categoryId,
+    label: `${r.label} · Community`,
+    description: r.description,
+    sortOrder: r.sortOrder,
+    total: Number(r.total),
+    isCommunity: true,
+    tallyKind: customResultTallyKind(r.answerType),
+  }));
+
+  return [...siteMeta, ...customMeta].sort(
+    (a, b) =>
+      a.sortOrder - b.sortOrder ||
+      a.categoryId.localeCompare(b.categoryId),
+  );
 }
 
 export type EditionCategoryStandingRow =
@@ -1199,6 +1714,7 @@ export async function getEditionCategoryPage(
   totalPages: number;
   rows: EditionCategoryStandingRow[];
 }> {
+  await ensureCustomCategoryFreezeComplete(editionId, db);
   const storage = storageModeFor(mode);
   const pageSize = Math.min(
     50,
@@ -1206,14 +1722,69 @@ export async function getEditionCategoryPage(
   );
 
   const enabledIds = await listEditionEnabledCategoryIds(editionId, db);
-  if (!enabledIds.includes(categoryId)) {
-    return {
-      page: 1,
-      pageSize,
-      total: 0,
-      totalPages: 1,
-      rows: [],
-    };
+  const isSiteCategory = enabledIds.includes(categoryId);
+  if (!isSiteCategory) {
+    const [customCat] = await db
+      .select({ id: communityCustomCategories.id })
+      .from(communityCustomCategories)
+      .where(
+        and(
+          eq(communityCustomCategories.editionId, editionId),
+          eq(communityCustomCategories.id, categoryId),
+        ),
+      )
+      .limit(1);
+    if (!customCat) {
+      return {
+        page: 1,
+        pageSize,
+        total: 0,
+        totalPages: 1,
+        rows: [],
+      };
+    }
+
+    const [countRow] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityEditionResultCustomCategories)
+      .where(
+        and(
+          eq(communityEditionResultCustomCategories.editionId, editionId),
+          eq(communityEditionResultCustomCategories.mode, storage),
+          eq(communityEditionResultCustomCategories.categoryId, categoryId),
+        ),
+      );
+    const total = Number(countRow?.n ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize) || 1);
+    const requested = Math.max(1, Math.floor(opts.page ?? 1));
+    const page = Math.min(requested, totalPages);
+    const offset = (page - 1) * pageSize;
+    const rows = await db
+      .select()
+      .from(communityEditionResultCustomCategories)
+      .where(
+        and(
+          eq(communityEditionResultCustomCategories.editionId, editionId),
+          eq(communityEditionResultCustomCategories.mode, storage),
+          eq(communityEditionResultCustomCategories.categoryId, categoryId),
+        ),
+      )
+      .orderBy(asc(communityEditionResultCustomCategories.place))
+      .limit(pageSize)
+      .offset(offset);
+
+    const mapped = rows.map((r) => ({
+      place: r.place,
+      gameId: r.gameId ?? r.entryId ?? r.categoryId,
+      slug: r.slug ?? "",
+      title: customResultDisplayTitle(r.title, r.subtitle),
+      coverUrl: r.imageUrl || r.coverUrl,
+      votes: r.votes,
+      supportLinkUrl: r.supportLinkUrl,
+    }));
+    const rankMode = opts.rankMode ?? "competition";
+    const ranked = withDisplayRanks(mapped, (r) => r.votes, rankMode);
+    return { page, pageSize, total, totalPages, rows: ranked };
   }
 
   const [countRow] = await db
@@ -1613,7 +2184,7 @@ export async function getEditionCategoryComparisonMatrix(
   if (picks == null) {
     picks =
       uniqueProfileIds.length > 0 && categories.length > 0
-        ? await loadBallotVoterCategoryPicks(
+        ? await loadBallotCategoryComparisonPicks(
             editionId,
             uniqueProfileIds,
             db,
@@ -1708,7 +2279,7 @@ export async function getEditionComparisonBundle(
       ? loadBallotVoterRanks(editionId, uniqueProfileIds, db)
       : Promise.resolve([]),
     uniqueProfileIds.length > 0
-      ? loadBallotVoterCategoryPicks(editionId, uniqueProfileIds, db)
+      ? loadBallotCategoryComparisonPicks(editionId, uniqueProfileIds, db)
       : Promise.resolve([]),
   ]);
 
@@ -1764,6 +2335,16 @@ export async function getEditionVoterDetail(
     title: string;
     coverUrl: string | null;
   }>;
+  customCategoryPicks: Array<{
+    categoryId: string;
+    gameId: string | null;
+    entryId: string | null;
+    title: string;
+    subtitle: string | null;
+    imageUrl: string | null;
+    coverUrl: string | null;
+    supportLinkUrl?: string | null;
+  }>;
 } | null> {
   const [voter] = await db
     .select({
@@ -1787,9 +2368,10 @@ export async function getEditionVoterDetail(
     .limit(1);
   if (!voter) return null;
 
-  const [ranks, categoryPicks] = await Promise.all([
+  const [ranks, categoryPicks, customCategoryPicks] = await Promise.all([
     loadBallotVoterRanks(editionId, [profileId], db),
     loadBallotVoterCategoryPicks(editionId, [profileId], db),
+    loadBallotVoterCustomCategoryPicks(editionId, [profileId], db),
   ]);
 
   return {
@@ -1813,6 +2395,16 @@ export async function getEditionVoterDetail(
       slug: r.slug,
       title: r.title,
       coverUrl: r.coverUrl,
+    })),
+    customCategoryPicks: customCategoryPicks.map((r) => ({
+      categoryId: r.categoryId,
+      gameId: r.gameId,
+      entryId: r.entryId,
+      title: r.title,
+      subtitle: r.subtitle,
+      imageUrl: r.imageUrl,
+      coverUrl: r.coverUrl,
+      supportLinkUrl: r.supportLinkUrl,
     })),
   };
 }

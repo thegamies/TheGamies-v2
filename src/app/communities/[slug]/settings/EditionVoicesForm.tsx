@@ -8,6 +8,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
+import { COMMUNITY_HOSTS_MAX } from "@/lib/communities/host-limits";
 import Link from "next/link";
 
 export type EditionVoiceMemberOption = {
@@ -89,6 +90,8 @@ export function EditionVoicesForm({
   const trimmed = query.trim();
   const visible = trimmed ? hits : roster;
   const defaultEmpty = !trimmed && visible.length === 0;
+  const hostCount = roster.filter((row) => row.isVoice).length;
+  const atCapacity = hostCount >= COMMUNITY_HOSTS_MAX;
 
   function onQueryChange(value: string) {
     setQuery(value);
@@ -100,6 +103,12 @@ export function EditionVoicesForm({
 
   function toggleVoice(member: EditionVoiceMemberOption) {
     const nextVoice = !member.isVoice;
+    if (nextVoice && atCapacity) {
+      setMutateError(
+        `A Hosts roster can have at most ${COMMUNITY_HOSTS_MAX} people.`,
+      );
+      return;
+    }
     const previousRoster = roster;
     const previousHits = hits;
     setMutateError(null);
@@ -134,8 +143,9 @@ export function EditionVoicesForm({
     <div className="mt-8 border-t border-line pt-6">
       <h3 className="font-display text-2xl tracking-wide text-ink">Hosts</h3>
       <p className="mt-2 max-w-xl text-sm text-muted">
-        Designate Hosts for the {year} event ({status}). This year only — it
-        does not promote or retire them for the community.{" "}
+        Designate Hosts for the {year} event ({status}), up to{" "}
+        {COMMUNITY_HOSTS_MAX}. This year only — it does not promote or retire
+        them for the community.{" "}
         <Link
           href={communitySettingsHref(slug, { tab: "hosts" })}
           className="underline underline-offset-2"
@@ -143,6 +153,10 @@ export function EditionVoicesForm({
           Community Hosts
         </Link>
         .
+      </p>
+      <p className="mt-1 text-sm text-muted">
+        {hostCount} of {COMMUNITY_HOSTS_MAX} Hosts
+        {atCapacity ? " · roster full" : null}
       </p>
 
       <div className="mt-4">
@@ -195,7 +209,7 @@ export function EditionVoicesForm({
               <Button
                 type="button"
                 variant="bordered"
-                disabled={mutating}
+                disabled={mutating || (!member.isVoice && atCapacity)}
                 className="text-sm"
                 onClick={() => toggleVoice(member)}
               >

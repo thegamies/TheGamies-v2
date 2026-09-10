@@ -52,9 +52,9 @@ Optional **later**: rare ceremony notices only (voting opened, results published
 
 Game-shaped cover boards. Not a people ticker, and not a numbered standings list — sort is internal; the UI shows covers and titles only. Independent of live GOTY sort (a title can trend in March and sit at #40 on the year list).
 
-**Window:** default **7 days**; optional 24h / 30d. Each person still counts once per game (Playing + GOTY-add is still one person; use their **most recent** counting event). **Sort** is the sum of recency weights; the board does not show a people count. Defaults: last 24 hours = 1, 1–3 days = ½, rest of the 7-day window = ¼, 7–30 days = ⅛ (30-day chip only). Admin-editable on `/admin/rankings`. A 40-game GOTY save still counts that person once per title.
+**Window:** default **7 days**; optional 24h / 30d. Each person still counts once per game (Playing + GOTY-add is still one person; use their **most recent** counting event). **Sort** is the sum of recency × kind weight; the board does not show a people count. Defaults: last 24 hours = 1, 1–3 days = ½, rest of the 7-day window = ¼, 7–30 days = ⅛ (30-day chip only). Kind defaults: wishlist / backlog / beat / GOTY-add = 1, Playing = **1.25**, paused / dropped / cleared / remove / reveal = **0** (omitted). Both recency and kind weights are admin-editable on `/admin/rankings`. Recency still dominates a modest Playing bump. A 40-game GOTY save still counts that person once per title.
 
-**Counting kinds:** `library_wishlist`, `library_backlog`, `library_playing`, `library_beat`, `list_add`. **Dropped and paused are not hype** — omit from the main board (optional later “cooling off” strip). Do not fold IGDB `hypes` / `follows` into the rank. Exclude adult games. Exclude private library and hidden-list events via the same on-read joins as the feed.
+**Counting kinds:** any event whose kind weight is above zero. Defaults match `library_wishlist`, `library_backlog`, `library_playing`, `library_beat`, `list_add`. **Dropped and paused are not hype** at weight 0 — omit from the main board unless an operator raises them. Do not fold IGDB `hypes` / `follows` into the rank. Exclude adult games. Exclude private library and hidden-list events via the same on-read joins as the feed.
 
 **Scopes:**
 

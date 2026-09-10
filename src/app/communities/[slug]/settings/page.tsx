@@ -201,6 +201,7 @@ export default async function CommunitySettingsPage({
             slug={community.slug}
             inviteCode={community.adminInviteCode ?? ""}
             openInvites={community.openInvites}
+            joinsClosed={community.joinsClosed}
           />
         ) : (
           <>
@@ -214,6 +215,7 @@ export default async function CommunitySettingsPage({
               visibility={
                 community.visibility === "public" ? "public" : "private"
               }
+              joinsClosed={community.joinsClosed}
               socialLinks={community.socialLinks}
               avatarUrl={community.avatarUrl}
               bannerUrl={community.bannerUrl}
@@ -235,6 +237,7 @@ export default async function CommunitySettingsPage({
               slug={community.slug}
               canLeave={canLeave}
               isPublic={community.visibility === "public"}
+              joinsClosed={community.joinsClosed}
             />
             <RequestCommunityDeletionForm
               slug={community.slug}

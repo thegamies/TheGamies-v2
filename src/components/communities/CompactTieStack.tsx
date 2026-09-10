@@ -253,19 +253,32 @@ export function CompactTieStack({
         ) : null}
       </button>
 
-      <Link
-        href={`/games/${shown.slug}`}
-        className="group mt-2 block min-w-0"
-      >
-        <FitDisplayTitle
-          className="w-full group-hover:text-accent"
-          maxPx={titleMaxPx}
-          minPx={titleMinPx}
-          lines={2}
+      {shown.slug.trim() ? (
+        <Link
+          href={`/games/${shown.slug}`}
+          className="group mt-2 block min-w-0"
         >
-          {shown.title}
-        </FitDisplayTitle>
-      </Link>
+          <FitDisplayTitle
+            className="w-full group-hover:text-accent"
+            maxPx={titleMaxPx}
+            minPx={titleMinPx}
+            lines={2}
+          >
+            {shown.title}
+          </FitDisplayTitle>
+        </Link>
+      ) : (
+        <div className="mt-2 min-w-0">
+          <FitDisplayTitle
+            className="w-full"
+            maxPx={titleMaxPx}
+            minPx={titleMinPx}
+            lines={2}
+          >
+            {shown.title}
+          </FitDisplayTitle>
+        </div>
+      )}
     </div>
   );
 }

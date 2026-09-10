@@ -18,9 +18,11 @@ export function AdminLibrarySeedClient() {
       </h2>
       <p className="max-w-2xl text-muted">
         Fill Wishlist, Backlog, Playing, and Beat shelves on seed accounts so Games
-        trending has enough people. Seed accounts stay out of People search
-        and cannot be followed, except by site operators and on local or
-        preview builds.
+        trending has enough people. Playing uses popular games that came out
+        recently — the same current titles across many seed accounts — with
+        those events stamped in the last day. Seed accounts stay out of People
+        search and cannot be followed, except by site operators and on local
+        or preview builds.
       </p>
       <div className="flex flex-wrap gap-3">
         <Button

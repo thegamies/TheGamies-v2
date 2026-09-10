@@ -18,10 +18,25 @@ export const listTitleSchema = z.string().trim().min(1).max(120);
 
 export const listYearSchema = z.coerce.number().int().min(1970).max(2100);
 
+export const listRankVisibilitySchema = z.enum([
+  "ranked",
+  "games_only",
+  "hidden",
+]);
+export type ListRankVisibility = z.infer<typeof listRankVisibilitySchema>;
+
+export function parseStoredRankVisibility(
+  value: string | null | undefined,
+): ListRankVisibility {
+  const parsed = listRankVisibilitySchema.safeParse(value);
+  return parsed.success ? parsed.data : "ranked";
+}
+
 export const createGotyDraftSchema = z.object({
   listType: z.literal("goty"),
   year: listYearSchema,
   title: listTitleSchema.optional(),
+  rankVisibility: listRankVisibilitySchema.optional(),
 });
 
 export const createCustomDraftSchema = z.object({
@@ -103,20 +118,6 @@ export type ListFormat = z.infer<typeof listFormatSchema>;
 export function parseStoredListFormat(value: string): ListFormat {
   const parsed = listFormatSchema.safeParse(value);
   return parsed.success ? parsed.data : "grid";
-}
-
-export const listRankVisibilitySchema = z.enum([
-  "ranked",
-  "games_only",
-  "hidden",
-]);
-export type ListRankVisibility = z.infer<typeof listRankVisibilitySchema>;
-
-export function parseStoredRankVisibility(
-  value: string | null | undefined,
-): ListRankVisibility {
-  const parsed = listRankVisibilitySchema.safeParse(value);
-  return parsed.success ? parsed.data : "ranked";
 }
 
 export const clientDraftUpsertSchema = z.object({

@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   communityMembers,
   createDb,
@@ -8,6 +8,10 @@ import {
   tgaYears,
   type Db,
 } from "@thegamies/db";
+import {
+  COMMUNITY_HOSTS_MAX,
+  communityHostsCapacityError,
+} from "@/lib/communities/host-limits";
 import {
   EDITION_HOST_ROSTER_LIMIT,
   EDITION_HOST_SEARCH_LIMIT,
@@ -59,12 +63,13 @@ export async function seedTgaCommunityHostsFromCurrent(
   designatedByProfileId: string | null,
   db: Db = getDb(),
 ): Promise<void> {
-  if (profileIds.length === 0) return;
+  const capped = profileIds.slice(0, COMMUNITY_HOSTS_MAX);
+  if (capped.length === 0) return;
   const designatedAt = new Date();
   await db
     .insert(tgaCommunityHosts)
     .values(
-      profileIds.map((profileId) => ({
+      capped.map((profileId) => ({
         communityId,
         year,
         profileId,
@@ -84,10 +89,25 @@ export async function syncTgaHostOnSyncableYears(
   const years = await listSyncableTgaYears(communityId, db);
   if (years.length === 0) return;
   const designatedAt = new Date();
+  const eligible: number[] = [];
+  for (const year of years) {
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(tgaCommunityHosts)
+      .where(
+        and(
+          eq(tgaCommunityHosts.communityId, communityId),
+          eq(tgaCommunityHosts.year, year),
+        ),
+      );
+    if (Number(n ?? 0) >= COMMUNITY_HOSTS_MAX) continue;
+    eligible.push(year);
+  }
+  if (eligible.length === 0) return;
   await db
     .insert(tgaCommunityHosts)
     .values(
-      years.map((year) => ({
+      eligible.map((year) => ({
         communityId,
         year,
         profileId,
@@ -243,6 +263,22 @@ export async function setTgaCommunityHost(
   }
 
   if (isHost) {
+    const existing = await db
+      .select({ profileId: tgaCommunityHosts.profileId })
+      .from(tgaCommunityHosts)
+      .where(
+        and(
+          eq(tgaCommunityHosts.communityId, detail.id),
+          eq(tgaCommunityHosts.year, year),
+        ),
+      );
+    const onRoster = existing.some((row) => row.profileId === targetProfileId);
+    const capacityError = communityHostsCapacityError(
+      existing.length,
+      onRoster,
+    );
+    if (capacityError) return { error: capacityError };
+
     await db
       .insert(tgaCommunityHosts)
       .values({

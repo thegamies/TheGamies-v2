@@ -44,7 +44,7 @@ Same official slate and winners. Separate sheets. Import from the global sheet (
 
 Community Settings lists created years (including locked). **Create** only offers a site-On year that has not locked (promoted first, else newest). Delete is on Pick’em **Settings** (`?view=settings`); type the year to confirm. Delete removes that community’s sheets, standings, and Host snapshot.
 
-Create seeds that year’s Host snapshot (`tga_community_hosts`) from current community Hosts. Promote / Retire syncs years that are not locked. Admins can still add or remove a Host for that year on Pick’em **Settings**. Standings has Community / Hosts; Hosts ranks only people on that year’s snapshot (SQL join + page).
+Create seeds that year’s Host snapshot (`tga_community_hosts`) from current community Hosts (capped at **12**). Promote / Retire syncs years that are not locked. Admins can still add or remove a Host for that year on Pick’em **Settings** (same **12** cap). Standings has Community / Hosts; Hosts ranks only people on that year’s snapshot (SQL join + page).
 
 ## Request cost
 

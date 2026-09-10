@@ -9,6 +9,10 @@ import { Button } from "@/components/ui/Button";
 import { YearPicker } from "@/components/ui/YearPicker";
 import { createCommunityEditionAction } from "@/app/communities/actions";
 import type { EditionAwardCategoryOption } from "@/lib/communities/edition-categories";
+import type {
+  CustomCategoryView,
+  EditionBallotCategoryRef,
+} from "@/lib/communities/custom-category-types";
 import {
   editionScheduleDateBounds,
   editionScheduleFieldNotice,
@@ -16,6 +20,22 @@ import {
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { nextAvailableYear } from "@/lib/ui/calendar-year";
 import { useUnsavedChangesGuard } from "@/hooks/useUnsavedChangesGuard";
+
+function serializeCustomCategoriesForCreate(categories: CustomCategoryView[]) {
+  return categories.map((c) => ({
+    localId: c.id,
+    name: c.name,
+    description: c.description,
+    answerType: c.answerType,
+    eligibility: c.eligibility,
+    entries: c.entries.map((e) => ({
+      title: e.title,
+      description: e.description,
+      gameId: e.gameId,
+      supportLinkUrl: e.supportLinkUrl,
+    })),
+  }));
+}
 
 export function CreateEventForm({
   slug,
@@ -40,6 +60,12 @@ export function CreateEventForm({
   const [closes, setCloses] = useState("");
   const [publishes, setPublishes] = useState("");
   const [selected, setSelected] = useState<EditionAwardCategoryOption[]>([]);
+  const [customCategories, setCustomCategories] = useState<
+    CustomCategoryView[]
+  >([]);
+  const [ballotOrder, setBallotOrder] = useState<EditionBallotCategoryRef[]>(
+    [],
+  );
   const [rankMode, setRankMode] = useState<SharedRankMode>("dense");
   const [submitted, setSubmitted] = useState(false);
 
@@ -49,6 +75,7 @@ export function CreateEventForm({
     closes !== "" ||
     publishes !== "" ||
     selected.length > 0 ||
+    customCategories.length > 0 ||
     rankMode !== "dense";
 
   const { allowLeave, dialog: unsavedDialog } = useUnsavedChangesGuard(
@@ -100,6 +127,10 @@ export function CreateEventForm({
     allowLeave();
   }
 
+  const siteIdsInOrder = ballotOrder
+    .filter((r) => r.kind === "site")
+    .map((r) => r.id);
+
   return (
     <>
       <form
@@ -109,9 +140,21 @@ export function CreateEventForm({
         className="mt-6 max-w-xl space-y-8"
       >
         <input type="hidden" name="slug" value={slug} />
-        {selected.map((c) => (
-          <input key={c.id} type="hidden" name="categoryIds" value={c.id} />
+        {siteIdsInOrder.map((id) => (
+          <input key={id} type="hidden" name="categoryIds" value={id} />
         ))}
+        <input
+          type="hidden"
+          name="ballotOrderJson"
+          value={JSON.stringify(ballotOrder)}
+        />
+        <input
+          type="hidden"
+          name="customCategoriesJson"
+          value={JSON.stringify(
+            serializeCustomCategoriesForCreate(customCategories),
+          )}
+        />
 
         <section className="space-y-3">
           <div>
@@ -162,14 +205,20 @@ export function CreateEventForm({
             Categories
           </h3>
           <p className="text-sm text-muted">
-            Add site awards to this event’s ballot. You can change them later.
+            Site awards and community awards share one ballot order. You can
+            change them after you create the event.
           </p>
           <EditionCategoriesDraft
             catalog={siteCategoryCatalog}
             selected={selected}
+            customCategories={customCategories}
+            slug={slug}
+            year={year}
             disabled={pending}
             locked={false}
             onChange={setSelected}
+            onBallotOrderChange={setBallotOrder}
+            onCustomCategoriesChange={setCustomCategories}
           />
         </section>
 

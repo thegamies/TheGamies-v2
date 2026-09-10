@@ -22,6 +22,7 @@ export function GameSearchField({
   excludeIds,
   eligibility,
   allowEditions = false,
+  allowDlcAddon = false,
 }: {
   /** Omit to search the whole catalog (TGA nominees, anticipated titles). */
   year?: number;
@@ -35,6 +36,7 @@ export function GameSearchField({
   excludeIds?: ReadonlySet<string>;
   eligibility?: AwardCategoryEligibility;
   allowEditions?: boolean;
+  allowDlcAddon?: boolean;
 }) {
   const searchId = useId();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -85,6 +87,7 @@ export function GameSearchField({
         gotyMode: useGotyMode,
         eligibility,
         allowEditions,
+        allowDlcAddon,
       });
       setHits(results);
     });

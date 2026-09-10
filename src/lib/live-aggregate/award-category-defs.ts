@@ -18,8 +18,6 @@ export type AwardCategoryGroup = (typeof AWARD_CATEGORY_GROUPS)[number];
 
 export const AWARD_CATEGORY_ELIGIBILITIES = [
   "current_year",
-  "current_or_active",
-  "active_in_year",
   "upcoming",
   "any_year",
 ] as const;
@@ -58,11 +56,77 @@ export const AWARD_CATEGORY_ELIGIBILITY_LABEL: Record<
   string
 > = {
   current_year: "Current year",
-  current_or_active: "Current or active",
-  active_in_year: "Active in year",
   upcoming: "Upcoming",
-  any_year: "Any year",
+  any_year: "Any year released",
 };
+
+/** Compact tile / heading caption. Current year is omitted (default). */
+export function awardEligibilityCaption(
+  eligibility: AwardCategoryEligibility,
+  year?: number,
+): string | null {
+  if (eligibility === "current_year") return null;
+  if (eligibility === "upcoming") {
+    return year != null ? `Upcoming · later than ${year}` : "Upcoming";
+  }
+  return year != null
+    ? `Any year released · ${year} or earlier`
+    : "Any year released";
+}
+
+/** Host-facing explanation for community custom awards. */
+export function awardEligibilityDescription(
+  eligibility: AwardCategoryEligibility,
+  year: number,
+): string {
+  if (eligibility === "current_year") {
+    return `Games from ${year} only.`;
+  }
+  if (eligibility === "upcoming") {
+    return `Titles from later years — not ${year}, even if still unreleased.`;
+  }
+  return `Already released, ${year} or earlier.`;
+}
+
+/** Site awards that only appear on the current and previous calendar-year lists. */
+export const CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS = [
+  "best-ongoing-game",
+  "most-anticipated-game",
+] as const;
+
+/** DLC add-ons are eligible here; packs, bundles, and other SKU types still are not. */
+export const DLC_ADDON_AWARD_ID = "best-expansion-dlc";
+
+export function awardAllowsDlcAddon(categoryId: string): boolean {
+  return categoryId === DLC_ADDON_AWARD_ID;
+}
+
+export function awardOfferedOnListYear(
+  categoryId: string,
+  listYear: number,
+  now: Date = new Date(),
+): boolean {
+  if (
+    !(CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS as readonly string[]).includes(
+      categoryId,
+    )
+  ) {
+    return true;
+  }
+  return listYear >= now.getUTCFullYear() - 1;
+}
+
+export function filterAwardsOfferedOnListYear<T extends { id: string }>(
+  awards: T[],
+  listYear: number,
+  opts?: { keepIds?: ReadonlySet<string>; now?: Date },
+): T[] {
+  return awards.filter(
+    (award) =>
+      awardOfferedOnListYear(award.id, listYear, opts?.now) ||
+      opts?.keepIds?.has(award.id),
+  );
+}
 
 function def(
   sortOrder: number,
@@ -91,10 +155,10 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(3, "art-direction", "Best Art Direction", "premier", "current_year", "A world with a look all its own."),
   def(4, "soundtrack", "Best Soundtrack", "premier", "current_year", "The music that stayed with you after you stopped playing."),
   def(5, "indie", "Best Indie Game", "major", "current_year", "A smaller production that made a huge impression."),
-  def(6, "best-multiplayer", "Best Multiplayer", "major", "current_or_active", "Better because you're playing with—or against—someone else."),
+  def(6, "best-multiplayer", "Best Multiplayer", "major", "current_year", "Better because you're playing with—or against—someone else."),
   def(7, "most-anticipated-game", "Most Anticipated Game", "special", "upcoming", "The game you need to play next."),
   def(8, "best-new-ip", "Best New IP", "major", "current_year", "The best brand-new world, idea, or franchise."),
-  def(9, "best-ongoing-game", "Best Ongoing Game", "major", "active_in_year", "Still giving you reasons to come back."),
+  def(9, "best-ongoing-game", "Best Ongoing Game", "major", "any_year", "Still giving you reasons to come back."),
   def(10, "most-innovative", "Most Innovative", "fun", "current_year", "The game that tried something genuinely different."),
   def(11, "best-audio-design", "Best Audio Design", "premier", "current_year", "Every hit, footstep, explosion, and quiet moment sounds just right."),
   def(12, "biggest-surprise", "Biggest Surprise", "fun", "current_year", "You expected little. You got something special."),
@@ -102,8 +166,8 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(14, "most-underrated", "Most Underrated", "fun", "current_year", "More people should be talking about this game."),
   def(15, "best-combat", "Best Combat", "gameplay", "current_year", "Fighting so good you look forward to the next encounter."),
   def(16, "best-expansion-dlc", "Best Expansion / DLC", "special", "current_year", "The add-on that gave you a reason to jump back in.", true),
-  def(17, "best-game-to-play-with-friends", "Best Game to Play With Friends", "community", "current_or_active", "Everything's better with the group."),
-  def(18, "best-co-op", "Best Co-op", "multiplayer", "current_or_active", "The game you want a friend beside you for."),
+  def(17, "best-game-to-play-with-friends", "Best Game to Play With Friends", "community", "current_year", "Everything's better with the group."),
+  def(18, "best-co-op", "Best Co-op", "multiplayer", "current_year", "The game you want a friend beside you for."),
   def(19, "best-level-design", "Best Level Design", "design", "current_year", "Every room, path, shortcut, and secret feels deliberately placed."),
   def(20, "best-worldbuilding", "Best Worldbuilding", "design", "current_year", "A place that feels like it existed before you arrived."),
   def(21, "best-exploration", "Best Exploration", "gameplay", "current_year", "The game that always rewarded taking the long way around."),
@@ -122,7 +186,7 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(34, "best-sim-strategy", "Best Sim / Strategy", "genre", "current_year", "The game that made every decision count."),
   def(35, "best-platformer", "Best Platformer", "genre", "current_year", "Jumping, climbing, bouncing, and falling done right."),
   def(36, "best-fighting-game", "Best Fighting Game", "genre", "current_year", "The best game for settling things one round at a time."),
-  def(37, "best-pvp", "Best PvP", "multiplayer", "current_or_active", "Nothing beats outplaying another human."),
+  def(37, "best-pvp", "Best PvP", "multiplayer", "current_year", "Nothing beats outplaying another human."),
   def(38, "best-gunplay", "Best Gunplay", "gameplay", "current_year", "Every shot just feels right."),
   def(39, "best-melee-combat", "Best Melee Combat", "gameplay", "current_year", "Up close and personal—and incredibly satisfying."),
   def(40, "best-enemy-design", "Best Enemy Design", "gameplay", "current_year", "Enemies that made every encounter interesting."),
@@ -146,11 +210,11 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(58, "best-loot-system", "Best Loot System", "systems", "current_year", "Always chasing that next drop."),
   def(59, "best-magic-system", "Best Magic System", "gameplay", "current_year", "The game that made casting spells feel truly powerful."),
   def(60, "best-difficulty-design", "Best Difficulty Design", "gameplay", "current_year", "Tough enough to test you, fair enough to keep you trying."),
-  def(61, "best-accessibility", "Best Accessibility", "craft", "current_or_active", "More ways for more people to play."),
+  def(61, "best-accessibility", "Best Accessibility", "craft", "current_year", "More ways for more people to play."),
   def(62, "best-ui-ux", "Best UI / UX", "technical", "current_year", "Everything is exactly where you expect it to be."),
   def(63, "best-one-more-run-game", "Best “One More Run” Game", "community", "current_year", "You know exactly what \"one more\" actually means."),
   def(64, "most-addictive", "Most Addictive", "fun", "current_year", "You were going to stop an hour ago."),
-  def(65, "best-local-multiplayer", "Best Local Multiplayer", "multiplayer", "current_or_active", "Same game. Same couch. Questionable friendships afterward."),
+  def(65, "best-local-multiplayer", "Best Local Multiplayer", "multiplayer", "current_year", "Same game. Same couch. Questionable friendships afterward."),
   def(66, "best-parry-system", "Best Parry System", "gameplay", "current_year", "That perfect clang that makes you feel unstoppable."),
   def(67, "best-dodge-dash", "Best Dodge / Dash", "gameplay", "current_year", "Getting out of the way is half the fun."),
   def(68, "best-crafting-system", "Best Crafting System", "systems", "current_year", "Turning a pile of stuff into something you actually want."),
@@ -161,11 +225,11 @@ export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(73, "best-ai", "Best AI", "technical", "current_year", "Enemies and characters that actually seem to know what they're doing."),
   def(74, "best-mobile-game", "Best Mobile Game", "platform", "current_year", "The best game made for your pocket."),
   def(75, "best-vr-ar-game", "Best VR / AR Game", "platform", "current_year", "The experience that made stepping inside the game worth it."),
-  def(76, "best-game-to-watch", "Best Game to Watch", "community", "current_or_active", "Almost as much fun to watch as it is to play."),
+  def(76, "best-game-to-watch", "Best Game to Watch", "community", "current_year", "Almost as much fun to watch as it is to play."),
   def(77, "best-game-you-finally-played", "Best Game You Finally Played", "community", "any_year", "Better late than never."),
   def(78, "biggest-disappointment", "Biggest Disappointment", "fun", "current_year", "You wanted to love it. You really did."),
-  def(79, "best-social-mechanics", "Best Social Mechanics", "multiplayer", "current_or_active", "The game that found clever ways to bring players together."),
-  def(80, "best-multiplayer-progression", "Best Multiplayer Progression", "multiplayer", "current_or_active", "Always one more unlock worth chasing."),
+  def(79, "best-social-mechanics", "Best Social Mechanics", "multiplayer", "current_year", "The game that found clever ways to bring players together."),
+  def(80, "best-multiplayer-progression", "Best Multiplayer Progression", "multiplayer", "current_year", "Always one more unlock worth chasing."),
   def(81, "best-tutorial-onboarding", "Best Tutorial / Onboarding", "technical", "current_year", "Teaching you how to play without feeling like homework."),
   def(82, "best-procedural-generation", "Best Procedural Generation", "technical", "current_year", "A game that keeps finding new ways to surprise you."),
   def(83, "best-inventory-system", "Best Inventory System", "systems", "current_year", "Somehow, managing all your stuff is actually enjoyable."),
@@ -258,13 +322,18 @@ export function parseAwardCategoryGroup(
   return DEFAULT_AWARD_CATEGORY_GROUP;
 }
 
+const LEGACY_SITE_ELIGIBILITY: Record<string, AwardCategoryEligibility> = {
+  current_or_active: "current_year",
+  active_in_year: "any_year",
+};
+
 export function parseAwardCategoryEligibility(
   raw: unknown,
 ): AwardCategoryEligibility {
-  if (
-    typeof raw === "string" &&
-    (AWARD_CATEGORY_ELIGIBILITIES as readonly string[]).includes(raw)
-  ) {
+  if (typeof raw !== "string") return "current_year";
+  const mapped = LEGACY_SITE_ELIGIBILITY[raw];
+  if (mapped) return mapped;
+  if ((AWARD_CATEGORY_ELIGIBILITIES as readonly string[]).includes(raw)) {
     return raw as AwardCategoryEligibility;
   }
   return "current_year";

@@ -12,7 +12,6 @@ import {
 } from "@thegamies/db";
 import { coverUrlFromImageId } from "@thegamies/igdb";
 import {
-  TRENDING_KINDS,
   emptyLibraryStatusCounts,
   parseActivityKind,
   parseLibraryStatus,
@@ -25,16 +24,19 @@ import {
   type FeedEventRow,
 } from "@/lib/activity/group-feed";
 import {
+  countingKindsFromWeights,
   DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+  DEFAULT_TRENDING_KIND_WEIGHTS,
   DEFAULT_TRENDING_RECENCY_WEIGHTS,
   isPublicTrendingReady,
   parsePublicTrendingMinPeople,
   parseTrendingWindowHours,
   scoreTrending,
+  type TrendingKindWeights,
   type TrendingRecencyWeights,
   type TrendingWindowHours,
 } from "@/lib/activity/trending";
-import { getTrendingRecencyWeights } from "@/lib/site-settings/service";
+import { getSiteSettings } from "@/lib/site-settings/service";
 import { paginateProfileItems } from "@/lib/profile/profile-page";
 
 export const FEED_PAGE_SIZE = 40;
@@ -260,6 +262,7 @@ export async function listTrendingBoard(opts: {
   minPeople?: number;
   applySiteFloor?: boolean;
   recencyWeights?: TrendingRecencyWeights;
+  kindWeights?: TrendingKindWeights;
   now?: Date;
   page?: number;
   db?: Db;
@@ -279,13 +282,25 @@ export async function listTrendingBoard(opts: {
   const minPeople = parsePublicTrendingMinPeople(
     opts.minPeople ?? DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
   );
-  const recencyWeights =
-    opts.recencyWeights ??
-    (await getTrendingRecencyWeights(db).catch(
-      () => DEFAULT_TRENDING_RECENCY_WEIGHTS,
-    ));
+  let recencyWeights = opts.recencyWeights;
+  let kindWeights = opts.kindWeights;
+  if (!recencyWeights || !kindWeights) {
+    const settings = await getSiteSettings(db).catch(() => null);
+    recencyWeights =
+      recencyWeights ??
+      settings?.trendingRecencyWeights ??
+      DEFAULT_TRENDING_RECENCY_WEIGHTS;
+    kindWeights =
+      kindWeights ??
+      settings?.trendingKindWeights ??
+      DEFAULT_TRENDING_KIND_WEIGHTS;
+  }
+  const countingKinds = countingKindsFromWeights(kindWeights);
 
-  if (opts.followedIds && opts.followedIds.length === 0) {
+  if (
+    countingKinds.length === 0 ||
+    (opts.followedIds && opts.followedIds.length === 0)
+  ) {
     return {
       rows: [],
       windowHours,
@@ -299,7 +314,7 @@ export async function listTrendingBoard(opts: {
 
   const filters = [
     gte(activityEvents.createdAt, since),
-    inArray(activityEvents.kind, [...TRENDING_KINDS]),
+    inArray(activityEvents.kind, countingKinds),
     eq(games.isAdult, false),
     eq(profiles.visibility, "public"),
     isNull(profiles.deletedAt),
@@ -321,6 +336,7 @@ export async function listTrendingBoard(opts: {
     gameId: activityEvents.gameId,
     profileId: activityEvents.profileId,
     lastAt: max(activityEvents.createdAt),
+    kind: sql<string>`(array_agg(${activityEvents.kind} ORDER BY ${activityEvents.createdAt} DESC, ${activityEvents.id} DESC))[1]`,
     slug: games.slug,
     title: games.title,
     coverImageId: covers.imageId,
@@ -369,7 +385,7 @@ export async function listTrendingBoard(opts: {
   const events: Array<{
     profileId: string;
     gameId: string;
-    kind: "library_backlog";
+    kind: string;
     createdAt?: Date;
   }> = [];
   for (const row of raw) {
@@ -378,7 +394,7 @@ export async function listTrendingBoard(opts: {
     events.push({
       profileId: row.profileId,
       gameId: row.gameId,
-      kind: "library_backlog",
+      kind: row.kind ?? "library_backlog",
       createdAt: row.lastAt ?? undefined,
     });
     if (!meta.has(row.gameId)) {
@@ -390,7 +406,11 @@ export async function listTrendingBoard(opts: {
     }
   }
 
-  const ranked = scoreTrending(events, { now, weights: recencyWeights });
+  const ranked = scoreTrending(events, {
+    now,
+    weights: recencyWeights,
+    kindWeights,
+  });
   const distinctPeople = allPeople.size;
   const publicReady = opts.applySiteFloor
     ? isPublicTrendingReady(distinctPeople, minPeople)

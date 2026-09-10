@@ -358,6 +358,48 @@
       "when": 1789516800000,
       "tag": "0050_library_status_rename",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1789603200000,
+      "tag": "0051_community_custom_categories",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1789689600000,
+      "tag": "0052_custom_category_eligibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1789776000000,
+      "tag": "0053_ballot_copy_prompted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1789862400000,
+      "tag": "0054_edition_ballot_list_copy_prompt",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1789948800000,
+      "tag": "0055_trending_kind_weights",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1790035200000,
+      "tag": "0056_community_featured_joins_closed",
+      "breakpoints": true
     }
   ]
 }

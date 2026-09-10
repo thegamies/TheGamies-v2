@@ -16,8 +16,10 @@ import {
   CategoryPickerGrid,
 } from "@/components/lists/CategoryPickerGrid";
 import {
-  AWARD_CATEGORY_ELIGIBILITY_LABEL,
   AWARD_CATEGORY_GROUP_LABEL,
+  awardAllowsDlcAddon,
+  awardEligibilityCaption,
+  filterAwardsOfferedOnListYear,
   parseAwardCategoryEligibility,
   parseAwardCategoryGroup,
   type StandingsCategoryGroupFilter,
@@ -44,6 +46,83 @@ export type CategoryVoteSelection = {
   title: string;
   coverUrl: string | null;
 };
+
+/** One site award as it appears on a ballot (heading + search / pick). */
+export function SiteCategoryBallotBlock({
+  category,
+  pick,
+  year,
+  onPick,
+  onClear,
+  onRemove,
+  interactive = true,
+}: {
+  category: AwardCategoryOption;
+  pick?: CategoryVoteSelection | null;
+  year?: number;
+  onPick?: (hit: GameSearchHit) => void;
+  onClear?: () => void;
+  /** Optional — personal GOTY lists can remove a category from the ballot. */
+  onRemove?: () => void;
+  /** When false, heading only (host preview before voting opens). */
+  interactive?: boolean;
+}) {
+  const group = parseAwardCategoryGroup(category.categoryGroup);
+  const eligibility = parseAwardCategoryEligibility(category.eligibility);
+  const eligibilityCaption = awardEligibilityCaption(eligibility, year);
+  const blurb = category.description?.trim() || null;
+  const hintParts = [AWARD_CATEGORY_GROUP_LABEL[group]];
+  if (eligibilityCaption) hintParts.push(eligibilityCaption);
+  const description = [blurb, eligibilityCaption].filter(Boolean).join(" · ")
+    || hintParts.join(" · ");
+
+  if (interactive && pick) {
+    return (
+      <CategoryPickCard
+        label={category.label}
+        description={description}
+        title={pick.title}
+        coverUrl={pick.coverUrl}
+        onClear={onClear}
+      />
+    );
+  }
+
+  return (
+    <div>
+      <CategoryVoteHeading
+        label={category.label}
+        description={description}
+      />
+      {interactive && year != null && onPick ? (
+        <div className="mt-4">
+          <GameSearchField
+            year={year}
+            eligibility={eligibility}
+            allowEditions={category.allowEditions === true}
+            allowDlcAddon={awardAllowsDlcAddon(category.id)}
+            onSelect={onPick}
+            aria-label={`Search games for ${category.label}`}
+            placeholder={`Search games for ${category.label}`}
+          />
+        </div>
+      ) : interactive ? null : (
+        <p className="mt-4 text-sm text-muted">
+          Members search and pick any eligible game.
+        </p>
+      )}
+      {interactive && onRemove ? (
+        <button
+          type="button"
+          className="mt-3 text-sm text-muted hover:text-ink"
+          onClick={onRemove}
+        >
+          Remove category
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 type Props = {
   categories: AwardCategoryOption[];
@@ -93,8 +172,12 @@ export function CategoryVotesEditor({
     return catalog.filter((c) => ids.has(c.id)).map((c) => c.id);
   }, [catalog, fixedCatalog, openIds, value]);
 
-  const unused = catalog.filter((c) => !visibleIds.includes(c.id));
+  const unused = filterAwardsOfferedOnListYear(
+    catalog.filter((c) => !visibleIds.includes(c.id)),
+    year,
+  );
   const added = catalog.filter((c) => visibleIds.includes(c.id));
+  const offeredCatalog = filterAwardsOfferedOnListYear(catalog, year);
   const filteredAdded = useMemo(
     () =>
       filterAwardCategories(added, { query: listQuery, group: listGroup }),
@@ -159,18 +242,18 @@ export function CategoryVotesEditor({
           ) : null}
         </div>
         <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-          {catalog.slice(0, 16).map((cat) => (
-            <li
-              key={cat.id}
-              className="border border-line bg-panel px-3 py-3 text-sm text-muted"
-            >
-              {cat.label}
-            </li>
-          ))}
+          {offeredCatalog.slice(0, 16).map((cat) => (
+              <li
+                key={cat.id}
+                className="border border-line bg-panel px-3 py-3 text-sm text-muted"
+              >
+                {cat.label}
+              </li>
+            ))}
         </ul>
-        {catalog.length > 16 ? (
+        {offeredCatalog.length > 16 ? (
           <p className="mt-3 text-xs text-muted">
-            +{catalog.length - 16} more after you sign in
+            +{offeredCatalog.length - 16} more after you sign in
           </p>
         ) : null}
       </section>
@@ -229,50 +312,18 @@ export function CategoryVotesEditor({
         <div className="mt-8 divide-y divide-line border-y border-line">
           {filteredAdded.map((cat) => {
             const selected = value.find((v) => v.categoryId === cat.id);
-            const group = parseAwardCategoryGroup(cat.categoryGroup);
-            const eligibility = parseAwardCategoryEligibility(cat.eligibility);
-            const hintParts = [AWARD_CATEGORY_GROUP_LABEL[group]];
-            if (eligibility !== "current_year") {
-              hintParts.push(AWARD_CATEGORY_ELIGIBILITY_LABEL[eligibility]);
-            }
-            const hint = hintParts.join(" · ");
             return (
               <div key={cat.id} className="py-6">
-                {selected ? (
-                  <CategoryPickCard
-                    label={cat.label}
-                    description={cat.description ?? hint}
-                    title={selected.title}
-                    coverUrl={selected.coverUrl}
-                    onClear={() => clear(cat.id)}
-                  />
-                ) : (
-                  <div>
-                    <CategoryVoteHeading
-                      label={cat.label}
-                      description={cat.description ?? hint}
-                    />
-                    <div className="mt-4">
-                      <GameSearchField
-                        year={year}
-                        eligibility={eligibility}
-                        allowEditions={cat.allowEditions === true}
-                        onSelect={(hit) => pick(cat.id, hit)}
-                        aria-label={`Search games for ${cat.label}`}
-                        placeholder={`Search games for ${cat.label}`}
-                      />
-                    </div>
-                    {fixedCatalog ? null : (
-                      <button
-                        type="button"
-                        className="mt-3 text-sm text-muted hover:text-ink"
-                        onClick={() => removeCategory(cat.id)}
-                      >
-                        Remove category
-                      </button>
-                    )}
-                  </div>
-                )}
+                <SiteCategoryBallotBlock
+                  category={cat}
+                  pick={selected}
+                  year={year}
+                  onPick={(hit) => pick(cat.id, hit)}
+                  onClear={() => clear(cat.id)}
+                  onRemove={
+                    fixedCatalog ? undefined : () => removeCategory(cat.id)
+                  }
+                />
               </div>
             );
           })}
@@ -301,7 +352,11 @@ export function CategoryVotesEditor({
           <p className="mt-2 text-sm text-muted">
             Choose an award to add to your list.
           </p>
-          <CategoryPickerGrid categories={unused} onSelect={addCategory} />
+          <CategoryPickerGrid
+            categories={unused}
+            year={year}
+            onSelect={addCategory}
+          />
         </Dialog>
       )}
     </section>

@@ -33,6 +33,25 @@ describe("buildEditionRevealDemoStandings", () => {
     expect(categoryComparison.rows[0]?.community[0]?.title).toBe("Game 1");
   });
 
+  it("labels community awards on demo podiums", () => {
+    const { categoryPodiums } = buildEditionRevealDemoStandings([
+      { id: "best-art", label: "Best Art", description: "Look" },
+      {
+        id: "best-boss",
+        label: "Best Boss",
+        description: null,
+        isCommunity: true,
+      },
+    ]);
+    expect(categoryPodiums).toHaveLength(2);
+    expect(categoryPodiums[0]?.label).toBe("Best Art");
+    expect(categoryPodiums[1]).toMatchObject({
+      categoryId: "best-boss",
+      label: "Best Boss · Community",
+      isCommunity: true,
+    });
+  });
+
   it("builds a podium per edition category", () => {
     const { categoryPodiums } = buildEditionRevealDemoStandings([
       { id: "best-art", label: "Best Art", description: "Look" },

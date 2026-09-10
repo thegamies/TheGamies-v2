@@ -8,6 +8,8 @@ import {
   communityBannerObjectKey,
   isJpegBytePayload,
   isPngBytePayload,
+  isWebpBytePayload,
+  detectCustomCategoryImageKind,
   profileBannerObjectKey,
   validateAvatarUploadInput,
   validateBannerUploadInput,
@@ -54,5 +56,26 @@ describe("avatar upload helpers", () => {
         contentLength: 10,
       }),
     ).toThrow(/JPEG/i);
+  });
+
+  it("detects JPEG and WebP for custom category images", () => {
+    expect(
+      detectCustomCategoryImageKind(new Uint8Array([0xff, 0xd8, 0xff]).buffer),
+    ).toEqual({ ext: "jpg", contentType: "image/jpeg" });
+
+    const webp = new Uint8Array(12);
+    webp.set([0x52, 0x49, 0x46, 0x46], 0);
+    webp.set([0x57, 0x45, 0x42, 0x50], 8);
+    expect(isWebpBytePayload(webp.buffer)).toBe(true);
+    expect(detectCustomCategoryImageKind(webp.buffer)).toEqual({
+      ext: "webp",
+      contentType: "image/webp",
+    });
+
+    expect(
+      detectCustomCategoryImageKind(
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47]).buffer,
+      ),
+    ).toBeNull();
   });
 });

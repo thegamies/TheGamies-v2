@@ -350,6 +350,14 @@ export function editionShowsVoterTurnout(status: EditionStatus): boolean {
   return status === "open" || status === "closed";
 }
 
+/**
+ * Hosts may inspect the ballot layout before voting opens.
+ * Members still only see the coming-soon deck.
+ */
+export function editionShowsHostBallotPreview(status: EditionStatus): boolean {
+  return status === "scheduled";
+}
+
 /** Other people’s ballots are only public after results publish. */
 export function editionRevealsVoterBallots(status: EditionStatus): boolean {
   return status === "published";

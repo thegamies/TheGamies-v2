@@ -11,7 +11,7 @@ import {
   or,
   sql,
 } from "drizzle-orm";
-import { GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS } from "@/lib/igdb-game-types";
+import { categoryEligibleGameTypeIgdbIds } from "@/lib/igdb-game-types";
 import {
   companies,
   covers,
@@ -52,6 +52,8 @@ export type BrowseGamesInput = {
   excludeEditions?: boolean;
   /** Main games + expansions/remakes; excludes packs, DLC/addons, bundles. */
   gotyEligibleTypes?: boolean;
+  /** With `gotyEligibleTypes`, also include IGDB DLC/addon (Best Expansion / DLC). */
+  includeDlcAddonType?: boolean;
   limit?: number;
   offset?: number;
   includeAdult?: boolean;
@@ -73,6 +75,7 @@ function browseGamesWhere(input: BrowseGamesInput) {
     releaseStatus = "all",
     excludeEditions = false,
     gotyEligibleTypes = false,
+    includeDlcAddonType = false,
     includeAdult = false,
   } = input;
 
@@ -107,7 +110,12 @@ function browseGamesWhere(input: BrowseGamesInput) {
     conditions.push(
       or(
         isNull(games.gameTypeIgdbId),
-        inArray(games.gameTypeIgdbId, [...GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS]),
+        inArray(
+          games.gameTypeIgdbId,
+          categoryEligibleGameTypeIgdbIds({
+            allowDlcAddon: includeDlcAddonType,
+          }),
+        ),
       )!,
     );
   }

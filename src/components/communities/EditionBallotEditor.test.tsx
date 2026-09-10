@@ -7,6 +7,9 @@ import { EditionBallotEditor } from "./EditionBallotEditor";
 
 vi.mock("@/app/communities/actions", () => ({
   saveEditionBallotAction: vi.fn(),
+  copyEditionBallotToGotyAction: vi.fn(),
+  dismissEditionBallotListCopyAction: vi.fn(),
+  previewEditionBallotListExportAction: vi.fn(),
 }));
 
 vi.mock("@/hooks/useUnsavedChangesGuard", () => ({
@@ -21,7 +24,12 @@ vi.mock("@/components/ui/GameSearchField", () => ({
 }));
 
 vi.mock("@/components/lists/CategoryVotesEditor", () => ({
-  CategoryVotesEditor: () => null,
+  SiteCategoryBallotBlock: () => null,
+}));
+
+vi.mock("@/components/communities/CustomCategoryVotesEditor", () => ({
+  CustomCategoryBallotBlock: () => null,
+  customVotesFromBallotView: () => [],
 }));
 
 afterEach(() => {
@@ -58,5 +66,32 @@ describe("EditionBallotEditor drag chrome", () => {
     for (const token of cardTouchLockClassName.split(" ")) {
       expect(handle.className).toContain(token);
     }
+  });
+
+  it("offers export to the Game of the Year list", () => {
+    render(
+      <EditionBallotEditor
+        slug="test"
+        year={2026}
+        initialItems={[
+          {
+            gameId: "g1",
+            igdbId: 1,
+            slug: "expedition-33",
+            title: "Clair Obscur: Expedition 33",
+            year: 2026,
+            coverUrl: null,
+            rank: 1,
+            blurb: "",
+          },
+        ]}
+        initialCategoryVotes={[]}
+        awardCategories={[]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Export to my list" }),
+    ).toBeTruthy();
   });
 });

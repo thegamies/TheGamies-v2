@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   communityEditions,
   communityEditionVoices,
@@ -9,6 +9,10 @@ import {
   type Db,
 } from "@thegamies/db";
 import { computeEditionStatus, type EditionStatus } from "./edition-status";
+import {
+  COMMUNITY_HOSTS_MAX,
+  communityHostsCapacityError,
+} from "./host-limits";
 import { canManageCommunity } from "./rules";
 import { getCommunityBySlug } from "./service";
 import {
@@ -143,7 +147,9 @@ export async function seedEditionVoicesFromCurrentHosts(
   designatedByProfileId: string | null,
   db: Db = getDb(),
 ): Promise<void> {
-  const profileIds = await listCurrentHostProfileIds(communityId, db);
+  const profileIds = (
+    await listCurrentHostProfileIds(communityId, db)
+  ).slice(0, COMMUNITY_HOSTS_MAX);
   if (profileIds.length === 0) return;
   const designatedAt = new Date();
   await db
@@ -188,10 +194,20 @@ async function addVoiceToEditions(
 ): Promise<void> {
   if (editionIds.length === 0) return;
   const designatedAt = new Date();
+  const eligible: string[] = [];
+  for (const editionId of editionIds) {
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(communityEditionVoices)
+      .where(eq(communityEditionVoices.editionId, editionId));
+    if (Number(n ?? 0) >= COMMUNITY_HOSTS_MAX) continue;
+    eligible.push(editionId);
+  }
+  if (eligible.length === 0) return;
   await db
     .insert(communityEditionVoices)
     .values(
-      editionIds.map((editionId) => ({
+      eligible.map((editionId) => ({
         editionId,
         profileId,
         designatedAt,
@@ -243,6 +259,14 @@ export async function promoteCommunityHost(
     return { error: "Only community members can be Hosts." };
   }
 
+  const currentHostIds = await listCurrentHostProfileIds(detail.id, db);
+  const alreadyHost = currentHostIds.includes(targetProfileId);
+  const capacityError = communityHostsCapacityError(
+    currentHostIds.length,
+    alreadyHost,
+  );
+  if (capacityError) return { error: capacityError };
+
   const now = new Date();
   await db
     .insert(communityHosts)
@@ -264,14 +288,16 @@ export async function promoteCommunityHost(
       },
     });
 
-  const editionIds = await listSyncableEditionIds(detail.id, db);
-  await addVoiceToEditions(editionIds, targetProfileId, actorProfileId, db);
-  await syncTgaHostOnSyncableYears(
-    detail.id,
-    targetProfileId,
-    actorProfileId,
-    db,
-  );
+  if (!alreadyHost) {
+    const editionIds = await listSyncableEditionIds(detail.id, db);
+    await addVoiceToEditions(editionIds, targetProfileId, actorProfileId, db);
+    await syncTgaHostOnSyncableYears(
+      detail.id,
+      targetProfileId,
+      actorProfileId,
+      db,
+    );
+  }
   return { ok: true };
 }
 

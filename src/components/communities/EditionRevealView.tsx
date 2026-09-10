@@ -2,6 +2,10 @@
 
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
+import {
+  standingGameHref,
+} from "@/components/communities/StandingGameCard";
+import { SupportWatchLink } from "@/components/media/SupportWatchLink";
 import Link from "next/link";
 import {
   createContext,
@@ -10,6 +14,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from "react";
 import type {
@@ -398,6 +403,51 @@ function CeremonyChapter({
   );
 }
 
+function CeremonyLinked({
+  slug,
+  className,
+  children,
+  style,
+  draggable,
+  ariaLabel,
+  coverAttr,
+}: {
+  slug: string | null | undefined;
+  className?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+  draggable?: boolean;
+  ariaLabel?: string;
+  coverAttr?: boolean;
+}) {
+  const href = standingGameHref(slug);
+  const coverProps = coverAttr ? { "data-c-cover": true as const } : {};
+  if (!href) {
+    return (
+      <div
+        className={className}
+        style={style}
+        aria-label={ariaLabel}
+        {...coverProps}
+      >
+        {children}
+      </div>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      className={className}
+      style={style}
+      draggable={draggable}
+      aria-label={ariaLabel}
+      {...coverProps}
+    >
+      {children}
+    </Link>
+  );
+}
+
 function CeremonyArt({
   title,
   coverUrl,
@@ -628,10 +678,12 @@ function GotyCountdown({
   year,
   communityName,
   places,
+  fadeHead = false,
 }: {
   year: number;
   communityName: string;
   places: EditionGotyStandingRow[];
+  fadeHead?: boolean;
 }) {
   const groups = groupByRank(places);
   const extra = groups.reduce(
@@ -646,7 +698,7 @@ function GotyCountdown({
       title={`${year} Game of the Year`}
       heightVh={heightVh}
       paint={paintGotyCountdown}
-      fadeHead
+      fadeHead={fadeHead}
     >
       <div className="relative h-full w-full">
         {groups.map((group) => {
@@ -705,9 +757,9 @@ function GotyCountdown({
                   }}
                 >
                   <div className="relative mx-auto flex w-full max-w-[var(--page-max)] items-end gap-5 pr-[min(22vw,7rem)] sm:gap-10 md:gap-14">
-                    <Link
-                      href={`/games/${row.slug}`}
-                      data-c-cover
+                    <CeremonyLinked
+                      slug={row.slug}
+                      coverAttr
                       className="relative block shrink-0"
                       style={{
                         width: featured
@@ -721,7 +773,7 @@ function GotyCountdown({
                         title={row.title}
                         coverUrl={row.coverUrl}
                       />
-                    </Link>
+                    </CeremonyLinked>
 
                     <div className="min-w-0 flex-1 pb-1">
                       <p className="text-[11px] font-extrabold uppercase tracking-[0.18em] text-muted">
@@ -739,12 +791,12 @@ function GotyCountdown({
                             : "text-[clamp(1.5rem,3.5vw,2.5rem)]"
                         }`}
                       >
-                        <Link
-                          href={`/games/${row.slug}`}
+                        <CeremonyLinked
+                          slug={row.slug}
                           className="hover:text-accent"
                         >
                           {row.title}
-                        </Link>
+                        </CeremonyLinked>
                       </h3>
                     </div>
                   </div>
@@ -760,9 +812,11 @@ function GotyCountdown({
 
 type CatSlot = {
   place: number;
+  gameId: string;
   slug: string;
   title: string;
   coverUrl: string | null;
+  supportLinkUrl: string | null;
 };
 
 type CatAward = {
@@ -1062,12 +1116,15 @@ function CategoryRevealBoard({
                 }}
               >
                 {place.rows.map((row) => (
-                  <li key={row.slug} className="min-w-0 w-full max-w-full">
-                    <Link
-                      href={`/games/${row.slug}`}
+                  <li
+                    key={row.gameId}
+                    className="min-w-0 w-full max-w-full"
+                  >
+                    <CeremonyLinked
+                      slug={row.slug}
                       className="group block min-w-0"
                       draggable={false}
-                      aria-label={row.title}
+                      ariaLabel={row.title}
                     >
                       <CeremonyArt
                         title={row.title}
@@ -1089,7 +1146,10 @@ function CategoryRevealBoard({
                           {row.title}
                         </p>
                       ) : null}
-                    </Link>
+                    </CeremonyLinked>
+                    {density.showTitles && row.supportLinkUrl ? (
+                      <SupportWatchLink url={row.supportLinkUrl} />
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -1105,10 +1165,12 @@ function CategoriesCountdown({
   year,
   communityName,
   awards,
+  fadeHead = false,
 }: {
   year: number;
   communityName: string;
   awards: CatAward[];
+  fadeHead?: boolean;
 }) {
   const placeUnits = awards.reduce((sum, cat) => {
     const grouped = groupByRank(
@@ -1136,6 +1198,7 @@ function CategoriesCountdown({
       title={`${year} Categories`}
       heightVh={heightVh}
       paint={paintCategoriesCountdown}
+      fadeHead={fadeHead}
     >
       <div className="relative h-full w-full">
         {awards.map((cat, awardIndex) => {
@@ -1150,9 +1213,11 @@ function CategoriesCountdown({
                 rank: place,
                 rows: g.rows.map((r) => ({
                   place: r.place,
+                  gameId: r.gameId,
                   slug: r.slug,
                   title: r.title,
                   coverUrl: r.coverUrl,
+                  supportLinkUrl: r.supportLinkUrl ?? null,
                 })),
               };
             })
@@ -1267,8 +1332,8 @@ function CeremonySummary({
             <ol className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 md:gap-4">
               {gotyAsc.map((row) => (
                 <li key={row.gameId} className="min-w-0">
-                  <Link
-                    href={`/games/${row.slug}`}
+                  <CeremonyLinked
+                    slug={row.slug}
                     className="group block"
                     draggable={false}
                   >
@@ -1285,7 +1350,7 @@ function CeremonySummary({
                     <p className="mt-1.5 line-clamp-2 font-display text-base leading-snug text-ink group-hover:text-accent sm:text-lg">
                       {row.title}
                     </p>
-                  </Link>
+                  </CeremonyLinked>
                 </li>
               ))}
             </ol>
@@ -1321,19 +1386,24 @@ function CeremonySummary({
                         />
                       </div>
                     ) : (
-                      <Link
-                        href={`/games/${first.slug}`}
-                        className="group mt-1.5 block"
-                        draggable={false}
-                      >
-                        <CeremonyArt
-                          title={first.title}
-                          coverUrl={first.coverUrl}
-                        />
-                        <p className="mt-1.5 line-clamp-2 font-display text-base leading-snug text-ink group-hover:text-accent sm:text-lg">
-                          {first.title}
-                        </p>
-                      </Link>
+                      <>
+                        <CeremonyLinked
+                          slug={first.slug}
+                          className="group mt-1.5 block"
+                          draggable={false}
+                        >
+                          <CeremonyArt
+                            title={first.title}
+                            coverUrl={first.coverUrl}
+                          />
+                          <p className="mt-1.5 line-clamp-2 font-display text-base leading-snug text-ink group-hover:text-accent sm:text-lg">
+                            {first.title}
+                          </p>
+                        </CeremonyLinked>
+                        {first.supportLinkUrl ? (
+                          <SupportWatchLink url={first.supportLinkUrl} />
+                        ) : null}
+                      </>
                     )}
                   </li>
                 );
@@ -1374,14 +1444,18 @@ function CeremonySummary({
 }
 
 /**
- * Compact centered welcome above the GOTY header.
+ * Compact centered welcome above the first ceremony chapter.
  */
 function RevealOpener({
   year,
   communityName,
+  hasCategories,
+  hasGoty,
 }: {
   year: number;
   communityName: string;
+  hasCategories: boolean;
+  hasGoty: boolean;
 }) {
   return (
     <section className="relative overflow-hidden px-[var(--gutter)] py-12 sm:py-14">
@@ -1397,7 +1471,11 @@ function RevealOpener({
           Welcome to the {communityName} community {year} Video Game Awards
         </h2>
         <p className="mt-4 font-serif text-base leading-relaxed text-muted sm:text-lg">
-          A countdown of the top 10, then the category awards.
+          {hasCategories && hasGoty
+            ? "The category awards, then a countdown of the top 10."
+            : hasCategories
+              ? "The category awards."
+              : "A countdown of the top 10."}
         </p>
         <p className="mt-6 text-xs font-extrabold uppercase tracking-[0.22em] text-muted sm:text-[11px]">
           Scroll to reveal
@@ -1441,11 +1519,33 @@ export function EditionRevealView({
   )
     .reverse()
     .flatMap((g) => g.rows);
+  const hasGoty = gotyDesc.length > 0;
+  const hasCategories = categories.length > 0;
+  const categoryAwards = categories.map((c) => ({
+    categoryId: c.categoryId,
+    label: c.label,
+    description: c.description,
+    rows: c.rows.map((r) => ({
+      place: r.rank,
+      gameId: r.gameId,
+      slug: r.slug,
+      title: r.title,
+      coverUrl: r.coverUrl,
+      supportLinkUrl: r.supportLinkUrl ?? null,
+    })),
+  }));
 
   return (
     <ReducedMotionProvider>
       <div className="reveal-ceremony -mx-[var(--gutter)] w-[calc(100%+2*var(--gutter))]">
-        {gotyDesc.length === 0 ? (
+        {hasGoty || hasCategories ? (
+          <RevealOpener
+            year={year}
+            communityName={communityName}
+            hasCategories={hasCategories}
+            hasGoty={hasGoty}
+          />
+        ) : (
           <section className="border-b border-line px-[var(--gutter)] py-16">
             <p className="text-[11px] font-extrabold uppercase tracking-[0.2em] text-accent sm:text-sm sm:tracking-[0.18em]">
               {year} {communityName} community
@@ -1457,32 +1557,23 @@ export function EditionRevealView({
               No Game of the Year scores for this mode.
             </p>
           </section>
-        ) : (
-          <>
-            <RevealOpener year={year} communityName={communityName} />
-            <GotyCountdown
-              year={year}
-              communityName={communityName}
-              places={gotyDesc}
-            />
-          </>
         )}
 
-        {categories.length > 0 ? (
+        {hasCategories ? (
           <CategoriesCountdown
             year={year}
             communityName={communityName}
-            awards={categories.map((c) => ({
-              categoryId: c.categoryId,
-              label: c.label,
-              description: c.description,
-              rows: c.rows.map((r) => ({
-                place: r.rank,
-                slug: r.slug,
-                title: r.title,
-                coverUrl: r.coverUrl,
-              })),
-            }))}
+            awards={categoryAwards}
+            fadeHead
+          />
+        ) : null}
+
+        {hasGoty ? (
+          <GotyCountdown
+            year={year}
+            communityName={communityName}
+            places={gotyDesc}
+            fadeHead={!hasCategories}
           />
         ) : null}
 

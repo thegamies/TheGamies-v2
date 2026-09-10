@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  categoryEligibleGameTypeIgdbIds,
   GOTY_ELIGIBLE_GAME_TYPE_IGDB_IDS,
   IGDB_GAME_TYPE,
+  isCategoryEligibleGameType,
   isGotyEligibleGameType,
 } from "./igdb-game-types";
 
@@ -22,5 +24,28 @@ describe("isGotyEligibleGameType", () => {
     expect(isGotyEligibleGameType(IGDB_GAME_TYPE.pack)).toBe(false);
     expect(isGotyEligibleGameType(IGDB_GAME_TYPE.bundle)).toBe(false);
     expect(isGotyEligibleGameType(IGDB_GAME_TYPE.port)).toBe(false);
+  });
+});
+
+describe("isCategoryEligibleGameType", () => {
+  it("matches GOTY types by default and allows DLC add-ons when opted in", () => {
+    expect(isCategoryEligibleGameType(IGDB_GAME_TYPE.expansion)).toBe(true);
+    expect(isCategoryEligibleGameType(IGDB_GAME_TYPE.dlcAddon)).toBe(false);
+    expect(
+      isCategoryEligibleGameType(IGDB_GAME_TYPE.dlcAddon, {
+        allowDlcAddon: true,
+      }),
+    ).toBe(true);
+    expect(
+      isCategoryEligibleGameType(IGDB_GAME_TYPE.pack, { allowDlcAddon: true }),
+    ).toBe(false);
+    expect(
+      isCategoryEligibleGameType(IGDB_GAME_TYPE.bundle, {
+        allowDlcAddon: true,
+      }),
+    ).toBe(false);
+    expect(
+      categoryEligibleGameTypeIgdbIds({ allowDlcAddon: true }),
+    ).toContain(IGDB_GAME_TYPE.dlcAddon);
   });
 });

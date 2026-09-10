@@ -1,6 +1,7 @@
 import { and, asc, eq, ilike, inArray, notInArray, or, sql } from "drizzle-orm";
 import {
   awardCategories,
+  communityCustomCategories,
   communityEditionBallotCategoryVotes,
   communityEditionBallots,
   communityEditionCategories,
@@ -12,6 +13,10 @@ import {
   ensureAwardCategories,
   listActiveAwardCategories,
 } from "@/lib/live-aggregate/categories";
+import {
+  awardOfferedOnListYear,
+  filterAwardsOfferedOnListYear,
+} from "@/lib/live-aggregate/award-category-defs";
 import { computeEditionStatus, type EditionStatus } from "./edition-status";
 import { getEditionByCommunityYear } from "./editions";
 import { canManageCommunity } from "./rules";
@@ -30,12 +35,12 @@ export type EditionAwardCategoryOption = {
   enabled: boolean;
 };
 
-/** Hosts may add/remove categories only before voting closes. */
+/** Hosts may add/remove categories only before voting opens. */
 export function editionCategoriesWriteBlockedReason(
   status: EditionStatus,
 ): string | null {
-  if (status === "closed" || status === "published") {
-    return "Categories can only be changed before voting closes.";
+  if (status === "open" || status === "closed" || status === "published") {
+    return "Categories can only be changed before voting opens.";
   }
   return null;
 }
@@ -51,10 +56,20 @@ export async function seedEditionCategories(
   await ensureAwardCategories(db);
   const active = await listActiveAwardCategories(db);
   if (active.length === 0) return;
+  const [edition] = await db
+    .select({ year: communityEditions.year })
+    .from(communityEditions)
+    .where(eq(communityEditions.id, editionId))
+    .limit(1);
+  const offered =
+    edition != null
+      ? filterAwardsOfferedOnListYear(active, edition.year)
+      : active;
+  if (offered.length === 0) return;
   await db
     .insert(communityEditionCategories)
     .values(
-      active.map((c) => ({
+      offered.map((c) => ({
         editionId,
         categoryId: c.id,
         sortOrder: c.sortOrder,
@@ -217,6 +232,7 @@ export async function searchSiteAwardCategories(
     q: string;
     excludeIds?: string[];
     limit?: number;
+    year?: number;
   },
   db?: Db,
 ): Promise<
@@ -269,7 +285,9 @@ export async function searchSiteAwardCategories(
     }
   }
 
-  return rows;
+  return opts.year == null
+    ? rows
+    : filterAwardsOfferedOnListYear(rows, opts.year);
 }
 
 async function requireEditableEdition(
@@ -329,6 +347,18 @@ export async function addEditionCategory(
     .limit(1);
   if (!siteCat) return { error: "That category was not found." };
 
+  if (!awardOfferedOnListYear(categoryId, gate.year)) {
+    const previousIds = await listEditionEnabledCategoryIds(
+      gate.edition.id,
+      db,
+    );
+    if (!previousIds.includes(categoryId)) {
+      return {
+        error:
+          "This award is only available on current and previous year events.",
+      };
+    }
+  }
   await db
     .insert(communityEditionCategories)
     .values({
@@ -381,7 +411,12 @@ export async function removeEditionCategory(
 export async function setCommunityEditionCategories(
   slug: string,
   profileId: string,
-  input: { year: unknown; categoryIds: string[] },
+  input: {
+    year: unknown;
+    categoryIds: string[];
+    /** Full interleaved ballot order; when set, writes shared sort_order for site + custom. */
+    ballotOrder?: Array<{ kind: "site" | "custom"; id: string }>;
+  },
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
   const gate = await requireEditableEdition(slug, profileId, input.year, db);
@@ -393,33 +428,85 @@ export async function setCommunityEditionCategories(
     active = await listActiveAwardCategories(db);
   }
   const activeIds = new Set(active.map((c) => c.id));
-  const unique = [
+  const previousIds = await listEditionEnabledCategoryIds(gate.edition.id, db);
+  const previousSet = new Set(previousIds);
+  const allowSite = (id: string) =>
+    activeIds.has(id) &&
+    (awardOfferedOnListYear(id, gate.year) || previousSet.has(id));
+
+  const uniqueFromForm = [
     ...new Set(
       input.categoryIds
         .map((id) => id.trim())
-        .filter((id) => id.length > 0 && activeIds.has(id)),
+        .filter((id) => id.length > 0 && allowSite(id)),
     ),
   ];
 
-  const sortById = new Map(active.map((c) => [c.id, c.sortOrder] as const));
-  unique.sort(
-    (a, b) =>
-      (sortById.get(a) ?? 0) - (sortById.get(b) ?? 0) || a.localeCompare(b),
-  );
+  // Prefer interleaved order when provided; keep form order (do not re-sort by catalog).
+  let siteIdsInOrder = uniqueFromForm;
+  if (input.ballotOrder && input.ballotOrder.length > 0) {
+    const fromOrder = input.ballotOrder
+      .filter((r) => r.kind === "site")
+      .map((r) => r.id)
+      .filter((id) => allowSite(id));
+    siteIdsInOrder = [...new Set(fromOrder)];
+  }
 
-  const previousIds = await listEditionEnabledCategoryIds(gate.edition.id, db);
-  const nextIds = new Set(unique);
+  const nextIds = new Set(siteIdsInOrder);
   const removedIds = previousIds.filter((id) => !nextIds.has(id));
 
   await db
     .delete(communityEditionCategories)
     .where(eq(communityEditionCategories.editionId, gate.edition.id));
-  if (unique.length > 0) {
+
+  if (input.ballotOrder && input.ballotOrder.length > 0) {
+    const customRows = await db
+      .select({ id: communityCustomCategories.id })
+      .from(communityCustomCategories)
+      .where(eq(communityCustomCategories.editionId, gate.edition.id));
+    const customIdSet = new Set(customRows.map((r) => r.id));
+
+    for (let i = 0; i < input.ballotOrder.length; i++) {
+      const item = input.ballotOrder[i]!;
+      if (item.kind === "site") {
+        if (!allowSite(item.id)) continue;
+        await db.insert(communityEditionCategories).values({
+          editionId: gate.edition.id,
+          categoryId: item.id,
+          sortOrder: i,
+        });
+      } else if (customIdSet.has(item.id)) {
+        await db
+          .update(communityCustomCategories)
+          .set({ sortOrder: i, updatedAt: new Date() })
+          .where(
+            and(
+              eq(communityCustomCategories.editionId, gate.edition.id),
+              eq(communityCustomCategories.id, item.id),
+            ),
+          );
+      }
+    }
+
+    // Site ids in form but missing from ballotOrder (shouldn't happen) — append.
+    const orderedSite = new Set(
+      input.ballotOrder.filter((r) => r.kind === "site").map((r) => r.id),
+    );
+    let appendAt = input.ballotOrder.length;
+    for (const id of siteIdsInOrder) {
+      if (orderedSite.has(id)) continue;
+      await db.insert(communityEditionCategories).values({
+        editionId: gate.edition.id,
+        categoryId: id,
+        sortOrder: appendAt++,
+      });
+    }
+  } else if (siteIdsInOrder.length > 0) {
     await db.insert(communityEditionCategories).values(
-      unique.map((categoryId, index) => ({
+      siteIdsInOrder.map((categoryId, index) => ({
         editionId: gate.edition.id,
         categoryId,
-        sortOrder: index + 1,
+        sortOrder: index,
       })),
     );
   }

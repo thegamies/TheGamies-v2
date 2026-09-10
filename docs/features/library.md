@@ -58,7 +58,7 @@ This table **is** contrib for “who has this status.” Do not duplicate a `lib
 
 ## Ops (local / staging)
 
-Admin Standings seed can fill public Wishlist / Backlog / Playing / Beat rows on seed accounts (and matching activity events) so site trending has enough people. Seed accounts stay out of public People search. Site operators, and local or preview builds, can follow them; everyone else cannot.
+Admin Standings seed can fill public Wishlist / Backlog / Playing / Beat rows on seed accounts (and matching activity events) so site trending has enough people. The catalog pool is this year’s **already released** titles, ranked by **popularity × recency** (a recent hit beats an older one; TBA / Dec 31 placeholders and brand-new nobodies drop out). **Playing** rotates through the hottest dozen of those so many accounts share the same current games; Beat / Backlog / Wishlist use the rest of the pool. Playing events are stamped in the last day. Seed accounts stay out of public People search. Site operators, and local or preview builds, can follow them; everyone else cannot.
 
 ## Non-goals (this feature)
 

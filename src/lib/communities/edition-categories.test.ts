@@ -42,14 +42,17 @@ describe("searchSiteAwardCategories", () => {
 });
 
 describe("editionCategoriesWriteBlockedReason", () => {
-  it("blocks after close or publish", () => {
+  it("blocks once voting opens, and after close or publish", () => {
+    expect(editionCategoriesWriteBlockedReason("draft")).toBeNull();
     expect(editionCategoriesWriteBlockedReason("scheduled")).toBeNull();
-    expect(editionCategoriesWriteBlockedReason("open")).toBeNull();
+    expect(editionCategoriesWriteBlockedReason("open")).toMatch(
+      /before voting opens/i,
+    );
     expect(editionCategoriesWriteBlockedReason("closed")).toMatch(
-      /before voting closes/i,
+      /before voting opens/i,
     );
     expect(editionCategoriesWriteBlockedReason("published")).toMatch(
-      /before voting closes/i,
+      /before voting opens/i,
     );
   });
 });

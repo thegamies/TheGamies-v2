@@ -26,6 +26,9 @@ import {
   communityVisibilitySchema,
   parseCreateCommunityInput,
   asCommunityVisibility,
+  COMMUNITY_JOINS_CLOSED_MESSAGE,
+  FEATURED_COMMUNITIES_LIMIT,
+  featuredCommunitySaveBlockedReason,
   isCommunityPublic,
   type CommunityRole,
   type CommunityVisibility,
@@ -137,7 +140,11 @@ function toCommunityDetail(
     memberCount,
     hostCount,
     viewerRole,
-    viewerInviteCode: canSeeCommunityInvite(viewerRole, community.openInvites)
+    viewerInviteCode: canSeeCommunityInvite(
+      viewerRole,
+      community.openInvites,
+      community.joinsClosed,
+    )
       ? inviteCode
       : null,
     adminInviteCode: viewerRole === "admin" ? inviteCode : null,
@@ -203,6 +210,157 @@ export async function listMembershipCommunitiesPage(
     total,
     totalPages,
   };
+}
+
+export async function listFeaturedCommunities(
+  db: Db = getDb(),
+): Promise<MembershipCommunity[]> {
+  const rows = await db
+    .select({
+      id: communities.id,
+      slug: communities.slug,
+      name: communities.name,
+      description: communities.description,
+      avatarUrl: communities.avatarUrl,
+      bannerUrl: communities.bannerUrl,
+    })
+    .from(communities)
+    .where(
+      and(
+        eq(communities.featured, true),
+        eq(communities.visibility, "public"),
+      ),
+    )
+    .orderBy(asc(communities.featuredAt), asc(communities.name))
+    .limit(FEATURED_COMMUNITIES_LIMIT);
+
+  const ids = rows.map((row) => row.id);
+  const countRows =
+    ids.length === 0
+      ? []
+      : await db
+          .select({
+            communityId: communityMembers.communityId,
+            n: sql<number>`count(*)::int`,
+          })
+          .from(communityMembers)
+          .where(inArray(communityMembers.communityId, ids))
+          .groupBy(communityMembers.communityId);
+  const countById = new Map(
+    countRows.map((row) => [row.communityId, Number(row.n)]),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    memberCount: countById.get(row.id) ?? 0,
+  }));
+}
+
+export type CommunityDirectoryFlags = {
+  slug: string;
+  name: string;
+  visibility: CommunityVisibility;
+  featured: boolean;
+  joinsClosed: boolean;
+};
+
+export async function getCommunityDirectoryFlags(
+  slug: string,
+  db: Db = getDb(),
+): Promise<CommunityDirectoryFlags | { error: string }> {
+  const [row] = await db
+    .select({
+      slug: communities.slug,
+      name: communities.name,
+      visibility: communities.visibility,
+      featured: communities.featured,
+      joinsClosed: communities.joinsClosed,
+    })
+    .from(communities)
+    .where(eq(communities.slug, slug.trim().toLowerCase()))
+    .limit(1);
+  if (!row) return { error: "Community not found." };
+  return {
+    slug: row.slug,
+    name: row.name,
+    visibility: asCommunityVisibility(row.visibility),
+    featured: row.featured,
+    joinsClosed: row.joinsClosed,
+  };
+}
+
+export async function listFeaturedCommunitiesForAdmin(
+  db: Db = getDb(),
+): Promise<CommunityDirectoryFlags[]> {
+  const rows = await db
+    .select({
+      slug: communities.slug,
+      name: communities.name,
+      visibility: communities.visibility,
+      featured: communities.featured,
+      joinsClosed: communities.joinsClosed,
+    })
+    .from(communities)
+    .where(eq(communities.featured, true))
+    .orderBy(asc(communities.featuredAt), asc(communities.name))
+    .limit(FEATURED_COMMUNITIES_LIMIT);
+  return rows.map((row) => ({
+    slug: row.slug,
+    name: row.name,
+    visibility: asCommunityVisibility(row.visibility),
+    featured: row.featured,
+    joinsClosed: row.joinsClosed,
+  }));
+}
+
+export async function updateCommunityDirectoryFlags(
+  slug: string,
+  input: {
+    featured: boolean;
+    joinsClosed: boolean;
+    visibility: CommunityVisibility;
+  },
+  db: Db = getDb(),
+): Promise<{ ok: true } | { error: string }> {
+  const [community] = await db
+    .select({
+      id: communities.id,
+      featured: communities.featured,
+      featuredAt: communities.featuredAt,
+    })
+    .from(communities)
+    .where(eq(communities.slug, slug.trim().toLowerCase()))
+    .limit(1);
+  if (!community) return { error: "Community not found." };
+
+  const [countRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(communities)
+    .where(eq(communities.featured, true));
+  const blocked = featuredCommunitySaveBlockedReason({
+    featured: input.featured,
+    visibility: input.visibility,
+    alreadyFeatured: community.featured,
+    featuredCount: Number(countRow?.n ?? 0),
+  });
+  if (blocked) return { error: blocked };
+
+  const featuredAt = input.featured
+    ? (community.featuredAt ?? new Date())
+    : null;
+
+  await db
+    .update(communities)
+    .set({
+      visibility: input.visibility,
+      featured: input.featured,
+      featuredAt,
+      joinsClosed: input.joinsClosed,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, community.id));
+
+  return { ok: true };
 }
 
 export async function listCommunitiesForProfile(
@@ -488,6 +646,7 @@ export async function getCommunityInvitePreview(
   name: string;
   slug: string;
   alreadyMember: boolean;
+  joinsClosed: boolean;
 } | null> {
   const code = parseInviteCode(codeRaw);
   if (!code) return null;
@@ -497,6 +656,7 @@ export async function getCommunityInvitePreview(
       id: communities.id,
       slug: communities.slug,
       name: communities.name,
+      joinsClosed: communities.joinsClosed,
     })
     .from(communities)
     .where(eq(communities.inviteCode, code))
@@ -522,6 +682,7 @@ export async function getCommunityInvitePreview(
     name: community.name,
     slug: community.slug,
     alreadyMember,
+    joinsClosed: community.joinsClosed,
   };
 }
 
@@ -537,13 +698,20 @@ export async function joinCommunityWithInvite(
     .select({
       id: communities.id,
       slug: communities.slug,
+      joinsClosed: communities.joinsClosed,
     })
     .from(communities)
     .where(eq(communities.inviteCode, code))
     .limit(1);
   if (!community) return { error: "That invite is not valid." };
 
-  return joinCommunityAsMember(community.id, community.slug, profileId, db);
+  return joinCommunityAsMember(
+    community.id,
+    community.slug,
+    profileId,
+    community.joinsClosed,
+    db,
+  );
 }
 
 /** Open join for public communities (no invite code). */
@@ -557,6 +725,7 @@ export async function joinCommunityPublic(
       id: communities.id,
       slug: communities.slug,
       visibility: communities.visibility,
+      joinsClosed: communities.joinsClosed,
     })
     .from(communities)
     .where(eq(communities.slug, slug.trim().toLowerCase()))
@@ -566,13 +735,20 @@ export async function joinCommunityPublic(
     return { error: "This community is private. You need an invite to join." };
   }
 
-  return joinCommunityAsMember(community.id, community.slug, profileId, db);
+  return joinCommunityAsMember(
+    community.id,
+    community.slug,
+    profileId,
+    community.joinsClosed,
+    db,
+  );
 }
 
 async function joinCommunityAsMember(
   communityId: string,
   slug: string,
   profileId: string,
+  joinsClosed: boolean,
   db: Db,
 ): Promise<{ ok: true; slug: string } | { error: string }> {
   const [existing] = await db
@@ -586,6 +762,7 @@ async function joinCommunityAsMember(
     )
     .limit(1);
   if (existing) return { ok: true, slug };
+  if (joinsClosed) return { error: COMMUNITY_JOINS_CLOSED_MESSAGE };
 
   const [banned] = await db
     .select({ profileId: communityBans.profileId })
@@ -960,6 +1137,7 @@ export async function updateCommunityIdentity(
     }
   }
 
+  const unfeature = visibility === "private" && detail.featured;
   await db
     .update(communities)
     .set({
@@ -967,6 +1145,7 @@ export async function updateCommunityIdentity(
       description: descParsed.data,
       visibility,
       socialLinks,
+      ...(unfeature ? { featured: false, featuredAt: null } : {}),
       updatedAt: new Date(),
     })
     .where(eq(communities.id, detail.id));

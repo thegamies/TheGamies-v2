@@ -5,6 +5,7 @@ import {
 } from "@/lib/auth/session";
 import { resolveCommunityEditionNavYear } from "@/lib/communities/community-primary-nav";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 
 type Params = Promise<{ slug: string }>;
 
@@ -28,7 +29,11 @@ export default async function CommunityEditionIndexPage({
   if (!community) {
     redirect("/communities");
   }
-  if (!community.viewerRole) {
+  if (!canBrowseCommunityBoards(
+    community.visibility,
+    community.joinsClosed,
+    community.viewerRole,
+  )) {
     redirect(`/communities/${encodeURIComponent(community.slug)}`);
   }
 

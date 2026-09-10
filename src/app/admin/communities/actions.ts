@@ -10,6 +10,16 @@ import {
   refreshPublishedEditionResultsForSeed,
   seedCommunityEditionBallots,
 } from "@/lib/communities/seed-community";
+import {
+  getCommunityDirectoryFlags,
+  listFeaturedCommunitiesForAdmin,
+  updateCommunityDirectoryFlags,
+  type CommunityDirectoryFlags,
+} from "@/lib/communities/service";
+import {
+  asCommunityVisibility,
+  communityVisibilitySchema,
+} from "@/lib/communities/schema";
 
 async function requireAdmin() {
   if (!(await isAdminAuthorized())) {
@@ -187,4 +197,66 @@ export async function loadCommunitySeedStatsAction(input: {
   if (denied) return denied;
   const stats = await countCommunitySeeds(input.communitySlug);
   return { ok: true, ...stats };
+}
+
+export async function loadCommunityDirectoryAction(input: {
+  communitySlug: string;
+}): Promise<
+  | { ok: true; flags: CommunityDirectoryFlags }
+  | { error: string }
+> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const flags = await getCommunityDirectoryFlags(input.communitySlug);
+  if ("error" in flags) return flags;
+  return { ok: true, flags };
+}
+
+export async function loadFeaturedCommunitiesAction(): Promise<
+  | { ok: true; featured: CommunityDirectoryFlags[] }
+  | { error: string }
+> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+  const featured = await listFeaturedCommunitiesForAdmin();
+  return { ok: true, featured };
+}
+
+export async function saveCommunityDirectoryAction(input: {
+  communitySlug: string;
+  featured: boolean;
+  joinsClosed: boolean;
+  visibility: string;
+}): Promise<{ ok: true; flags: CommunityDirectoryFlags } | { error: string }> {
+  const denied = await requireAdmin();
+  if (denied) return denied;
+
+  const visParsed = communityVisibilitySchema.safeParse(input.visibility);
+  if (!visParsed.success) {
+    return { error: "Choose public or private." };
+  }
+
+  const result = await updateCommunityDirectoryFlags(input.communitySlug, {
+    featured: input.featured,
+    joinsClosed: input.joinsClosed,
+    visibility: visParsed.data,
+  });
+  if ("error" in result) return result;
+
+  const slug = input.communitySlug.trim().toLowerCase();
+  revalidatePath("/admin/communities");
+  revalidatePath("/communities");
+  revalidatePath(`/communities/${slug}`);
+  revalidatePath(`/communities/${slug}/edition`);
+  revalidatePath(`/communities/${slug}/settings`);
+
+  const flags = await getCommunityDirectoryFlags(slug);
+  if ("error" in flags) return { ok: true, flags: {
+    slug,
+    name: slug,
+    visibility: asCommunityVisibility(visParsed.data),
+    featured: input.featured,
+    joinsClosed: input.joinsClosed,
+  } };
+  return { ok: true, flags };
 }

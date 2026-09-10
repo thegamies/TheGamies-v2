@@ -9,6 +9,7 @@ import { CommunityJoinForm } from "./CommunityJoinForm";
 import { Button } from "@/components/ui/Button";
 import { getCommunityInvitePreview } from "@/lib/communities/service";
 import { parseInviteCode } from "@/lib/communities/invite-code";
+import { COMMUNITY_JOINS_CLOSED_MESSAGE } from "@/lib/communities/schema";
 
 type Params = Promise<{ code: string }>;
 
@@ -52,9 +53,11 @@ export default async function CommunityJoinPage({
             {preview.name}
           </h1>
           <p className="mt-3 max-w-xl text-muted">
-            You are invited to join this community.
+            {preview.joinsClosed
+              ? COMMUNITY_JOINS_CLOSED_MESSAGE
+              : "You are invited to join this community."}
           </p>
-          {profile ? (
+          {preview.joinsClosed ? null : profile ? (
             <CommunityJoinForm code={code} communityName={preview.name} />
           ) : user ? (
             <p className="mt-6 text-sm text-muted">

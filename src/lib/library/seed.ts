@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   activityEvents,
   createDb,
@@ -15,7 +15,17 @@ import { seedAccountsWhere } from "@/lib/seed-accounts";
 
 export const SEED_LIBRARY_GAMES_PER_PROFILE = 10;
 export const SEED_LIBRARY_POOL_SIZE = 80;
+/** Rank this many released candidates by popularity × recency, then take the pool. */
+export const SEED_LIBRARY_CANDIDATE_LIMIT = 400;
+/** Only this many hottest titles are eligible for Playing. */
+export const SEED_LIBRARY_PLAYING_POOL_SIZE = 12;
+export const SEED_LIBRARY_PLAYING_PER_PROFILE = 3;
+/** Recency half-life so a month-old hit still counts, January fades. */
+export const LIBRARY_SEED_RECENCY_HALF_LIFE_DAYS = 45;
+export const LIBRARY_SEED_RECENCY_FLOOR = 0.15;
 const WRITE_CHUNK = 100;
+const MS_PER_HOUR = 60 * 60 * 1000;
+const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 const LIBRARY_EVENT_KINDS = [
   "library_wishlist",
@@ -29,15 +39,65 @@ const LIBRARY_EVENT_KINDS = [
   "library_played",
 ] as const;
 
-const STATUS_CYCLE: LibraryStatus[] = [
-  "playing",
-  "beat",
-  "backlog",
-  "wishlist",
-];
+const REST_STATUS_CYCLE: LibraryStatus[] = ["beat", "backlog", "wishlist"];
+
+export type LibrarySeedCandidate = {
+  id: string;
+  popularity: number;
+  firstReleaseDate: Date | null;
+};
+
+function librarySeedReleased(now: Date) {
+  return and(
+    sql`${games.firstReleaseDate} is not null`,
+    sql`${games.firstReleaseDate} <= ${now}`,
+  );
+}
 
 function getDb(): Db {
   return createDb();
+}
+
+/** 1 for a game that just released; floor for old-but-out titles. Future/TBA is 0. */
+export function librarySeedRecencyWeight(
+  firstReleaseDate: Date | null,
+  now: Date,
+): number {
+  if (!firstReleaseDate) return 0;
+  const ageMs = now.getTime() - firstReleaseDate.getTime();
+  if (ageMs < 0) return 0;
+  const ageDays = ageMs / MS_PER_DAY;
+  const decay = Math.exp(
+    (-Math.LN2 * ageDays) / LIBRARY_SEED_RECENCY_HALF_LIFE_DAYS,
+  );
+  return LIBRARY_SEED_RECENCY_FLOOR + (1 - LIBRARY_SEED_RECENCY_FLOOR) * decay;
+}
+
+/** Popularity scaled by how recently the game actually came out. */
+export function librarySeedPlayingHeat(
+  popularity: number,
+  firstReleaseDate: Date | null,
+  now: Date,
+): number {
+  const recency = librarySeedRecencyWeight(firstReleaseDate, now);
+  if (recency <= 0) return 0;
+  return Math.max(popularity, 0) * recency;
+}
+
+export function rankLibrarySeedPool(
+  candidates: readonly LibrarySeedCandidate[],
+  now: Date,
+  limit = SEED_LIBRARY_POOL_SIZE,
+): string[] {
+  return [...candidates]
+    .map((row) => ({
+      id: row.id,
+      heat: librarySeedPlayingHeat(row.popularity, row.firstReleaseDate, now),
+    }))
+    .filter((row) => row.heat > 0)
+    .sort((a, b) => b.heat - a.heat || a.id.localeCompare(b.id))
+    .slice(0, limit)
+    .map((row) => row.id);
 }
 
 export function seedLibraryGameIdsForIndex(
@@ -55,20 +115,64 @@ export function seedLibraryGameIdsForIndex(
   return ids;
 }
 
-export function seedLibraryStatusForIndex(
+export type LibrarySeedAssignment = {
+  gameId: string;
+  status: LibraryStatus;
+};
+
+/**
+ * Playing rotates through the hottest popular-recent titles so many accounts
+ * share them. Beat / Backlog / Wishlist come from the rest of the pool.
+ */
+export function seedLibraryAssignmentsForIndex(
+  pool: readonly string[],
   profileIndex: number,
-  gameIndex: number,
-): LibraryStatus {
-  return STATUS_CYCLE[(profileIndex + gameIndex) % STATUS_CYCLE.length]!;
+): LibrarySeedAssignment[] {
+  if (pool.length === 0) return [];
+  const playingSource = pool.slice(
+    0,
+    Math.min(SEED_LIBRARY_PLAYING_POOL_SIZE, pool.length),
+  );
+  const playingIds = seedLibraryGameIdsForIndex(
+    playingSource,
+    profileIndex,
+    SEED_LIBRARY_PLAYING_PER_PROFILE,
+  );
+  const playingSet = new Set(playingIds);
+  const restSource = pool.filter((id) => !playingSet.has(id));
+  const restCount = Math.max(
+    0,
+    SEED_LIBRARY_GAMES_PER_PROFILE - playingIds.length,
+  );
+  const restIds = seedLibraryGameIdsForIndex(
+    restSource,
+    profileIndex,
+    restCount,
+  );
+  return [
+    ...playingIds.map((gameId) => ({
+      gameId,
+      status: "playing" as const,
+    })),
+    ...restIds.map((gameId, index) => ({
+      gameId,
+      status: REST_STATUS_CYCLE[index % REST_STATUS_CYCLE.length]!,
+    })),
+  ];
 }
 
 export function seedLibraryEventTime(
   now: Date,
   profileIndex: number,
   gameIndex: number,
+  status: LibraryStatus = "backlog",
 ): Date {
-  const hoursAgo = 2 + ((profileIndex * 7 + gameIndex * 5) % (24 * 5));
-  return new Date(now.getTime() - hoursAgo * 60 * 60 * 1000);
+  if (status === "playing") {
+    const hoursAgo = 1 + ((profileIndex * 3 + gameIndex * 2) % 23);
+    return new Date(now.getTime() - hoursAgo * MS_PER_HOUR);
+  }
+  const hoursAgo = 24 + ((profileIndex * 7 + gameIndex * 5) % (24 * 4));
+  return new Date(now.getTime() - hoursAgo * MS_PER_HOUR);
 }
 
 async function listSeedProfileIds(db: Db): Promise<string[]> {
@@ -79,23 +183,44 @@ async function listSeedProfileIds(db: Db): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
-async function loadLibrarySeedPool(db: Db): Promise<string[]> {
-  const year = new Date().getUTCFullYear();
-  const where = and(
+async function loadReleasedCandidates(
+  db: Db,
+  now: Date,
+  year: number | null,
+): Promise<LibrarySeedCandidate[]> {
+  const filters = [
     eq(games.isAdult, false),
     isNull(games.versionParentIgdbId),
-  );
-  const yearRows = await db
-    .select({ id: games.id })
+    librarySeedReleased(now),
+  ];
+  if (year != null) filters.push(eq(games.year, year));
+  const rows = await db
+    .select({
+      id: games.id,
+      popularity: games.popularity,
+      firstReleaseDate: games.firstReleaseDate,
+    })
     .from(games)
-    .where(and(where, eq(games.year, year)))
+    .where(and(...filters))
     .orderBy(desc(games.popularity), games.id)
-    .limit(SEED_LIBRARY_POOL_SIZE);
-  if (yearRows.length >= 8) return yearRows.map((row) => row.id);
+    .limit(SEED_LIBRARY_CANDIDATE_LIMIT);
+  return rows;
+}
+
+async function loadLibrarySeedPool(db: Db, now: Date): Promise<string[]> {
+  const year = now.getUTCFullYear();
+  const yearCandidates = await loadReleasedCandidates(db, now, year);
+  const yearPool = rankLibrarySeedPool(yearCandidates, now);
+  if (yearPool.length >= 8) return yearPool;
+  const anyReleased = await loadReleasedCandidates(db, now, null);
+  const releasedPool = rankLibrarySeedPool(anyReleased, now);
+  if (releasedPool.length > 0) return releasedPool;
   const anyYear = await db
     .select({ id: games.id })
     .from(games)
-    .where(where)
+    .where(
+      and(eq(games.isAdult, false), isNull(games.versionParentIgdbId)),
+    )
     .orderBy(desc(games.popularity), games.id)
     .limit(SEED_LIBRARY_POOL_SIZE);
   return anyYear.map((row) => row.id);
@@ -154,7 +279,7 @@ export async function seedLibrariesForSeedAccounts(
         "No seed accounts yet. Create standings or community seeds first.",
     };
   }
-  const pool = await loadLibrarySeedPool(db);
+  const pool = await loadLibrarySeedPool(db, now);
   if (pool.length === 0) {
     return { error: "No games in the catalog yet." };
   }
@@ -177,22 +302,26 @@ export async function seedLibrariesForSeedAccounts(
   }> = [];
 
   profileIds.forEach((profileId, profileIndex) => {
-    const gameIds = seedLibraryGameIdsForIndex(pool, profileIndex);
-    gameIds.forEach((gameId, gameIndex) => {
-      const status = seedLibraryStatusForIndex(profileIndex, gameIndex);
-      const createdAt = seedLibraryEventTime(now, profileIndex, gameIndex);
+    const assignments = seedLibraryAssignmentsForIndex(pool, profileIndex);
+    assignments.forEach((row, gameIndex) => {
+      const createdAt = seedLibraryEventTime(
+        now,
+        profileIndex,
+        gameIndex,
+        row.status,
+      );
       entryRows.push({
         profileId,
-        gameId,
-        status,
+        gameId: row.gameId,
+        status: row.status,
         visibility: "public",
         updatedAt: createdAt,
       });
       eventRows.push({
         profileId,
-        kind: libraryEventKindForStatus(status),
+        kind: libraryEventKindForStatus(row.status),
         batchId: crypto.randomUUID(),
-        gameId,
+        gameId: row.gameId,
         createdAt,
       });
     });

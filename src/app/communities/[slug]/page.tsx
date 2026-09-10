@@ -22,7 +22,9 @@ import { communityCreateEventHref } from "@/lib/communities/community-settings-h
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import {
   asCommunityVisibility,
+  canBrowseCommunityBoards,
   canBrowseCommunityHome,
+  COMMUNITY_JOINS_CLOSED_MESSAGE,
   isCommunityPublic,
 } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
@@ -79,6 +81,7 @@ export default async function CommunityHomePage({
 
   const visibility = asCommunityVisibility(community.visibility);
   const isMember = community.viewerRole != null;
+  const joinsClosed = community.joinsClosed;
   if (!canBrowseCommunityHome(visibility, community.viewerRole)) {
     return <CommunityPrivateView name={community.name} />;
   }
@@ -89,9 +92,15 @@ export default async function CommunityHomePage({
   const canManage = canManageCommunity(community.viewerRole);
   const membersHref = `/communities/${encodeURIComponent(community.slug)}/members`;
   const publicGuest = !isMember && isCommunityPublic(visibility);
+  const limitedPublicHome = publicGuest && !joinsClosed;
+  const showBoards = canBrowseCommunityBoards(
+    visibility,
+    joinsClosed,
+    community.viewerRole,
+  );
 
   let editions: CommunityEditionPublic[] = [];
-  if (isMember) {
+  if (showBoards) {
     try {
       editions = await listEditionsForCommunity(community.id);
     } catch {
@@ -116,9 +125,9 @@ export default async function CommunityHomePage({
       <CommunityHeader
         name={community.name}
         slug={community.slug}
-        liveEnabled={isMember && community.liveRankingsEnabled}
+        liveEnabled={showBoards && community.liveRankingsEnabled}
         canManage={canManage}
-        editionStatus={isMember ? navEditionStatus : null}
+        editionStatus={showBoards ? navEditionStatus : null}
         editionYear={
           featuredEdition && featuredEdition.status !== "draft"
             ? featuredEdition.year
@@ -136,10 +145,10 @@ export default async function CommunityHomePage({
         avatarUrl={community.avatarUrl}
         bannerUrl={community.bannerUrl}
         socialLinks={community.socialLinks}
-        showNav={isMember}
+        showNav={showBoards}
       />
 
-      {publicGuest ? (
+      {limitedPublicHome ? (
         <section className="mt-10 max-w-2xl">
           <h2 className="font-display text-3xl tracking-wide text-ink">
             About
@@ -216,12 +225,18 @@ export default async function CommunityHomePage({
                 {community.memberCount === 1 ? "member" : "members"}
               </Link>
             </p>
-            {profile ? (
+            {publicGuest && joinsClosed ? (
+              <p className="mt-4 text-sm text-muted">
+                {COMMUNITY_JOINS_CLOSED_MESSAGE}
+              </p>
+            ) : null}
+            {profile && isMember ? (
               <MembershipActions
                 slug={community.slug}
                 canLeave={canLeave}
                 isHost={canManage}
                 isPublic={isCommunityPublic(visibility)}
+                joinsClosed={joinsClosed}
               />
             ) : null}
           </section>

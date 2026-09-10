@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
@@ -11,6 +12,31 @@ import {
   standingCardChrome,
   type RankScoreLayout,
 } from "@/components/communities/standingCardLayout";
+
+export function standingGameHref(
+  slug: string | null | undefined,
+): string | null {
+  const trimmed = slug?.trim();
+  return trimmed ? `/games/${trimmed}` : null;
+}
+
+function OptionalGameLink({
+  slug,
+  className,
+  children,
+}: {
+  slug: string | null | undefined;
+  className?: string;
+  children: ReactNode;
+}) {
+  const href = standingGameHref(slug);
+  if (!href) return <div className={className}>{children}</div>;
+  return (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  );
+}
 
 export type { RankScoreLayout };
 
@@ -214,8 +240,12 @@ export function StandingGameCard({
       ? "group block w-[103px] lg:w-[206px]"
       : "group block";
 
+  const to = href ?? standingGameHref(slug);
+  if (!to) {
+    return <div className={linkClass}>{body}</div>;
+  }
   return (
-    <Link href={href ?? `/games/${slug}`} className={linkClass} draggable={false}>
+    <Link href={to} className={linkClass} draggable={false}>
       {body}
     </Link>
   );
@@ -332,8 +362,8 @@ function PodiumCoverStack({
       <div className="flex h-8 items-end sm:h-12">
         <RankMarker rank={entry.place} size={isWinner ? "lg" : "md"} />
       </div>
-      <Link
-        href={`/games/${entry.slug}`}
+      <OptionalGameLink
+        slug={entry.slug}
         className="mt-2 block w-full min-w-0 sm:mt-3"
       >
         <GameCover
@@ -344,7 +374,7 @@ function PodiumCoverStack({
           width={isWinner ? PODIUM_COVER.width : RUNNER_MAX.width}
           height={isWinner ? PODIUM_COVER.height : RUNNER_MAX.height}
         />
-      </Link>
+      </OptionalGameLink>
     </div>
   );
 }
@@ -360,8 +390,8 @@ function PodiumCaption({
   const titleMax = isWinner ? 28 : 18;
   return (
     <div className={`flex flex-col items-start text-left ${podiumColClass(size)}`}>
-      <Link
-        href={`/games/${entry.slug}`}
+      <OptionalGameLink
+        slug={entry.slug}
         className="group mt-2 block w-full min-w-0 sm:mt-3"
       >
         <FitDisplayTitle
@@ -372,7 +402,7 @@ function PodiumCaption({
         >
           {entry.title}
         </FitDisplayTitle>
-      </Link>
+      </OptionalGameLink>
       {entry.meta ? (
         <p className="mt-1.5 text-xs text-muted sm:mt-2 sm:text-sm">
           {entry.meta}

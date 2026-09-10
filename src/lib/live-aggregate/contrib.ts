@@ -18,7 +18,11 @@ import {
   liveGotyYearStats,
   type Db,
 } from "@thegamies/db";
-import { parseAwardCategoryEligibility } from "./award-category-defs";
+import {
+  awardAllowsDlcAddon,
+  awardOfferedOnListYear,
+  parseAwardCategoryEligibility,
+} from "./award-category-defs";
 import { categoryEligibilityError } from "./category-eligibility";
 import {
   buildGotyContribRows,
@@ -153,6 +157,7 @@ export async function syncOwnedGotyContribFromList(
       firstReleaseDate: games.firstReleaseDate,
       versionParentIgdbId: games.versionParentIgdbId,
       isAdult: games.isAdult,
+      gameTypeIgdbId: games.gameTypeIgdbId,
     })
     .from(listCategoryVotes)
     .innerJoin(games, eq(games.id, listCategoryVotes.gameId))
@@ -187,10 +192,14 @@ export async function syncOwnedGotyContribFromList(
           firstReleaseDate: v.firstReleaseDate,
           versionParentIgdbId: v.versionParentIgdbId,
           isAdult: v.isAdult,
+          gameTypeIgdbId: v.gameTypeIgdbId,
         },
         list.year!,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions },
+        {
+          allowEditions: cat.allowEditions,
+          allowDlcAddon: awardAllowsDlcAddon(cat.id),
+        },
       ) == null
     );
   });
@@ -298,8 +307,27 @@ export async function replaceCategoryVotesForList(
 
   const year = list.year;
 
+  const previousVotes = await db
+    .select({ categoryId: listCategoryVotes.categoryId })
+    .from(listCategoryVotes)
+    .where(eq(listCategoryVotes.listId, listId));
+  const previousCategoryIds = new Set(
+    previousVotes.map((row) => row.categoryId),
+  );
+
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
+    for (const categoryId of categoryIds) {
+      if (
+        !awardOfferedOnListYear(categoryId, year) &&
+        !previousCategoryIds.has(categoryId)
+      ) {
+        return {
+          error:
+            "This award is only available on current and previous year lists.",
+        };
+      }
+    }
     const activeCats = await db
       .select({
         id: awardCategories.id,
@@ -326,6 +354,7 @@ export async function replaceCategoryVotesForList(
         firstReleaseDate: games.firstReleaseDate,
         versionParentIgdbId: games.versionParentIgdbId,
         isAdult: games.isAdult,
+        gameTypeIgdbId: games.gameTypeIgdbId,
       })
       .from(games)
       .where(inArray(games.id, gameIds));
@@ -347,7 +376,7 @@ export async function replaceCategoryVotesForList(
         game,
         year,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions },
+        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat.id) },
       );
       if (err) return { error: err };
     }
@@ -372,6 +401,73 @@ export async function replaceCategoryVotesForList(
     .where(eq(lists.id, listId));
 
   return { ok: true };
+}
+
+/** Insert award picks that are not already on the list. Existing picks stay. */
+export async function insertMissingCategoryVotesForList(
+  listId: string,
+  votes: { categoryId: string; gameId: string }[],
+  db: Db = getLiveAggregateDb(),
+): Promise<{ ok: true; added: number } | { error: string }> {
+  if (votes.length === 0) return { ok: true, added: 0 };
+
+  const previous = await db
+    .select({
+      categoryId: listCategoryVotes.categoryId,
+      gameId: listCategoryVotes.gameId,
+    })
+    .from(listCategoryVotes)
+    .where(eq(listCategoryVotes.listId, listId));
+  const previousIds = new Set(previous.map((row) => row.categoryId));
+  const missing: { categoryId: string; gameId: string }[] = [];
+  const seen = new Set<string>();
+  for (const vote of votes) {
+    if (previousIds.has(vote.categoryId) || seen.has(vote.categoryId)) continue;
+    seen.add(vote.categoryId);
+    missing.push(vote);
+  }
+  if (missing.length === 0) return { ok: true, added: 0 };
+
+  const merged = [
+    ...previous.map((row) => ({
+      categoryId: row.categoryId,
+      gameId: row.gameId,
+    })),
+    ...missing,
+  ];
+  const written = await replaceCategoryVotesForList(listId, merged, db);
+  if ("error" in written) return written;
+  return { ok: true, added: missing.length };
+}
+
+/** Set award picks from the ballot; leave other list awards as they are. */
+export async function upsertCategoryVotesForList(
+  listId: string,
+  votes: { categoryId: string; gameId: string }[],
+  db: Db = getLiveAggregateDb(),
+): Promise<{ ok: true } | { error: string }> {
+  if (votes.length === 0) return { ok: true };
+  const previous = await db
+    .select({
+      categoryId: listCategoryVotes.categoryId,
+      gameId: listCategoryVotes.gameId,
+    })
+    .from(listCategoryVotes)
+    .where(eq(listCategoryVotes.listId, listId));
+  const next = new Map(
+    previous.map((row) => [row.categoryId, row.gameId] as const),
+  );
+  for (const vote of votes) {
+    next.set(vote.categoryId, vote.gameId);
+  }
+  return replaceCategoryVotesForList(
+    listId,
+    [...next.entries()].map(([categoryId, gameId]) => ({
+      categoryId,
+      gameId,
+    })),
+    db,
+  );
 }
 
 export async function listYearsNeedingRefresh(

@@ -16,7 +16,12 @@ export async function searchGamesForList(
 
   const categoryBrowse =
     year != null && input.eligibility
-      ? browseInputForCategoryEligibility(year, eligibility, allowEditions)
+      ? browseInputForCategoryEligibility(
+          year,
+          eligibility,
+          allowEditions,
+          input.allowDlcAddon === true,
+        )
       : null;
 
   const rows = await browseGames({

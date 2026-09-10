@@ -6,6 +6,7 @@ import {
   standingStripColClass,
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { SupportWatchLink } from "@/components/media/SupportWatchLink";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
@@ -18,6 +19,16 @@ import {
   editionResultsHref,
 } from "@/lib/communities/edition-results-href";
 import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
+
+function tallyCountCopy(
+  total: number,
+  kind: "game" | "entry" = "game",
+): string {
+  if (kind === "entry") {
+    return `${total} ${total === 1 ? "entry" : "entries"}`;
+  }
+  return `${total} game${total === 1 ? "" : "s"}`;
+}
 
 function CategoryChapterHeader({
   label,
@@ -112,7 +123,7 @@ export function EditionCategoryDetail({
           description={category.description}
         />
         <p className="mt-2 text-sm text-muted">
-          {category.total} game{category.total === 1 ? "" : "s"}
+          {tallyCountCopy(category.total, category.tallyKind ?? "game")}
         </p>
       </div>
 
@@ -133,6 +144,9 @@ export function EditionCategoryDetail({
                   points={row.votes}
                   scoreUnit="votes"
                 />
+                {row.supportLinkUrl ? (
+                  <SupportWatchLink url={row.supportLinkUrl} />
+                ) : null}
               </li>
             ))}
           </StandingGameCardGrid>
@@ -275,6 +289,9 @@ export function EditionCategoryResults({
                           priority={row.rank === 1}
                           pinCover
                         />
+                        {row.supportLinkUrl ? (
+                          <SupportWatchLink url={row.supportLinkUrl} />
+                        ) : null}
                       </li>
                     ))}
                   </ul>

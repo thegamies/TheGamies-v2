@@ -11,6 +11,7 @@ import { getCommunityLiveStandings } from "@/lib/communities/live";
 import { isCommunityLiveScoresRevealed } from "@/lib/communities/live-reveal";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { canManageCommunity } from "@/lib/communities/rules";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
@@ -88,7 +89,13 @@ export default async function CommunityLiveYearPage({
     community = null;
   }
   if (!community) notFound();
-  if (!community.viewerRole) {
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
     return <CommunityPrivateView name={community.name} />;
   }
   if (!community.liveRankingsEnabled) notFound();
@@ -157,7 +164,10 @@ export default async function CommunityLiveYearPage({
             : null
         }
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={
+          Boolean(community.viewerRole) &&
+          (await communityTgaNavVisible(community.id).catch(() => false))
+        }
         active="live"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

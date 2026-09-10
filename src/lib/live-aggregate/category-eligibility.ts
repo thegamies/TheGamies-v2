@@ -1,20 +1,30 @@
 import type { GotyGameCandidate } from "@/lib/lists/rules";
 import { gotyYearAndReleaseError } from "@/lib/lists/rules";
+import { isCategoryEligibleGameType } from "@/lib/igdb-game-types";
 import type { AwardCategoryEligibility } from "./award-category-defs";
 
 export type CategoryGameCandidate = GotyGameCandidate;
 
+function releaseYear(game: CategoryGameCandidate): number | null {
+  if (game.year != null) return game.year;
+  if (game.firstReleaseDate) return game.firstReleaseDate.getUTCFullYear();
+  return null;
+}
+
 /**
  * Category pick eligibility for a list/ballot year.
- * Current/active and active-in-year treat prior-year *released* titles as
- * eligible (no live-ops flag in the catalog yet). Upcoming is later years
- * only — not the list year, even if still unreleased.
+ * Any-year means already released and not later than the list year.
+ * Upcoming is later years only — not the list year, even if still unreleased.
  */
 export function categoryEligibilityError(
   game: CategoryGameCandidate,
   year: number,
   eligibility: AwardCategoryEligibility,
-  opts: { allowEditions?: boolean; now?: Date } = {},
+  opts: {
+    allowEditions?: boolean;
+    allowDlcAddon?: boolean;
+    now?: Date;
+  } = {},
 ): string | null {
   const now = opts.now ?? new Date();
   const allowEditions = opts.allowEditions === true;
@@ -24,6 +34,13 @@ export function categoryEligibilityError(
   }
   if (!allowEditions && game.versionParentIgdbId != null) {
     return "Edition or version titles cannot be added to this category.";
+  }
+  if (
+    !isCategoryEligibleGameType(game.gameTypeIgdbId, {
+      allowDlcAddon: opts.allowDlcAddon === true,
+    })
+  ) {
+    return "Packs, add-ons, and bundles cannot be added to this category.";
   }
 
   if (eligibility === "current_year") {
@@ -44,15 +61,8 @@ export function categoryEligibilityError(
     return "Only titles from later years belong in this category.";
   }
 
-  if (eligibility === "any_year") {
-    if (game.firstReleaseDate && game.firstReleaseDate > now) {
-      return "Upcoming titles cannot be added to this category.";
-    }
-    return null;
-  }
-
-  // current_or_active + active_in_year: this year, or an earlier released game.
-  if (game.year != null && game.year > year) {
+  const catalogYear = releaseYear(game);
+  if (catalogYear != null && catalogYear > year) {
     return `Only ${year} or earlier releases belong in this category.`;
   }
   if (game.firstReleaseDate && game.firstReleaseDate > now) {
@@ -65,6 +75,7 @@ export function browseInputForCategoryEligibility(
   year: number,
   eligibility: AwardCategoryEligibility,
   allowEditions: boolean,
+  allowDlcAddon = false,
 ): {
   year?: number;
   yearAtMost?: number;
@@ -72,13 +83,18 @@ export function browseInputForCategoryEligibility(
   yearKnownAtLeast?: number;
   releaseStatus: "released" | "upcoming" | "all";
   excludeEditions: boolean;
+  gotyEligibleTypes: true;
+  includeDlcAddonType: boolean;
 } {
   const excludeEditions = !allowEditions;
+  const includeDlcAddonType = allowDlcAddon === true;
   if (eligibility === "current_year") {
     return {
       year,
       releaseStatus: "released",
       excludeEditions,
+      gotyEligibleTypes: true,
+      includeDlcAddonType,
     };
   }
   if (eligibility === "upcoming") {
@@ -86,14 +102,15 @@ export function browseInputForCategoryEligibility(
       yearKnownAtLeast: year + 1,
       releaseStatus: "upcoming",
       excludeEditions,
+      gotyEligibleTypes: true,
+      includeDlcAddonType,
     };
-  }
-  if (eligibility === "any_year") {
-    return { releaseStatus: "released", excludeEditions };
   }
   return {
     yearAtMost: year,
     releaseStatus: "released",
     excludeEditions,
+    gotyEligibleTypes: true,
+    includeDlcAddonType,
   };
 }

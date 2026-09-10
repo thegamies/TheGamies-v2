@@ -4,7 +4,10 @@ import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
-import { DEFAULT_TRENDING_RECENCY_WEIGHTS } from "@/lib/activity/trending";
+import {
+  DEFAULT_TRENDING_KIND_WEIGHTS,
+  DEFAULT_TRENDING_RECENCY_WEIGHTS,
+} from "@/lib/activity/trending";
 import type { SharedRankMode } from "@/lib/standings/shared-rank";
 import { AdminRankingsClient } from "./AdminRankingsClient";
 
@@ -25,6 +28,7 @@ export default async function AdminRankingsPage() {
   let initialPublicBoardMinCategoryVotes = 5;
   let initialPublicTrendingMinPeople = 5;
   let initialTrendingRecencyWeights = DEFAULT_TRENDING_RECENCY_WEIGHTS;
+  let initialTrendingKindWeights = DEFAULT_TRENDING_KIND_WEIGHTS;
   let initialStandingFillMinVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   try {
     const stats = await getYearStats(year);
@@ -48,6 +52,7 @@ export default async function AdminRankingsPage() {
     initialPublicBoardMinCategoryVotes = settings.publicBoardMinCategoryVotes;
     initialPublicTrendingMinPeople = settings.publicTrendingMinPeople;
     initialTrendingRecencyWeights = settings.trendingRecencyWeights;
+    initialTrendingKindWeights = settings.trendingKindWeights;
     initialStandingFillMinVisible = settings.standingFillMinVisible;
   } catch {
     initialLandingYears = null;
@@ -56,6 +61,7 @@ export default async function AdminRankingsPage() {
     initialPublicBoardMinCategoryVotes = 5;
     initialPublicTrendingMinPeople = 5;
     initialTrendingRecencyWeights = DEFAULT_TRENDING_RECENCY_WEIGHTS;
+    initialTrendingKindWeights = DEFAULT_TRENDING_KIND_WEIGHTS;
     initialStandingFillMinVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
   }
 
@@ -74,8 +80,8 @@ export default async function AdminRankingsPage() {
         year cache, choose homepage years, or set how ties are numbered on
         the public boards, how many lists a year needs before Game of the
         Year is public, how many votes an award needs before that category
-        board is public, how strongly recent people lift a game on
-        trending, or how many covers sit in view on the homepage
+        board is public, how strongly recent people and each event type
+        lift a game on trending, or how many covers sit in view on the homepage
         row.
       </p>
       <div className="mt-10">
@@ -90,6 +96,7 @@ export default async function AdminRankingsPage() {
           }
           initialPublicTrendingMinPeople={initialPublicTrendingMinPeople}
           initialTrendingRecencyWeights={initialTrendingRecencyWeights}
+          initialTrendingKindWeights={initialTrendingKindWeights}
           initialStandingFillMinVisible={initialStandingFillMinVisible}
         />
       </div>

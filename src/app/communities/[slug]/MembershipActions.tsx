@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Dialog } from "@/components/ui/Dialog";
+import { communityLeaveRejoinCopy } from "@/lib/communities/schema";
 import { leaveCommunityAction } from "../actions";
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
   isHost?: boolean;
   /** Public communities can be rejoined from the community page. */
   isPublic?: boolean;
+  joinsClosed?: boolean;
 };
 
 export function MembershipActions({
@@ -19,6 +21,7 @@ export function MembershipActions({
   canLeave,
   isHost = false,
   isPublic = false,
+  joinsClosed = false,
 }: Props) {
   const [leaveState, leaveFormAction, leavePending] = useActionState(
     leaveCommunityAction,
@@ -52,9 +55,7 @@ export function MembershipActions({
             className="w-full max-w-md"
           >
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              {isPublic
-                ? "You will leave this community. You can join again from this page anytime."
-                : "You will leave this community. You can join again later with an invite."}
+              {communityLeaveRejoinCopy(isPublic, joinsClosed)}
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-3">
               <form action={leaveFormAction}>

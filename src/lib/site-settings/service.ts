@@ -14,7 +14,9 @@ import {
 import {
   DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
   parsePublicTrendingMinPeople,
+  parseTrendingKindWeights,
   parseTrendingRecencyWeights,
+  type TrendingKindWeights,
   type TrendingRecencyWeights,
 } from "@/lib/activity/trending";
 import {
@@ -41,6 +43,7 @@ export type SiteSettingsRow = {
   publicBoardMinCategoryVotes: number;
   publicTrendingMinPeople: number;
   trendingRecencyWeights: TrendingRecencyWeights;
+  trendingKindWeights: TrendingKindWeights;
   standingFillMinVisible: number;
 };
 
@@ -58,6 +61,7 @@ export async function getSiteSettings(
       trendingRecencyWeight1To3d: siteSettings.trendingRecencyWeight1To3d,
       trendingRecencyWeightRest7d: siteSettings.trendingRecencyWeightRest7d,
       trendingRecencyWeight7To30d: siteSettings.trendingRecencyWeight7To30d,
+      trendingKindWeights: siteSettings.trendingKindWeights,
       standingFillMinVisible: siteSettings.standingFillMinVisible,
     })
     .from(siteSettings)
@@ -82,6 +86,7 @@ export async function getSiteSettings(
       restOf7d: row?.trendingRecencyWeightRest7d,
       days7to30: row?.trendingRecencyWeight7To30d,
     }),
+    trendingKindWeights: parseTrendingKindWeights(row?.trendingKindWeights),
     standingFillMinVisible: parseStandingFillMinVisible(
       row?.standingFillMinVisible ?? DEFAULT_STANDING_FILL_MIN_VISIBLE,
     ),
@@ -320,6 +325,38 @@ export async function setTrendingRecencyWeights(
         trendingRecencyWeight1To3d: trendingRecencyWeights.days1to3,
         trendingRecencyWeightRest7d: trendingRecencyWeights.restOf7d,
         trendingRecencyWeight7To30d: trendingRecencyWeights.days7to30,
+        updatedAt: new Date(),
+      },
+    });
+
+  return getSiteSettings(db);
+}
+
+export async function getTrendingKindWeights(
+  db: Db = getDb(),
+): Promise<TrendingKindWeights> {
+  const settings = await getSiteSettings(db);
+  return settings.trendingKindWeights;
+}
+
+/** Persist per-event-kind sort weights for trending boards. */
+export async function setTrendingKindWeights(
+  raw: Partial<Record<string, unknown>>,
+  db: Db = getDb(),
+): Promise<SiteSettingsRow> {
+  const trendingKindWeights = parseTrendingKindWeights(raw);
+
+  await db
+    .insert(siteSettings)
+    .values({
+      id: SETTINGS_ID,
+      trendingKindWeights,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: siteSettings.id,
+      set: {
+        trendingKindWeights,
         updatedAt: new Date(),
       },
     });

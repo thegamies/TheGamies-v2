@@ -20,7 +20,7 @@ const sample = [
     description: null,
     sortOrder: 1,
     categoryGroup: "major",
-    eligibility: "current_or_active",
+    eligibility: "current_year",
   },
   {
     id: "c",

@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     gotyMode: url.searchParams.get("gotyMode") === "1",
     eligibility: url.searchParams.get("eligibility") ?? undefined,
     allowEditions: url.searchParams.get("allowEditions") === "1",
+    allowDlcAddon: url.searchParams.get("allowDlcAddon") === "1",
   });
 
   return NextResponse.json(hits);

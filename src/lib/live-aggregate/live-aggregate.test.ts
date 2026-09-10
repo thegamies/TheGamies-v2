@@ -108,7 +108,7 @@ describe("GOTY category vote eligibility", () => {
     isAdult: false,
   };
 
-  it("reuses year and release rules for current-year categories, not GOTY type bans", () => {
+  it("reuses year and release rules for current-year categories, and bans DLC add-ons unless allowed", () => {
     expect(gotyEligibilityError(base, year, now)).toBeNull();
     expect(
       categoryEligibilityError(base, year, "current_year", { now }),
@@ -128,15 +128,55 @@ describe("GOTY category vote eligibility", () => {
         "current_year",
         { now },
       ),
+    ).toMatch(/add-ons/);
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 1 },
+        year,
+        "current_year",
+        { now, allowDlcAddon: true },
+      ),
+    ).toBeNull();
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 13 },
+        year,
+        "current_year",
+        { now, allowDlcAddon: true },
+      ),
+    ).toMatch(/Packs/);
+    expect(
+      categoryEligibilityError(
+        { ...base, gameTypeIgdbId: 2 },
+        year,
+        "current_year",
+        { now },
+      ),
     ).toBeNull();
   });
 
-  it("allows earlier released titles for current-or-active", () => {
+  it("allows earlier released titles for any-year, not later years", () => {
     expect(
-      categoryEligibilityError({ ...base, year: 2024 }, year, "current_or_active", {
+      categoryEligibilityError({ ...base, year: 2024 }, year, "any_year", {
         now,
       }),
     ).toBeNull();
+    expect(
+      categoryEligibilityError(
+        { ...base, year: 2027, firstReleaseDate: new Date("2026-03-01") },
+        year,
+        "any_year",
+        { now },
+      ),
+    ).toMatch(/2026 or earlier/);
+    expect(browseInputForCategoryEligibility(year, "any_year", false)).toEqual(
+      expect.objectContaining({
+        yearAtMost: 2026,
+        releaseStatus: "released",
+        gotyEligibleTypes: true,
+        includeDlcAddonType: false,
+      }),
+    );
   });
 
   it("allows remake editions when the category permits them", () => {
@@ -174,7 +214,20 @@ describe("GOTY category vote eligibility", () => {
       ),
     ).toBeNull();
     expect(browseInputForCategoryEligibility(year, "upcoming", false)).toEqual(
-      expect.objectContaining({ yearKnownAtLeast: 2027 }),
+      expect.objectContaining({
+        yearKnownAtLeast: 2027,
+        gotyEligibleTypes: true,
+        includeDlcAddonType: false,
+      }),
+    );
+    expect(
+      browseInputForCategoryEligibility(year, "current_year", true, true),
+    ).toEqual(
+      expect.objectContaining({
+        gotyEligibleTypes: true,
+        includeDlcAddonType: true,
+        excludeEditions: false,
+      }),
     );
   });
 });
