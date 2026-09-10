@@ -9,7 +9,7 @@ afterEach(() => {
 });
 
 describe("TgaYearTabs", () => {
-  it("hides Your ballot for guest standings", () => {
+  it("hides Your ballot when asked", () => {
     render(
       <TgaYearTabs
         path="/communities/eric/the-game-awards/2025"

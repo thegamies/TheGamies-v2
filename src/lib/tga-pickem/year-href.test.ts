@@ -77,17 +77,17 @@ describe("resolveCommunityTgaYearView", () => {
     ).toBe("settings");
   });
 
-  it("sends guests to standings except locked public sheets", () => {
+  it("lets guests view the ballot and standings, not settings", () => {
     expect(
       resolveCommunityTgaYearView(undefined, {
         isMember: false,
         revealWinners: false,
       }),
-    ).toBe("standings");
+    ).toBe("ballot");
     expect(
-      resolveCommunityTgaYearView("ballot", {
+      resolveCommunityTgaYearView("standings", {
         isMember: false,
-        revealWinners: true,
+        revealWinners: false,
       }),
     ).toBe("standings");
     expect(
@@ -95,13 +95,13 @@ describe("resolveCommunityTgaYearView", () => {
         isMember: false,
         revealWinners: true,
       }),
-    ).toBe("standings");
+    ).toBe("ballot");
     expect(
       resolveCommunityTgaYearView("sheet", {
         isMember: false,
         revealWinners: false,
       }),
-    ).toBe("standings");
+    ).toBe("ballot");
     expect(
       resolveCommunityTgaYearView("sheet", {
         isMember: false,

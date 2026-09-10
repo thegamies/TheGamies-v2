@@ -43,8 +43,8 @@ export function canBrowseCommunityHome(
 /**
  * Members always. Guests may open boards only when the community is public
  * and joins are closed (showcase / demo). Regular public communities still
- * keep interiors members-only. Showcase boards include Pick’em standings;
- * Your ballot stays members-only.
+ * keep interiors members-only. Showcase boards include Pick’em Standings and
+ * a read-only ballot; sheet submit stays members-only.
  */
 export function canBrowseCommunityBoards(
   visibility: string,

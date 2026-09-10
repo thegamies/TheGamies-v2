@@ -185,7 +185,6 @@ export default async function CommunityTgaYearPage({
         <TgaYearTabs
           path={path}
           view={view}
-          showYourBallot={isMember}
           showSettings={canManage}
         />
         {view === "settings" ? (
@@ -254,11 +253,11 @@ export default async function CommunityTgaYearPage({
             picks={sheet.picks}
             guess={sheet.worldPremieresGuess}
           />
-        ) : !isMember || !showBallot ? (
+        ) : !showBallot ? (
           <TgaBallotComingSoon year={slate} />
         ) : (
           <>
-            {reveal ? <TgaBallotScore standing={standing} /> : null}
+            {isMember && reveal ? <TgaBallotScore standing={standing} /> : null}
             <TgaBallotForm
               categories={
                 reveal ? ballot : maskTgaBallotWinners(ballot)
@@ -266,15 +265,24 @@ export default async function CommunityTgaYearPage({
               initialPicks={sheet.picks}
               initialGuess={sheet.worldPremieresGuess}
               locked={!open}
-              onSave={saveCommunityTgaSheetAction.bind(null, slug, year)}
-              importLabel="Import from the global sheet"
-              onImport={importSiteTgaSheetAction.bind(null, slug, year)}
-              onCopyToGlobal={saveCommunityPicksToSiteAction.bind(
-                null,
-                slug,
-                year,
-              )}
-              globalHref={`/the-game-awards/${year}`}
+              readOnly={!isMember}
+              onSave={
+                isMember
+                  ? saveCommunityTgaSheetAction.bind(null, slug, year)
+                  : undefined
+              }
+              importLabel={isMember ? "Import from the global sheet" : undefined}
+              onImport={
+                isMember
+                  ? importSiteTgaSheetAction.bind(null, slug, year)
+                  : undefined
+              }
+              onCopyToGlobal={
+                isMember
+                  ? saveCommunityPicksToSiteAction.bind(null, slug, year)
+                  : undefined
+              }
+              globalHref={isMember ? `/the-game-awards/${year}` : undefined}
             />
           </>
         )}
