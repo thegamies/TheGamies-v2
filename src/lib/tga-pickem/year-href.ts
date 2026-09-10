@@ -12,8 +12,8 @@ export function parseTgaYearView(raw: unknown): TgaYearView {
 }
 
 /**
- * Guests on a closed-join showcase see Standings (and locked public sheets).
- * Your ballot and Settings stay members-only.
+ * Guests on a closed-join showcase may view the ballot, Standings, and locked
+ * public sheets. Settings stay members-only.
  */
 export function resolveCommunityTgaYearView(
   raw: unknown,
@@ -21,8 +21,9 @@ export function resolveCommunityTgaYearView(
 ): TgaYearView {
   const view = parseTgaYearView(raw);
   if (opts.isMember) return view;
-  if (view === "sheet" && opts.revealWinners) return "sheet";
-  return "standings";
+  if (view === "settings") return "ballot";
+  if (view === "sheet" && !opts.revealWinners) return "ballot";
+  return view;
 }
 
 export function parseTgaBoardMode(raw: unknown): TgaBoardMode {

@@ -82,6 +82,7 @@ export function TgaBallotForm({
   initialGuess,
   locked,
   signInHref,
+  readOnly = false,
   onSave,
   importLabel,
   onImport,
@@ -93,6 +94,8 @@ export function TgaBallotForm({
   initialGuess: number | null;
   locked: boolean;
   signInHref?: string | null;
+  /** View the slate without picking or saving. */
+  readOnly?: boolean;
   onSave?: (input: {
     picks: Record<string, string>;
     worldPremieresGuess: number;
@@ -122,7 +125,7 @@ export function TgaBallotForm({
   const [pending, startTransition] = useTransition();
   const dirty =
     guess !== savedGuess || JSON.stringify(picks) !== JSON.stringify(savedPicks);
-  const canPick = !locked && !signInHref;
+  const canPick = !locked && !signInHref && !readOnly;
   const hasExistingPicks =
     Object.keys(picks).length > 0 || guess !== "";
 
