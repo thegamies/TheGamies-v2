@@ -7,21 +7,25 @@ import { tgaYearHref, type TgaYearView } from "@/lib/tga-pickem/year-href";
 export function TgaYearTabs({
   path,
   view,
+  showYourBallot = true,
   showSettings = false,
 }: {
   path: string;
   view: TgaYearView;
+  showYourBallot?: boolean;
   showSettings?: boolean;
 }) {
   return (
     <ScrollableNav aria-label={TGA_PUBLIC_LABEL} className="mt-10">
-      <Link
-        href={tgaYearHref(path, { view: "ballot" })}
-        scroll={false}
-        className={navItemClass("secondary", view === "ballot")}
-      >
-        Your ballot
-      </Link>
+      {showYourBallot ? (
+        <Link
+          href={tgaYearHref(path, { view: "ballot" })}
+          scroll={false}
+          className={navItemClass("secondary", view === "ballot")}
+        >
+          Your ballot
+        </Link>
+      ) : null}
       <Link
         href={tgaYearHref(path, { view: "standings" })}
         scroll={false}

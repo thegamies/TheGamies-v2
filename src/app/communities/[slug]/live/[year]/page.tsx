@@ -165,8 +165,7 @@ export default async function CommunityLiveYearPage({
         }
         communityId={community.id}
         tgaEnabled={
-          Boolean(community.viewerRole) &&
-          (await communityTgaNavVisible(community.id).catch(() => false))
+          await communityTgaNavVisible(community.id).catch(() => false)
         }
         active="live"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}

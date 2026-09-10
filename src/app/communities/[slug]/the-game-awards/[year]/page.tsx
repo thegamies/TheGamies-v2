@@ -5,6 +5,7 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
+import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { TgaBallotComingSoon } from "@/components/tga-pickem/TgaBallotComingSoon";
 import { TgaBallotForm } from "@/components/tga-pickem/TgaBallotForm";
 import { TgaBallotScore } from "@/components/tga-pickem/TgaBallotScore";
@@ -19,6 +20,7 @@ import { getProfileByUsername } from "@/lib/profile/service";
 import { getFeaturedEditionForCommunity } from "@/lib/communities/editions";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { canManageCommunity } from "@/lib/communities/rules";
+import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import {
   getCommunityViewerStanding,
@@ -38,7 +40,7 @@ import { picksAreOpen, revealTgaWinners, tgaBallotVisible, tgaStatusLabel } from
 import {
   parseTgaBoardMode,
   parseTgaSheetUsername,
-  parseTgaYearView,
+  resolveCommunityTgaYearView,
   tgaYearHref,
 } from "@/lib/tga-pickem/year-href";
 import { noIndexRobots } from "@/lib/seo/site";
@@ -67,28 +69,36 @@ export default async function CommunityTgaYearPage({
   const year = Number(raw);
   if (!Number.isInteger(year)) notFound();
   const user = await getRequestSessionUser();
-  if (!user?.id) {
-    redirect(
-      `/auth/sign-in?next=/communities/${encodeURIComponent(slug)}/the-game-awards/${year}`,
-    );
+  const profile = user?.id
+    ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
+    : null;
+  const community = await getCommunityBySlug(slug, profile?.id).catch(() => null);
+  if (!community) notFound();
+  if (
+    !canBrowseCommunityBoards(
+      community.visibility,
+      community.joinsClosed,
+      community.viewerRole,
+    )
+  ) {
+    return <CommunityPrivateView name={community.name} />;
   }
-  const profile = await getRequestProfileByAuthUserId(user.id);
-  if (!profile) redirect("/account");
-  const community = await getCommunityBySlug(slug, profile.id).catch(() => null);
-  if (!community?.viewerRole) notFound();
 
   const slate = await getEnabledTgaYear(year).catch(() => null);
   const optedIn = await isCommunityTgaOptedIn(community.id, year);
   if (!slate || !optedIn) notFound();
 
+  const isMember = community.viewerRole != null;
+  const canManage = canManageCommunity(community.viewerRole);
+  const reveal = revealTgaWinners(slate);
   const sp = await searchParams;
-  const view = parseTgaYearView(
+  const view = resolveCommunityTgaYearView(
     Array.isArray(sp.view) ? sp.view[0] : sp.view,
+    { isMember, revealWinners: reveal },
   );
   const boardMode = parseTgaBoardMode(
     Array.isArray(sp.mode) ? sp.mode[0] : sp.mode,
   );
-  const canManage = canManageCommunity(community.viewerRole);
   if (view === "settings" && !canManage) {
     redirect(`/communities/${slug}/the-game-awards/${year}`);
   }
@@ -99,7 +109,6 @@ export default async function CommunityTgaYearPage({
   const page = Number(pageRaw ?? 1);
   const path = `/communities/${slug}/the-game-awards/${year}`;
   const open = picksAreOpen(slate);
-  const reveal = revealTgaWinners(slate);
   const showBallot = tgaBallotVisible(slate);
   const [featured, tgaNav] = await Promise.all([
     getFeaturedEditionForCommunity(community.id).catch(() => null),
@@ -130,12 +139,12 @@ export default async function CommunityTgaYearPage({
           { hostsOnly: boardMode === "voices" },
         )
       : Promise.resolve(null),
-    view === "ballot" && showBallot
+    view === "ballot" && showBallot && profile
       ? getCommunitySheet(community.id, profile.id, year)
       : view === "sheet" && sheetOwner
         ? getCommunitySheet(community.id, sheetOwner.id, year)
         : Promise.resolve({ picks: {}, worldPremieresGuess: null }),
-    view === "ballot" && reveal
+    view === "ballot" && reveal && profile
       ? getCommunityViewerStanding(community.id, year, profile.id)
       : Promise.resolve(null),
     view === "settings"
@@ -173,7 +182,12 @@ export default async function CommunityTgaYearPage({
           {year}
         </h2>
         <p className="mt-2 text-sm text-muted">{tgaStatusLabel(slate.status)}</p>
-        <TgaYearTabs path={path} view={view} showSettings={canManage} />
+        <TgaYearTabs
+          path={path}
+          view={view}
+          showYourBallot={isMember}
+          showSettings={canManage}
+        />
         {view === "settings" ? (
           <>
             <TgaCommunityHostsForm
@@ -240,7 +254,7 @@ export default async function CommunityTgaYearPage({
             picks={sheet.picks}
             guess={sheet.worldPremieresGuess}
           />
-        ) : !showBallot ? (
+        ) : !isMember || !showBallot ? (
           <TgaBallotComingSoon year={slate} />
         ) : (
           <>
