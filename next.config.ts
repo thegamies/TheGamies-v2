@@ -50,6 +50,21 @@ const nextConfig: NextConfig = {
   // Dev server blocks cross-origin /_next assets unless the browser host is
   // allowlisted (localhost alone is not enough for 127.0.0.1 or LAN IPs).
   allowedDevOrigins: [...lanDevOrigins(), ...extraDevOrigins],
+  // Old thegamies.gg catalog paths still in Google’s index.
+  async redirects() {
+    return [
+      {
+        source: "/game",
+        destination: "/games",
+        permanent: true,
+      },
+      {
+        source: "/game/:slug",
+        destination: "/games/:slug",
+        permanent: true,
+      },
+    ];
+  },
   // Viewport Link prefetch runs the destination Server Component. Off by default.
   turbopack: {
     resolveAlias: {
