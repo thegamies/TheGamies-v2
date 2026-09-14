@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { PROFILE_LIBRARY_PAGE_SIZE } from "@/lib/library/service";
 import {
   PROFILE_COMMUNITIES_PAGE_SIZE,
+  PROFILE_LIBRARY_PAGE_SIZE,
   PROFILE_LIST_PREVIEW_ITEM_LIMIT,
   PROFILE_LISTS_PAGE_SIZE,
   paginateProfileItems,

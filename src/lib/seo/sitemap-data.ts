@@ -1,6 +1,5 @@
 import { asc, count, eq, sql } from "drizzle-orm";
-import { createDb } from "@thegamies/db";
-import { communities } from "@thegamies/db/schema";
+import { communities, createDb } from "@thegamies/db";
 import { listPublicStandingsYears } from "@/lib/live-aggregate/service";
 import { siteGotySitemapYearPaths } from "@/lib/live-aggregate/award-category-defs";
 import { listTgaYears } from "@/lib/tga-pickem/service";

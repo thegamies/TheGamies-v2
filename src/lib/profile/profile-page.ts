@@ -7,6 +7,7 @@ export type ProfileTab =
 
 export const PROFILE_LISTS_PAGE_SIZE = 12;
 export const PROFILE_COMMUNITIES_PAGE_SIZE = 24;
+export const PROFILE_LIBRARY_PAGE_SIZE = 24;
 export const PROFILE_LIST_PREVIEW_ITEM_LIMIT = 5;
 
 export function parseProfileTab(raw: unknown): ProfileTab {

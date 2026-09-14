@@ -8,6 +8,7 @@ import {
 } from "@thegamies/db";
 import { coverUrlFromImageId } from "@thegamies/igdb";
 import {
+  PROFILE_LIBRARY_PAGE_SIZE,
   paginateProfileItems,
 } from "@/lib/profile/profile-page";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/lib/activity/kinds";
 import { insertActivityEvents } from "@/lib/activity/emit";
 
-export const PROFILE_LIBRARY_PAGE_SIZE = 24;
+export { PROFILE_LIBRARY_PAGE_SIZE };
 
 function getDb(): Db {
   return createDb();

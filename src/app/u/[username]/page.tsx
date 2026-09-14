@@ -21,16 +21,14 @@ import {
   listFollowingPage,
 } from "@/lib/follow/service";
 import { allowFollowSeedAccounts } from "@/lib/follow/rules";
-import {
-  PROFILE_LIBRARY_PAGE_SIZE,
-  listLibraryForProfilePage,
-} from "@/lib/library/service";
+import { listLibraryForProfilePage } from "@/lib/library/service";
 import { listOwnedForProfilePage } from "@/lib/lists/service";
 import {
   parseProfilePage,
   parseProfileTab,
   profileHref,
   PROFILE_COMMUNITIES_PAGE_SIZE,
+  PROFILE_LIBRARY_PAGE_SIZE,
   PROFILE_LISTS_PAGE_SIZE,
 } from "@/lib/profile/profile-page";
 import {
