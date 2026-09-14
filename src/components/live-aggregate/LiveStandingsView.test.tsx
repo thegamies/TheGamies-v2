@@ -43,6 +43,9 @@ describe("LiveStandingsView", () => {
     expect(
       screen.getByRole("link", { name: "Create list" }).getAttribute("href"),
     ).toBe("/create/goty?year=2026");
+    expect(
+      screen.getByRole("link", { name: "Categories" }).getAttribute("href"),
+    ).toBe("/game-of-the-year/2026/categories");
   });
 
   it("links Make picks on the categories board", () => {

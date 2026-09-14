@@ -15,10 +15,8 @@ import {
   existingGotyPreviewHref,
 } from "@/lib/lists/existing-goty";
 import { clientDraftGotyYear } from "@/lib/lists/create-goty-entry";
-import {
-  parseListShareView,
-  withListShareView,
-} from "@/lib/lists/urls";
+import { parseListShareView, withListShareView } from "@/lib/lists/urls";
+import { revalidateSiteGotyYear } from "@/lib/live-aggregate/revalidate-site-goty";
 import {
   claimList,
   createDraft,
@@ -215,7 +213,7 @@ export async function saveOwnedListAction(
   revalidatePath(`/create/custom`);
   revalidatePath(`/game-of-the-year`);
   if (result.list.year != null) {
-    revalidatePath(`/game-of-the-year/${result.list.year}`);
+    revalidateSiteGotyYear(result.list.year);
   }
   revalidatePath("/");
   const share = await getListShareTarget(result.list);
@@ -310,7 +308,7 @@ export async function shareListAction(formData: FormData) {
   revalidatePath(`/create/custom`);
   revalidatePath(`/game-of-the-year`);
   if (result.list.year != null) {
-    revalidatePath(`/game-of-the-year/${result.list.year}`);
+    revalidateSiteGotyYear(result.list.year);
   }
   redirect(share.path);
 }
@@ -465,7 +463,7 @@ export async function completeListAuthIntentAction(
   revalidatePath(`/create/custom`);
   revalidatePath(`/game-of-the-year`);
   if (result.list.year != null) {
-    revalidatePath(`/game-of-the-year/${result.list.year}`);
+    revalidateSiteGotyYear(result.list.year);
   }
   revalidatePath("/");
 
@@ -504,7 +502,7 @@ export async function deleteOwnedListAction(formData: FormData) {
   revalidatePath("/");
   revalidatePath("/game-of-the-year");
   if (result.year != null) {
-    revalidatePath(`/game-of-the-year/${result.year}`);
+    revalidateSiteGotyYear(result.year);
   }
   revalidatePath(profileHref(result.username, { tab: "lists" }));
   redirect(profileHref(result.username, { tab: "lists" }));

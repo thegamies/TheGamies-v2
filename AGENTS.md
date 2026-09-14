@@ -45,6 +45,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | GitHub Actions secrets (setup list) | `docs/github-secrets.md` |
 | Account wiring checklist | `docs/setup-checklist.md` |
 | Go-live remaining work | `docs/go-live.md` |
+| AdSense / publisher review | `docs/adsense.md` |
 | Local reference checkouts | `docs/references.md` |
 | Decisions | `docs/decisions.md` |
 | IGDB catalog sync | `docs/igdb-sync.md` |

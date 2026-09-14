@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { liveStandingsHref } from "@/lib/live-aggregate/award-category-defs";
 
 export type GameCategoryWinItem = {
   year: number;
@@ -27,7 +28,10 @@ export function GameCategoryWins({
         {wins.map((win) => (
           <li key={`${win.year}-${win.categoryId}`}>
             <Link
-              href={`/game-of-the-year/${win.year}?view=categories`}
+              href={liveStandingsHref(`/game-of-the-year/${win.year}`, {
+                view: "category",
+                category: win.categoryId,
+              })}
               className="text-ink hover:text-accent"
             >
               {win.year} · {win.label}

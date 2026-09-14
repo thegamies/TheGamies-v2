@@ -44,7 +44,7 @@ import {
   DEMO_2025_LIST_SIZE,
   DEMO_2025_MIN_GOTY_GAMES,
   DEMO_2025_YEAR,
-  pickDemoCategoryVote,
+  buildDemo2025CategoryVotes,
   pickDemoGotyList,
   rngForVoter,
   seedCommunityDisplayName,
@@ -725,13 +725,15 @@ export async function seedCommunityEditionBallots(
           blurb: null,
         });
       }
-      for (const cat of demoCatalog.categories) {
-        const gameId = pickDemoCategoryVote(cat.games, taste, rng);
-        if (!gameId) continue;
+      for (const vote of buildDemo2025CategoryVotes(
+        demoCatalog.categories,
+        taste,
+        rng,
+      )) {
         categoryVoteRows.push({
           ballotId,
-          categoryId: cat.categoryId,
-          gameId,
+          categoryId: vote.categoryId,
+          gameId: vote.gameId,
         });
       }
       continue;

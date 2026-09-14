@@ -3,9 +3,10 @@ import {
   formatSitemapShardId,
   ownedListSitemapPath,
   parseSitemapShardId,
+  shouldIndexGamesHub,
   shouldIndexProfile,
-  SITEMAP_CATALOG_YEAR_COUNT,
-  SITEMAP_GAMES_PER_YEAR,
+  SITEMAP_GAMES_MAX,
+  SITEMAP_STATIC_PATHS,
   sitemapCatalogYears,
   sitemapPageCount,
   sitemapShardsForCounts,
@@ -40,9 +41,24 @@ describe("sitemap shards", () => {
     expect(parseSitemapShardId("nope")).toBeNull();
   });
 
-  it("caps catalog games per included year", () => {
-    expect(SITEMAP_GAMES_PER_YEAR).toBe(100);
-    expect(SITEMAP_CATALOG_YEAR_COUNT).toBe(2);
+  it("caps valued catalog URLs", () => {
+    expect(SITEMAP_GAMES_MAX).toBe(5000);
+  });
+
+  it("includes About feature pages in the static sitemap", () => {
+    expect(SITEMAP_STATIC_PATHS).toEqual(
+      expect.arrayContaining([
+        "/about",
+        "/about/lists",
+        "/about/communities",
+        "/about/library",
+        "/about/people",
+        "/about/pickem",
+      ]),
+    );
+    expect(SITEMAP_STATIC_PATHS).not.toContain(
+      "/game-of-the-year/2025/recap",
+    );
   });
 
   it("lists this year and last year for catalog URLs", () => {
@@ -52,6 +68,11 @@ describe("sitemap shards", () => {
     expect(sitemapCatalogYears(new Date("2027-01-01T00:00:00.000Z"))).toEqual([
       2027, 2026,
     ]);
+  });
+
+  it("indexes the games hub and not later catalog pages", () => {
+    expect(shouldIndexGamesHub(1)).toBe(true);
+    expect(shouldIndexGamesHub(2)).toBe(false);
   });
 
   it("counts pages", () => {

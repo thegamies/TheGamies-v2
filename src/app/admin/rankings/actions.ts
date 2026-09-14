@@ -18,6 +18,7 @@ import {
   setTrendingRecencyWeights,
 } from "@/lib/site-settings/service";
 import { parseSharedRankMode } from "@/lib/standings/shared-rank";
+import { revalidateSiteGotyYear } from "@/lib/live-aggregate/revalidate-site-goty";
 
 async function requireAdmin() {
   if (!(await isAdminAuthorized())) {
@@ -34,7 +35,7 @@ export async function setRevealAction(
   if (denied) return denied;
   if (!Number.isFinite(year)) return { error: "Invalid year." };
   await setYearRevealed(Math.floor(year), revealed);
-  revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidateSiteGotyYear(Math.floor(year));
   revalidatePath("/");
   revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");
@@ -54,7 +55,7 @@ export async function rebuildYearAction(
       error: err instanceof Error ? err.message : "Rebuild failed.",
     };
   }
-  revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidateSiteGotyYear(Math.floor(year));
   revalidatePath("/");
   revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");
@@ -68,7 +69,7 @@ export async function refreshYearAction(
   if (denied) return denied;
   if (!Number.isFinite(year)) return { error: "Invalid year." };
   const result = await tryRefreshYear(Math.floor(year));
-  revalidatePath(`/game-of-the-year/${Math.floor(year)}`);
+  revalidateSiteGotyYear(Math.floor(year));
   revalidatePath("/");
   revalidatePath("/game-of-the-year");
   revalidatePath("/admin/rankings");

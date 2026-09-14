@@ -16,7 +16,7 @@ import {
   AWARD_CATEGORY_GROUPS,
   CATEGORY_LIST_PAGE_SIZE,
   STANDINGS_CATEGORY_GROUP_LABEL,
-  standingsQueryString,
+  liveStandingsHref,
   type LiveStandingsViewId,
   type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
@@ -40,11 +40,11 @@ function CategoryChapter({
   group: StandingsCategoryGroupFilter;
 }) {
   if (block.rows.length === 0) return null;
-  const detailHref = `${hrefBase}${standingsQueryString({
+  const detailHref = liveStandingsHref(hrefBase, {
     group,
     view: "category",
     category: block.categoryId,
-  })}`;
+  });
   const votesLabel =
     block.totalVotes != null
       ? `${block.totalVotes} vote${block.totalVotes === 1 ? "" : "s"}`
@@ -213,7 +213,10 @@ export function LiveCategoriesPanel({
                 return (
                   <li key={g} role="option" aria-selected={active}>
                     <Link
-                      href={`${hrefBase}${standingsQueryString({ group: g, view })}`}
+                      href={liveStandingsHref(hrefBase, {
+                        group: g,
+                        view,
+                      })}
                       className={`block px-3 py-2 text-sm tracking-wide ${
                         active
                           ? "text-accent"
@@ -287,10 +290,10 @@ export function LiveCategoryDetailPanel({
   gameTotal: number;
   empty: string;
 }) {
-  const backHref = `${hrefBase}${standingsQueryString({
+  const backHref = liveStandingsHref(hrefBase, {
     group,
     view: "categories",
-  })}`;
+  });
 
   if (!block) {
     return (
@@ -364,12 +367,12 @@ export function LiveCategoryDetailPanel({
               <div className="flex gap-2">
                 {page > 1 ? (
                   <Link
-                    href={`${hrefBase}${standingsQueryString({
+                    href={liveStandingsHref(hrefBase, {
                       group,
                       view: "category",
                       category: block.categoryId,
                       page: page - 1,
-                    })}`}
+                    })}
                     className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                   >
                     Previous
@@ -381,12 +384,12 @@ export function LiveCategoryDetailPanel({
                 )}
                 {page < totalPages ? (
                   <Link
-                    href={`${hrefBase}${standingsQueryString({
+                    href={liveStandingsHref(hrefBase, {
                       group,
                       view: "category",
                       category: block.categoryId,
                       page: page + 1,
-                    })}`}
+                    })}
                     className="border border-line px-3 py-1.5 text-muted transition-colors hover:border-accent hover:text-ink"
                   >
                     Next

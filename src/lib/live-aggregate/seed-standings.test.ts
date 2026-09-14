@@ -3,6 +3,7 @@ import {
   buildSeedCategoryVotes,
   resolveSeedStartIndex,
   seedGotyListEventTime,
+  selectStandingsSeedWork,
   weightForRatedGame,
   weightForTopRank,
   weightedSample,
@@ -77,6 +78,52 @@ describe("buildSeedCategoryVotes", () => {
   it("returns nothing without picks or categories", () => {
     expect(buildSeedCategoryVotes([{ id: "a" }], [])).toEqual([]);
     expect(buildSeedCategoryVotes([], [{ id: "g1" }])).toEqual([]);
+  });
+});
+
+describe("selectStandingsSeedWork", () => {
+  const profileIds = ["a", "b", "c"];
+  const listProfileIds = new Set(["a", "c"]);
+
+  it("rewrites every profile when reseed is on", () => {
+    expect(
+      selectStandingsSeedWork({
+        categoriesOnly: false,
+        reseed: true,
+        profileIds,
+        listProfileIds,
+      }),
+    ).toEqual({ activeProfileIds: ["a", "b", "c"], skipped: 0 });
+  });
+
+  it("skips existing lists when reseed is off", () => {
+    expect(
+      selectStandingsSeedWork({
+        categoriesOnly: false,
+        reseed: false,
+        profileIds,
+        listProfileIds,
+      }),
+    ).toEqual({ activeProfileIds: ["b"], skipped: 2 });
+  });
+
+  it("only touches existing GOTY lists when categories-only", () => {
+    expect(
+      selectStandingsSeedWork({
+        categoriesOnly: true,
+        reseed: true,
+        profileIds,
+        listProfileIds,
+      }),
+    ).toEqual({ activeProfileIds: ["a", "c"], skipped: 1 });
+    expect(
+      selectStandingsSeedWork({
+        categoriesOnly: true,
+        reseed: false,
+        profileIds,
+        listProfileIds,
+      }).activeProfileIds,
+    ).toEqual(["a", "c"]);
   });
 });
 

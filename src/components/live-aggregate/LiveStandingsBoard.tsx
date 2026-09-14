@@ -17,22 +17,11 @@ import type {
   StandingsPage,
 } from "@/lib/live-aggregate/service";
 import {
-  standingsQueryString,
+  liveStandingsHref,
+  parseSiteGotyStandingsPath,
+  siteGotyYearPath,
   type LiveStandingsViewId,
-  type StandingsCategoryGroupFilter,
 } from "@/lib/live-aggregate/award-category-defs";
-
-export function liveStandingsHref(
-  basePath: string,
-  opts: {
-    page?: number;
-    group?: StandingsCategoryGroupFilter;
-    view?: LiveStandingsViewId;
-    category?: string | null;
-  } = {},
-): string {
-  return `${basePath}${standingsQueryString(opts)}`;
-}
 
 function GotyPager({
   page,
@@ -202,6 +191,7 @@ export function LiveStandingsBoard({
 }: LiveStandingsBoardProps) {
   const revealed = page.detailedStatsRevealed;
   const yearBase = (y: number) => {
+    if (parseSiteGotyStandingsPath(basePath)) return siteGotyYearPath(y);
     const parts = basePath.split("/");
     parts[parts.length - 1] = String(y);
     return parts.join("/");

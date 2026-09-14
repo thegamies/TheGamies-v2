@@ -2,12 +2,12 @@ import { asc, count, eq, sql } from "drizzle-orm";
 import { createDb } from "@thegamies/db";
 import { communities } from "@thegamies/db/schema";
 import { listPublicStandingsYears } from "@/lib/live-aggregate/service";
+import { siteGotySitemapYearPaths } from "@/lib/live-aggregate/award-category-defs";
 import { listTgaYears } from "@/lib/tga-pickem/service";
 import {
-  SITEMAP_GAMES_PER_YEAR,
+  SITEMAP_GAMES_MAX,
   SITEMAP_PAGE_SIZE,
   SITEMAP_STATIC_PATHS,
-  sitemapCatalogYears,
   type SitemapShard,
 } from "./sitemap-plan";
 
@@ -15,26 +15,55 @@ function getDb() {
   return createDb();
 }
 
-/** Top `SITEMAP_GAMES_PER_YEAR` slugs per included catalog year, by IGDB popularity. */
-function popularGamesSql(years: readonly number[]) {
-  if (years.length === 0) {
-    return sql`select slug from games where false`;
-  }
+/**
+ * Games with original site value: public GOTY presence, a public category #1,
+ * or appearance on a public owned list. Starts from score/list tables, not
+ * the full catalog.
+ */
+function valuedGamesSql() {
   return sql`
-    select slug
+    select g.slug
     from (
-      select
-        slug,
-        row_number() over (
-          partition by year
-          order by popularity desc, slug asc
-        ) as rn
-      from games
-      where igdb_removed_at is null
-        and is_adult = false
-        and year in (${sql.join(years.map((year) => sql`${year}`), sql`, `)})
-    ) ranked
-    where rn <= ${SITEMAP_GAMES_PER_YEAR}
+      select s.game_id
+      from live_goty_scores s
+      left join live_goty_year_stats ys on ys.year = s.year
+      left join site_settings ss on ss.id = 'default'
+      where coalesce(ys.list_count, 0) >= coalesce(ss.public_board_min_lists, 5)
+      union
+      select w.game_id
+      from live_category_scores w
+      inner join (
+        select year, category_id, coalesce(sum(vote_count), 0)::int as total
+        from live_category_scores
+        group by year, category_id
+      ) cv on cv.year = w.year and cv.category_id = w.category_id
+      cross join (
+        select coalesce(
+          (select public_board_min_category_votes from site_settings where id = 'default'),
+          5
+        )::int as min
+      ) f
+      where cv.total >= f.min
+        and not exists (
+          select 1
+          from live_category_scores other
+          where other.year = w.year
+            and other.category_id = w.category_id
+            and other.vote_count > w.vote_count
+        )
+      union
+      select li.game_id
+      from list_items li
+      inner join lists l on l.id = li.list_id
+      inner join profiles p on p.id = l.profile_id
+      where l.rank_visibility is distinct from 'hidden'
+        and p.visibility = 'public'
+        and p.deleted_at is null
+        and p.is_seed = false
+    ) valued
+    inner join games g on g.id = valued.game_id
+    where g.igdb_removed_at is null
+      and g.is_adult = false
   `;
 }
 
@@ -43,10 +72,10 @@ export async function getSitemapCounts(): Promise<{
   communities: number;
 }> {
   const db = getDb();
-  const popularGames = popularGamesSql(sitemapCatalogYears());
+  const valuedGames = valuedGamesSql();
   const gamesResult = await db.execute(sql`
-    select count(*)::int as value
-    from (${popularGames}) popular_games
+    select least(count(*)::int, ${SITEMAP_GAMES_MAX}) as value
+    from (${valuedGames}) valued_games
   `);
   const [communityRow] = await db
     .select({ value: count() })
@@ -69,7 +98,7 @@ export async function sitemapUrlsForShard(
       .catch(() => [] as number[]);
     return [
       ...SITEMAP_STATIC_PATHS.map((path) => ({ path })),
-      ...years.map((year) => ({ path: `/game-of-the-year/${year}` })),
+      ...siteGotySitemapYearPaths(years).map((path) => ({ path })),
       ...tgaYears.map((year) => ({ path: `/the-game-awards/${year}` })),
     ];
   }
@@ -78,11 +107,13 @@ export async function sitemapUrlsForShard(
   const offset = shard.page * SITEMAP_PAGE_SIZE;
 
   if (shard.kind === "games") {
-    const popularGames = popularGamesSql(sitemapCatalogYears());
+    const remaining = Math.max(0, SITEMAP_GAMES_MAX - offset);
+    if (remaining === 0) return [];
+    const valuedGames = valuedGamesSql();
     const result = await db.execute(sql`
-      ${popularGames}
+      ${valuedGames}
       order by slug
-      limit ${SITEMAP_PAGE_SIZE}
+      limit ${Math.min(SITEMAP_PAGE_SIZE, remaining)}
       offset ${offset}
     `);
     return result.rows

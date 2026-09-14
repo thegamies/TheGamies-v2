@@ -44,6 +44,7 @@ export function AdminSeedClient({
   const [topN, setTopN] = useState("50");
   const [weightPower, setWeightPower] = useState(1);
   const [includeCategories, setIncludeCategories] = useState(false);
+  const [categoriesOnly, setCategoriesOnly] = useState(false);
   const [reseed, setReseed] = useState(true);
   const [stats, setStats] = useState<Stats | null>(initialStats);
   const [message, setMessage] = useState<string | null>(null);
@@ -62,6 +63,9 @@ export function AdminSeedClient({
     }
   }
 
+  const effectiveReseed = categoriesOnly || reseed;
+  const effectiveIncludeCategories = categoriesOnly || includeCategories;
+
   async function runBatch(opts: {
     startIndex: number;
     count: number;
@@ -78,14 +82,15 @@ export function AdminSeedClient({
       distribution,
       topN: parseTopN(topN),
       weightPower,
-      includeCategories,
-      reseed,
+      includeCategories: effectiveIncludeCategories,
+      categoriesOnly,
+      reseed: effectiveReseed,
       rebuild: opts.rebuild,
     });
   }
 
   function categorySummary(votes: number, categoryCount: number): string {
-    if (!includeCategories) return "GOTY only";
+    if (!effectiveIncludeCategories) return "GOTY only";
     return `${votes} category votes across ${categoryCount} categories`;
   }
 
@@ -108,10 +113,13 @@ export function AdminSeedClient({
         });
       }
 
-      let startIndex = resolveSeedStartIndex({ reseed, maxIndex });
+      let startIndex = resolveSeedStartIndex({
+        reseed: effectiveReseed,
+        maxIndex,
+      });
       if (startIndex > 1000) {
         setMessage(
-          reseed
+          effectiveReseed
             ? "Seed index cannot exceed 1000."
             : "Already at 1000 seed voters. Clear some before adding more, or turn Reseed on to rewrite 1…N.",
         );
@@ -235,6 +243,7 @@ export function AdminSeedClient({
   }
 
   const busy = pending || running;
+  const gotyLocked = busy || categoriesOnly;
 
   return (
     <div className="max-w-xl space-y-6">
@@ -270,7 +279,7 @@ export function AdminSeedClient({
             onChange={(e) =>
               setDistribution(e.target.value as Distribution)
             }
-            disabled={busy}
+            disabled={gotyLocked}
           >
             <option value="weighted">Weighted (critic count × rating)</option>
             <option value="uniform">Uniform</option>
@@ -288,7 +297,7 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={minGames}
             onChange={(e) => setMinGames(Number(e.target.value))}
-            disabled={busy}
+            disabled={gotyLocked}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -300,7 +309,7 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={maxGames}
             onChange={(e) => setMaxGames(Number(e.target.value))}
-            disabled={busy}
+            disabled={gotyLocked}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -312,7 +321,7 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={minRank}
             onChange={(e) => setMinRank(Number(e.target.value))}
-            disabled={busy}
+            disabled={gotyLocked}
           />
         </label>
         <label className="block text-sm text-muted">
@@ -324,13 +333,17 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={maxRank}
             onChange={(e) => setMaxRank(Number(e.target.value))}
-            disabled={busy}
+            disabled={gotyLocked}
           />
         </label>
       </div>
 
       <div>
-        <p className="text-sm text-muted">Voters to create / reseed</p>
+        <p className="text-sm text-muted">
+          {categoriesOnly
+            ? "Voters to rewrite category votes for"
+            : "Voters to create / reseed"}
+        </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {COUNT_PRESETS.map((n) => (
             <button
@@ -368,7 +381,7 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={topN}
             onChange={(e) => setTopN(e.target.value)}
-            disabled={busy}
+            disabled={gotyLocked}
             placeholder="No limit"
           />
         </label>
@@ -382,7 +395,7 @@ export function AdminSeedClient({
             className={`${fieldInputClass} mt-1`}
             value={weightPower}
             onChange={(e) => setWeightPower(Number(e.target.value))}
-            disabled={busy}
+            disabled={gotyLocked}
           />
         </label>
       </div>
@@ -392,22 +405,45 @@ export function AdminSeedClient({
         appear on lists but do not score standings.
       </p>
 
-      <label className="flex items-center gap-2 text-sm text-ink">
+      <label className="flex items-start gap-2 text-sm text-ink">
         <input
           type="checkbox"
-          checked={includeCategories}
-          onChange={(e) => setIncludeCategories(e.target.checked)}
+          className="mt-0.5"
+          checked={effectiveIncludeCategories}
+          onChange={(e) => {
+            const on = e.target.checked;
+            setIncludeCategories(on);
+            if (!on) setCategoriesOnly(false);
+          }}
           disabled={busy}
         />
-        Include category votes (from each list’s GOTY ranks)
+        Include category votes. 2025 uses the reception-demo award pools
+        (Story, Combat, and the rest of that slate). Other years pick from
+        each list’s GOTY ranks.
+      </label>
+
+      <label className="flex items-start gap-2 text-sm text-ink">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={categoriesOnly}
+          onChange={(e) => {
+            const on = e.target.checked;
+            setCategoriesOnly(on);
+            if (on) setIncludeCategories(true);
+          }}
+          disabled={busy}
+        />
+        Rewrite category votes only. Keeps existing GOTY lists. Updates voters
+        1…N that already have a list.
       </label>
 
       <label className="flex items-center gap-2 text-sm text-ink">
         <input
           type="checkbox"
-          checked={reseed}
+          checked={effectiveReseed}
           onChange={(e) => setReseed(e.target.checked)}
-          disabled={busy}
+          disabled={busy || categoriesOnly}
         />
         Reseed: rewrite voters 1…N. Off = add N new voters after the current max
         index.
@@ -421,12 +457,14 @@ export function AdminSeedClient({
             void seedOnce();
           }}
         >
-          Seed {count} voters
+          {categoriesOnly
+            ? `Rewrite ${count} category votes`
+            : `Seed ${count} voters`}
         </Button>
         <Button
           type="button"
           variant="bordered"
-          disabled={busy}
+          disabled={busy || categoriesOnly}
           onClick={() => {
             void seedUntilStopped();
           }}
@@ -503,7 +541,7 @@ export function AdminSeedClient({
         >
           {year} standings
         </a>
-        {includeCategories
+        {effectiveIncludeCategories
           ? " (switch to Categories to confirm award votes)."
           : "."}
       </p>

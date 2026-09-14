@@ -5,16 +5,17 @@ import { GameCategoryWins } from "@/components/games/GameCategoryWins";
 import { GameGotyRankings } from "@/components/games/GameGotyRankings";
 import { GameImagesSection } from "@/components/games/GameImagesSection";
 import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
+import { GameSiteContext } from "@/components/games/GameSiteContext";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameVideosSection } from "@/components/games/GameVideosSection";
 import { GameLibraryControls } from "@/components/library/GameLibraryControls";
 import { GameCover } from "@/components/ui/GameCover";
 import {
   getGameArtworksForDetail,
-  getGameBySlug,
   getGameScreenshotsForDetail,
   getGameVideosForDetail,
 } from "@/lib/catalog";
+import { getGamePageData } from "@/lib/catalog/game-public-value";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
@@ -24,12 +25,7 @@ import { listFollowedProfileIds } from "@/lib/follow/service";
 import { getLibraryEntry } from "@/lib/library/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
-import {
-  getGameDetailCategoryWins,
-  getGameDetailGotyRankings,
-  type GameCategoryWin,
-  type GameGotyRankings as GameGotyRankingsData,
-} from "@/lib/live-aggregate/game-rankings";
+import { adsenseAccountMetadata } from "@/lib/ads/adsense";
 
 type Params = Promise<{ slug: string }>;
 
@@ -43,14 +39,19 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const game = await getGameBySlug(slug);
-    if (!game) return { title: "Game" };
-    return publicPageMetadata({
-      title: game.title,
-      description: game.summary?.slice(0, 160) ?? undefined,
-      path: `/games/${slug}`,
-      image: ogImagePath({ kind: "game", slug }),
-    });
+    const data = await getGamePageData(slug);
+    if (!data) return { title: "Game" };
+    return {
+      ...publicPageMetadata({
+        title: data.game.title,
+        description: data.game.summary?.slice(0, 160) ?? undefined,
+        path: `/games/${slug}`,
+        image: ogImagePath({ kind: "game", slug }),
+        index: data.hasPublicSiteValue,
+        follow: true,
+      }),
+      ...(data.hasPublicSiteValue ? adsenseAccountMetadata() : {}),
+    };
   } catch {
     return { title: "Game" };
   }
@@ -69,30 +70,13 @@ const TIME_TO_BEAT_LABELS = [
 
 export default async function GameDetailPage({ params }: { params: Params }) {
   const { slug } = await params;
-  let game: Awaited<ReturnType<typeof getGameBySlug>> = null;
-  try {
-    game = await getGameBySlug(slug);
-  } catch {
-    notFound();
-  }
-  if (!game) notFound();
+  const data = await getGamePageData(slug).catch(() => null);
+  if (!data) notFound();
+  const { game, rankings, categoryWins, publicLists } = data;
 
-  let rankings: GameGotyRankingsData = { byYear: [], viaParent: null };
-  let categoryWins: GameCategoryWin[] = [];
   let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
   let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
   let videos: Awaited<ReturnType<typeof getGameVideosForDetail>> = [];
-  try {
-    rankings = await getGameDetailGotyRankings(game);
-  } catch {
-    rankings = { byYear: [], viaParent: null };
-  }
-  try {
-    const awards = await getGameDetailCategoryWins(game);
-    categoryWins = awards.wins;
-  } catch {
-    categoryWins = [];
-  }
   try {
     [artworks, screenshots, videos] = await Promise.all([
       getGameArtworksForDetail(game.id),
@@ -160,6 +144,12 @@ export default async function GameDetailPage({ params }: { params: Params }) {
             </h1>
 
             {game.summary ? <GameSummary text={game.summary} /> : null}
+
+            <GameSiteContext
+              title={game.title}
+              rankings={rankings}
+              lists={publicLists}
+            />
 
             <GameGotyRankings
               stats={rankings}

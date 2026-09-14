@@ -697,6 +697,7 @@ export const listItems = pgTable(
   (t) => [
     uniqueIndex("list_items_list_rank_uidx").on(t.listId, t.rank),
     uniqueIndex("list_items_list_game_uidx").on(t.listId, t.gameId),
+    index("list_items_game_idx").on(t.gameId),
   ],
 );
 

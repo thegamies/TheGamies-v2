@@ -26,6 +26,8 @@ If the answer is “load everything, then slice,” the design is wrong.
 
 The client receives **only the rows it paints**. A 50-row page is 50 rows over the wire—not 5,000 with 50 displayed.
 
+Game detail may show public lists that include the title: **capped** (`GAME_PUBLIC_LISTS_CAP`), never the full roster. The sitemap of game URLs is the valued set (GOTY / category #1 / public lists), not the IGDB dump.
+
 ## Search is SQL, not a client filter
 
 A search box that filters an already-downloaded list is **not search**. It is a filter, and it forces an unbounded load on every page view.
@@ -55,7 +57,7 @@ Neon HTTP is roughly **one round trip per query**. Serial `await`s stack. Don’
 
 ## Link prefetch
 
-Next.js `<Link>` prefetch is **off** (`src/lib/next-link.tsx`, aliased over `next/link`). Prefetch is not a free hint: it runs the destination route on the Worker (same queries as a real visit) and ships the RSC payload. A homepage of game covers would otherwise prefetch many `/games/[slug]` pages. Opt in with `prefetch={true}` only when the destination is cheap and a click is likely. Decorative art is not a link.
+Next.js `<Link>` prefetch is **off** (`src/lib/next-link.tsx`, aliased over `next/link`). Prefetch is not a free hint: it runs the destination route on the Worker (same queries as a real visit) and ships the RSC payload. A homepage of game covers would otherwise prefetch many `/games/[slug]` pages. Opt in with `prefetch={true}` only when the destination is cheap and a click is likely. Decorative art is not a link. Homepage discover strips (`Trending`, `Upcoming`) are SQL-capped (`HOME_DISCOVER_CAP`, 12). The trending helper reuses the existing windowed board query and ships only the first page of covers.
 
 ## Freeze and snapshots
 

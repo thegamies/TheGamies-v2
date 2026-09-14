@@ -31,7 +31,7 @@ Account close deletes the person’s events (or they become unjoinable after lib
 
 ## Follow feed (`/following`)
 
-Actor set = people the viewer follows ([follow.md](./follow.md)). Signed-in **`/following`** opens the **Activity** tab first. Unsigned home stays Big Picture + GOTY strips. Unsigned `/following` goes to **People** search (`/people`).
+Actor set = people the viewer follows ([follow.md](./follow.md)). Signed-in **`/following`** opens the **Activity** tab first. Unsigned home stays Big Picture + pitch chapters + GOTY strips + capped Trending / Upcoming. Unsigned `/following` goes to **People** search (`/people`).
 
 **Group on read** so one person is one card per UTC day:
 
@@ -68,7 +68,7 @@ Community trending is **on even if Live Rankings are off**. It is a different bo
 
 **Empty floor (site):** hide the public board (editorial empty, not a 404) until at least `site_settings.public_trending_min_people` (default **5**) distinct people have produced a counting event in the default window. Admin-editable on `/admin/rankings`. Public copy does not name the number. Community / following trending have no site-wide floor (small friend groups should still see a thin board).
 
-**First slice:** Games browse **Trending** sort for the site board (Everyone, plus People you follow when signed in). Signed-in **Following** also has a **Trending** tab for people you follow only. No homepage strip and no top-level Trending tab. Community trending is a community interior surface (placement next to Live Rankings when built).
+**First slice:** Games browse **Trending** sort for the site board (Everyone, plus People you follow when signed in). Signed-in **Following** also has a **Trending** tab for people you follow only. Homepage `/` shows a **capped** site trending strip (same floor as Games trending, 12 covers) plus a capped **Upcoming** popularity strip — not a top-level Trending tab. Community trending is a community interior surface (placement next to Live Rankings when built).
 
 **Cache:** first slice is a windowed `GROUP BY` on `activity_events`. Add `library_trending_scores` + dirty keys later if site trending is hot — same idea as [live-aggregate.md](./live-aggregate.md), not a per-viewer cache. Following trending is always a read-time join.
 

@@ -6,10 +6,15 @@ import {
   awardEligibilityDescription,
   awardOfferedOnListYear,
   filterAwardsOfferedOnListYear,
+  liveStandingsHref,
   parseAwardCategoryEligibility,
   parseAwardCategoryGroup,
   parseLiveStandingsView,
+  parseSiteGotyStandingsPath,
   parseStandingsCategoryGroup,
+  siteGotyLegacyViewRedirectPath,
+  siteGotyRevalidatePaths,
+  siteGotySitemapYearPaths,
   standingsQueryString,
 } from "./award-category-defs";
 
@@ -105,6 +110,44 @@ describe("AWARD_CATEGORY_DEFS", () => {
         group: "premier",
       }),
     ).toBe("?group=premier&view=category&category=best-gameplay");
+    expect(
+      liveStandingsHref("/game-of-the-year/2025", { view: "categories" }),
+    ).toBe("/game-of-the-year/2025/categories");
+    expect(
+      liveStandingsHref("/game-of-the-year/2025", {
+        view: "category",
+        category: "best-combat",
+        group: "gameplay",
+      }),
+    ).toBe(
+      "/game-of-the-year/2025/categories?group=gameplay&category=best-combat",
+    );
+    expect(
+      liveStandingsHref("/communities/demo/live/2025", { view: "categories" }),
+    ).toBe("/communities/demo/live/2025?view=categories");
+    expect(
+      siteGotyLegacyViewRedirectPath({
+        year: 2025,
+        view: "categories",
+        group: "genre",
+      }),
+    ).toBe("/game-of-the-year/2025/categories?group=genre");
+    expect(
+      siteGotyLegacyViewRedirectPath({ year: 2025, view: "goty" }),
+    ).toBeNull();
+    expect(siteGotySitemapYearPaths([2025, 2026])).toEqual([
+      "/game-of-the-year/2025",
+      "/game-of-the-year/2025/categories",
+      "/game-of-the-year/2026",
+      "/game-of-the-year/2026/categories",
+    ]);
+    expect(siteGotyRevalidatePaths(2025)).toEqual([
+      "/game-of-the-year/2025",
+      "/game-of-the-year/2025/categories",
+    ]);
+    expect(
+      parseSiteGotyStandingsPath("/game-of-the-year/2025/not-a-board"),
+    ).toBeNull();
   });
 
   it("parses live standings views", () => {

@@ -5,6 +5,8 @@ import {
   ADSENSE_BANNER_SLOT,
   ADSENSE_CLIENT_ID,
   adsTxtBody,
+  adsbygoogleScriptSrc,
+  adsenseAccountMetadata,
   adsenseAllowedOnPath,
   adsensePublisherId,
   adsenseTestAds,
@@ -95,17 +97,33 @@ describe("adsenseTestAds", () => {
 describe("adsenseAllowedOnPath", () => {
   it("allows public pages and fails open without a path", () => {
     expect(adsenseAllowedOnPath("/")).toBe(true);
-    expect(adsenseAllowedOnPath("/games/mass-effect")).toBe(true);
+    expect(adsenseAllowedOnPath("/game-of-the-year/2025")).toBe(true);
+    expect(adsenseAllowedOnPath("/game-of-the-year/2025/categories")).toBe(
+      true,
+    );
+    expect(adsenseAllowedOnPath("/games")).toBe(true);
     expect(adsenseAllowedOnPath(null)).toBe(true);
     expect(adsenseAllowedOnPath(undefined)).toBe(true);
   });
 
-  it("blocks auth and account", () => {
+  it("blocks auth, account, and legal pages", () => {
     expect(adsenseAllowedOnPath("/auth")).toBe(false);
     expect(adsenseAllowedOnPath("/auth/sign-in")).toBe(false);
     expect(adsenseAllowedOnPath("/auth/sign-in?next=/games/x")).toBe(false);
     expect(adsenseAllowedOnPath("/account")).toBe(false);
     expect(adsenseAllowedOnPath("/account/settings")).toBe(false);
+    expect(adsenseAllowedOnPath("/privacy")).toBe(false);
+    expect(adsenseAllowedOnPath("/terms")).toBe(false);
+    expect(adsenseAllowedOnPath("/contact")).toBe(false);
+    expect(adsenseAllowedOnPath("/guidelines")).toBe(false);
+  });
+
+  it("blocks catalog pagination and game detail paths", () => {
+    expect(adsenseAllowedOnPath("/games", "page=1")).toBe(true);
+    expect(adsenseAllowedOnPath("/games", "")).toBe(true);
+    expect(adsenseAllowedOnPath("/games", "page=2")).toBe(false);
+    expect(adsenseAllowedOnPath("/games?page=2")).toBe(false);
+    expect(adsenseAllowedOnPath("/games/mass-effect")).toBe(false);
   });
 });
 
@@ -120,5 +138,21 @@ describe("adsTxtBody", () => {
   it("matches public/ads.txt", () => {
     const file = readFileSync(join(process.cwd(), "public", "ads.txt"), "utf8");
     expect(file.replace(/\r\n/g, "\n").trim()).toBe(adsTxtBody().trim());
+  });
+});
+
+describe("adsbygoogleScriptSrc", () => {
+  it("is Google’s client snippet URL", () => {
+    expect(adsbygoogleScriptSrc(ADSENSE_CLIENT_ID)).toBe(
+      `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_CLIENT_ID}`,
+    );
+  });
+});
+
+describe("adsenseAccountMetadata", () => {
+  it("emits the publisher meta when the client is on", () => {
+    expect(adsenseAccountMetadata()).toEqual({
+      other: { "google-adsense-account": ADSENSE_CLIENT_ID },
+    });
   });
 });

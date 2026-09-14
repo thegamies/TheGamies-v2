@@ -10,7 +10,8 @@ import {
 } from "@/lib/ads/adsense";
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/games/mass-effect",
+  usePathname: () => "/game-of-the-year/2025",
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock("@/lib/ads/adsense", () => ({
@@ -147,5 +148,13 @@ describe("SiteAdBanner", () => {
     const { container } = render(<SiteAdBanner />);
     expect(container.firstChild).toBeNull();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("opts a ranked game page back in with force", () => {
+    vi.mocked(adsenseAllowedOnPath).mockReturnValue(false);
+    mockAdsbygoogle();
+
+    render(<SiteAdBanner force />);
+    expect(document.querySelector("ins.adsbygoogle")).toBeTruthy();
   });
 });

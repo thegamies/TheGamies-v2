@@ -1,18 +1,41 @@
 import { describe, expect, it } from "vitest";
+import { AWARD_CATEGORY_DEFS } from "@/lib/live-aggregate/award-category-defs";
 import {
+  DEMO_2025_CATEGORIES,
   DEMO_2025_CATEGORY_IDS,
   DEMO_2025_GOTY,
   DEMO_2025_LIST_SIZE,
+  buildDemo2025CategoryVotes,
   combatFavoriteKey,
   mulberry32,
   pickDemoCategoryVote,
   pickDemoGotyList,
+  resolveTitleDef,
   rngForVoter,
   seedCommunityDisplayName,
   tasteForIndex,
   uniqueTitlesForLookup,
   weightedSampleWithRng,
 } from "./seed-2025-demo";
+import { demo2025CategoriesForActiveAwards } from "./seed-2025-demo-catalog";
+
+function fakeDemoCategoryPools() {
+  return DEMO_2025_CATEGORIES.map((cat) => ({
+    categoryId: cat.categoryId,
+    games: cat.picks.flatMap((pick) => {
+      const def = resolveTitleDef(pick);
+      if (!def) return [];
+      return [
+        {
+          key: pick.key,
+          gameId: `g-${pick.key}`,
+          weight: pick.weight,
+          tags: def.tags,
+        },
+      ];
+    }),
+  }));
+}
 
 describe("2025 demo seed data", () => {
   it("keeps 60 GOTY sampling weights without normalizing", () => {
@@ -29,6 +52,13 @@ describe("2025 demo seed data", () => {
     expect(new Set(DEMO_2025_CATEGORY_IDS).size).toBe(10);
   });
 
+  it("maps every demo award onto a site catalog id", () => {
+    const ids = new Set(AWARD_CATEGORY_DEFS.map((row) => row.id));
+    for (const id of DEMO_2025_CATEGORY_IDS) {
+      expect(ids.has(id)).toBe(true);
+    }
+  });
+
   it("does not make Clair Obscur the Best Combat favorite", () => {
     expect(combatFavoriteKey()).toBe("hades-ii");
     expect(combatFavoriteKey()).not.toBe("clair-obscur");
@@ -38,6 +68,20 @@ describe("2025 demo seed data", () => {
     const keys = uniqueTitlesForLookup().map((row) => row.key);
     expect(keys).toContain("dying-light-beast");
     expect(keys).toContain("little-nightmares-3");
+    expect(keys).toContain("re-survival-unit");
+  });
+
+  it("does not put 2026 Resident Evil Requiem on the 2025 horror slate", () => {
+    const horror = DEMO_2025_CATEGORIES.find(
+      (cat) => cat.categoryId === "best-horror-game",
+    );
+    const residentEvil = horror?.picks.find(
+      (pick) => pick.key === "re-survival-unit",
+    );
+    expect(residentEvil?.titles).toEqual(["Resident Evil Survival Unit"]);
+    const titles = uniqueTitlesForLookup().flatMap((row) => row.titles);
+    expect(titles.some((title) => /requiem/i.test(title))).toBe(false);
+    expect(titles.some((title) => /resident evil 9/i.test(title))).toBe(false);
   });
 });
 
@@ -120,6 +164,75 @@ describe("2025 demo sampling", () => {
     expect(counts.get("g-clair-obscur") ?? 0).toBeLessThan(
       counts.get(ranked[0]![0]) ?? 0,
     );
+  });
+
+  it("votes every demo award and skips empty pools", () => {
+    const pools = [
+      ...fakeDemoCategoryPools(),
+      { categoryId: "empty", games: [] },
+    ];
+    const votes = buildDemo2025CategoryVotes(
+      pools,
+      tasteForIndex(1),
+      rngForVoter(1),
+    );
+    expect(votes.map((vote) => vote.categoryId)).toEqual([
+      ...DEMO_2025_CATEGORY_IDS,
+    ]);
+  });
+
+  it("does not crown Clair Obscur in Best Combat across many voters", () => {
+    const pools = fakeDemoCategoryPools();
+    const counts = new Map<string, number>();
+    for (let i = 1; i <= 150; i += 1) {
+      const votes = buildDemo2025CategoryVotes(
+        pools,
+        tasteForIndex(i),
+        rngForVoter(i + 90),
+      );
+      const combat = votes.find((vote) => vote.categoryId === "best-combat");
+      if (combat) {
+        counts.set(combat.gameId, (counts.get(combat.gameId) ?? 0) + 1);
+      }
+    }
+    const ranked = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    expect(ranked[0]?.[0]).not.toBe("g-clair-obscur");
+  });
+
+  it("keeps only active demo awards that have catalog matches", () => {
+    const filtered = demo2025CategoriesForActiveAwards(
+      {
+        goty: [],
+        unmatched: [],
+        categories: [
+          {
+            categoryId: "best-combat",
+            games: [
+              {
+                key: "hades-ii",
+                gameId: "g1",
+                weight: 100,
+                tags: ["action"],
+              },
+            ],
+          },
+          { categoryId: "narrative", games: [] },
+          {
+            categoryId: "indie",
+            games: [
+              {
+                key: "silksong",
+                gameId: "g2",
+                weight: 80,
+                tags: ["indie"],
+              },
+            ],
+          },
+        ],
+      },
+      new Set(["best-combat", "narrative"]),
+    );
+    expect(filtered.map((cat) => cat.categoryId)).toEqual(["best-combat"]);
   });
 
   it("uses injected rng for weighted sample", () => {

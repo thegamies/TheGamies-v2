@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   activityEvents,
   createDb,
@@ -20,6 +20,17 @@ import { generatePublicId } from "@/lib/lists/secrets";
 import { gotySlugForYear } from "@/lib/lists/rules";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
 import { insertInChunks } from "@/lib/db/insert-chunks";
+import {
+  DEMO_2025_YEAR,
+  buildDemo2025CategoryVotes,
+  rngForVoter,
+  tasteForIndex,
+} from "@/lib/communities/seed-2025-demo";
+import {
+  demo2025CategoriesForActiveAwards,
+  resolveDemo2025Catalog,
+  type Demo2025Resolved,
+} from "@/lib/communities/seed-2025-demo-catalog";
 import {
   markProfilesAsSeed,
   seedAccountsWithAuthPrefixWhere,
@@ -137,6 +148,7 @@ export function weightForTopRank(rank: number, power = 2.4): number {
 /**
  * Pick category votes from a voter's ranked GOTY list.
  * Participation defaults high; game choice is top-rank weighted.
+ * Site standings seed for 2025 uses `buildDemo2025CategoryVotes` instead.
  */
 export function buildSeedCategoryVotes(
   categories: Array<{ id: string }>,
@@ -256,8 +268,13 @@ export type SeedStandingsInput = {
   topN?: number | null;
   /** Weight sharpness 0.1–5 (default 1). */
   weightPower?: number;
-  /** When true, also write category votes from each GOTY list. */
+  /** When true, also write category votes. 2025 uses the reception-demo pools. */
   includeCategories?: boolean;
+  /**
+   * Rewrite category votes on existing GOTY lists only.
+   * Does not create voters, lists, or GOTY picks. Implies includeCategories.
+   */
+  categoriesOnly?: boolean;
   /** When false, skip voters that already have a GOTY list for the year. */
   reseed?: boolean;
   /** Rebuild year score cache after this batch (default true). */
@@ -311,6 +328,36 @@ export function resolveSeedStartIndex(opts: {
 }
 
 /**
+ * Which seed profiles in this batch should get writes.
+ * Categories-only: existing GOTY lists only (never create lists).
+ * Reseed on: rewrite every profile in the batch.
+ * Reseed off: skip profiles that already have a GOTY list.
+ */
+export function selectStandingsSeedWork(opts: {
+  categoriesOnly: boolean;
+  reseed: boolean;
+  profileIds: readonly string[];
+  listProfileIds: ReadonlySet<string>;
+}): { activeProfileIds: string[]; skipped: number } {
+  let skipped = 0;
+  const activeProfileIds: string[] = [];
+  for (const id of opts.profileIds) {
+    const hasList = opts.listProfileIds.has(id);
+    if (opts.categoriesOnly) {
+      if (hasList) activeProfileIds.push(id);
+      else skipped += 1;
+      continue;
+    }
+    if (!opts.reseed && hasList) {
+      skipped += 1;
+      continue;
+    }
+    activeProfileIds.push(id);
+  }
+  return { activeProfileIds, skipped };
+}
+
+/**
  * Create/update a batch of synthetic GOTY voters.
  * Use startIndex + count for paging up to SEED_MAX_INDEX; client can loop until stopped.
  */
@@ -331,8 +378,10 @@ export async function seedStandingsVoters(
     weightPower: input.weightPower,
   });
   if ("error" in sampling) return sampling;
-  const includeCategories = input.includeCategories === true;
-  const reseed = input.reseed !== false;
+  const categoriesOnly = input.categoriesOnly === true;
+  const includeCategories =
+    categoriesOnly || input.includeCategories === true;
+  const reseed = categoriesOnly ? true : input.reseed !== false;
   const doRebuild = input.rebuild !== false;
 
   if (!Number.isFinite(year) || year < 1970 || year > 2100) {
@@ -353,15 +402,18 @@ export async function seedStandingsVoters(
     (_, i) => startIndex + i,
   );
 
-  const pool = await loadIgdbWeightedSeedPool(year, sampling.topN, db);
-  if (pool.length === 0) {
-    return {
-      error: `Need ${year} games in the catalog to seed lists.`,
-    };
-  }
-
   const wantedAuthIds = indices.map(seedAuthUserId);
   const wantedUsernames = indices.map(seedUsername);
+
+  let pool: PoolGame[] = [];
+  if (!categoriesOnly) {
+    pool = await loadIgdbWeightedSeedPool(year, sampling.topN, db);
+    if (pool.length === 0) {
+      return {
+        error: `Need ${year} games in the catalog to seed lists.`,
+      };
+    }
+  }
 
   const existingProfiles = await db
     .select()
@@ -378,7 +430,8 @@ export async function seedStandingsVoters(
     }))
     .filter((row) => !byAuth.has(row.authUserId));
 
-  if (missing.length > 0) {
+  let skipped = 0;
+  if (missing.length > 0 && !categoriesOnly) {
     const usernameClash = await db
       .select({ username: profiles.username })
       .from(profiles)
@@ -411,38 +464,60 @@ export async function seedStandingsVoters(
       byAuth.set(profile.authUserId, profile);
     }
   }
+  if (categoriesOnly) {
+    skipped += missing.length;
+  }
 
-  const profilesInOrder = wantedAuthIds.map((id) => byAuth.get(id)!);
-  const profileIds = profilesInOrder.map((p) => p.id);
-  await markProfilesAsSeed(profileIds, db);
-
-  const existingLists = await db
-    .select()
-    .from(lists)
-    .where(
-      and(
-        inArray(lists.profileId, profileIds),
-        eq(lists.listType, "goty"),
-        eq(lists.year, year),
-      ),
+  const profilesInOrder = wantedAuthIds
+    .map((id) => byAuth.get(id))
+    .filter(
+      (profile): profile is NonNullable<typeof profile> => Boolean(profile),
     );
+  const profileIds = profilesInOrder.map((p) => p.id);
+  if (profileIds.length > 0) {
+    await markProfilesAsSeed(profileIds, db);
+  }
+
+  const existingLists =
+    profileIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(lists)
+          .where(
+            and(
+              inArray(lists.profileId, profileIds),
+              eq(lists.listType, "goty"),
+              eq(lists.year, year),
+            ),
+          );
   const listByProfile = new Map(
     existingLists
       .filter((l) => l.profileId != null)
       .map((l) => [l.profileId!, l]),
   );
 
-  let skipped = 0;
-  const activeProfiles = profilesInOrder.filter((profile) => {
-    if (reseed) return true;
-    if (listByProfile.has(profile.id)) {
-      skipped += 1;
-      return false;
-    }
-    return true;
+  const work = selectStandingsSeedWork({
+    categoriesOnly,
+    reseed,
+    profileIds,
+    listProfileIds: new Set(listByProfile.keys()),
   });
+  skipped += work.skipped;
+  const profileById = new Map(
+    profilesInOrder.map((profile) => [profile.id, profile] as const),
+  );
+  const activeProfiles = work.activeProfileIds.map(
+    (id) => profileById.get(id)!,
+  );
 
   if (activeProfiles.length === 0) {
+    if (categoriesOnly) {
+      return {
+        error:
+          "No existing seed Game of the Year lists in that voter range. Seed lists first, or turn off Rewrite category votes only.",
+      };
+    }
     return {
       createdProfiles: missing.length,
       createdLists: 0,
@@ -459,7 +534,9 @@ export async function seedStandingsVoters(
   }
 
   const now = new Date();
-  const listsToCreate = activeProfiles.filter((p) => !listByProfile.has(p.id));
+  const listsToCreate = categoriesOnly
+    ? []
+    : activeProfiles.filter((p) => !listByProfile.has(p.id));
   if (listsToCreate.length > 0) {
     const insertedLists = await db
       .insert(lists)
@@ -486,6 +563,7 @@ export async function seedStandingsVoters(
   const updatedLists = allLists.length - listsToCreate.length;
 
   let categories: Array<{ id: string }> = [];
+  let demoCategoryPools: Demo2025Resolved["categories"] | null = null;
   if (includeCategories) {
     await ensureAwardCategories(db);
     categories = await listActiveAwardCategories(db);
@@ -495,13 +573,52 @@ export async function seedStandingsVoters(
           "No active award categories found after syncing the catalog. Check award category migrations.",
       };
     }
+    if (year === DEMO_2025_YEAR) {
+      const resolved = await resolveDemo2025Catalog(db);
+      demoCategoryPools = demo2025CategoriesForActiveAwards(
+        resolved,
+        new Set(categories.map((cat) => cat.id)),
+      );
+      if (demoCategoryPools.length === 0) {
+        return {
+          error:
+            "The 2025 category seed needs catalog matches for the reception-demo awards (Story, Combat, and the rest of that slate).",
+        };
+      }
+    }
   }
 
-  await db.delete(listItems).where(inArray(listItems.listId, listIds));
+  const indexByProfileId = new Map<string, number>();
+  for (let i = 0; i < indices.length; i += 1) {
+    const profile = byAuth.get(wantedAuthIds[i]!);
+    if (profile) indexByProfileId.set(profile.id, indices[i]!);
+  }
+
+  const existingPicksByListId = new Map<string, Array<{ id: string }>>();
+  if (categoriesOnly && includeCategories && !demoCategoryPools) {
+    const existingItems = await db
+      .select({
+        listId: listItems.listId,
+        gameId: listItems.gameId,
+        rank: listItems.rank,
+      })
+      .from(listItems)
+      .where(inArray(listItems.listId, listIds))
+      .orderBy(asc(listItems.rank), asc(listItems.gameId));
+    for (const row of existingItems) {
+      const picks = existingPicksByListId.get(row.listId) ?? [];
+      picks.push({ id: row.gameId });
+      existingPicksByListId.set(row.listId, picks);
+    }
+  }
+
+  if (!categoriesOnly) {
+    await db.delete(listItems).where(inArray(listItems.listId, listIds));
+    await deleteListActivityForLists(listIds, db);
+  }
   await db
     .delete(listCategoryVotes)
     .where(inArray(listCategoryVotes.listId, listIds));
-  await deleteListActivityForLists(listIds, db);
 
   const itemRows: {
     listId: string;
@@ -545,48 +662,61 @@ export async function seedStandingsVoters(
     );
 
   for (const [listIndex, list] of allLists.entries()) {
-    const { picks, ranks } = sampleSeedList(pool, sampling, weightOf);
-    const batchId = crypto.randomUUID();
-    const createdAt = seedGotyListEventTime(now, listIndex);
-    for (let i = 0; i < picks.length; i += 1) {
-      const game = picks[i]!;
-      itemRows.push({
-        listId: list.id,
-        gameId: game.id,
-        rank: ranks[i]!,
-        blurb: null,
-      });
-      if (list.profileId) {
-        activityRows.push({
-          profileId: list.profileId,
-          kind: "list_add",
-          batchId,
-          gameId: game.id,
+    let rankedPicks: Array<{ id: string }> = [];
+    if (!categoriesOnly) {
+      const { picks, ranks } = sampleSeedList(pool, sampling, weightOf);
+      rankedPicks = picks.map((game) => ({ id: game.id }));
+      const batchId = crypto.randomUUID();
+      const createdAt = seedGotyListEventTime(now, listIndex);
+      for (let i = 0; i < picks.length; i += 1) {
+        const game = picks[i]!;
+        itemRows.push({
           listId: list.id,
-          createdAt,
+          gameId: game.id,
+          rank: ranks[i]!,
+          blurb: null,
+        });
+        if (list.profileId) {
+          activityRows.push({
+            profileId: list.profileId,
+            kind: "list_add",
+            batchId,
+            gameId: game.id,
+            listId: list.id,
+            createdAt,
+          });
+        }
+      }
+      const scored = buildGotyContribRows(
+        picks.map((game, index) => ({
+          gameId: game.id,
+          rank: ranks[index]!,
+          isAdult: false,
+        })),
+      );
+      for (const row of scored) {
+        contribRows.push({
+          listId: list.id,
+          gameId: row.gameId,
+          profileId: list.profileId!,
+          year,
+          rank: row.rank,
+          points: row.points,
         });
       }
-    }
-    const scored = buildGotyContribRows(
-      picks.map((game, index) => ({
-        gameId: game.id,
-        rank: ranks[index]!,
-        isAdult: false,
-      })),
-    );
-    for (const row of scored) {
-      contribRows.push({
-        listId: list.id,
-        gameId: row.gameId,
-        profileId: list.profileId!,
-        year,
-        rank: row.rank,
-        points: row.points,
-      });
+    } else {
+      rankedPicks = existingPicksByListId.get(list.id) ?? [];
     }
 
     if (!includeCategories) continue;
-    const catVotes = buildSeedCategoryVotes(categories, picks);
+    const voterIndex = indexByProfileId.get(list.profileId!) ?? 1;
+    const catVotes = demoCategoryPools
+      ? buildDemo2025CategoryVotes(
+          demoCategoryPools,
+          tasteForIndex(voterIndex),
+          rngForVoter(voterIndex),
+        )
+      : buildSeedCategoryVotes(categories, rankedPicks);
     for (const vote of catVotes) {
       categoryVoteRows.push({
         listId: list.id,
@@ -625,9 +755,11 @@ export async function seedStandingsVoters(
     );
   }
 
-  await db
-    .delete(liveGotyContrib)
-    .where(inArray(liveGotyContrib.listId, listIds));
+  if (!categoriesOnly) {
+    await db
+      .delete(liveGotyContrib)
+      .where(inArray(liveGotyContrib.listId, listIds));
+  }
   await db
     .delete(liveCategoryContrib)
     .where(inArray(liveCategoryContrib.listId, listIds));
@@ -664,13 +796,13 @@ export async function seedStandingsVoters(
   }
 
   return {
-    createdProfiles: missing.length,
+    createdProfiles: categoriesOnly ? 0 : missing.length,
     createdLists: listsToCreate.length,
     updatedLists,
     skipped,
     year,
     gamePoolSize: pool.length,
-    categoryCount: categories.length,
+    categoryCount: demoCategoryPools?.length ?? categories.length,
     categoryVotes: categoryVoteRows.length,
     startIndex,
     endIndex,

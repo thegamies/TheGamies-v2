@@ -95,7 +95,7 @@ Still open:
 
 Shipped on Cloudflare:
 
-- `robots.txt` / paged `sitemap.xml` (top 100 popular games from this year and last year, public GOTY boards, public community homes; no people)
+- `robots.txt` / paged `sitemap.xml` (games with original site value, public GOTY boards including `/categories`, public community homes, `/rankings`; no people)
 - Permanent redirects from legacy `/game` and `/game/[slug]` to `/games` / `/games/[slug]`
 - `metadataBase` from `NEXT_PUBLIC_APP_URL`
 - Open Graph / Twitter metadata, a static default card (`/og.png`), and generated cards at `/api/og` (game, list, profile, GOTY year, public community)
@@ -163,6 +163,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Mailboxes actually receive mail
 - Cookie banner + GA: site property ships gtag; `off` disables. Banner still shows either way.
 - AdSense **European regulations** message published in Privacy & messaging for `thegamies.gg` (Funding Choices; privacy policy `https://thegamies.gg/privacy`; Consent Mode on). The site tag is in the app; the message itself is created in AdSense.
+- After the 2026 “low value content” rejection: do not request another review until Search Console shows `/about`, `/rankings`, `/game-of-the-year/2025`, `/game-of-the-year/2025/categories`, and a ranked game indexed, and thin catalog URLs dropping out. Wait 2–4 weeks. Details: [adsense.md](./adsense.md).
 
 ### Hosting plans
 
