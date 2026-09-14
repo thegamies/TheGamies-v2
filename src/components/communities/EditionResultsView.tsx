@@ -158,7 +158,6 @@ export function EditionResultsView({
   year,
   communityName,
   mode,
-  rankMode = "competition",
   view,
   categoryId = null,
   meta,

@@ -13,11 +13,11 @@ function stampPathHeaders(request: NextRequest): Headers {
 }
 
 /**
- * Next.js 16 runs `proxy.ts` (the `middleware.ts` convention is ignored).
- * Stamp the path for account auth. AdSense is mounted per publication route,
- * not from this file.
+ * OpenNext Cloudflare 1.20.2 still builds Edge `middleware.ts`, not Node
+ * `proxy.ts`. Next 16 deprecates this filename but still runs it. Stamp the
+ * path for account auth. AdSense is mounted per publication route, not here.
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const requestHeaders = stampPathHeaders(request);
   const nextWithPath = () =>
     NextResponse.next({ request: { headers: requestHeaders } });

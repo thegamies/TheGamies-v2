@@ -41,7 +41,6 @@ export function EditionVoicesForm({
   year,
   status,
   members,
-  locked: _locked,
 }: {
   slug: string;
   year: number;

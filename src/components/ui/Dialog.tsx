@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+const subscribeNoop = () => () => {};
 
 export function Dialog({
   open,
@@ -33,14 +35,14 @@ export function Dialog({
   backLabel?: string;
 }) {
   const headingId = useId();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
   const surfaceClass =
     className ??
     (placement === "contained" ? "w-full max-w-3xl" : "w-full max-w-xl");
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;

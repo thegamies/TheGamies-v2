@@ -117,6 +117,35 @@ function refsFromRows(rows: OrderRow[]): EditionBallotCategoryRef[] {
   return rows.map((r) => ({ kind: r.kind, id: r.id }));
 }
 
+function reconcileOrder(
+  prev: OrderRow[],
+  selected: EditionAwardCategoryOption[],
+  customCategories: CustomCategoryView[],
+): OrderRow[] {
+  const merged = mergeOrder(selected, customCategories);
+  const byKey = new Map<string, OrderRow>();
+  for (const r of merged) {
+    byKey.set(rowKey(r), r);
+  }
+  const next: OrderRow[] = [];
+  for (const row of prev) {
+    const key = rowKey(row);
+    const fresh = byKey.get(key);
+    if (fresh) {
+      next.push(fresh);
+      byKey.delete(key);
+    }
+  }
+  for (const row of merged) {
+    const key = rowKey(row);
+    if (byKey.has(key)) {
+      next.push(row);
+      byKey.delete(key);
+    }
+  }
+  return next;
+}
+
 function propsSyncKey(
   selected: EditionAwardCategoryOption[],
   customCategories: CustomCategoryView[],
@@ -217,34 +246,11 @@ export function EditionCategoriesDraft({
   useDragBodyScrollLock(dragging);
   const localCustom = Boolean(onCustomCategoriesChange);
 
-  useEffect(() => {
-    setOrder((prev) => {
-      const merged = mergeOrder(selected, customCategories);
-      const byKey = new Map<string, OrderRow>();
-      for (const r of merged) {
-        byKey.set(rowKey(r), r);
-      }
-      const next: OrderRow[] = [];
-      for (const row of prev) {
-        const key = rowKey(row);
-        const fresh = byKey.get(key);
-        if (fresh) {
-          next.push(fresh);
-          byKey.delete(key);
-        }
-      }
-      for (const row of merged) {
-        const key = rowKey(row);
-        if (byKey.has(key)) {
-          next.push(row);
-          byKey.delete(key);
-        }
-      }
-      return next;
-    });
-    // Intentionally sync when category identity/content changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- syncKey captures selected + custom
-  }, [syncKey]);
+  const [appliedSyncKey, setAppliedSyncKey] = useState(syncKey);
+  if (syncKey !== appliedSyncKey) {
+    setAppliedSyncKey(syncKey);
+    setOrder((prev) => reconcileOrder(prev, selected, customCategories));
+  }
 
   useEffect(() => {
     onBallotOrderChange?.(refsFromRows(order));

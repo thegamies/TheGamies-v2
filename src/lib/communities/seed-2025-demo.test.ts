@@ -93,7 +93,7 @@ describe("seed host display names", () => {
 });
 
 describe("2025 demo sampling", () => {
-  const pool = DEMO_2025_GOTY.map((row, i) => ({
+  const pool = DEMO_2025_GOTY.map((row) => ({
     key: row.key,
     gameId: `g-${row.key}`,
     weight: row.weight,

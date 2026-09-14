@@ -3,9 +3,7 @@
 import Link from "next/link";
 import {
   useActionState,
-  useEffect,
   useMemo,
-  useRef,
   useState,
   type FormEvent,
 } from "react";
@@ -209,7 +207,7 @@ function EditionYearSettingsForm({
   );
   const [draftRankMode, setDraftRankMode] = useState(rankMode);
   const [clientError, setClientError] = useState<string | null>(null);
-  const submittedKeyRef = useRef<string | null>(null);
+  const [submittedKey, setSubmittedKey] = useState<string | null>(null);
 
   const siteIdsInOrder = ballotOrder
     .filter((r) => r.kind === "site")
@@ -249,7 +247,9 @@ function EditionYearSettingsForm({
     });
   }
 
-  useEffect(() => {
+  const [categoriesSnap, setCategoriesSnap] = useState(customCategories);
+  if (customCategories !== categoriesSnap) {
+    setCategoriesSnap(customCategories);
     setEntryOrders((prev) => {
       let changed = false;
       const next = { ...prev };
@@ -272,7 +272,7 @@ function EditionYearSettingsForm({
       }
       return changed ? next : prev;
     });
-  }, [customCategories]);
+  }
 
   const currentKey = settingsDraftKey({
     opens,
@@ -290,15 +290,16 @@ function EditionYearSettingsForm({
       "Leave without saving? Your latest edition settings won’t be kept.",
   });
 
-  useEffect(() => {
-    if (!state) return;
-    if ("ok" in state && state.ok && submittedKeyRef.current) {
-      setSavedKey(submittedKeyRef.current);
+  const [seenSaveState, setSeenSaveState] = useState(state);
+  if (state !== seenSaveState) {
+    setSeenSaveState(state);
+    if (state && "ok" in state && state.ok && submittedKey) {
+      setSavedKey(submittedKey);
       setEntryOrders({});
       setClientError(null);
     }
-    submittedKeyRef.current = null;
-  }, [state]);
+    if (state) setSubmittedKey(null);
+  }
 
   const bounds = useMemo(
     () => editionScheduleDateBounds({ opens, closes, publishes }),
@@ -329,7 +330,7 @@ function EditionYearSettingsForm({
       event.preventDefault();
       return;
     }
-    submittedKeyRef.current = currentKey;
+    setSubmittedKey(currentKey);
   }
 
   const saveBarMessage = error ? (

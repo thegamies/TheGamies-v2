@@ -42,7 +42,7 @@ export function AdminTgaSeedClient({
   initialYear,
   initialStats,
 }: Props) {
-  const [pageYears, setPageYears] = useState(years);
+  const pageYears = years;
   const [year, setYear] = useState(initialYear);
   const [stats, setStats] = useState<Stats | null>(initialStats);
   const [communitySlug, setCommunitySlug] = useState("");

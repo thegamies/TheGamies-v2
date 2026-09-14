@@ -395,12 +395,13 @@ async function handleAdminRegister(
   return json({ error: "Not found." }, 404);
 }
 
-export default {
+const worker = {
   async fetch(
     request: Request,
     env: Env,
-    _ctx: ExecutionContext,
+    ctx: ExecutionContext,
   ): Promise<Response> {
+    void ctx;
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/$/, "") || "/";
 
@@ -460,8 +461,9 @@ export default {
   async scheduled(
     controller: ScheduledController,
     env: Env,
-    _ctx: ExecutionContext,
+    ctx: ExecutionContext,
   ): Promise<void> {
+    void ctx;
     try {
       if (controller.cron === WEBHOOK_LOG_CLEANUP_CRON) {
         const result = await cleanupOldWebhookLogs(env, {
@@ -551,3 +553,5 @@ export default {
     }
   },
 };
+
+export default worker;

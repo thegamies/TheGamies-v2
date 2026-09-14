@@ -5,22 +5,22 @@ import { ADSENSE_CLIENT_ID, adsbygoogleScriptSrc } from "@/lib/ads/adsense";
 import { GoogleAdSense } from "./GoogleAdSense";
 
 vi.mock("next/script", () => ({
-  default: function Script({
-    children,
-    dangerouslySetInnerHTML,
-    strategy: _strategy,
-    onLoad: _onLoad,
-    onReady: _onReady,
-    onError: _onError,
-    ...props
-  }: ScriptHTMLAttributes<HTMLScriptElement> & {
-    strategy?: string;
-    onLoad?: unknown;
-    onReady?: unknown;
-    onError?: unknown;
-  }) {
+  default: function Script(
+    props: ScriptHTMLAttributes<HTMLScriptElement> & {
+      strategy?: string;
+      onLoad?: unknown;
+      onReady?: unknown;
+      onError?: unknown;
+    },
+  ) {
+    const rest = { ...props };
+    delete rest.strategy;
+    delete rest.onLoad;
+    delete rest.onReady;
+    delete rest.onError;
+    const { children, dangerouslySetInnerHTML, ...dom } = rest;
     return (
-      <script {...props} dangerouslySetInnerHTML={dangerouslySetInnerHTML}>
+      <script {...dom} dangerouslySetInnerHTML={dangerouslySetInnerHTML}>
         {children}
       </script>
     );
