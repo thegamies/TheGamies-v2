@@ -70,6 +70,7 @@ export function AdminSeedClient({
     startIndex: number;
     count: number;
     rebuild: boolean;
+    categoryRerollSeed: number;
   }) {
     return seedStandingsAction({
       year,
@@ -83,6 +84,7 @@ export function AdminSeedClient({
       topN: parseTopN(topN),
       weightPower,
       includeCategories: effectiveIncludeCategories,
+      categoryRerollSeed: opts.categoryRerollSeed,
       categoriesOnly,
       reseed: effectiveReseed,
       rebuild: opts.rebuild,
@@ -99,6 +101,7 @@ export function AdminSeedClient({
     setRunning(true);
     stopRef.current = false;
     let hadError = false;
+    const categoryRerollSeed = crypto.getRandomValues(new Uint32Array(1))[0]!;
 
     try {
       // Fresh max index so Reseed-off appends instead of re-targeting 1…N.
@@ -151,6 +154,7 @@ export function AdminSeedClient({
           startIndex,
           count: batch,
           rebuild,
+          categoryRerollSeed,
         });
         if ("error" in result) {
           setMessage(result.error);
@@ -203,6 +207,7 @@ export function AdminSeedClient({
     let categoryVotes = 0;
     let wroteAnything = false;
     let hadError = false;
+    const categoryRerollSeed = crypto.getRandomValues(new Uint32Array(1))[0]!;
 
     try {
       while (!stopRef.current && startIndex <= 1000) {
@@ -210,6 +215,7 @@ export function AdminSeedClient({
           startIndex,
           count: Math.min(BATCH_SIZE, 1000 - startIndex + 1),
           rebuild: false,
+          categoryRerollSeed,
         });
         if ("error" in result) {
           setMessage(result.error);
@@ -419,7 +425,7 @@ export function AdminSeedClient({
         />
         Include category votes. 2025 and 2026 use per-award pools
         (Story, Combat, and the rest of that slate). Other years pick from
-        each list’s GOTY ranks.
+        each list’s GOTY ranks. Every run rerolls the category spread.
       </label>
 
       <label className="flex items-start gap-2 text-sm text-ink">

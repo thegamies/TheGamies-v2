@@ -102,6 +102,15 @@ describe("2026 standings category seed data", () => {
     expect(rngForVoter(1, DEMO_2026_YEAR)()).not.toBe(rngForVoter(1)());
   });
 
+  it("rerolls the same voter when the run seed changes", () => {
+    expect(rngForVoter(1, DEMO_2026_YEAR, 10)()).not.toBe(
+      rngForVoter(1, DEMO_2026_YEAR, 11)(),
+    );
+    expect(rngForVoter(1, DEMO_2026_YEAR, 10)()).toBe(
+      rngForVoter(1, DEMO_2026_YEAR, 10)(),
+    );
+  });
+
   it("does not let Orbitals take Best Indie from higher-weighted games", () => {
     const indie = DEMO_2026_CATEGORIES.find(
       (cat) => cat.categoryId === "indie",
