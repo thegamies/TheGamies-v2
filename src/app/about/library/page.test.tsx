@@ -13,6 +13,6 @@ describe("AboutLibraryPage", () => {
     render(<AboutLibraryPage />);
     expect(screen.getByRole("heading", { name: "Library" })).toBeTruthy();
     expect(screen.getByText("Wishlist")).toBeTruthy();
-    expect(screen.getByText(/does not add a game to Game of the Year/i)).toBeTruthy();
+    expect(screen.getByText(/does not automatically add it to your Game of the Year list/i)).toBeTruthy();
   });
 });

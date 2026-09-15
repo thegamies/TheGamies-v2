@@ -12,46 +12,53 @@ export const metadata: Metadata = publicPageMetadata({
 
 export default function AboutLibraryPage() {
   return (
-    <AboutInfoLayout title="Library" deck="A shelf, not a yearly ranking">
+    <AboutInfoLayout title="Library" deck="Track games without ranking them">
       <p>
-        Library is the shelf next to your year list: what you want, what you
-        are playing, and what you finished. It is not a Game of the Year list
-        and it is not a custom list.
+        Your Library is where you keep track of the games you want to play, are
+        playing, or have finished. It is separate from your Game of the Year
+        and custom lists, so games can stay organized without needing to be
+        ranked.
       </p>
 
       <h2>Statuses</h2>
-      <p>One status per game. The statuses are:</p>
+      <p>Each game can have one Library status:</p>
       <ul>
         <li>
-          <strong>Wishlist</strong> — marked for later, not a working queue
+          <strong>Wishlist</strong> for games you want to remember for later
         </li>
         <li>
-          <strong>Backlog</strong> — on the shelf to play
+          <strong>Backlog</strong> for games you plan to play
         </li>
         <li>
-          <strong>Playing</strong> — in progress
+          <strong>Playing</strong> for games currently in progress
         </li>
         <li>
-          <strong>Paused</strong> — stopped for now, still on the shelf
+          <strong>Paused</strong> for games you have put aside for now
         </li>
         <li>
-          <strong>Beat</strong> — finished
+          <strong>Beat</strong> for games you have finished
         </li>
         <li>
-          <strong>Dropped</strong> — stopped without treating it as Beat
+          <strong>Dropped</strong> for games you stopped playing
         </li>
       </ul>
       <p>
-        Beat does not add a game to Game of the Year. A GOTY list does not
-        require Beat. Unreleased and off-year titles can sit on the shelf.
+        Your Library and Game of the Year lists are independent. Beating a game
+        does not automatically add it to your Game of the Year list, and you
+        do not need to beat a game before ranking it.
       </p>
+      <p>You can also add unreleased games and games from any year to your Library.</p>
 
       <h2>Visibility</h2>
       <p>
-        Each row can be public or private. Public rows can show on a public
-        profile and in activity. Private rows stay on your shelf. Set a
-        status from a game page. Open someone’s{" "}
-        <Link href="/people">profile</Link> to see a public library.
+        Each game in your Library can be public or private. Public games can
+        appear on your profile and in activity, while private games are visible
+        only to you.
+      </p>
+      <p>
+        You can update your Library from any game page and browse other
+        people&apos;s public Libraries from their{" "}
+        <Link href="/people">profiles</Link>.
       </p>
     </AboutInfoLayout>
   );

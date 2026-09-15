@@ -39,6 +39,7 @@ describe("HomeCoverStrip", () => {
       "href",
       "/games/hades-ii",
     );
+    expect(screen.getByText("Hades II").className).toContain("line-clamp-2");
   });
 
   it("shows an editorial empty when the board is not ready", () => {

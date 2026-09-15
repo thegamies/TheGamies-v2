@@ -101,7 +101,9 @@ import { listEditionBallotCategories } from "@/lib/communities/edition-ballot-ca
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import { getOwnedGotyItemsForYear } from "@/lib/lists/service";
-import { noIndexRobots } from "@/lib/seo/site";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
+import { shouldIndexCommunityBoards } from "@/lib/seo/sitemap-plan";
 
 type Params = Promise<{ slug: string; year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -123,11 +125,22 @@ export async function generateMetadata({
     if (!Number.isFinite(year)) {
       return { title: `${community.name} event`, robots: noIndexRobots };
     }
-    return {
-      title: `${community.name} ${Math.floor(year)} event`,
+    const y = Math.floor(year);
+    const edition = await getEditionByCommunityYear(community.id, y).catch(
+      () => null,
+    );
+    const index =
+      shouldIndexCommunityBoards(community) &&
+      Boolean(edition && showEditionNav(edition.status));
+    return publicPageMetadata({
+      title: `${community.name} ${y} event`,
       description: `${community.name} Game of the Year event.`,
-      robots: noIndexRobots,
-    };
+      path: `/communities/${community.slug}/edition/${y}`,
+      index,
+      image: index
+        ? ogImagePath({ kind: "community", slug: community.slug })
+        : undefined,
+    });
   } catch {
     return { title: "Event", robots: noIndexRobots };
   }

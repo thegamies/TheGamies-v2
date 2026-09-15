@@ -43,7 +43,9 @@ import {
   resolveCommunityTgaYearView,
   tgaYearHref,
 } from "@/lib/tga-pickem/year-href";
-import { noIndexRobots } from "@/lib/seo/site";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { shouldIndexCommunityBoards } from "@/lib/seo/sitemap-plan";
 import {
   importSiteTgaSheetAction,
   saveCommunityPicksToSiteAction,
@@ -53,10 +55,37 @@ import {
 type Params = Promise<{ slug: string; year: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-export const metadata: Metadata = {
-  title: "Video Game Awards Pick’em",
-  robots: noIndexRobots,
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Params;
+}): Promise<Metadata> {
+  const { slug, year: raw } = await params;
+  const year = Number(raw);
+  try {
+    const community = await getCommunityBySlug(slug);
+    if (!community || !Number.isInteger(year)) {
+      return { title: "Video Game Awards Pick’em", robots: noIndexRobots };
+    }
+    const [slate, optedIn] = await Promise.all([
+      getEnabledTgaYear(year).catch(() => null),
+      isCommunityTgaOptedIn(community.id, year),
+    ]);
+    const index =
+      shouldIndexCommunityBoards(community) && Boolean(slate && optedIn);
+    return publicPageMetadata({
+      title: `${community.name} Video Game Awards Pick’em`,
+      description: `${community.name} predictions for the Video Game Awards.`,
+      path: `/communities/${community.slug}/the-game-awards/${year}`,
+      index,
+      image: index
+        ? ogImagePath({ kind: "community", slug: community.slug })
+        : undefined,
+    });
+  } catch {
+    return { title: "Video Game Awards Pick’em", robots: noIndexRobots };
+  }
+}
 
 export default async function CommunityTgaYearPage({
   params,

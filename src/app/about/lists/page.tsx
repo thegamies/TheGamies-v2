@@ -12,36 +12,50 @@ export const metadata: Metadata = publicPageMetadata({
 
 export default function AboutListsPage() {
   return (
-    <AboutInfoLayout title="Lists" deck="Yearly rankings and named lists">
+    <AboutInfoLayout
+      title="Lists"
+      deck="Yearly Game of the Year lists and custom lists"
+    >
       <p>
-        There are two kinds of lists. A Game of the Year list is a ranked year.
-        A custom list is a named ranking you title yourself.
+        The Gamies has two kinds of lists: yearly Game of the Year lists and
+        custom lists you can build around anything.
       </p>
 
       <h2>Game of the Year</h2>
       <p>
-        Rank up to 100 games for a year. The top 10 score: 10 points for 1st,
-        down to 1 point for 10th. Games 11–100 stay on the list; they do not
-        move the site board.
+        Rank up to 100 games from a year. Your Top 10 determine the points that
+        go toward the overall Game of the Year rankings. Your #1 earns 10
+        points, #2 earns 9, continuing down to 1 point for #10.
       </p>
       <p>
-        On the same list, pick one game per award — Best Indie, Best
-        Soundtrack, and the rest of the slate. You can start without an
-        account and save the list to a profile when you are ready.
+        Games ranked 11 through 100 still appear on your personal list, but they
+        do not contribute points to the overall rankings.
       </p>
       <p>
-        Signed-in lists add up to the live{" "}
-        <Link href="/game-of-the-year">Game of the Year</Link> board.{" "}
-        <Link href="/rankings">How rankings work</Link> covers scoring and when
-        ranks go public.{" "}
+        You can also choose a winner for each award category, including Best
+        Indie, Best Soundtrack, Best Combat, and the rest of the year&apos;s
+        categories.
+      </p>
+      <p>
+        Lists contribute to the live{" "}
+        <Link href="/game-of-the-year">Game of the Year</Link> board, where
+        games are ranked by the points they earn across everyone&apos;s lists.
+        Rankings become public once enough lists have been submitted, while vote
+        counts stay hidden until the year is revealed.{" "}
+        <Link href="/rankings">How rankings work</Link>
+        {" · "}
         <Link href="/create/goty">Create a Game of the Year list</Link>.
       </p>
 
       <h2>Custom lists</h2>
       <p>
-        A custom list is a ranked pile with your own title. It is not tied to
-        a year and does not feed the site Game of the Year board. Share the
-        URL when you want it public.{" "}
+        Custom lists let you rank games around any topic you want. Give your
+        list a name, add your games, put them in order, and share it with
+        others.
+      </p>
+      <p>
+        Unlike Game of the Year lists, custom lists are not tied to a specific
+        year and do not contribute to the overall Game of the Year rankings.{" "}
         <Link href="/create/custom">Create a custom list</Link>.
       </p>
     </AboutInfoLayout>

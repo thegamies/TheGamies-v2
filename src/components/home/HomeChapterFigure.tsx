@@ -1,68 +1,28 @@
 import type { ReactNode } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { GameCover } from "@/components/ui/GameCover";
-
-export type HomeChapterCover = {
-  gameId: string;
-  title: string;
-  coverUrl: string | null;
-  place?: number;
-};
 
 /**
- * Decorative still for a homepage chapter. Covers are not links.
+ * Decorative product still for a homepage chapter. Not a link.
  */
 export function HomeChapterFigure({
-  covers,
-  ranked = false,
+  src,
+  alt,
 }: {
-  covers: HomeChapterCover[];
-  ranked?: boolean;
+  src: string;
+  alt: string;
 }) {
-  const still = ranked ? covers.slice(0, 5) : covers.slice(0, 10);
-  const hasStill = still.length >= 4;
-
   return (
     <figure className="min-w-0">
-      <div
-        className={`overflow-hidden rounded-[var(--radius-artwork)] border border-line bg-panel ${
-          hasStill ? "" : "min-h-[12rem] sm:min-h-[14rem]"
-        }`}
-      >
-        {hasStill ? (
-          ranked ? (
-            <ul className="grid grid-cols-5 gap-1 p-2 sm:gap-1.5 sm:p-2.5">
-              {still.map((game) => (
-                <li key={game.gameId} className="min-w-0">
-                  {game.place != null ? (
-                    <p className="mb-1 font-display text-lg leading-none tracking-wide text-ink sm:text-xl">
-                      {game.place}
-                    </p>
-                  ) : null}
-                  <GameCover
-                    title={game.title}
-                    imageUrl={game.coverUrl}
-                    fluid
-                    width={96}
-                  />
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <ul className="grid grid-cols-5 gap-1 p-2 sm:p-2.5">
-              {still.map((game) => (
-                <li key={game.gameId}>
-                  <GameCover
-                    title={game.title}
-                    imageUrl={game.coverUrl}
-                    fluid
-                    width={80}
-                  />
-                </li>
-              ))}
-            </ul>
-          )
-        ) : null}
+      <div className="overflow-hidden rounded-[var(--radius-artwork)] border border-line bg-panel">
+        <Image
+          src={src}
+          alt={alt}
+          width={1024}
+          height={819}
+          unoptimized
+          className="h-auto w-full"
+        />
       </div>
     </figure>
   );
@@ -78,15 +38,15 @@ const accentLinkClass =
 export function HomeChapterSplit({
   title,
   children,
-  covers,
-  ranked = false,
+  stillSrc,
+  stillAlt,
   imageSide = "right",
   actions,
 }: {
   title: string;
   children: ReactNode;
-  covers: HomeChapterCover[];
-  ranked?: boolean;
+  stillSrc: string;
+  stillAlt: string;
   imageSide?: "left" | "right";
   actions: Array<{ href: string; label: string; accent?: boolean }>;
 }) {
@@ -124,7 +84,7 @@ export function HomeChapterSplit({
         {copy}
       </div>
       <div className={imageSide === "left" ? "min-w-0 md:order-1" : "min-w-0"}>
-        <HomeChapterFigure covers={covers} ranked={ranked} />
+        <HomeChapterFigure src={stillSrc} alt={stillAlt} />
       </div>
     </div>
   );

@@ -14,28 +14,35 @@ export default function AboutPeoplePage() {
   return (
     <AboutInfoLayout title="People" deck="Profiles, follow, and activity">
       <p>
-        A public profile can show Game of the Year lists, custom lists, and a
-        public library. You choose whether a profile is public. Private
-        profiles are not listed for other people.
+        Profiles are where you can share your Game of the Year lists, custom
+        lists, Library, and activity with others.
+      </p>
+      <p>
+        You choose whether your profile is public or private. Private profiles
+        do not appear in search or to other people.
       </p>
 
-      <h2>Follow</h2>
+      <h2>Following</h2>
       <p>
-        Sign in to follow a public profile. Follow is one-to-one: you see
-        that person’s public list and library activity without joining a
-        community. It is not membership, and it is not a request to approve.
+        Follow people to keep up with what they are playing, ranking, and adding
+        to their lists. Following someone is separate from joining a community
+        and does not require their approval.
       </p>
       <p>
-        When you are signed in, <Link href="/following">Following</Link> is
-        the feed of people you follow. When you are signed out,{" "}
+        Your <Link href="/following">Following</Link> feed brings together
+        public activity from the people you follow, including their lists and
+        Library updates. When you are signed out,{" "}
         <Link href="/people">People</Link> is username search.
       </p>
 
       <h2>Trending</h2>
       <p>
-        Site trending on the homepage is public activity across the site.
-        Following also has a trending view limited to people you follow.
-        Private library rows do not count.
+        Trending highlights what people across The Gamies are playing, ranking,
+        and adding to their Libraries.
+      </p>
+      <p>
+        You can also see what&apos;s trending specifically among the people you
+        follow. Private Library activity is never included.
       </p>
     </AboutInfoLayout>
   );

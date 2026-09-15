@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AboutInfoLayout } from "@/components/about/AboutInfoLayout";
 import { ABOUT_SECTION_LINKS } from "@/lib/about/sections";
-import { IGDB_URL } from "@/lib/site";
 import { publicPageMetadata } from "@/lib/seo/site";
 
 export const metadata: Metadata = publicPageMetadata({
@@ -18,7 +17,7 @@ const SECTION_BLURBS: Record<(typeof ABOUT_SECTION_LINKS)[number]["href"], strin
     "/about/lists":
       "Game of the Year lists, category picks, and custom lists.",
     "/about/communities":
-      "Group boards, live rankings, and year-end Events.",
+      "Live rankings, year-end Events, and group Pick’em.",
     "/about/library":
       "Wishlist, backlog, playing, and the rest of the shelf.",
     "/about/people": "Profiles, follow, and public activity.",
@@ -34,13 +33,6 @@ export default function AboutPage() {
         those lists produce. Keep a yearly list, pick category awards, keep a
         library, follow people, and join a community to run its own board or
         year-end awards.
-      </p>
-      <p>
-        Titles and covers come from{" "}
-        <a href={IGDB_URL} target="_blank" rel="noopener noreferrer">
-          IGDB
-        </a>
-        . The ranks are from lists on this site.
       </p>
 
       <h2>Features</h2>

@@ -9,13 +9,6 @@ import {
   HomeWhatIs,
 } from "./HomePitch";
 
-const covers = [
-  { gameId: "1", title: "One", coverUrl: "https://cdn.example/1.jpg" },
-  { gameId: "2", title: "Two", coverUrl: "https://cdn.example/2.jpg" },
-  { gameId: "3", title: "Three", coverUrl: "https://cdn.example/3.jpg" },
-  { gameId: "4", title: "Four", coverUrl: "https://cdn.example/4.jpg" },
-];
-
 describe("Home guest chapters", () => {
   it("explains what the site is without a pitch", () => {
     render(<HomeWhatIs />);
@@ -25,24 +18,25 @@ describe("Home guest chapters", () => {
     expect(
       screen.getByText(/place to rank Game of the Year/i),
     ).toBeTruthy();
-    expect(screen.getByText(/Titles and covers come from IGDB/i)).toBeTruthy();
+    expect(
+      screen.queryByText(/Titles and covers come from IGDB/i),
+    ).toBeNull();
   });
 
   it("combines list and standings under Game of the Year with plate CTAs", () => {
-    render(
-      <HomeGotyIntro
-        listCovers={covers}
-        standingsCovers={covers.map((game, i) => ({ ...game, place: i + 1 }))}
-      />,
-    );
+    render(<HomeGotyIntro />);
     expect(
       screen.getByRole("heading", { name: "Create a list" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("heading", { name: "View results" }),
     ).toBeTruthy();
-    expect(screen.getByText(/top 10 score/i)).toBeTruthy();
-    expect(screen.getByText(/one game per award/i)).toBeTruthy();
+    expect(screen.getByText(/Your Top 10 earn points/i)).toBeTruthy();
+    expect(screen.getByText(/pick your winners for each award/i)).toBeTruthy();
+    expect(screen.getByText(/shape the live Game of the Year rankings/i)).toBeTruthy();
+    expect(
+      screen.getByText(/Category winners appear alongside/i),
+    ).toBeTruthy();
     expect(screen.getByRole("link", { name: "Create a list" })).toHaveAttribute(
       "href",
       "/create/goty",
@@ -66,6 +60,16 @@ describe("Home guest chapters", () => {
       screen.getByRole("link", { name: "How rankings work" }),
     ).toHaveAttribute("href", "/rankings");
     expect(
+      screen.getByRole("img", {
+        name: "A Game of the Year list in Ranked grid view",
+      }),
+    ).toHaveAttribute("src", "/home/list-ranked.jpg");
+    expect(
+      screen.getByRole("img", {
+        name: "Game of the Year standings with ranked covers",
+      }),
+    ).toHaveAttribute("src", "/home/standings-goty.jpg");
+    expect(
       document.querySelectorAll('a[href^="/games/"]').length,
     ).toBe(0);
     const rows = document.querySelectorAll(
@@ -80,12 +84,23 @@ describe("Home guest chapters", () => {
   });
 
   it("gives communities one plate and a CTA", () => {
-    render(<HomeCommunitiesIntro covers={covers} />);
-    expect(screen.getByText(/live rankings from members/i)).toBeTruthy();
+    render(<HomeCommunitiesIntro />);
+    expect(
+      screen.getByRole("heading", { name: "Run a community" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Create a community for your friends/i),
+    ).toBeTruthy();
+    expect(screen.getByText(/Keep rankings live throughout the year/i)).toBeTruthy();
     expect(screen.getByRole("link", { name: "Communities" })).toHaveAttribute(
       "href",
       "/communities",
     );
+    expect(
+      screen.getByRole("img", {
+        name: "A community overview with events and Pick’em",
+      }),
+    ).toHaveAttribute("src", "/home/community-overview.jpg");
     const row = document.querySelector(
       "[aria-labelledby='home-communities'] .home-chapter-rows > div",
     );

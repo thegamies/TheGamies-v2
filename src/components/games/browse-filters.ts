@@ -44,7 +44,7 @@ export const BROWSE_SORT_DIR_OPTIONS: { value: "asc" | "desc"; label: string }[]
   ];
 
 export const BROWSE_RELEASE_OPTIONS: {
-  value: ReleaseStatus;
+  value: Exclude<ReleaseStatus, "unreleased">;
   label: string;
 }[] = [
   { value: "all", label: "All" },

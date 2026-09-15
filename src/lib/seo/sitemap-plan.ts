@@ -94,6 +94,36 @@ export function shouldIndexProfile(input: {
   return input.visibility === "public" && input.deletedAt == null;
 }
 
+/** Guests can open interiors only on public showcase communities (joins closed). */
+export function shouldIndexCommunityBoards(input: {
+  visibility: string;
+  joinsClosed: boolean;
+}): boolean {
+  return input.visibility === "public" && input.joinsClosed;
+}
+
+export function communitySitemapPaths(input: {
+  slug: string;
+  visibility: string;
+  joinsClosed: boolean;
+  editionYears?: number[];
+  tgaYears?: number[];
+}): string[] {
+  if (input.visibility !== "public") return [];
+  const base = `/communities/${input.slug}`;
+  if (!shouldIndexCommunityBoards(input)) return [base];
+  const paths = [base, `${base}/trending`];
+  const editionYears = [...(input.editionYears ?? [])].sort((a, b) => b - a);
+  for (const year of editionYears) {
+    paths.push(`${base}/edition/${year}`);
+  }
+  const tgaYears = [...(input.tgaYears ?? [])].sort((a, b) => b - a);
+  for (const year of tgaYears) {
+    paths.push(`${base}/the-game-awards/${year}`);
+  }
+  return paths;
+}
+
 export function ownedListSitemapPath(input: {
   username: string;
   slug: string | null;

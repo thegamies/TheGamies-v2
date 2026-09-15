@@ -38,7 +38,6 @@ import { PromoBanner } from "@/components/promo/PromoBanner";
 import { tgaPromoCopy } from "@/lib/tga-pickem/promo";
 import { getPromotedTgaYear } from "@/lib/tga-pickem/service";
 import type { TgaYearSchedule } from "@/lib/tga-pickem/status";
-import type { HomeChapterCover } from "@/components/home/HomeChapterFigure";
 
 export const metadata = {
   ...publicPageMetadata({
@@ -73,16 +72,6 @@ type HomeYearSection = {
   }>;
   creatorCta?: GotyCreatorCta;
 };
-
-function asChapterCovers(
-  games: HomeBigPictureGame[],
-): HomeChapterCover[] {
-  return games.map((game) => ({
-    gameId: game.gameId,
-    title: game.title,
-    coverUrl: game.coverUrl,
-  }));
-}
 
 export default async function HomePage() {
   let sections: HomeYearSection[] = [];
@@ -176,19 +165,6 @@ export default async function HomePage() {
 
   const featuredYear = sections[0] ?? null;
   const laterYears = sections.slice(1);
-  const listCovers = asChapterCovers(bigPictureGames);
-  const standingsCovers: HomeChapterCover[] =
-    featuredYear && featuredYear.rows.length > 0
-      ? featuredYear.rows.map((row) => ({
-          gameId: row.gameId,
-          title: row.title,
-          coverUrl: row.coverUrl,
-          place: row.place,
-        }))
-      : asChapterCovers([...bigPictureGames].reverse()).slice(0, 5);
-  const communityCovers = asChapterCovers(
-    [...bigPictureGames].slice().reverse(),
-  );
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] pb-6 pt-0 sm:pb-8">
@@ -209,8 +185,6 @@ export default async function HomePage() {
       {signedIn ? null : <HomeWhatIs />}
       {signedIn ? null : (
         <HomeGotyIntro
-          listCovers={listCovers}
-          standingsCovers={standingsCovers}
           resultsHref={featuredYear?.yearHref ?? "/game-of-the-year"}
           resultsCategoriesHref={
             featuredYear
@@ -219,7 +193,7 @@ export default async function HomePage() {
           }
         />
       )}
-      {signedIn ? null : <HomeCommunitiesIntro covers={communityCovers} />}
+      {signedIn ? null : <HomeCommunitiesIntro />}
       {tgaBand ? (
         <section className="border-b border-line py-6 sm:py-8">
           <PromoBanner

@@ -50,8 +50,8 @@ export async function listHomeTrendingGames(opts: {
 }
 
 /**
- * Most-anticipated upcoming titles: GOTY-eligible, no editions,
- * IGDB popularity among unreleased (same sort as `/games`).
+ * Upcoming titles: GOTY-eligible, no editions, dated in the next six months.
+ * SQL picks the most popular page; that page is then ordered soonest first.
  */
 export async function listHomeUpcomingGames(): Promise<HomeDiscoverGame[]> {
   const rows = await browseGames({
@@ -65,6 +65,12 @@ export async function listHomeUpcomingGames(): Promise<HomeDiscoverGame[]> {
   }).catch(() => []);
   return rows
     .filter((row) => row.coverUrl)
+    .sort((a, b) => {
+      const aTime = a.firstReleaseDate?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bTime = b.firstReleaseDate?.getTime() ?? Number.POSITIVE_INFINITY;
+      if (aTime !== bTime) return aTime - bTime;
+      return a.id.localeCompare(b.id);
+    })
     .map((row) =>
       toDiscover({
         id: row.id,

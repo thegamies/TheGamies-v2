@@ -60,7 +60,7 @@ export function HomeCoverStrip({
                     fluid
                     width={96}
                   />
-                  <p className="mt-2 truncate text-sm text-ink group-hover:text-accent">
+                  <p className="mt-2 line-clamp-2 min-h-[2.5em] text-sm leading-snug text-ink group-hover:text-accent">
                     {game.title}
                   </p>
                 </Link>

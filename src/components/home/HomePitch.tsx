@@ -1,8 +1,5 @@
 import Link from "next/link";
-import {
-  HomeChapterSplit,
-  type HomeChapterCover,
-} from "@/components/home/HomeChapterFigure";
+import { HomeChapterSplit } from "@/components/home/HomeChapterFigure";
 
 const outlinedLinkClass =
   "inline-flex h-9 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-line px-3 text-xs font-semibold tracking-wide text-ink transition-colors hover:border-accent";
@@ -25,23 +22,15 @@ export function HomeWhatIs() {
           those lists produce. Keep a yearly list, pick category awards, and
           join a community to run its own board or year-end awards.
         </p>
-        <p>
-          Titles and covers come from IGDB. The ranks are from lists on this
-          site.
-        </p>
       </div>
     </section>
   );
 }
 
 export function HomeGotyIntro({
-  listCovers,
-  standingsCovers,
   resultsHref = "/game-of-the-year",
   resultsCategoriesHref = "/game-of-the-year",
 }: {
-  listCovers: HomeChapterCover[];
-  standingsCovers: HomeChapterCover[];
   resultsHref?: string;
   resultsCategoriesHref?: string;
 }) {
@@ -61,7 +50,8 @@ export function HomeGotyIntro({
       <div className="home-chapter-rows mt-3 space-y-8 sm:mt-4 sm:space-y-10">
         <HomeChapterSplit
           title="Create a list"
-          covers={listCovers}
+          stillSrc="/home/list-ranked.jpg"
+          stillAlt="A Game of the Year list in Ranked grid view"
           imageSide="left"
           actions={[
             { href: "/create/goty", label: "Create a list", accent: true },
@@ -69,19 +59,19 @@ export function HomeGotyIntro({
           ]}
         >
           <p>
-            Rank up to 100 games for a year. The top 10 score: 10 points for
-            1st, down to 1 point for 10th.
+            Rank up to 100 games from the year and build your personal Game of
+            the Year list. Your Top 10 earn points, with 10 for #1 and 1 for
+            #10.
           </p>
           <p>
-            On the same list, pick one game per award — Best Indie, Best
-            Soundtrack, and the rest of the slate. You can start without an
-            account and save it to a profile when you are ready.
+            Then pick your winners for each award, from Best Indie and Best
+            Soundtrack to the rest of the year&apos;s categories.
           </p>
         </HomeChapterSplit>
         <HomeChapterSplit
           title="View results"
-          covers={standingsCovers}
-          ranked
+          stillSrc="/home/standings-goty.jpg"
+          stillAlt="Game of the Year standings with ranked covers"
           imageSide="right"
           actions={[
             { href: resultsHref, label: "Game of the Year" },
@@ -90,12 +80,13 @@ export function HomeGotyIntro({
           ]}
         >
           <p>
-            Signed-in lists add up to a live Game of the Year board with place
-            and points. Category #1s sit beside the year.
+            Every list helps shape the live Game of the Year rankings. See where
+            each game stands and how many points it has earned.
           </p>
           <p>
-            Ranks are public once enough lists exist. Vote counts stay hidden
-            until that year is revealed.
+            Category winners appear alongside the year&apos;s overall rankings.
+            Rankings go public once enough lists have been submitted, while vote
+            counts stay hidden until the year is revealed.
           </p>
         </HomeChapterSplit>
       </div>
@@ -103,11 +94,7 @@ export function HomeGotyIntro({
   );
 }
 
-export function HomeCommunitiesIntro({
-  covers,
-}: {
-  covers: HomeChapterCover[];
-}) {
+export function HomeCommunitiesIntro() {
   return (
     <section className="py-5 sm:py-6" aria-labelledby="home-communities">
       <h2
@@ -118,20 +105,23 @@ export function HomeCommunitiesIntro({
       </h2>
       <div className="home-chapter-rows mt-3 sm:mt-4">
         <HomeChapterSplit
-          title="Run a group board"
-          covers={covers}
+          title="Run a community"
+          stillSrc="/home/community-overview.jpg"
+          stillAlt="A community overview with events and Pick’em"
           imageSide="left"
           actions={[{ href: "/communities", label: "Communities", accent: true }]}
         >
           <p>
-            Communities let a group run its own awards. Turn on live rankings
-            from members’ lists, or schedule a year-end Event with hidden
-            ballots, Hosts, and frozen Combined / Community / Hosts results.
+            Create a community for your friends, group, or audience and run your
+            own Game of the Year rankings and awards.
           </p>
           <p>
-            Communities are invite-only unless hosts make them public. Public
-            memberships can appear on profiles. Live rankings, Events, and
-            members stay inside the community.
+            Keep rankings live throughout the year, or run a year-end Event with
+            hidden ballots, Hosts, and final results.
+          </p>
+          <p>
+            Communities can be private and invite-only or open to everyone.
+            Rankings, Events, and members all live in one place.
           </p>
         </HomeChapterSplit>
       </div>
