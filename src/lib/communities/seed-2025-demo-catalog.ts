@@ -7,8 +7,16 @@ import {
   DEMO_2025_YEAR,
   resolveTitleDef,
   uniqueTitlesForLookup,
+  type DemoCategoryPickDef,
   type DemoPickable,
+  type DemoTitleDef,
 } from "./seed-2025-demo";
+import {
+  DEMO_2026_CATEGORIES,
+  DEMO_2026_YEAR,
+  resolveDemo2026TitleDef,
+  uniqueTitlesFor2026Lookup,
+} from "./seed-2026-demo";
 
 const LOOKUP_CHUNK = 20;
 
@@ -79,21 +87,30 @@ export type Demo2025Resolved = {
   unmatched: string[];
 };
 
-export async function resolveDemo2025Catalog(
-  db: Db,
-): Promise<Demo2025Resolved> {
-  const lookup = uniqueTitlesForLookup();
-  const allTitles = lookup.flatMap((row) => row.titles);
-  const rows = await loadCatalogMatches(allTitles, db);
-  const gotyKeys = new Set(DEMO_2025_GOTY.map((row) => row.key));
+async function resolveDemoYearCatalog(opts: {
+  db: Db;
+  year: number;
+  lookup: Array<{ key: string; titles: string[] }>;
+  goty: readonly DemoTitleDef[];
+  categories: ReadonlyArray<{
+    categoryId: string;
+    picks: readonly DemoCategoryPickDef[];
+  }>;
+  resolvePick: (pick: DemoCategoryPickDef) => DemoTitleDef | null;
+  yearOptionalKeys?: ReadonlySet<string>;
+}): Promise<Demo2025Resolved> {
+  const allTitles = opts.lookup.flatMap((row) => row.titles);
+  const rows = await loadCatalogMatches(allTitles, opts.db);
+  const gotyKeys = new Set(opts.goty.map((row) => row.key));
+  const yearOptional = opts.yearOptionalKeys ?? new Set<string>();
 
   const idByKey = new Map<string, string>();
   const unmatched: string[] = [];
 
-  for (const row of lookup) {
+  for (const row of opts.lookup) {
     const gameId = pickDemo2025CatalogId(row.titles, rows, {
-      year: DEMO_2025_YEAR,
-      requireYear: !gotyKeys.has(row.key),
+      year: opts.year,
+      requireYear: !gotyKeys.has(row.key) && !yearOptional.has(row.key),
     });
     if (!gameId) {
       unmatched.push(row.titles[0] ?? row.key);
@@ -103,7 +120,7 @@ export async function resolveDemo2025Catalog(
   }
 
   const goty: DemoPickable[] = [];
-  for (const row of DEMO_2025_GOTY) {
+  for (const row of opts.goty) {
     const gameId = idByKey.get(row.key);
     if (!gameId) continue;
     goty.push({
@@ -114,10 +131,10 @@ export async function resolveDemo2025Catalog(
     });
   }
 
-  const categories = DEMO_2025_CATEGORIES.map((cat) => {
+  const categories = opts.categories.map((cat) => {
     const gamesForCat: DemoPickable[] = [];
     for (const pick of cat.picks) {
-      const def = resolveTitleDef(pick);
+      const def = opts.resolvePick(pick);
       const gameId = idByKey.get(pick.key);
       if (!def || !gameId) continue;
       gamesForCat.push({
@@ -131,6 +148,36 @@ export async function resolveDemo2025Catalog(
   });
 
   return { goty, categories, unmatched };
+}
+
+export async function resolveDemo2025Catalog(
+  db: Db,
+): Promise<Demo2025Resolved> {
+  return resolveDemoYearCatalog({
+    db,
+    year: DEMO_2025_YEAR,
+    lookup: uniqueTitlesForLookup(),
+    goty: DEMO_2025_GOTY,
+    categories: DEMO_2025_CATEGORIES,
+    resolvePick: resolveTitleDef,
+  });
+}
+
+/** Early-access titles may still be stored as an earlier IGDB year. */
+const DEMO_2026_YEAR_OPTIONAL_KEYS = new Set(["valheim", "slay-the-spire-2"]);
+
+export async function resolveDemo2026Catalog(
+  db: Db,
+): Promise<Demo2025Resolved> {
+  return resolveDemoYearCatalog({
+    db,
+    year: DEMO_2026_YEAR,
+    lookup: uniqueTitlesFor2026Lookup(),
+    goty: [],
+    categories: DEMO_2026_CATEGORIES,
+    resolvePick: resolveDemo2026TitleDef,
+    yearOptionalKeys: DEMO_2026_YEAR_OPTIONAL_KEYS,
+  });
 }
 
 export function demo2025CategoriesForActiveAwards(

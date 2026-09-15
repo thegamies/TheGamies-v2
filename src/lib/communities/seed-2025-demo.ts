@@ -346,8 +346,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-export function rngForVoter(index: number): () => number {
-  return mulberry32(index * 9973 + 2025);
+export function rngForVoter(index: number, year = DEMO_2025_YEAR): () => number {
+  return mulberry32(index * 9973 + year);
 }
 
 export function tasteAffinity(

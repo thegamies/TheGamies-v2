@@ -40,7 +40,7 @@ describe("YearTopFiveStrip", () => {
     const create = screen.getByRole("link", { name: "Create list" });
     expect(create.getAttribute("href")).toBe("/create/goty?year=2026");
     expect(create.className).toContain("border");
-    expect(screen.getByRole("link", { name: "Top Categories" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "2026 Top Categories" })).toBeTruthy();
     const seeAll = screen.getByRole("link", { name: "See All" });
     expect(seeAll.getAttribute("href")).toBe(
       "/game-of-the-year/2026/categories",
@@ -119,7 +119,7 @@ describe("YearTopFiveStrip", () => {
     ).toBeTruthy();
     expect(screen.getByText("2025 Game of the Year")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Full Standings" })).toBeTruthy();
-    expect(screen.queryByRole("link", { name: "Top Categories" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "2025 Top Categories" })).toBeNull();
     expect(screen.queryByRole("link", { name: "See All" })).toBeNull();
     expect(screen.queryByText("Best Debut")).toBeNull();
   });
@@ -157,10 +157,10 @@ describe("YearTopFiveStrip", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: "Top Categories" }).getAttribute("href"),
+      screen.getByRole("link", { name: "2026 Top Categories" }).getAttribute("href"),
     ).toBe("/game-of-the-year/2026/categories");
     expect(
-      screen.getByRole("link", { name: "Top Categories" }).className,
+      screen.getByRole("link", { name: "2026 Top Categories" }).className,
     ).toContain("hover:text-accent");
     const seeAll = screen.getByRole("link", { name: "See All" });
     expect(seeAll.getAttribute("href")).toBe(

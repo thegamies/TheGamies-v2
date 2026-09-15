@@ -176,7 +176,6 @@ export default async function HomePage() {
             sections={[featuredYear]}
             minVisible={minVisible}
             showHeader={false}
-            showCategories={signedIn}
             gotyHeading
             empty={null}
           />
@@ -228,6 +227,7 @@ export default async function HomePage() {
             sections={laterYears}
             minVisible={minVisible}
             showHeader={false}
+            gotyHeading
             empty={null}
           />
         </section>
