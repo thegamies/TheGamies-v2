@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_2025_YEAR } from "./seed-2025-demo";
+import { DEMO_2026_YEAR } from "./seed-2026-demo";
 import { pickDemo2025CatalogId } from "./seed-2025-demo-catalog";
 
 describe("pickDemo2025CatalogId", () => {
@@ -32,5 +33,25 @@ describe("pickDemo2025CatalogId", () => {
         { year: DEMO_2025_YEAR, requireYear: false },
       ),
     ).toBe("hades");
+  });
+
+  it("requires catalog year 2026 for 2026 category picks", () => {
+    expect(
+      pickDemo2025CatalogId(
+        ["The Blood of Dawnwalker"],
+        [{ id: "old", title: "The Blood of Dawnwalker", year: 2025 }],
+        { year: DEMO_2026_YEAR, requireYear: true },
+      ),
+    ).toBeNull();
+    expect(
+      pickDemo2025CatalogId(
+        ["The Blood of Dawnwalker"],
+        [
+          { id: "old", title: "The Blood of Dawnwalker", year: 2025 },
+          { id: "now", title: "The Blood of Dawnwalker", year: 2026 },
+        ],
+        { year: DEMO_2026_YEAR, requireYear: true },
+      ),
+    ).toBe("now");
   });
 });

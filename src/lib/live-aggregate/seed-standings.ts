@@ -26,9 +26,11 @@ import {
   rngForVoter,
   tasteForIndex,
 } from "@/lib/communities/seed-2025-demo";
+import { DEMO_2026_YEAR } from "@/lib/communities/seed-2026-demo";
 import {
   demo2025CategoriesForActiveAwards,
   resolveDemo2025Catalog,
+  resolveDemo2026Catalog,
   type Demo2025Resolved,
 } from "@/lib/communities/seed-2025-demo-catalog";
 import {
@@ -148,7 +150,7 @@ export function weightForTopRank(rank: number, power = 2.4): number {
 /**
  * Pick category votes from a voter's ranked GOTY list.
  * Participation defaults high; game choice is top-rank weighted.
- * Site standings seed for 2025 uses `buildDemo2025CategoryVotes` instead.
+ * Site standings seed for 2025 and 2026 uses `buildDemo2025CategoryVotes` instead.
  */
 export function buildSeedCategoryVotes(
   categories: Array<{ id: string }>,
@@ -268,7 +270,7 @@ export type SeedStandingsInput = {
   topN?: number | null;
   /** Weight sharpness 0.1–5 (default 1). */
   weightPower?: number;
-  /** When true, also write category votes. 2025 uses the reception-demo pools. */
+  /** When true, also write category votes. 2025 and 2026 use per-award pools. */
   includeCategories?: boolean;
   /**
    * Rewrite category votes on existing GOTY lists only.
@@ -586,6 +588,19 @@ export async function seedStandingsVoters(
         };
       }
     }
+    if (year === DEMO_2026_YEAR) {
+      const resolved = await resolveDemo2026Catalog(db);
+      demoCategoryPools = demo2025CategoriesForActiveAwards(
+        resolved,
+        new Set(categories.map((cat) => cat.id)),
+      );
+      if (demoCategoryPools.length === 0) {
+        return {
+          error:
+            "The 2026 category seed needs catalog matches for the per-award pools (Story, Combat, and the rest of that slate).",
+        };
+      }
+    }
   }
 
   const indexByProfileId = new Map<string, number>();
@@ -714,7 +729,7 @@ export async function seedStandingsVoters(
       ? buildDemo2025CategoryVotes(
           demoCategoryPools,
           tasteForIndex(voterIndex),
-          rngForVoter(voterIndex),
+          rngForVoter(voterIndex, year),
         )
       : buildSeedCategoryVotes(categories, rankedPicks);
     for (const vote of catVotes) {

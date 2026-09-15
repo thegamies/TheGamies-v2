@@ -417,7 +417,7 @@ export function AdminSeedClient({
           }}
           disabled={busy}
         />
-        Include category votes. 2025 uses the reception-demo award pools
+        Include category votes. 2025 and 2026 use per-award pools
         (Story, Combat, and the rest of that slate). Other years pick from
         each list’s GOTY ranks.
       </label>

@@ -74,6 +74,7 @@ export function YearTopFiveStrip({
     view: "categories",
   });
   const yearLabel = `${year} Game of the Year`;
+  const categoriesLabel = `${year} Top Categories`;
 
   return (
     <article
@@ -135,7 +136,7 @@ export function YearTopFiveStrip({
                 href={categoriesHref}
                 className="text-ink transition-colors hover:text-accent"
               >
-                Top Categories
+                {categoriesLabel}
               </Link>
             </p>
             <div className={headingActionsClass}>
