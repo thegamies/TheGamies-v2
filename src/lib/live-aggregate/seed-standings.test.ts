@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSeedCategoryVotes,
+  GOTY_SEED_EXCLUDED_TITLES,
   resolveSeedStartIndex,
   seedGotyListEventTime,
   selectStandingsSeedWork,
@@ -8,6 +9,12 @@ import {
   weightForTopRank,
   weightedSample,
 } from "./seed-standings";
+
+describe("GOTY seed exclusions", () => {
+  it("keeps Palworld and Valheim out of seeded GOTY lists", () => {
+    expect(GOTY_SEED_EXCLUDED_TITLES).toEqual(["palworld", "valheim"]);
+  });
+});
 
 describe("weightForRatedGame", () => {
   it("raises high-rated weight when bias is positive", () => {

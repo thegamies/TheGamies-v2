@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  notInArray,
+  or,
+  sql,
+} from "drizzle-orm";
 import {
   activityEvents,
   createDb,
@@ -54,6 +64,7 @@ export const SEED_MAX_INDEX = 1000;
 export const SEED_MAX_BATCH = 100;
 /** Neon HTTP inserts stay reliable when category vote batches stay small. */
 export const SEED_INSERT_CHUNK = 200;
+export const GOTY_SEED_EXCLUDED_TITLES = ["palworld", "valheim"] as const;
 
 const LIST_ACTIVITY_KINDS = [
   "list_add",
@@ -196,6 +207,9 @@ function eligibleSeedGamesWhere(
     eq(games.year, year),
     eq(games.isAdult, false),
     isNull(games.versionParentIgdbId),
+    notInArray(sql<string>`lower(${games.title})`, [
+      ...GOTY_SEED_EXCLUDED_TITLES,
+    ]),
     release,
   );
 }
@@ -272,6 +286,8 @@ export type SeedStandingsInput = {
   weightPower?: number;
   /** When true, also write category votes. 2025 and 2026 use per-award pools. */
   includeCategories?: boolean;
+  /** Per-run salt that rerolls deterministic 2025/2026 category votes. */
+  categoryRerollSeed?: number;
   /**
    * Rewrite category votes on existing GOTY lists only.
    * Does not create voters, lists, or GOTY picks. Implies includeCategories.
@@ -383,6 +399,9 @@ export async function seedStandingsVoters(
   const categoriesOnly = input.categoriesOnly === true;
   const includeCategories =
     categoriesOnly || input.includeCategories === true;
+  const categoryRerollSeed = Number.isFinite(input.categoryRerollSeed)
+    ? Math.floor(input.categoryRerollSeed!)
+    : 0;
   const reseed = categoriesOnly ? true : input.reseed !== false;
   const doRebuild = input.rebuild !== false;
 
@@ -729,7 +748,7 @@ export async function seedStandingsVoters(
       ? buildDemo2025CategoryVotes(
           demoCategoryPools,
           tasteForIndex(voterIndex),
-          rngForVoter(voterIndex, year),
+          rngForVoter(voterIndex, year, categoryRerollSeed),
         )
       : buildSeedCategoryVotes(categories, rankedPicks);
     for (const vote of catVotes) {

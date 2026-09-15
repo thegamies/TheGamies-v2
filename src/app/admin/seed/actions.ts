@@ -33,6 +33,7 @@ export async function seedStandingsAction(input: {
   topN: number | null;
   weightPower: number;
   includeCategories: boolean;
+  categoryRerollSeed: number;
   categoriesOnly: boolean;
   reseed: boolean;
   rebuild: boolean;

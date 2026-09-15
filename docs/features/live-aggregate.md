@@ -80,7 +80,7 @@ Displayed **rank is derived at read**, not stored on score rows (dirty-key SUM w
 - Legacy `/game` and `/game/[slug]` permanently redirect to `/games` and `/games/[slug]` (old site URLs still in Google’s index).
 - Community Live Rankings use the same board pattern under `/communities/[slug]/live/[year]`
 - Year switching uses the shared `YearSelect` popover. Site GOTY (`/game-of-the-year` **All** and `/game-of-the-year/[year]`) lists years with a public GOTY board **or** at least one public category — not a rolling calendar window. Community Live still uses recent calendar years.
-- Admin `/admin/seed` writes GOTY lists; **category votes are optional**. Non-demo community edition seed uses the GOTY-rank weights. **2025** standings category votes reuse the reception-demo per-award pools. **2026** uses a separate already-out per-award pool.
+- Admin `/admin/seed` writes GOTY lists; **category votes are optional**. Palworld and Valheim are excluded from GOTY seed lists. Each run uses one fresh reroll seed across all of its batches, so rewriting 2025/2026 category votes produces a new spread while remaining internally consistent. Non-demo community edition seed uses the GOTY-rank weights. **2025** standings category votes reuse the reception-demo per-award pools. **2026** uses a separate already-out per-award pool.
 
 - `/admin` — ops index (sync, rankings, seed)
 - `/admin/rankings` — reveal / refresh / rebuild + homepage year override + **tie numbering** (competition vs dense) + **minimum lists before GOTY is public** + **minimum category votes before category boards are public**

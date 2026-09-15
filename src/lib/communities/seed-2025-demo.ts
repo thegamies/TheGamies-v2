@@ -346,8 +346,12 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-export function rngForVoter(index: number, year = DEMO_2025_YEAR): () => number {
-  return mulberry32(index * 9973 + year);
+export function rngForVoter(
+  index: number,
+  year = DEMO_2025_YEAR,
+  rerollSeed = 0,
+): () => number {
+  return mulberry32(index * 9973 + year + Math.floor(rerollSeed));
 }
 
 export function tasteAffinity(
