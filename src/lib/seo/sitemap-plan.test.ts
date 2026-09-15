@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  communitySitemapPaths,
   formatSitemapShardId,
   ownedListSitemapPath,
   parseSitemapShardId,
+  shouldIndexCommunityBoards,
   shouldIndexGamesHub,
   shouldIndexProfile,
   SITEMAP_GAMES_MAX,
@@ -91,6 +93,45 @@ describe("sitemap include rules", () => {
     expect(
       shouldIndexProfile({ visibility: "public", deletedAt: new Date() }),
     ).toBe(false);
+  });
+
+  it("indexes showcase community interiors, not ordinary public homes only", () => {
+    expect(
+      shouldIndexCommunityBoards({
+        visibility: "public",
+        joinsClosed: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldIndexCommunityBoards({
+        visibility: "public",
+        joinsClosed: false,
+      }),
+    ).toBe(false);
+    expect(
+      communitySitemapPaths({
+        slug: "demo-community",
+        visibility: "public",
+        joinsClosed: true,
+        editionYears: [2025, 2024],
+        tgaYears: [2025],
+      }),
+    ).toEqual([
+      "/communities/demo-community",
+      "/communities/demo-community/trending",
+      "/communities/demo-community/edition/2025",
+      "/communities/demo-community/edition/2024",
+      "/communities/demo-community/the-game-awards/2025",
+    ]);
+    expect(
+      communitySitemapPaths({
+        slug: "open-join",
+        visibility: "public",
+        joinsClosed: false,
+        editionYears: [2025],
+        tgaYears: [2025],
+      }),
+    ).toEqual(["/communities/open-join"]);
   });
 
   it("builds owned list paths when slug and username exist", () => {

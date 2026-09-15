@@ -14,7 +14,9 @@ describe("AboutCommunitiesPage", () => {
     expect(
       screen.getByRole("heading", { name: "Communities" }),
     ).toBeTruthy();
-    expect(screen.getByRole("heading", { name: "Events" })).toBeTruthy();
+    expect(
+      screen.getByText(/run their own Game of the Year rankings and awards/i),
+    ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Find or start a community" }).getAttribute("href"),
     ).toBe("/communities");

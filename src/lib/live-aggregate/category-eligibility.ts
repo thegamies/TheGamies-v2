@@ -81,7 +81,7 @@ export function browseInputForCategoryEligibility(
   yearAtMost?: number;
   yearAtLeast?: number;
   yearKnownAtLeast?: number;
-  releaseStatus: "released" | "upcoming" | "all";
+  releaseStatus: "released" | "upcoming" | "unreleased" | "all";
   excludeEditions: boolean;
   gotyEligibleTypes: true;
   includeDlcAddonType: boolean;
@@ -100,7 +100,7 @@ export function browseInputForCategoryEligibility(
   if (eligibility === "upcoming") {
     return {
       yearKnownAtLeast: year + 1,
-      releaseStatus: "upcoming",
+      releaseStatus: "unreleased",
       excludeEditions,
       gotyEligibleTypes: true,
       includeDlcAddonType,

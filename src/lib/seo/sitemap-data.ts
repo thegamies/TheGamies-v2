@@ -1,9 +1,20 @@
-import { asc, count, eq, sql } from "drizzle-orm";
-import { communities, createDb } from "@thegamies/db";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import {
+  communities,
+  communityEditions,
+  createDb,
+  tgaCommunityYears,
+  tgaYears,
+} from "@thegamies/db";
 import { listPublicStandingsYears } from "@/lib/live-aggregate/service";
 import { siteGotySitemapYearPaths } from "@/lib/live-aggregate/award-category-defs";
 import { listTgaYears } from "@/lib/tga-pickem/service";
 import {
+  computeEditionStatus,
+  showEditionNav,
+} from "@/lib/communities/edition-status";
+import {
+  communitySitemapPaths,
   SITEMAP_GAMES_MAX,
   SITEMAP_PAGE_SIZE,
   SITEMAP_STATIC_PATHS,
@@ -124,11 +135,66 @@ export async function sitemapUrlsForShard(
   }
 
   const rows = await db
-    .select({ slug: communities.slug })
+    .select({
+      id: communities.id,
+      slug: communities.slug,
+      joinsClosed: communities.joinsClosed,
+    })
     .from(communities)
     .where(eq(communities.visibility, "public"))
     .orderBy(asc(communities.slug))
     .limit(SITEMAP_PAGE_SIZE)
     .offset(offset);
-  return rows.map((row) => ({ path: `/communities/${row.slug}` }));
+
+  const showcaseIds = rows.filter((row) => row.joinsClosed).map((row) => row.id);
+  const editionYearsByCommunity = new Map<string, number[]>();
+  const tgaYearsByCommunity = new Map<string, number[]>();
+  if (showcaseIds.length > 0) {
+    const [editionRows, tgaRows] = await Promise.all([
+      db
+        .select({
+          communityId: communityEditions.communityId,
+          year: communityEditions.year,
+          opensAt: communityEditions.opensAt,
+          closesAt: communityEditions.closesAt,
+          publishesAt: communityEditions.publishesAt,
+        })
+        .from(communityEditions)
+        .where(inArray(communityEditions.communityId, showcaseIds)),
+      db
+        .select({
+          communityId: tgaCommunityYears.communityId,
+          year: tgaCommunityYears.year,
+        })
+        .from(tgaCommunityYears)
+        .innerJoin(tgaYears, eq(tgaYears.year, tgaCommunityYears.year))
+        .where(
+          and(
+            inArray(tgaCommunityYears.communityId, showcaseIds),
+            eq(tgaYears.enabled, true),
+          ),
+        ),
+    ]);
+    for (const row of editionRows) {
+      if (!showEditionNav(computeEditionStatus(row))) continue;
+      const years = editionYearsByCommunity.get(row.communityId) ?? [];
+      years.push(row.year);
+      editionYearsByCommunity.set(row.communityId, years);
+    }
+    for (const row of tgaRows) {
+      const years = tgaYearsByCommunity.get(row.communityId) ?? [];
+      years.push(row.year);
+      tgaYearsByCommunity.set(row.communityId, years);
+    }
+  }
+
+  return rows.flatMap((row) =>
+    communitySitemapPaths({
+      slug: row.slug,
+      visibility: "public",
+      joinsClosed: row.joinsClosed,
+      editionYears: editionYearsByCommunity.get(row.id) ?? [],
+      tgaYears: tgaYearsByCommunity.get(row.id) ?? [],
+    }).map((path) => ({ path })),
+  );
 }

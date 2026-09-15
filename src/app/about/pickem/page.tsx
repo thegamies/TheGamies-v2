@@ -14,32 +14,43 @@ export default function AboutPickemPage() {
   return (
     <AboutInfoLayout
       title="Pick’em"
-      deck="Predictions for the external awards show"
+      deck="Predict the Video Game Awards and compete on score"
     >
       <p>
-        Video Game Awards Pick’em is a prediction sheet for the external
-        awards show. It is not this site’s Game of the Year, and it does not
-        feed the GOTY board.
+        Video Game Awards Pick’em lets you predict the winners of the annual
+        Video Game Awards and compete to see how many you get right.
+      </p>
+      <p>
+        Pick’em is separate from The Gamies&apos; Game of the Year rankings and
+        awards. Your predictions do not affect Game of the Year results.
       </p>
 
-      <h2>How a year works</h2>
+      <h2>How it works</h2>
       <p>
-        Each year has a slate of categories and nominees. Game categories
-        link to titles in the catalog. Other categories (performances,
-        esports, and similar) use names on the sheet. Picks lock when the
-        show starts. Scoring follows official winners as they are called: 1
-        point per correct called award. Uncalled awards do not score.
+        Each year includes the show&apos;s categories and nominees. Make your
+        picks before the show begins, then follow along as the winners are
+        announced.
       </p>
       <p>
-        Open the current or past years at{" "}
+        Picks lock when the show starts. Each correct prediction earns 1 point,
+        and your score updates as awards are called. Awards that are not
+        announced do not count toward your score.
+      </p>
+      <p>
+        You can also look back at previous years to see past nominees, winners,
+        and results.{" "}
         <Link href="/the-game-awards">Video Game Awards Pick’em</Link>.
       </p>
 
       <h2>Communities</h2>
       <p>
-        A community can run its own sheets against the same official
-        winners. Those sheets stay inside the community. They do not replace
-        the site-wide game.
+        Communities can run their own Pick’em competitions using the same
+        nominees and official winners.
+      </p>
+      <p>
+        Make your picks alongside the rest of the community and see who finishes
+        with the best score. Community Pick’em results stay within that
+        community and do not affect the site-wide competition.
       </p>
     </AboutInfoLayout>
   );

@@ -17,30 +17,41 @@ import {
 } from "./discover-games";
 
 describe("listHomeUpcomingGames", () => {
-  it("loads a capped upcoming popularity page and skips coverless rows", async () => {
+  it("loads a capped popular upcoming page, skips coverless rows, and orders by date", async () => {
     const browse = vi.mocked(browseGames);
     browse.mockResolvedValue([
       {
-        id: "a",
+        id: "later",
         igdbId: 1,
-        slug: "one",
-        title: "One",
-        year: 2027,
-        firstReleaseDate: new Date("2027-03-01"),
-        popularity: 100,
-        coverImageId: "x",
-        coverUrl: "https://cdn.example/one.jpg",
-      },
-      {
-        id: "b",
-        igdbId: 2,
-        slug: "two",
-        title: "Two",
+        slug: "later",
+        title: "Later",
         year: 2027,
         firstReleaseDate: new Date("2027-06-01"),
-        popularity: 90,
+        popularity: 100,
+        coverImageId: "x",
+        coverUrl: "https://cdn.example/later.jpg",
+      },
+      {
+        id: "bare",
+        igdbId: 2,
+        slug: "bare",
+        title: "Bare",
+        year: 2027,
+        firstReleaseDate: new Date("2027-04-01"),
+        popularity: 95,
         coverImageId: null,
         coverUrl: null,
+      },
+      {
+        id: "sooner",
+        igdbId: 3,
+        slug: "sooner",
+        title: "Sooner",
+        year: 2027,
+        firstReleaseDate: new Date("2027-03-01"),
+        popularity: 90,
+        coverImageId: "y",
+        coverUrl: "https://cdn.example/sooner.jpg",
       },
     ]);
 
@@ -59,10 +70,16 @@ describe("listHomeUpcomingGames", () => {
     );
     expect(games).toEqual([
       {
-        gameId: "a",
-        slug: "one",
-        title: "One",
-        coverUrl: "https://cdn.example/one.jpg",
+        gameId: "sooner",
+        slug: "sooner",
+        title: "Sooner",
+        coverUrl: "https://cdn.example/sooner.jpg",
+      },
+      {
+        gameId: "later",
+        slug: "later",
+        title: "Later",
+        coverUrl: "https://cdn.example/later.jpg",
       },
     ]);
   });
