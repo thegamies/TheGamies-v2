@@ -43,7 +43,7 @@ describe("YearTopFiveStrip", () => {
     expect(screen.getByRole("link", { name: "Top Categories" })).toBeTruthy();
     const seeAll = screen.getByRole("link", { name: "See All" });
     expect(seeAll.getAttribute("href")).toBe(
-      "/game-of-the-year/2026?view=categories",
+      "/game-of-the-year/2026/categories",
     );
     expect(seeAll.className).toContain("border");
     expect(screen.getByText("Not enough votes yet.")).toBeTruthy();
@@ -60,6 +60,68 @@ describe("YearTopFiveStrip", () => {
       screen.getByRole("link", { name: "Make picks" }).getAttribute("href"),
     ).toBe("/create/goty?year=2026&view=categories");
     expect(screen.queryByRole("link", { name: "Standings" })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "2026 Game of the Year" }).textContent,
+    ).toBe("2026");
+  });
+
+  it("titles the homepage board as the year Game of the Year", () => {
+    render(
+      <YearTopFiveStrip
+        year={2026}
+        yearHref="/game-of-the-year/2026"
+        gotyHeading
+        showCategories={false}
+        rows={[]}
+      />,
+    );
+    const heading = screen.getByRole("link", { name: "2026 Game of the Year" });
+    expect(heading.textContent).toBe("2026 Game of the Year");
+    expect(heading.getAttribute("href")).toBe("/game-of-the-year/2026");
+  });
+
+  it("can hide Top Categories for a GOTY-only strip", () => {
+    render(
+      <YearTopFiveStrip
+        year={2025}
+        yearHref="/game-of-the-year/2025"
+        showCategories={false}
+        gotyHeading
+        rows={[
+          {
+            place: 1,
+            gameId: "g1",
+            slug: "clair-obscur",
+            title: "Clair Obscur",
+            coverUrl: null,
+            score: 40,
+          },
+        ]}
+        categoryWinners={[
+          {
+            categoryId: "best-debut",
+            label: "Best Debut",
+            games: [
+              {
+                gameId: "g2",
+                slug: "hades-ii",
+                title: "Hades II",
+                coverUrl: null,
+              },
+            ],
+          },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByRole("link", { name: "2025 Game of the Year" }),
+    ).toBeTruthy();
+    expect(screen.getByText("2025 Game of the Year")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Full Standings" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Top Categories" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "See All" })).toBeNull();
+    expect(screen.queryByText("Best Debut")).toBeNull();
   });
 
   it("links category names, game titles, and all-categories", () => {
@@ -96,13 +158,13 @@ describe("YearTopFiveStrip", () => {
 
     expect(
       screen.getByRole("link", { name: "Top Categories" }).getAttribute("href"),
-    ).toBe("/game-of-the-year/2026?view=categories");
+    ).toBe("/game-of-the-year/2026/categories");
     expect(
       screen.getByRole("link", { name: "Top Categories" }).className,
     ).toContain("hover:text-accent");
     const seeAll = screen.getByRole("link", { name: "See All" });
     expect(seeAll.getAttribute("href")).toBe(
-      "/game-of-the-year/2026?view=categories",
+      "/game-of-the-year/2026/categories",
     );
     expect(seeAll.className).toContain("border");
     expect(screen.queryByRole("link", { name: "All categories" })).toBeNull();
@@ -115,7 +177,7 @@ describe("YearTopFiveStrip", () => {
     expect(screen.queryByText(/Not enough votes yet/)).toBeNull();
     const category = screen.getByRole("link", { name: "Best Debut" });
     expect(category.getAttribute("href")).toBe(
-      "/game-of-the-year/2026?view=category&category=best-debut",
+      "/game-of-the-year/2026/categories?category=best-debut",
     );
     expect(category.className).toContain("truncate");
     expect(

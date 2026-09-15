@@ -15,7 +15,7 @@ describe("GameCategoryWins", () => {
     );
     const link = screen.getByRole("link", { name: "2026 · Best Narrative" });
     expect(link.getAttribute("href")).toBe(
-      "/game-of-the-year/2026?view=categories",
+      "/game-of-the-year/2026/categories?category=narrative",
     );
   });
 });

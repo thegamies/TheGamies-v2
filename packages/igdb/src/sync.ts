@@ -1,5 +1,4 @@
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
-import type { Db } from "@thegamies/db";
 import {
   artworks,
   companies,
@@ -23,7 +22,8 @@ import {
   screenshots,
   syncRuns,
   themes,
-} from "@thegamies/db/schema";
+  type Db,
+} from "@thegamies/db";
 import {
   fetchByIds,
   fetchGamesPage,

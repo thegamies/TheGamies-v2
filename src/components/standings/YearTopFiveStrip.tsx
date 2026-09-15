@@ -11,6 +11,7 @@ import {
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import type { CategoryHighlightWinner } from "@/lib/live-aggregate/category-highlights";
+import { liveStandingsHref } from "@/lib/live-aggregate/award-category-defs";
 import { gotyCreatorCta, type GotyCreatorCta } from "@/lib/lists/existing-goty";
 import {
   DEFAULT_STANDING_FILL_MIN_VISIBLE,
@@ -52,6 +53,8 @@ export function YearTopFiveStrip({
   yearHref,
   categoryWinners = [],
   showRule = false,
+  showCategories = true,
+  gotyHeading = false,
   minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE,
   creatorCta,
 }: {
@@ -60,11 +63,17 @@ export function YearTopFiveStrip({
   yearHref: string;
   categoryWinners?: CategoryHighlightWinner[];
   showRule?: boolean;
+  showCategories?: boolean;
+  /** Visible “{year} Game of the Year” instead of the year number alone. */
+  gotyHeading?: boolean;
   minVisible?: number;
   creatorCta?: GotyCreatorCta;
 }) {
   const cta = creatorCta ?? gotyCreatorCta(year, null);
-  const categoriesHref = `/game-of-the-year/${year}?view=categories`;
+  const categoriesHref = liveStandingsHref(`/game-of-the-year/${year}`, {
+    view: "categories",
+  });
+  const yearLabel = `${year} Game of the Year`;
 
   return (
     <article
@@ -80,9 +89,9 @@ export function YearTopFiveStrip({
           <Link
             href={yearHref}
             className="text-ink transition-colors hover:text-accent"
-            aria-label={`${year} Game of the Year`}
+            aria-label={gotyHeading ? undefined : yearLabel}
           >
-            {year}
+            {gotyHeading ? yearLabel : year}
           </Link>
         </h3>
         <div className={headingActionsClass}>
@@ -118,69 +127,77 @@ export function YearTopFiveStrip({
         </HorizontalScroll>
       )}
 
-      <div className="mt-5">
-        <div className={headingRowClass}>
-          <p className="m-0 font-display text-2xl leading-none tracking-wide sm:text-3xl">
-            <Link
-              href={categoriesHref}
-              className="text-ink transition-colors hover:text-accent"
+      {showCategories ? (
+        <div className="mt-5">
+          <div className={headingRowClass}>
+            <p className="m-0 font-display text-2xl leading-none tracking-wide sm:text-3xl">
+              <Link
+                href={categoriesHref}
+                className="text-ink transition-colors hover:text-accent"
+              >
+                Top Categories
+              </Link>
+            </p>
+            <div className={headingActionsClass}>
+              <Link href={categoriesHref} className={outlinedLinkClass}>
+                See All
+              </Link>
+              <Link href={cta.categoriesHref} className={outlinedLinkClass}>
+                {cta.categoriesLabel}
+              </Link>
+            </div>
+          </div>
+          {categoryWinners.length > 0 ? (
+            <HorizontalScroll
+              className="@container mt-3"
+              label={`${year} top categories`}
             >
-              Top Categories
-            </Link>
-          </p>
-          <div className={headingActionsClass}>
-            <Link href={categoriesHref} className={outlinedLinkClass}>
-              See All
-            </Link>
-            <Link href={cta.categoriesHref} className={outlinedLinkClass}>
-              {cta.categoriesLabel}
-            </Link>
-          </div>
+              <ul className={standingFillFiveFlowClass}>
+                {categoryWinners.map((winner) => {
+                  const categoryHref = liveStandingsHref(
+                    `/game-of-the-year/${year}`,
+                    {
+                      view: "category",
+                      category: winner.categoryId,
+                    },
+                  );
+                  const solo = winner.games[0];
+                  return (
+                    <li key={winner.categoryId} className="min-w-0">
+                      <Link
+                        href={categoryHref}
+                        title={winner.label}
+                        className="mb-2 block truncate font-display text-lg leading-none tracking-wide text-ink hover:text-accent sm:text-xl"
+                      >
+                        {winner.label}
+                      </Link>
+                      {winner.games.length > 1 ? (
+                        <CompactTieStack
+                          games={winner.games}
+                          className="w-full"
+                        />
+                      ) : solo ? (
+                        <StandingGameCard
+                          slug={solo.slug}
+                          title={solo.title}
+                          coverUrl={solo.coverUrl}
+                        />
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </HorizontalScroll>
+          ) : (
+            <div className="mt-3 flex min-h-28 flex-col items-center justify-center gap-3 py-6 text-center">
+              <p className="text-sm text-muted">Not enough votes yet.</p>
+              <Link href={cta.categoriesHref} className={outlinedLinkClass}>
+                Add categories to your list
+              </Link>
+            </div>
+          )}
         </div>
-        {categoryWinners.length > 0 ? (
-          <HorizontalScroll
-            className="@container mt-3"
-            label={`${year} top categories`}
-          >
-            <ul className={standingFillFiveFlowClass}>
-              {categoryWinners.map((winner) => {
-                const categoryHref = `/game-of-the-year/${year}?view=category&category=${winner.categoryId}`;
-                const solo = winner.games[0];
-                return (
-                  <li key={winner.categoryId} className="min-w-0">
-                    <Link
-                      href={categoryHref}
-                      title={winner.label}
-                      className="mb-2 block truncate font-display text-lg leading-none tracking-wide text-ink hover:text-accent sm:text-xl"
-                    >
-                      {winner.label}
-                    </Link>
-                    {winner.games.length > 1 ? (
-                      <CompactTieStack
-                        games={winner.games}
-                        className="w-full"
-                      />
-                    ) : solo ? (
-                      <StandingGameCard
-                        slug={solo.slug}
-                        title={solo.title}
-                        coverUrl={solo.coverUrl}
-                      />
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ul>
-          </HorizontalScroll>
-        ) : (
-          <div className="mt-3 flex min-h-28 flex-col items-center justify-center gap-3 py-6 text-center">
-            <p className="text-sm text-muted">Not enough votes yet.</p>
-            <Link href={cta.categoriesHref} className={outlinedLinkClass}>
-              Add categories to your list
-            </Link>
-          </div>
-        )}
-      </div>
+      ) : null}
     </article>
   );
 }
@@ -189,6 +206,10 @@ export function YearTopFiveSections({
   sections,
   allYearsHref,
   minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE,
+  showHeader = true,
+  showCategories = true,
+  gotyHeading = false,
+  empty,
 }: {
   sections: Array<{
     year: number;
@@ -199,16 +220,23 @@ export function YearTopFiveSections({
   }>;
   allYearsHref?: string | null;
   minVisible?: number;
+  /** Homepage guest GOTY chapter already titles this block. */
+  showHeader?: boolean;
+  showCategories?: boolean;
+  gotyHeading?: boolean;
+  empty?: string | null;
 }) {
   if (sections.length === 0) {
-    return (
-      <p className="mt-3 text-sm text-muted">No standings years to show yet.</p>
+    return empty === null ? null : (
+      <p className="mt-3 text-sm text-muted">
+        {empty ?? "No standings years to show yet."}
+      </p>
     );
   }
 
   return (
     <div>
-      {allYearsHref ? (
+      {showHeader && allYearsHref ? (
         <div className="mb-3 flex items-end justify-between gap-4 border-b border-line pb-2 sm:mb-4">
           <h2 className="text-pretty font-display text-4xl leading-none tracking-wide text-ink sm:text-5xl">
             Game of the Year
@@ -227,6 +255,8 @@ export function YearTopFiveSections({
           categoryWinners={section.categoryWinners}
           creatorCta={section.creatorCta}
           showRule={index > 0}
+          showCategories={showCategories}
+          gotyHeading={gotyHeading}
           minVisible={minVisible}
         />
       ))}

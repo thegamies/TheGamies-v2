@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   adsenseAllowedOnPath,
   adsenseTestAds,
@@ -13,13 +13,18 @@ import {
   queueAdsenseFill,
 } from "@/lib/ads/queueAdsenseFill";
 
-export function SiteAdBanner() {
+function SiteAdBannerInner({ force = false }: { force?: boolean }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const client = getAdsenseClientId();
   const slot = getAdsenseBannerSlot();
   const testAds = adsenseTestAds();
   const insRef = useRef<HTMLModElement>(null);
-  const show = Boolean(client && slot && adsenseAllowedOnPath(pathname));
+  const show = Boolean(
+    client &&
+      slot &&
+      (force || adsenseAllowedOnPath(pathname, searchParams.toString())),
+  );
   const [filled, setFilled] = useState(false);
 
   useEffect(() => {
@@ -41,7 +46,8 @@ export function SiteAdBanner() {
   }, [show, client, slot]);
 
   useEffect(() => {
-    const visible = show && filled;
+    if (!show) return;
+    const visible = filled;
     document.documentElement.classList.toggle("has-site-ad", visible);
     return () => {
       document.documentElement.classList.remove("has-site-ad");
@@ -82,5 +88,13 @@ export function SiteAdBanner() {
         </div>
       </aside>
     </>
+  );
+}
+
+export function SiteAdBanner({ force = false }: { force?: boolean }) {
+  return (
+    <Suspense fallback={null}>
+      <SiteAdBannerInner force={force} />
+    </Suspense>
   );
 }

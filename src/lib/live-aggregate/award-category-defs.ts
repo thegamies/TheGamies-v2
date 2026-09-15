@@ -285,11 +285,36 @@ export function parseStandingsCategoryGroup(
   return DEFAULT_STANDINGS_CATEGORY_GROUP;
 }
 
+export function siteGotyYearPath(year: number): string {
+  return `/game-of-the-year/${Math.floor(year)}`;
+}
+
+export function siteGotyCategoriesPath(year: number): string {
+  return `${siteGotyYearPath(year)}/categories`;
+}
+
+const SITE_GOTY_STANDINGS_PATH =
+  /^\/game-of-the-year\/(\d+)(?:\/categories)?$/;
+
+export function parseSiteGotyStandingsPath(pathname: string): {
+  year: number;
+  categories: boolean;
+} | null {
+  const match = SITE_GOTY_STANDINGS_PATH.exec(pathname);
+  if (!match) return null;
+  return {
+    year: Number(match[1]),
+    categories: pathname.endsWith("/categories"),
+  };
+}
+
 export function standingsQueryString(opts: {
   page?: number;
   group?: StandingsCategoryGroupFilter;
   view?: LiveStandingsViewId;
   category?: string | null;
+  /** When true, never write `view` (used with `/categories` paths). */
+  omitView?: boolean;
 }): string {
   const params = new URLSearchParams();
   if (opts.page != null && opts.page > 1) {
@@ -299,15 +324,68 @@ export function standingsQueryString(opts: {
   if (group !== DEFAULT_STANDINGS_CATEGORY_GROUP) {
     params.set("group", group);
   }
-  const view = opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW;
-  if (view !== DEFAULT_LIVE_STANDINGS_VIEW) {
-    params.set("view", view);
+  if (!opts.omitView) {
+    const view = opts.view ?? DEFAULT_LIVE_STANDINGS_VIEW;
+    if (view !== DEFAULT_LIVE_STANDINGS_VIEW) {
+      params.set("view", view);
+    }
   }
   if (opts.category) {
     params.set("category", opts.category);
   }
   const q = params.toString();
   return q ? `?${q}` : "";
+}
+
+export function liveStandingsHref(
+  basePath: string,
+  opts: {
+    page?: number;
+    group?: StandingsCategoryGroupFilter;
+    view?: LiveStandingsViewId;
+    category?: string | null;
+  } = {},
+): string {
+  const site = parseSiteGotyStandingsPath(basePath);
+  if (site) {
+    const view =
+      opts.view ??
+      (site.categories ? "categories" : DEFAULT_LIVE_STANDINGS_VIEW);
+    const query = standingsQueryString({
+      page: opts.page,
+      group: opts.group,
+      category: view === "category" ? opts.category : null,
+      omitView: true,
+    });
+    if (view === "categories" || view === "category") {
+      return `${siteGotyCategoriesPath(site.year)}${query}`;
+    }
+    return `${siteGotyYearPath(site.year)}${query}`;
+  }
+  return `${basePath}${standingsQueryString(opts)}`;
+}
+
+/** Permanent-redirect target for `/game-of-the-year/2025?view=categories`. */
+export function siteGotyLegacyViewRedirectPath(opts: {
+  year: number;
+  view: LiveStandingsViewId;
+  page?: number;
+  group?: StandingsCategoryGroupFilter;
+  category?: string | null;
+}): string | null {
+  if (opts.view !== "categories" && opts.view !== "category") return null;
+  return liveStandingsHref(siteGotyYearPath(opts.year), opts);
+}
+
+export function siteGotySitemapYearPaths(years: readonly number[]): string[] {
+  return years.flatMap((year) => [
+    siteGotyYearPath(year),
+    siteGotyCategoriesPath(year),
+  ]);
+}
+
+export function siteGotyRevalidatePaths(year: number): string[] {
+  return [siteGotyYearPath(year), siteGotyCategoriesPath(year)];
 }
 
 export function parseAwardCategoryGroup(

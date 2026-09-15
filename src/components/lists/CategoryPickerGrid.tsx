@@ -123,21 +123,23 @@ export function CategoryPickerGrid({
                   }`}
                   onClick={() => onSelect(cat.id)}
                 >
-                  {showGroupTag ? (
-                    <span className="absolute top-2 left-2 right-2 text-[10px] font-extrabold tracking-[0.14em] text-muted uppercase">
-                      {AWARD_CATEGORY_GROUP_LABEL[catGroup]}
-                    </span>
-                  ) : null}
-                  <span className={TITLE_LINES_CLASS}>{cat.label}</span>
-                  {selected ? (
-                    <span className="absolute bottom-2 left-2 right-2 text-[10px] font-extrabold tracking-[0.14em] text-accent uppercase">
-                      Added
-                    </span>
-                  ) : extra ? (
-                    <span className="absolute bottom-2 left-2 right-2 text-[10px] leading-snug text-muted sm:text-xs">
-                      {extra}
-                    </span>
-                  ) : null}
+                  <span className="h-[1lh] overflow-hidden text-[10px] font-extrabold leading-none tracking-[0.14em] text-muted uppercase">
+                    {showGroupTag
+                      ? AWARD_CATEGORY_GROUP_LABEL[catGroup]
+                      : "\u00a0"}
+                  </span>
+                  <span className="mt-1 flex h-[3lh] items-center justify-center">
+                    <span className={TITLE_LINES_CLASS}>{cat.label}</span>
+                  </span>
+                  <span
+                    className={`mt-1 h-[1lh] overflow-hidden text-[10px] leading-none sm:text-xs ${
+                      selected
+                        ? "font-extrabold tracking-[0.14em] text-accent uppercase"
+                        : "text-muted"
+                    }`}
+                  >
+                    {selected ? "Added" : extra ?? "\u00a0"}
+                  </span>
                 </button>
               </li>
             );

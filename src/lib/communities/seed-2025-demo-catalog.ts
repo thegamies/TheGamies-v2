@@ -4,6 +4,7 @@ import { normalizeNomineeTitle } from "@/lib/tga-pickem/nominee-seed";
 import {
   DEMO_2025_CATEGORIES,
   DEMO_2025_GOTY,
+  DEMO_2025_YEAR,
   resolveTitleDef,
   uniqueTitlesForLookup,
   type DemoPickable,
@@ -11,12 +12,18 @@ import {
 
 const LOOKUP_CHUNK = 20;
 
+export type Demo2025CatalogRow = {
+  id: string;
+  title: string;
+  year: number | null;
+};
+
 async function loadCatalogMatches(
   titles: string[],
   db: Db,
-): Promise<Array<{ id: string; title: string }>> {
+): Promise<Demo2025CatalogRow[]> {
   const unique = [...new Set(titles.map((t) => t.trim()).filter(Boolean))];
-  const found: Array<{ id: string; title: string }> = [];
+  const found: Demo2025CatalogRow[] = [];
   for (let i = 0; i < unique.length; i += LOOKUP_CHUNK) {
     const chunk = unique.slice(i, i + LOOKUP_CHUNK);
     const matchers = chunk.flatMap((title) => [
@@ -28,26 +35,42 @@ async function loadCatalogMatches(
       .select({
         id: games.id,
         title: games.title,
+        year: games.year,
         popularity: games.popularity,
       })
       .from(games)
       .where(and(isNull(games.igdbRemovedAt), or(...matchers)))
       .orderBy(desc(games.popularity))
       .limit(80);
-    found.push(...rows);
+    found.push(
+      ...rows.map((row) => ({
+        id: row.id,
+        title: row.title,
+        year: row.year,
+      })),
+    );
   }
   return found;
 }
 
-function pickGameId(
+/**
+ * Prefer a catalog-year match. Category-only titles must be that year;
+ * curated GOTY keys may fall back if IGDB stored an earlier early-access year.
+ */
+export function pickDemo2025CatalogId(
   titles: string[],
-  rows: Array<{ id: string; title: string }>,
+  rows: Demo2025CatalogRow[],
+  opts: { year?: number; requireYear?: boolean } = {},
 ): string | null {
+  const year = opts.year ?? DEMO_2025_YEAR;
   const wanted = new Set(titles.map(normalizeNomineeTitle));
-  const exact = rows.find((row) =>
+  const matches = rows.filter((row) =>
     wanted.has(normalizeNomineeTitle(row.title)),
   );
-  return exact?.id ?? null;
+  const inYear = matches.find((row) => row.year === year);
+  if (inYear) return inYear.id;
+  if (opts.requireYear) return null;
+  return matches[0]?.id ?? null;
 }
 
 export type Demo2025Resolved = {
@@ -62,12 +85,16 @@ export async function resolveDemo2025Catalog(
   const lookup = uniqueTitlesForLookup();
   const allTitles = lookup.flatMap((row) => row.titles);
   const rows = await loadCatalogMatches(allTitles, db);
+  const gotyKeys = new Set(DEMO_2025_GOTY.map((row) => row.key));
 
   const idByKey = new Map<string, string>();
   const unmatched: string[] = [];
 
   for (const row of lookup) {
-    const gameId = pickGameId(row.titles, rows);
+    const gameId = pickDemo2025CatalogId(row.titles, rows, {
+      year: DEMO_2025_YEAR,
+      requireYear: !gotyKeys.has(row.key),
+    });
     if (!gameId) {
       unmatched.push(row.titles[0] ?? row.key);
       continue;
@@ -104,4 +131,13 @@ export async function resolveDemo2025Catalog(
   });
 
   return { goty, categories, unmatched };
+}
+
+export function demo2025CategoriesForActiveAwards(
+  resolved: Demo2025Resolved,
+  activeCategoryIds: ReadonlySet<string>,
+): Demo2025Resolved["categories"] {
+  return resolved.categories.filter(
+    (cat) => activeCategoryIds.has(cat.categoryId) && cat.games.length > 0,
+  );
 }

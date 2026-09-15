@@ -5,9 +5,12 @@ import { envAppOrigin } from "./origin-env";
 export const SITE_NAME = "The Gamies";
 
 export const SITE_DESCRIPTION =
-  "Community Game of the Year awards, Hosts, and personal ranked lists.";
+  "Independent Game of the Year lists, live standings, and community awards.";
 
 export const noIndexRobots = { index: false, follow: false } as const;
+
+/** Thin catalog game pages: stay out of the index, still pass PageRank to lists. */
+export const noIndexFollowRobots = { index: false, follow: true } as const;
 
 export function appOrigin(): string {
   return envAppOrigin();
@@ -18,15 +21,21 @@ export function publicPageMetadata(input: {
   description?: string;
   path: string;
   index?: boolean;
+  follow?: boolean;
   image?: string;
 }): Metadata {
   const index = input.index !== false;
+  const follow = input.follow ?? index;
   const image = input.image ?? ogImagePath({ kind: "default" });
   return {
     title: input.title,
     description: input.description,
     alternates: { canonical: input.path },
-    robots: index ? { index: true, follow: true } : noIndexRobots,
+    robots: index
+      ? { index: true, follow }
+      : follow
+        ? noIndexFollowRobots
+        : noIndexRobots,
     openGraph: {
       title: input.title,
       description: input.description,

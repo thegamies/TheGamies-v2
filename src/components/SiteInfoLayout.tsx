@@ -5,10 +5,12 @@ import { SITE_INFO_LINKS } from "@/lib/site";
 export function SiteInfoLayout({
   title,
   deck,
+  subnav,
   children,
 }: {
   title: string;
   deck?: string;
+  subnav?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -23,11 +25,12 @@ export function SiteInfoLayout({
           </Link>
         ))}
       </nav>
+      {subnav}
       <h1 className="mt-4 font-display text-5xl tracking-wide text-ink md:text-6xl">
         {title}
       </h1>
       {deck ? <p className="mt-3 text-sm text-muted">{deck}</p> : null}
-      <article className="mt-8 max-w-2xl space-y-6 text-muted [&_a]:text-ink [&_a]:underline [&_a]:decoration-line [&_a]:underline-offset-2 hover:[&_a]:text-accent [&_h2]:font-display [&_h2]:text-2xl [&_h2]:tracking-wide [&_h2]:text-ink [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
+      <article className="mt-8 max-w-2xl space-y-6 text-muted [&_a]:text-ink [&_a]:underline [&_a]:decoration-line [&_a]:underline-offset-2 hover:[&_a]:text-accent [&_h2]:font-display [&_h2]:text-2xl [&_h2]:tracking-wide [&_h2]:text-ink [&_h3]:font-display [&_h3]:text-xl [&_h3]:tracking-wide [&_h3]:text-ink [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5">
         {children}
       </article>
     </main>

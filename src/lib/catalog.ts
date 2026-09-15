@@ -1,8 +1,8 @@
 import {
   and,
-  asc,
   desc,
   eq,
+  gt,
   ilike,
   inArray,
   isNull,
@@ -37,7 +37,23 @@ import {
 } from "@/lib/catalog-game-detail";
 
 export type BrowseSort = "popularity" | "name" | "first_release_date";
-export type ReleaseStatus = "all" | "released" | "upcoming";
+/** `unreleased` is for award search (later years, dated or not). Not a browse chip. */
+export type ReleaseStatus = "all" | "released" | "upcoming" | "unreleased";
+
+/** Dated Upcoming rails and `/games?releaseStatus=upcoming`. */
+export const UPCOMING_HORIZON_MONTHS = 6;
+
+/** Exclusive after start of UTC today, inclusive through the same calendar day plus N months. */
+export function upcomingReleaseWindow(
+  now = new Date(),
+  months = UPCOMING_HORIZON_MONTHS,
+): { after: Date; onOrBefore: Date } {
+  const after = new Date(now);
+  after.setUTCHours(0, 0, 0, 0);
+  const onOrBefore = new Date(after);
+  onOrBefore.setUTCMonth(onOrBefore.getUTCMonth() + months);
+  return { after, onOrBefore };
+}
 
 export type BrowseGamesInput = {
   q?: string;
@@ -127,6 +143,15 @@ function browseGamesWhere(input: BrowseGamesInput) {
       )!,
     );
   } else if (releaseStatus === "upcoming") {
+    const { after, onOrBefore } = upcomingReleaseWindow(today);
+    conditions.push(
+      and(
+        sql`${games.firstReleaseDate} is not null`,
+        gt(games.firstReleaseDate, after),
+        lte(games.firstReleaseDate, onOrBefore),
+      )!,
+    );
+  } else if (releaseStatus === "unreleased") {
     conditions.push(
       or(
         isNull(games.firstReleaseDate),

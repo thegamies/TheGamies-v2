@@ -27,14 +27,30 @@ import {
 } from "@/lib/catalog";
 import { listFollowedProfileIds } from "@/lib/follow/service";
 import { paginateProfileItems, parseProfilePage } from "@/lib/profile/profile-page";
+import { SiteAds } from "@/components/ads/AdsLayout";
+import { adsenseAccountMetadata } from "@/lib/ads/adsense";
 import { publicPageMetadata } from "@/lib/seo/site";
+import { shouldIndexGamesHub } from "@/lib/seo/sitemap-plan";
 import { getPublicTrendingMinPeople } from "@/lib/site-settings/service";
 
-export const metadata: Metadata = publicPageMetadata({
-  title: "Games",
-  description: "Browse the game catalog on The Gamies.",
-  path: "/games",
-});
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const pageRaw = parseProfilePage(first(params.page));
+  return {
+    ...publicPageMetadata({
+      title: "Games",
+      description:
+        "Browse titles on The Gamies and open the ones that appear on Game of the Year lists.",
+      path: "/games",
+      index: shouldIndexGamesHub(pageRaw),
+    }),
+    ...(shouldIndexGamesHub(pageRaw) ? adsenseAccountMetadata() : {}),
+  };
+}
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -61,10 +77,20 @@ export default async function GamesPage({
 
   return (
     <>
+      {pageRaw <= 1 ? <SiteAds /> : null}
       <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] py-[var(--page-pad-y)]">
         <h1 className="font-display text-5xl tracking-wide text-ink md:text-7xl">
           Games
         </h1>
+        <p className="mt-4 max-w-2xl text-muted">
+          The catalog is here so you can find a title and put it on a list.
+          Rankings and public lists are the original desk — not the
+          metadata imported for each cover.{" "}
+          <Link href="/rankings" className="text-ink underline decoration-line underline-offset-2 hover:text-accent">
+            How rankings work
+          </Link>
+          .
+        </p>
 
         <GamesBrowseFilters
           key={`${q}|${year ?? ""}|${sort}|${sortDir}|${releaseStatus}|${hoursRaw ?? ""}|${scopeRaw ?? ""}`}
@@ -240,16 +266,17 @@ async function GamesCatalogGrid({
   try {
     total = await countBrowseGames(filters);
     if (total === 0) {
-      return <p className="mt-8 text-muted">No games in the catalog yet.</p>;
+      games = [];
+    } else {
+      const paging = paginateProfileItems(pageRaw, total, GAMES_BROWSE_PAGE_SIZE);
+      page = paging.page;
+      totalPages = paging.totalPages;
+      games = await browseGames({
+        ...filters,
+        limit: GAMES_BROWSE_PAGE_SIZE,
+        offset: paging.offset,
+      });
     }
-    const paging = paginateProfileItems(pageRaw, total, GAMES_BROWSE_PAGE_SIZE);
-    page = paging.page;
-    totalPages = paging.totalPages;
-    games = await browseGames({
-      ...filters,
-      limit: GAMES_BROWSE_PAGE_SIZE,
-      offset: paging.offset,
-    });
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

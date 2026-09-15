@@ -2,10 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isAdminAuthorized } from "@/lib/admin-auth";
-import {
-  loadCloudflareCronSettings,
-  saveCloudflareCronPaused,
-} from "@/lib/cloudflare/cron-settings-store";
+import { saveCloudflareCronPaused } from "@/lib/cloudflare/cron-settings-store";
 
 async function requireAdmin() {
   if (!(await isAdminAuthorized())) {

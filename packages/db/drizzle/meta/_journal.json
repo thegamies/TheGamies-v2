@@ -400,6 +400,13 @@
       "when": 1790035200000,
       "tag": "0056_community_featured_joins_closed",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790121600000,
+      "tag": "0057_list_items_game_idx",
+      "breakpoints": true
     }
   ]
 }

@@ -15,7 +15,9 @@ import { canManageCommunity } from "@/lib/communities/rules";
 import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
-import { noIndexRobots } from "@/lib/seo/site";
+import { ogImagePath } from "@/lib/seo/og-path";
+import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
+import { shouldIndexCommunityBoards } from "@/lib/seo/sitemap-plan";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -33,11 +35,16 @@ export async function generateMetadata({
   try {
     const community = await getCommunityBySlug(slug);
     if (!community) return { title: "Trending", robots: noIndexRobots };
-    return {
+    const index = shouldIndexCommunityBoards(community);
+    return publicPageMetadata({
       title: `${community.name} Trending`,
       description: `Games moving among members of ${community.name}.`,
-      robots: noIndexRobots,
-    };
+      path: `/communities/${community.slug}/trending`,
+      index,
+      image: index
+        ? ogImagePath({ kind: "community", slug: community.slug })
+        : undefined,
+    });
   } catch {
     return { title: "Trending", robots: noIndexRobots };
   }

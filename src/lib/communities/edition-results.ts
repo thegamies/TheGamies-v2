@@ -1590,7 +1590,11 @@ export async function getEditionCategoryResults(
         a.sortOrder - b.sortOrder ||
         a.categoryId.localeCompare(b.categoryId),
     )
-    .map(({ sortOrder: _sortOrder, ...block }) => block);
+    .map((row) => {
+      const { sortOrder, ...block } = row;
+      void sortOrder;
+      return block;
+    });
 }
 
 export const CATEGORY_RANKED_TOP = 3;

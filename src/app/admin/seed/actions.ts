@@ -7,6 +7,7 @@ import {
   seedLibrariesForSeedAccounts,
 } from "@/lib/library/seed";
 import { rebuildYear } from "@/lib/live-aggregate/refresh";
+import { revalidateSiteGotyYear } from "@/lib/live-aggregate/revalidate-site-goty";
 import {
   clearStandingsSeeds,
   countStandingsSeeds,
@@ -32,6 +33,7 @@ export async function seedStandingsAction(input: {
   topN: number | null;
   weightPower: number;
   includeCategories: boolean;
+  categoriesOnly: boolean;
   reseed: boolean;
   rebuild: boolean;
 }): Promise<
@@ -57,7 +59,7 @@ export async function seedStandingsAction(input: {
   const result = await seedStandingsVoters(input);
   if ("error" in result) return result;
 
-  revalidatePath(`/game-of-the-year/${result.year}`);
+  revalidateSiteGotyYear(result.year);
   revalidatePath("/admin/seed");
   revalidatePath("/admin/rankings");
   return { ok: true, ...result };
@@ -75,7 +77,7 @@ export async function rebuildSeedYearAction(input: {
   }
 
   await rebuildYear(year);
-  revalidatePath(`/game-of-the-year/${year}`);
+  revalidateSiteGotyYear(year);
   revalidatePath("/admin/seed");
   revalidatePath("/admin/rankings");
   return { ok: true };
@@ -92,7 +94,7 @@ export async function clearStandingsSeedsAction(input: {
 
   const result = await clearStandingsSeeds(input.year);
   for (const year of result.years) {
-    revalidatePath(`/game-of-the-year/${year}`);
+    revalidateSiteGotyYear(year);
   }
   revalidatePath("/admin/seed");
   revalidatePath("/admin/rankings");

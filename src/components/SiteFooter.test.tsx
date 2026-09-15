@@ -12,6 +12,9 @@ describe("SiteFooter", () => {
       "/about",
     );
     expect(
+      screen.getByRole("link", { name: "Rankings" }).getAttribute("href"),
+    ).toBe("/rankings");
+    expect(
       screen.getByRole("link", { name: "Contact" }).getAttribute("href"),
     ).toBe("/contact");
     expect(

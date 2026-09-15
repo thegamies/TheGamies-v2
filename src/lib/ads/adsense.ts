@@ -10,16 +10,44 @@ export const SITE_AD_BAR_PX = 90;
 /** Google’s certified seller id for AdSense `ads.txt`. */
 export const ADSENSE_CERTIFIED_SELLER_ID = "f08c47fec0942fa0";
 
-/** Middleware stamps the request path so ads can stay off `/auth` and `/account`. */
+/** Proxy may stamp the request path; ads themselves are gated per route. */
 export const REQUEST_PATHNAME_HEADER = "x-pathname";
 
-/** No ads on sign-in / account HTML (AdSense crawler follows those links). */
+/** Query string (no leading `?`) so `/games?page=2` can stay off ads. */
+export const REQUEST_SEARCH_HEADER = "x-search";
+
+const LEGAL_PATHS = new Set([
+  "/privacy",
+  "/terms",
+  "/contact",
+  "/guidelines",
+]);
+
+function pageFromSearch(search: string | null | undefined): number {
+  if (!search) return 1;
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  const page = Number(new URLSearchParams(raw).get("page") ?? "1");
+  if (!Number.isFinite(page)) return 1;
+  return Math.max(1, Math.floor(page));
+}
+
+/**
+ * No ads on sign-in / account, legal pages, catalog pagination, or game
+ * detail (IGDB replica). Ranked game pages opt back in with `SiteAdBanner force`.
+ * Missing path fails open so a skipped proxy still leaves ads on `/`.
+ */
 export function adsenseAllowedOnPath(
   pathname: string | null | undefined,
+  search?: string | null,
 ): boolean {
-  const path = (pathname ?? "/").split("?")[0] || "/";
+  const [pathPart, queryFromPath] = (pathname ?? "/").split("?");
+  const path = pathPart || "/";
+  const query = search ?? queryFromPath;
   if (path === "/auth" || path.startsWith("/auth/")) return false;
   if (path === "/account" || path.startsWith("/account/")) return false;
+  if (LEGAL_PATHS.has(path)) return false;
+  if (path === "/games") return pageFromSearch(query) <= 1;
+  if (path.startsWith("/games/")) return false;
   return true;
 }
 
@@ -94,4 +122,17 @@ export function adsenseTestAds(
   if (raw === "on" || raw === "1") return true;
   const nodeEnv = env ? env.NODE_ENV : process.env.NODE_ENV;
   return nodeEnv === "development";
+}
+
+/** Google’s display-ads snippet. Same URL the AdSense site checker looks for. */
+export function adsbygoogleScriptSrc(clientId: string): string {
+  return `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(clientId)}`;
+}
+
+/** Publisher meta for pages that actually load the AdSense snippet. */
+export function adsenseAccountMetadata(): {
+  other?: { "google-adsense-account": string };
+} {
+  const client = getAdsenseClientId();
+  return client ? { other: { "google-adsense-account": client } } : {};
 }

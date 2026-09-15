@@ -270,31 +270,31 @@ export function CategorySheet({
     null,
   );
 
-  useEffect(() => {
-    if (!open || !mode) return;
+  const [sheetSession, setSheetSession] = useState({ open, mode, category });
+  if (
+    open !== sheetSession.open ||
+    mode !== sheetSession.mode ||
+    category !== sheetSession.category
+  ) {
+    setSheetSession({ open, mode, category });
     setError(null);
     setBusy(false);
     setEntryForm({ kind: "list" });
     setDraftForm(emptyDraft());
-    if (mode.kind === "create") {
-      setCreateStep("setup");
+    setCreateStep("setup");
+    if (open && mode?.kind === "create") {
       setName("");
       setDescription("");
       setAnswerType("selected_games");
       setEligibility("current_year");
       setDrafts([]);
-      return;
+    } else if (open && mode?.kind === "edit" && category) {
+      setName(category.name);
+      setDescription(category.description);
+      setAnswerType(category.answerType);
+      setEligibility(parseCustomCategoryEligibility(category.eligibility));
     }
-    setCreateStep("setup");
-  }, [open, mode]);
-
-  useEffect(() => {
-    if (!open || mode?.kind !== "edit" || !category) return;
-    setName(category.name);
-    setDescription(category.description);
-    setAnswerType(category.answerType);
-    setEligibility(parseCustomCategoryEligibility(category.eligibility));
-  }, [open, mode, category]);
+  }
 
   const liveAnswerType = isEdit
     ? (category?.answerType ?? "any_game")
@@ -1202,25 +1202,18 @@ function LiveEntriesPanel({
     setLocalError(null);
   }
 
-  useEffect(() => {
+  const formSourceKey =
+    entryForm.kind === "edit"
+      ? `edit:${entryForm.entry.id}`
+      : entryForm.kind === "add"
+        ? "add"
+        : "list";
+  const [appliedFormKey, setAppliedFormKey] = useState(formSourceKey);
+  if (formSourceKey !== appliedFormKey) {
+    setAppliedFormKey(formSourceKey);
     if (entryForm.kind === "add") resetFormFields(null);
     if (entryForm.kind === "edit") resetFormFields(entryForm.entry);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reset only when mode/entry changes
-  }, [entryForm]);
-
-  useEffect(() => {
-    if (entryState && "ok" in entryState && entryState.ok) {
-      onEntryFormChange({ kind: "list" });
-      resetFormFields(null);
-    }
-  }, [entryState, onEntryFormChange]);
-
-  useEffect(() => {
-    if (updateEntryState && "ok" in updateEntryState && updateEntryState.ok) {
-      onEntryFormChange({ kind: "list" });
-      resetFormFields(null);
-    }
-  }, [updateEntryState, onEntryFormChange]);
+  }
 
   function onDragEnd(event: DragEndEvent) {
     setDragging(false);

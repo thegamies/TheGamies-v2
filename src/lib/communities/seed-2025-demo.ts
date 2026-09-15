@@ -105,7 +105,7 @@ export const DEMO_2025_GOTY: readonly DemoTitleDef[] = [
   title("citizen-sleeper-2", 16, ["Citizen Sleeper 2", "Citizen Sleeper 2: Starward Vector"], ["indie", "narrative", "rpg"]),
   title("cronos", 15, ["Cronos: The New Dawn"], ["horror"]),
   title("pirate-yakuza", 15, ["Like a Dragon: Pirate Yakuza in Hawaii", "Like a Dragon Pirate Yakuza in Hawaii"], ["japanese", "rpg"]),
-  title("deltarune-34", 14, ["Deltarune Chapters 3+4", "Deltarune", "DELTARUNE"], ["indie", "narrative"]),
+  title("deltarune-34", 14, ["Deltarune Chapters 3+4"], ["indie", "narrative"]),
   title("trails-sky-1st", 14, ["Trails in the Sky 1st Chapter", "The Legend of Heroes: Trails in the Sky 1st Chapter"], ["rpg", "japanese"]),
   title("digimon-time-stranger", 13, ["Digimon Story Time Stranger", "Digimon Story: Time Stranger"], ["rpg", "japanese"]),
   title("oblivion-remastered", 13, ["The Elder Scrolls IV: Oblivion Remastered", "Oblivion Remastered"], ["rpg"]),
@@ -276,13 +276,9 @@ export const DEMO_2025_CATEGORIES: ReadonlyArray<{
         tags: ["horror", "indie"],
       },
       {
-        key: "re-2025",
+        key: "re-survival-unit",
         weight: 20,
-        titles: [
-          "Resident Evil Requiem",
-          "Resident Evil 9",
-          "Resident Evil Survival Unit",
-        ],
+        titles: ["Resident Evil Survival Unit"],
         tags: ["horror"],
       },
       {
@@ -454,6 +450,20 @@ export function pickDemoCategoryVote(
     rng,
   );
   return choice?.gameId ?? null;
+}
+
+export function buildDemo2025CategoryVotes(
+  categories: Array<{ categoryId: string; games: DemoPickable[] }>,
+  taste: DemoTasteProfile,
+  rng: () => number,
+): Array<{ categoryId: string; gameId: string }> {
+  const votes: Array<{ categoryId: string; gameId: string }> = [];
+  for (const cat of categories) {
+    const gameId = pickDemoCategoryVote(cat.games, taste, rng);
+    if (!gameId) continue;
+    votes.push({ categoryId: cat.categoryId, gameId });
+  }
+  return votes;
 }
 
 export function resolveTitleDef(pick: DemoCategoryPickDef): DemoTitleDef | null {

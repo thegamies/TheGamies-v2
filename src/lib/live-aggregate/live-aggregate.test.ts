@@ -216,6 +216,7 @@ describe("GOTY category vote eligibility", () => {
     expect(browseInputForCategoryEligibility(year, "upcoming", false)).toEqual(
       expect.objectContaining({
         yearKnownAtLeast: 2027,
+        releaseStatus: "unreleased",
         gotyEligibleTypes: true,
         includeDlcAddonType: false,
       }),

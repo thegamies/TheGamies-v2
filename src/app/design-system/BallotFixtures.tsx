@@ -62,6 +62,30 @@ export function CategoryVotesEditorFixture() {
           categoryGroup: "genre",
           eligibility: "current_year",
         },
+        {
+          id: "best-game-to-play-with-friends",
+          label: "Best Game to Play With Friends",
+          description: null,
+          sortOrder: 17,
+          categoryGroup: "community",
+          eligibility: "current_or_active",
+        },
+        {
+          id: "best-one-more-run-game",
+          label: "Best “One More Run” Game",
+          description: null,
+          sortOrder: 63,
+          categoryGroup: "community",
+          eligibility: "current_year",
+        },
+        {
+          id: "best-game-you-finally-played",
+          label: "Best Game You Finally Played",
+          description: null,
+          sortOrder: 77,
+          categoryGroup: "community",
+          eligibility: "any_year",
+        },
       ]}
       value={value}
       onChange={setValue}

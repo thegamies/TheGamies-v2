@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  communitySitemapPaths,
   formatSitemapShardId,
   ownedListSitemapPath,
   parseSitemapShardId,
+  shouldIndexCommunityBoards,
+  shouldIndexGamesHub,
   shouldIndexProfile,
-  SITEMAP_CATALOG_YEAR_COUNT,
-  SITEMAP_GAMES_PER_YEAR,
+  SITEMAP_GAMES_MAX,
+  SITEMAP_STATIC_PATHS,
   sitemapCatalogYears,
   sitemapPageCount,
   sitemapShardsForCounts,
@@ -40,9 +43,24 @@ describe("sitemap shards", () => {
     expect(parseSitemapShardId("nope")).toBeNull();
   });
 
-  it("caps catalog games per included year", () => {
-    expect(SITEMAP_GAMES_PER_YEAR).toBe(100);
-    expect(SITEMAP_CATALOG_YEAR_COUNT).toBe(2);
+  it("caps valued catalog URLs", () => {
+    expect(SITEMAP_GAMES_MAX).toBe(5000);
+  });
+
+  it("includes About feature pages in the static sitemap", () => {
+    expect(SITEMAP_STATIC_PATHS).toEqual(
+      expect.arrayContaining([
+        "/about",
+        "/about/lists",
+        "/about/communities",
+        "/about/library",
+        "/about/people",
+        "/about/pickem",
+      ]),
+    );
+    expect(SITEMAP_STATIC_PATHS).not.toContain(
+      "/game-of-the-year/2025/recap",
+    );
   });
 
   it("lists this year and last year for catalog URLs", () => {
@@ -52,6 +70,11 @@ describe("sitemap shards", () => {
     expect(sitemapCatalogYears(new Date("2027-01-01T00:00:00.000Z"))).toEqual([
       2027, 2026,
     ]);
+  });
+
+  it("indexes the games hub and not later catalog pages", () => {
+    expect(shouldIndexGamesHub(1)).toBe(true);
+    expect(shouldIndexGamesHub(2)).toBe(false);
   });
 
   it("counts pages", () => {
@@ -70,6 +93,45 @@ describe("sitemap include rules", () => {
     expect(
       shouldIndexProfile({ visibility: "public", deletedAt: new Date() }),
     ).toBe(false);
+  });
+
+  it("indexes showcase community interiors, not ordinary public homes only", () => {
+    expect(
+      shouldIndexCommunityBoards({
+        visibility: "public",
+        joinsClosed: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldIndexCommunityBoards({
+        visibility: "public",
+        joinsClosed: false,
+      }),
+    ).toBe(false);
+    expect(
+      communitySitemapPaths({
+        slug: "demo-community",
+        visibility: "public",
+        joinsClosed: true,
+        editionYears: [2025, 2024],
+        tgaYears: [2025],
+      }),
+    ).toEqual([
+      "/communities/demo-community",
+      "/communities/demo-community/trending",
+      "/communities/demo-community/edition/2025",
+      "/communities/demo-community/edition/2024",
+      "/communities/demo-community/the-game-awards/2025",
+    ]);
+    expect(
+      communitySitemapPaths({
+        slug: "open-join",
+        visibility: "public",
+        joinsClosed: false,
+        editionYears: [2025],
+        tgaYears: [2025],
+      }),
+    ).toEqual(["/communities/open-join"]);
   });
 
   it("builds owned list paths when slug and username exist", () => {

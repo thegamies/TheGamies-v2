@@ -25,8 +25,9 @@ export type EditionVoicePublic = {
 };
 
 export function editionVoicesWriteBlockedReason(
-  _status: ReturnType<typeof computeEditionStatus>,
+  status: ReturnType<typeof computeEditionStatus>,
 ): string | null {
+  void status;
   return null;
 }
 

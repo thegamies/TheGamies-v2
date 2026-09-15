@@ -1,8 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { headers } from "next/headers";
 import { Archivo, Bebas_Neue, Source_Serif_4 } from "next/font/google";
-import { GoogleAdSense } from "@/components/ads/GoogleAdSense";
-import { SiteAdBanner } from "@/components/ads/SiteAdBanner";
 import { GtagConsentHead } from "@/components/analytics/GtagConsentHead";
 import {
   GoogleAnalytics,
@@ -13,12 +10,6 @@ import { AppProviders } from "@/components/AppProviders";
 import { NavigationProgress } from "@/components/NavigationProgress";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
-import {
-  adsenseAllowedOnPath,
-  getAdsenseBannerSlot,
-  getAdsenseClientId,
-  REQUEST_PATHNAME_HEADER,
-} from "@/lib/ads/adsense";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { resolvePublicOrigin } from "@/lib/seo/origin";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
@@ -53,9 +44,6 @@ export async function generateMetadata(): Promise<Metadata> {
       metadataBase = undefined;
     }
   }
-  const adsenseClient = getAdsenseClientId();
-  const pathname = (await headers()).get(REQUEST_PATHNAME_HEADER);
-  const allowAds = adsenseAllowedOnPath(pathname);
   return {
     metadataBase,
     title: {
@@ -63,9 +51,6 @@ export async function generateMetadata(): Promise<Metadata> {
       template: `%s · ${SITE_NAME}`,
     },
     description: SITE_DESCRIPTION,
-    ...(adsenseClient && allowAds
-      ? { other: { "google-adsense-account": adsenseClient } }
-      : {}),
     openGraph: {
       type: "website",
       siteName: SITE_NAME,
@@ -90,27 +75,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = (await headers()).get(REQUEST_PATHNAME_HEADER);
-  const allowAds = adsenseAllowedOnPath(pathname);
-  const showSiteAd = Boolean(
-    getAdsenseClientId() && getAdsenseBannerSlot() && allowAds,
-  );
   return (
     <html
       lang="en"
-      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable}${showSiteAd ? " has-site-ad" : ""}`}
+      className={`${archivo.variable} ${bebas.variable} ${sourceSerif.variable}`}
       // Cursor / remote preview injects attributes on <html>; ignore those.
       suppressHydrationWarning
     >
       <head suppressHydrationWarning>
         <GtagConsentHead />
         <GoogleAnalytics />
-        <GoogleAdSense enabled={allowAds} />
       </head>
       <body className="bg-paper font-sans text-ink antialiased">
         <NavigationProgress />
@@ -119,7 +98,6 @@ export default async function RootLayout({
             <SiteHeader />
             <div className="site-main">{children}</div>
             <SiteFooter />
-            <SiteAdBanner />
           </div>
           <GoogleAnalyticsRouteTracker />
           <CookieConsentBanner />

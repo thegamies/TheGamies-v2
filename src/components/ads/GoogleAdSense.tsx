@@ -1,33 +1,37 @@
-import { getAdsenseClientId } from "@/lib/ads/adsense";
+import Script from "next/script";
+import { adsbygoogleScriptSrc, getAdsenseClientId } from "@/lib/ads/adsense";
 import {
   fundingChoicesScriptSrc,
   googleFcPresentScript,
 } from "@/lib/ads/funding-choices";
 
-/** AdSense’s snippet must be in `<head>` of the initial HTML (their crawler). */
+/**
+ * AdSense + Funding Choices. `next/script` so React 19 does not treat a raw
+ * `<script>` in this tree as a client-rendered tag (those never run).
+ * `afterInteractive` still injects the real `adsbygoogle.js?client=` URL on
+ * first paint and on client navigations onto publication routes.
+ */
 export function GoogleAdSense({ enabled = true }: { enabled?: boolean }) {
   const client = getAdsenseClientId();
   if (!enabled || !client) return null;
 
   return (
     <>
-      <script
+      <Script
         id="funding-choices"
-        async
         src={fundingChoicesScriptSrc(client)}
-        suppressHydrationWarning
-      />
-      <script
-        id="googlefc-present"
-        suppressHydrationWarning
-        dangerouslySetInnerHTML={{ __html: googleFcPresentScript() }}
-      />
-      <script
-        id="adsbygoogle"
+        strategy="afterInteractive"
         async
-        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`}
+      />
+      <Script id="googlefc-present" strategy="afterInteractive">
+        {googleFcPresentScript()}
+      </Script>
+      <Script
+        id="adsbygoogle"
+        src={adsbygoogleScriptSrc(client)}
+        strategy="afterInteractive"
+        async
         crossOrigin="anonymous"
-        suppressHydrationWarning
       />
     </>
   );

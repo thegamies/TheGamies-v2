@@ -50,7 +50,7 @@ const nextConfig: NextConfig = {
   // Dev server blocks cross-origin /_next assets unless the browser host is
   // allowlisted (localhost alone is not enough for 127.0.0.1 or LAN IPs).
   allowedDevOrigins: [...lanDevOrigins(), ...extraDevOrigins],
-  // Old thegamies.gg catalog paths still in Google’s index.
+  // Old thegamies.gg catalog paths still in Google’s index, plus dropped recap URLs.
   async redirects() {
     return [
       {
@@ -61,6 +61,11 @@ const nextConfig: NextConfig = {
       {
         source: "/game/:slug",
         destination: "/games/:slug",
+        permanent: true,
+      },
+      {
+        source: "/game-of-the-year/:year(\\d+)/recap",
+        destination: "/game-of-the-year/:year",
         permanent: true,
       },
     ];
