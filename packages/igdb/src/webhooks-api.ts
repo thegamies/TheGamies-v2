@@ -15,6 +15,22 @@ export type IgdbWebhookRegistration = {
   updated_at: string;
 };
 
+export type PublicWebhookRegistration = Pick<
+  IgdbWebhookRegistration,
+  "id" | "url" | "active"
+>;
+
+/** Strip `secret` / `api_key` before a registration leaves the worker. */
+export function toPublicWebhookRegistration(
+  registration: IgdbWebhookRegistration,
+): PublicWebhookRegistration {
+  return {
+    id: registration.id,
+    url: registration.url,
+    active: registration.active,
+  };
+}
+
 async function igdbAuthedFetch(
   path: string,
   init: RequestInit,

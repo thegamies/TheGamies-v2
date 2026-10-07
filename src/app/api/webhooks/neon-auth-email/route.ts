@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BodyTooLargeError, readTextWithLimit } from "@thegamies/igdb";
 import { neonAuthJwksUrl, verifyNeonAuthWebhook } from "@/lib/email/neon-webhook";
 import {
   buildAuthEmail,
@@ -7,11 +8,22 @@ import {
   sendAuthEmail,
 } from "@/lib/email/send";
 
+const MAX_BODY_BYTES = 256 * 1024;
+
 export async function POST(request: Request) {
-  const rawBody = await request.text();
   const baseUrl = process.env.NEON_AUTH_BASE_URL?.trim();
   if (!baseUrl) {
     return NextResponse.json({ error: "Auth is not configured." }, { status: 503 });
+  }
+
+  let rawBody: string;
+  try {
+    rawBody = await readTextWithLimit(request, MAX_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return NextResponse.json({ error: "Payload too large." }, { status: 413 });
+    }
+    throw error;
   }
 
   let payload;

@@ -60,7 +60,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Staging spec:** `e2e/staging/auth-redirect.spec.ts` — signed-in host hits `/auth/complete-profile?next=…` (redirects straight to `next` when the profile exists); safe paths kept, unsafe ones land on `/account`. Signed out, an unsafe `next` is dropped from the sign-in link.
 - **Local dev note:** the email-verification skip now needs `NEXT_PUBLIC_APP_URL` set to a loopback URL (Doppler `dev` / `dev_personal` and `.env.example` already do).
 
-### [ ] 4. Secret comparisons and origin check
+### [x] 4. Secret comparisons and origin check
 
 - **Cron** (`src/app/api/cron/edition-freeze/route.ts`): Bearer only, constant-time compare; remove `?secret=`.
   - Check first: confirm nobody triggers freeze manually with `?secret=` (internal `scheduled` handler already uses Bearer). Update `docs/go-live.md` "manual hit" wording. Rotate `CRON_SECRET` if it was ever used in a URL.
@@ -79,6 +79,16 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Email links:** `src/lib/email/templates.ts` `ctaButton` — allow `https:` only.
 - **Admin proxy ids:** validate `id` / `webhookId` path segments (`[A-Za-z0-9-]+`) before building worker URLs.
 - **Tests:** `neon-webhook.test.ts` (future timestamp), worker tests for 413 + redacted registration, template test for non-https href.
+- **As built (2026-10-07):**
+  - Shared `readTextWithLimit` + `toPublicWebhookRegistration` live in `@thegamies/igdb` (the worker has no test runner). Cap: 256KB on the Neon email webhook (checked before signature work).
+  - **IGDB intake: no size cap, by decision — an IGDB delivery must never fail for size** (a refused delivery leaves that record stale, and repeated failures can get the webhook deactivated). The secret check before reading the body is the guard. Real payloads: median ~3.6KB, largest seen ~24KB (Call of Duty: Black Ops III; Nintendo for companies).
+  - Cloudflare Queues caps messages at 128KB. Envelopes that would not fit (`fitsInQueueMessage`, 16KB headroom) skip the queue and are processed live — even when delivery is closed — and log `igdb-webhooks-oversized` with size, entity, and id. With no database binding the worker answers 503 so IGDB retries.
+  - Generic 500 only on the IGDB intake (`/igdb`); admin-only worker routes and `/api/admin/sync` keep detailed errors for the operator.
+  - Neon JWKS cached 10 minutes; an unknown `kid` refetches at most once a minute (rotation still works, forged requests can't force a fetch each time).
+  - Email link check lives in `buildAuthEmail` (`isSafeEmailHref`): https, or http on loopback; anything else builds no email.
+  - Admin proxy ids: webhook id digits only, event id UUID — checked in the app route and again in the worker.
+  - Staging spec `e2e/staging/webhook-limits.spec.ts`: 300KB POST → 413; small unsigned → 401.
+  - **Optional follow-up:** rotate `IGDB_WEBHOOK_SECRET` and re-register slots — registration responses carried it to the admin browser before this step.
 
 ### [ ] 6. Security headers
 
@@ -151,6 +161,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Host promote voice checks (`community-hosts.ts`): one grouped count.
 - Community overview editions: capped SQL instead of load-all-then-slice.
 - Delete dead unbounded helpers: `listCommunityMemberOptions`, `listOwnedForProfile`.
+- Worker typecheck: `tsc --noEmit` in `workers/igdb-webhooks` fails on missing Workers globals (`KVNamespace`, `fetch`, `console`, …) — the generated types aren't picked up, so the worker is only checked by wrangler's bundler. Wire `worker-configuration.d.ts` / `@cloudflare/workers-types` and add it to CI.
 - Small-print fixes: join/ban race in `joinCommunityAsMember` (transaction).
 - ~~Flaky unit test: `src/components/home/HomePitch.test.tsx`~~ — failed CI twice on 2026-10-07 ("window is not defined" after jsdom teardown); fixed early by adding `afterEach(cleanup)` like the other component tests. Reopen if it recurs.
 - **Tests:** integration for freeze output parity.

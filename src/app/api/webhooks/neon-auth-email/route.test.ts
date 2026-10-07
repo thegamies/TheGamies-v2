@@ -58,6 +58,29 @@ describe("POST /api/webhooks/neon-auth-email", () => {
     expect(sendAuthEmail).not.toHaveBeenCalled();
   });
 
+  it("refuses oversized bodies before verifying the signature", async () => {
+    const response = await POST(
+      new Request("https://thegamies.gg/api/webhooks/neon-auth-email", {
+        method: "POST",
+        body: "x".repeat(300 * 1024),
+      }),
+    );
+    expect(response.status).toBe(413);
+    expect(verifyNeonAuthWebhook).not.toHaveBeenCalled();
+  });
+
+  it("refuses a declared oversized length", async () => {
+    const response = await POST(
+      new Request("https://thegamies.gg/api/webhooks/neon-auth-email", {
+        method: "POST",
+        body: "{}",
+        headers: { "content-length": String(10 * 1024 * 1024) },
+      }),
+    );
+    expect(response.status).toBe(413);
+    expect(verifyNeonAuthWebhook).not.toHaveBeenCalled();
+  });
+
   it("still sends verification mail to real addresses", async () => {
     verifyNeonAuthWebhook.mockResolvedValueOnce(
       verificationPayload("ada@gmail.com"),

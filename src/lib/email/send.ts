@@ -1,3 +1,4 @@
+import { isLoopbackHost } from "@/lib/auth/loopback";
 import { AUTH_EMAIL_FROM_DEFAULT, AUTH_EMAIL_SUBJECTS } from "./copy";
 import type { NeonAuthEmailPayload } from "./neon-webhook";
 import { rewriteNeonAuthEmailHref, confirmationPageHref, resetPasswordPageHref } from "./auth-link";
@@ -39,6 +40,17 @@ export function isIgnoredAuthEmail(payload: NeonAuthEmailPayload): boolean {
     payload.event_type === "send.otp" &&
     payload.event_data?.otp_type === "email-verification"
   );
+}
+
+/** Email buttons and links: https only, plus plain http on loopback for local dev. */
+export function isSafeEmailHref(href: string): boolean {
+  try {
+    const url = new URL(href);
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && isLoopbackHost(url.hostname);
+  } catch {
+    return false;
+  }
 }
 
 export function buildAuthEmail(
@@ -91,6 +103,7 @@ export function buildAuthEmail(
     const rawHref = data.link_url?.trim();
     if (!rawHref) return null;
     const href = hrefForMagicLink(data.link_type, rawHref);
+    if (!isSafeEmailHref(href)) return null;
     if (data.link_type === "forget-password") {
       return {
         to,
