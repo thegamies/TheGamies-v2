@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run -c vitest.integration.config.mts",
+    "test:integration:mark": "tsx scripts/integration/mark-test-db.ts",
     "test:e2e": "playwright test",
     "test:staging": "playwright test -c playwright.staging.config.ts",
     "qa:fixtures": "tsx scripts/qa/ensure-staging-fixtures.ts",

@@ -26,3 +26,78 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+
+  # Throwaway Neon branch per run: emptied, migrated from zero, marked, tested, deleted.
+  integration:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: ci/integration-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            db:
+              - 'src/lib/**'
+              - 'src/test/integration/**'
+              - '**/*.int.test.ts'
+              - 'packages/db/**'
+              - 'scripts/integration/**'
+              - 'vitest.config.mts'
+              - 'vitest.integration.config.mts'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - id: guard
+        run: |
+          if [ "${{ steps.filter.outputs.db }}" != "true" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No database-related changes; skipping integration tests."
+          elif [ -z "${{ secrets.NEON_API_KEY }}" ] || [ -z "${{ secrets.NEON_PROJECT_ID }}" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Neon secrets missing; skipping integration tests."
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.run == 'true'
+        uses: neondatabase/create-branch-action@v6
+        id: branch
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch_name: ${{ env.BRANCH_NAME }}
+          parent_branch: develop
+          api_key: ${{ secrets.NEON_API_KEY }}
+          role: neondb_owner
+      - if: steps.guard.outputs.run == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.run == 'true'
+        name: Empty the branch, migrate from zero, mark as test database
+        env:
+          INTEGRATION_BRANCH_NAME: ${{ env.BRANCH_NAME }}
+          INTEGRATION_DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+          DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+        run: |
+          pnpm exec tsx scripts/integration/reset-ci-branch.ts
+          pnpm db:migrate
+          pnpm test:integration:mark --confirm-test-database
+      - if: steps.guard.outputs.run == 'true'
+        env:
+          INTEGRATION_DATABASE_URL: ${{ steps.branch.outputs.db_url }}
+        run: pnpm test:integration
+      - if: always() && steps.branch.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ secrets.NEON_PROJECT_ID }}
+          branch: ${{ steps.branch.outputs.branch_id }}
+          api_key: ${{ secrets.NEON_API_KEY }}

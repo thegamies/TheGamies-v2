@@ -107,7 +107,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ## Phase 3 — Privacy
 
-### [ ] 7. Privacy fixes
+### [x] 7. Privacy fixes
 
 - **Account form DTO:** `src/app/account/page.tsx` passes only the fields `AccountProfileForm` uses (no `authUserId`, `isSiteAdmin`, `isSeed`).
 - **Private community metadata:** `generateMetadata` on `communities/[slug]` (+ live, edition, members) returns generic title/no description for non-public communities.
@@ -129,8 +129,14 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 - **Why:** steps 9, 11, 12, 14 change SQL; mocked unit tests cannot prove the new queries return the same rows.
 - **Change:** `pnpm test:integration` (Vitest project) against a Neon branch / test database — never production. Seed helpers for profiles, follows, lists, communities, editions. Add a CI job when a branch DB is available.
-- **Decision needed:** Neon branch per CI run vs a shared test branch.
+- **Decision (2026-10-07):** fresh Neon branch per CI run; the job runs only when database-related paths change.
 - **Docs:** update `docs/engineering.md` (Integration tests section).
+- **As built (2026-10-07):**
+  - `pnpm test:integration` runs `*.int.test.ts` via `vitest.integration.config.mts`; `pnpm test` excludes them.
+  - Guard: global setup refuses unless the database has `integration.marker`, created only by `pnpm test:integration:mark --confirm-test-database`. Staging and production are never marked.
+  - CI job `integration` (`ci.yml`): creates `ci/integration-<run>-<attempt>` from `develop`, empties it (`scripts/integration/reset-ci-branch.ts`, CI-only), migrates from zero, marks it, runs the tests, deletes the branch even on failure or cancel. Path-filtered to `src/lib`, `packages/db`, integration files, the Vitest configs, `ci.yml`, the lockfile.
+  - Seed helpers (`src/test/integration/seed.ts`): profiles, games, follows, library entries, lists + items, communities, members, editions. Rows carry a random tag so files can share a database; `cleanup()` deletes only that seeder's rows.
+  - First test `src/lib/follow/follow-graph.int.test.ts` pins today's follow-graph results (the baseline step 9 must keep).
 
 ### [ ] 9. Stop loading full follow lists
 
