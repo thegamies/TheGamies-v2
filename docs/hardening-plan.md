@@ -6,7 +6,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ## Phase 1 — Fix now
 
-### [ ] 1. Upgrade Next.js to 16.3.8
+### [x] 1. Upgrade Next.js to 16.3.8
 
 - **Why:** `next@16.3.0` is affected by GHSA-vcvr-r3jv-pc5j (critical RCE in `next/og` `ImageResponse`, fixed in 16.3.6) and CVE-2026-94483 (image optimization SSRF, fixed in 16.3.8). `/api/og` renders user-written text (display names, list titles, community names/descriptions).
 - **Change:** bump `next` and `eslint-config-next` to `16.3.8` in `package.json`; refresh lockfile. Re-read `node_modules/next/dist/docs/` release notes for anything that affects OpenNext.
