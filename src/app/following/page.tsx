@@ -28,8 +28,8 @@ import {
 import { allowFollowSeedAccounts } from "@/lib/follow/rules";
 import {
   FOLLOW_ROSTER_PAGE_SIZE,
+  followsAnyone,
   listFollowedAmong,
-  listFollowedProfileIds,
   listFollowersPage,
   listFollowingPage,
 } from "@/lib/follow/service";
@@ -254,10 +254,9 @@ async function FollowingTrending({
   pageRaw: number;
 }) {
   const hours = parseTrendingWindowHours(hoursRaw);
-  const followedIds = await listFollowedProfileIds(profileId).catch(() => []);
   const board = await listTrendingBoard({
     windowHours: hours,
-    followedIds,
+    followerProfileId: profileId,
     applySiteFloor: false,
     page: pageRaw,
   }).catch(() => ({
@@ -269,6 +268,9 @@ async function FollowingTrending({
     page: 1,
     totalPages: 1,
   }));
+  const followsNobody =
+    board.rows.length === 0 &&
+    !(await followsAnyone(profileId).catch(() => true));
 
   const from =
     board.total === 0 ? 0 : (board.page - 1) * TRENDING_PAGE_SIZE + 1;
@@ -282,7 +284,7 @@ async function FollowingTrending({
         scope="following"
         followingPage
         empty={
-          followedIds.length === 0
+          followsNobody
             ? "Follow people whose lists you already open to see games moving among them."
             : "No games are moving among people you follow in this window."
         }
@@ -324,8 +326,16 @@ async function FollowingActivity({
   profileId: string;
   pageRaw: number;
 }) {
-  const followedIds = await listFollowedProfileIds(profileId).catch(() => []);
-  if (followedIds.length === 0) {
+  const feed = await listFollowingFeedPage(profileId, pageRaw).catch(() => ({
+    cards: [],
+    page: 1,
+    hasMore: false,
+  }));
+
+  if (
+    feed.cards.length === 0 &&
+    !(await followsAnyone(profileId).catch(() => true))
+  ) {
     return (
       <p className="mt-10 max-w-xl text-muted">
         Follow people from Discover people. Their public library and ranked
@@ -333,12 +343,6 @@ async function FollowingActivity({
       </p>
     );
   }
-
-  const feed = await listFollowingFeedPage(followedIds, pageRaw).catch(() => ({
-    cards: [],
-    page: 1,
-    hasMore: false,
-  }));
 
   if (feed.cards.length === 0) {
     return (

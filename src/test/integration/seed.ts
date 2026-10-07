@@ -1,6 +1,7 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import {
+  activityEvents,
   communities,
   communityEditions,
   communityMembers,
@@ -12,7 +13,11 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import type { LibraryStatus, LibraryVisibility } from "@/lib/activity/kinds";
+import type {
+  ActivityKind,
+  LibraryStatus,
+  LibraryVisibility,
+} from "@/lib/activity/kinds";
 
 type ProfileInsert = typeof profiles.$inferInsert;
 type GameInsert = typeof games.$inferInsert;
@@ -88,6 +93,23 @@ export function createSeeder(db: Db) {
         gameId: input.gameId,
         status: input.status,
         visibility: input.visibility ?? "public",
+      });
+    },
+
+    async activity(input: {
+      profileId: string;
+      kind: ActivityKind;
+      gameId?: string | null;
+      listId?: string | null;
+      createdAt?: Date;
+    }) {
+      await db.insert(activityEvents).values({
+        profileId: input.profileId,
+        kind: input.kind,
+        gameId: input.gameId ?? null,
+        listId: input.listId ?? null,
+        batchId: randomUUID(),
+        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
       });
     },
 

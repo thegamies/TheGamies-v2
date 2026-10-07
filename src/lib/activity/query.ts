@@ -1,4 +1,16 @@
-import { and, desc, eq, gte, inArray, isNull, max, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  gte,
+  inArray,
+  isNull,
+  max,
+  or,
+  sql,
+  type AnyColumn,
+} from "drizzle-orm";
 import {
   activityEvents,
   communityMembers,
@@ -7,6 +19,7 @@ import {
   games,
   libraryEntries,
   lists,
+  profileFollows,
   profiles,
   type Db,
 } from "@thegamies/db";
@@ -176,15 +189,28 @@ function feedDayText(day: unknown): string {
   return String(day).slice(0, 10);
 }
 
+/** Correlated follow check: no follow list is loaded or sent back as `IN (...)`. */
+function followedBy(db: Db, followerProfileId: string, profileId: AnyColumn) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(profileFollows)
+      .where(
+        and(
+          eq(profileFollows.followerProfileId, followerProfileId),
+          eq(profileFollows.followedProfileId, profileId),
+        ),
+      ),
+  );
+}
+
 export async function listFollowingFeedPage(
-  followedIds: string[],
+  followerProfileId: string,
   pageRaw: number,
   db: Db = getDb(),
 ): Promise<{ cards: FeedCard[]; page: number; hasMore: boolean }> {
   const page = Math.max(1, Math.floor(pageRaw) || 1);
-  if (followedIds.length === 0) {
-    return { cards: [], page, hasMore: false };
-  }
+  const followed = followedBy(db, followerProfileId, activityEvents.profileId);
 
   const offset = (page - 1) * FEED_PAGE_SIZE;
   const dayRows = await db
@@ -203,7 +229,7 @@ export async function listFollowingFeedPage(
         eq(libraryEntries.gameId, activityEvents.gameId),
       ),
     )
-    .where(and(inArray(activityEvents.profileId, followedIds), feedPublicVisible()))
+    .where(and(followed, feedPublicVisible()))
     .groupBy(activityEvents.profileId, utcFeedDay)
     .orderBy(desc(max(activityEvents.createdAt)), desc(activityEvents.profileId))
     .limit(FEED_PAGE_SIZE + 1)
@@ -226,11 +252,7 @@ export async function listFollowingFeedPage(
 
   const rows = await feedEventJoins(db)
     .where(
-      and(
-        inArray(activityEvents.profileId, followedIds),
-        feedPublicVisible(),
-        dayMatch,
-      ),
+      and(followed, feedPublicVisible(), dayMatch),
     )
     .orderBy(desc(activityEvents.createdAt), desc(activityEvents.id))
     .limit(FEED_DAY_EVENT_CAP);
@@ -257,7 +279,8 @@ export type TrendingBoardRow = {
 
 export async function listTrendingBoard(opts: {
   windowHours?: TrendingWindowHours;
-  followedIds?: string[] | null;
+  /** Restrict to people this profile follows. */
+  followerProfileId?: string | null;
   communityId?: string | null;
   minPeople?: number;
   applySiteFloor?: boolean;
@@ -297,10 +320,7 @@ export async function listTrendingBoard(opts: {
   }
   const countingKinds = countingKindsFromWeights(kindWeights);
 
-  if (
-    countingKinds.length === 0 ||
-    (opts.followedIds && opts.followedIds.length === 0)
-  ) {
+  if (countingKinds.length === 0) {
     return {
       rows: [],
       windowHours,
@@ -328,8 +348,8 @@ export async function listTrendingBoard(opts: {
     )`,
   ];
 
-  if (opts.followedIds) {
-    filters.push(inArray(activityEvents.profileId, opts.followedIds));
+  if (opts.followerProfileId) {
+    filters.push(followedBy(db, opts.followerProfileId, activityEvents.profileId));
   }
 
   const grouped = {
@@ -456,11 +476,10 @@ export async function listTrendingBoard(opts: {
 
 export async function countFollowsLibraryForGame(
   gameId: string,
-  followedIds: string[],
+  followerProfileId: string,
   db: Db = getDb(),
 ): Promise<Record<LibraryStatus, number>> {
   const empty = emptyLibraryStatusCounts();
-  if (followedIds.length === 0) return empty;
   const rows = await db
     .select({
       status: libraryEntries.status,
@@ -474,7 +493,7 @@ export async function countFollowsLibraryForGame(
         eq(libraryEntries.visibility, "public"),
         eq(profiles.visibility, "public"),
         isNull(profiles.deletedAt),
-        inArray(libraryEntries.profileId, followedIds),
+        followedBy(db, followerProfileId, libraryEntries.profileId),
       ),
     )
     .groupBy(libraryEntries.status);

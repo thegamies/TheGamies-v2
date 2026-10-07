@@ -20,7 +20,6 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { countFollowsLibraryForGame } from "@/lib/activity/query";
-import { listFollowedProfileIds } from "@/lib/follow/service";
 import { getLibraryEntry } from "@/lib/library/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
@@ -93,13 +92,9 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   const libraryEntry = profile
     ? await getLibraryEntry(profile.id, game.id).catch(() => null)
     : null;
-  const followedIds = profile
-    ? await listFollowedProfileIds(profile.id).catch(() => [] as string[])
-    : [];
-  const followCounts =
-    profile && followedIds.length > 0
-      ? await countFollowsLibraryForGame(game.id, followedIds).catch(() => null)
-      : null;
+  const followCounts = profile
+    ? await countFollowsLibraryForGame(game.id, profile.id).catch(() => null)
+    : null;
 
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);

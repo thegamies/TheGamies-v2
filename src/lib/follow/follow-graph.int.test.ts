@@ -3,8 +3,8 @@ import { emptyLibraryStatusCounts } from "@/lib/activity/kinds";
 import { countFollowsLibraryForGame } from "@/lib/activity/query";
 import {
   followCounts,
+  followsAnyone,
   listFollowedAmong,
-  listFollowedProfileIds,
   listFollowingPage,
 } from "@/lib/follow/service";
 import { integrationDb } from "@/test/integration/db";
@@ -59,27 +59,24 @@ describe("follow graph (integration)", () => {
     await seed?.cleanup();
   });
 
-  it("lists followed ids newest first, including private and deleted edges", async () => {
-    await expect(listFollowedProfileIds(viewer.id, db)).resolves.toEqual([
-      deletedD.id,
-      privateC.id,
-      publicB.id,
-      publicA.id,
-    ]);
+  it("knows whether someone follows anyone, counting private and deleted edges", async () => {
+    await expect(followsAnyone(viewer.id, db)).resolves.toBe(true);
+    await expect(followsAnyone(stranger.id, db)).resolves.toBe(true);
+    await expect(followsAnyone(publicA.id, db)).resolves.toBe(false);
   });
 
   it("counts only public library entries of public, live, followed people", async () => {
-    const followedIds = await listFollowedProfileIds(viewer.id, db);
-    await expect(countFollowsLibraryForGame(game.id, followedIds, db)).resolves.toEqual({
+    await expect(countFollowsLibraryForGame(game.id, viewer.id, db)).resolves.toEqual({
       ...emptyLibraryStatusCounts(),
       playing: 1,
     });
   });
 
-  it("returns empty counts when the viewer follows nobody", async () => {
-    const followedIds = await listFollowedProfileIds(stranger.id, db);
-    expect(followedIds).toEqual([viewer.id]);
-    await expect(countFollowsLibraryForGame(game.id, [], db)).resolves.toEqual(
+  it("returns empty counts when the viewer follows nobody with the game", async () => {
+    await expect(countFollowsLibraryForGame(game.id, publicA.id, db)).resolves.toEqual(
+      emptyLibraryStatusCounts(),
+    );
+    await expect(countFollowsLibraryForGame(game.id, stranger.id, db)).resolves.toEqual(
       emptyLibraryStatusCounts(),
     );
   });

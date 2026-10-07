@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, sql } from "drizzle-orm";
 import {
   createDb,
   profileFollows,
@@ -175,16 +175,17 @@ async function listRosterPage(
   };
 }
 
-export async function listFollowedProfileIds(
+/** One-row check for "follows nobody" empty states. */
+export async function followsAnyone(
   followerProfileId: string,
   db: Db = getDb(),
-): Promise<string[]> {
-  const rows = await db
+): Promise<boolean> {
+  const [row] = await db
     .select({ id: profileFollows.followedProfileId })
     .from(profileFollows)
     .where(eq(profileFollows.followerProfileId, followerProfileId))
-    .orderBy(desc(profileFollows.createdAt));
-  return rows.map((row) => row.id);
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function listFollowedAmong(

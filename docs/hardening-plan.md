@@ -125,7 +125,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ## Phase 4 — Performance
 
-### [ ] 8. Integration test harness (prerequisite)
+### [x] 8. Integration test harness (prerequisite)
 
 - **Why:** steps 9, 11, 12, 14 change SQL; mocked unit tests cannot prove the new queries return the same rows.
 - **Change:** `pnpm test:integration` (Vitest project) against a Neon branch / test database — never production. Seed helpers for profiles, follows, lists, communities, editions. Add a CI job when a branch DB is available.
@@ -143,6 +143,10 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Why:** `listFollowedProfileIds` (`src/lib/follow/service.ts`) loads every followed id, then queries with a huge `IN (...)` on game detail, following feed, games trending.
 - **Change:** replace with `EXISTS` / join on `profile_follows` inside `countFollowsLibraryForGame`, `listFollowingFeedPage`, `listTrendingBoard`. Remove the helper if unused.
 - **Tests:** integration — same results as before for a seeded follow graph; unit tests on callers.
+- **As built (2026-10-07):**
+  - `countFollowsLibraryForGame(gameId, followerProfileId)`, `listFollowingFeedPage(followerProfileId, page)` and `listTrendingBoard({ followerProfileId })` filter with a correlated `EXISTS` on `profile_follows` (primary key lookup) instead of `IN (<every followed id>)`.
+  - `listFollowedProfileIds` is gone. "Follows nobody" empty states (`/following` feed + trending, `/games?scope=following`) call `followsAnyone` (`LIMIT 1`) only when the result is empty. Game detail drops the extra query entirely (zero counts already render nothing).
+  - Integration: `src/lib/activity/following-scope.int.test.ts` (feed + trending) and `src/lib/follow/follow-graph.int.test.ts` were run against the old code first, then the new code, with the same expected results. The pages had no unit tests; the empty-state switch is a one-line boolean, covered by `followsAnyone` in integration.
 
 ### [ ] 10. Narrow community revalidation
 
@@ -182,6 +186,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Host promote voice checks (`community-hosts.ts`): one grouped count.
 - Community overview editions: capped SQL instead of load-all-then-slice.
 - Delete dead unbounded helpers: `listCommunityMemberOptions`, `listOwnedForProfile`.
+- Trending (`listTrendingBoard` in `src/lib/activity/query.ts`) loads every matching (game, person) row in the window and scores + pages in worker memory. Move scoring into SQL (or a periodically refreshed score table) so a page reads only its 48 rows.
 - Worker typecheck: `tsc --noEmit` in `workers/igdb-webhooks` fails on missing Workers globals (`KVNamespace`, `fetch`, `console`, …) — the generated types aren't picked up, so the worker is only checked by wrangler's bundler. Wire `worker-configuration.d.ts` / `@cloudflare/workers-types` and add it to CI.
 - Small-print fixes: join/ban race in `joinCommunityAsMember` (transaction).
 - ~~Flaky unit test: `src/components/home/HomePitch.test.tsx`~~ — failed CI twice on 2026-10-07 ("window is not defined" after jsdom teardown); fixed early by adding `afterEach(cleanup)` like the other component tests. Reopen if it recurs.

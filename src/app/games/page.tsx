@@ -25,7 +25,7 @@ import {
   browseGames,
   countBrowseGames,
 } from "@/lib/catalog";
-import { listFollowedProfileIds } from "@/lib/follow/service";
+import { followsAnyone } from "@/lib/follow/service";
 import { paginateProfileItems, parseProfilePage } from "@/lib/profile/profile-page";
 import { SiteAds } from "@/components/ads/AdsLayout";
 import { adsenseAccountMetadata } from "@/lib/ads/adsense";
@@ -155,10 +155,9 @@ async function GamesTrendingSection({
         )}`,
       );
     }
-    const followedIds = await listFollowedProfileIds(profile.id).catch(() => []);
     const board = await listTrendingBoard({
       windowHours: hours,
-      followedIds,
+      followerProfileId: profile.id,
       applySiteFloor: false,
       page: pageRaw,
     }).catch(() => ({
@@ -170,6 +169,9 @@ async function GamesTrendingSection({
       page: 1,
       totalPages: 1,
     }));
+    const followsNobody =
+      board.rows.length === 0 &&
+      !(await followsAnyone(profile.id).catch(() => true));
 
     return (
       <>
@@ -179,7 +181,7 @@ async function GamesTrendingSection({
           scope="following"
           showFollowingScope={signedIn}
           empty={
-            followedIds.length === 0
+            followsNobody
               ? "Follow people whose lists you already open to see games moving among them."
               : "No games are moving among people you follow in this window."
           }
