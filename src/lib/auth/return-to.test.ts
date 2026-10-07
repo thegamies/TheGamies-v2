@@ -74,6 +74,27 @@ describe("buildSignInHref / buildSignUpHref", () => {
     ).toBeNull();
   });
 
+  it("allows plain http only on exact loopback hosts", () => {
+    expect(buildAbsoluteAppUrl("http://localhost:3000/", "/account")).toBe(
+      "http://localhost:3000/account",
+    );
+    expect(buildAbsoluteAppUrl("http://127.0.0.1:3000", "/account")).toBe(
+      "http://127.0.0.1:3000/account",
+    );
+    expect(buildAbsoluteAppUrl("http://localhost.evil.com", "/account")).toBeNull();
+    expect(buildAbsoluteAppUrl("http://localhost@evil.com", "/account")).toBeNull();
+    expect(buildAbsoluteAppUrl("not a url", "/account")).toBeNull();
+  });
+
+  it("falls back to account for unsafe paths", () => {
+    expect(buildAbsoluteAppUrl("https://thegamies.gg", "/\\evil.com")).toBe(
+      "https://thegamies.gg/account",
+    );
+    expect(buildAbsoluteAppUrl("https://thegamies.gg", "//evil.com")).toBe(
+      "https://thegamies.gg/account",
+    );
+  });
+
   it("builds an email-confirmed callback URL", () => {
     expect(
       buildEmailConfirmedCallbackUrl(
@@ -104,6 +125,8 @@ describe("resolvePostAuthRedirect", () => {
   it("defaults to account", () => {
     expect(resolvePostAuthRedirect(null)).toBe("/account");
     expect(resolvePostAuthRedirect("https://evil")).toBe("/account");
+    expect(resolvePostAuthRedirect("/\\evil.com")).toBe("/account");
+    expect(resolvePostAuthRedirect("/%2F%2Fevil.com")).toBe("/account");
   });
 
   it("returns next and merges intent", () => {

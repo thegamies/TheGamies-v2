@@ -26,7 +26,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Tests:** new route tests (mock community/edition/role): anon on private → 404; anon on public with joins open → 404; anon on public showcase → 200; member on private → 200.
 - **Preview check:** hit the comparison URL for a private community signed out.
 
-### [ ] 2b. Staging validation harness (signed-in checks)
+### [x] 2b. Staging validation harness (signed-in checks)
 
 - **Why:** unit tests mock the session. Signed-in behavior (members see private boards, outsiders don't, Hosts see Host-only views) needs a real check on staging that runs with no manual setup and no one's personal password.
 - **Fully automated — no accounts, communities, or joins made by hand.** Runs in GitHub Actions after every staging deploy.
@@ -57,6 +57,8 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **`skipEmailVerification`** (`src/lib/auth/skip-email-verification.ts`): fail closed — only skip when `NEXT_PUBLIC_APP_URL` is set and its hostname is `localhost` / `127.0.0.1` / `::1`.
 - **Also:** `buildAbsoluteAppUrl` (`src/lib/auth/return-to.ts`) — parse and require exact loopback hostname; `errorCallbackPath` in `google-sign-in-client.ts` → run through `safeNextPath`.
 - **Tests:** new `safe-next.test.ts` (`/\evil.com`, `/\t//evil.com`, `/%2F%2Fevil.com`, normal paths still pass); extend `skip-email-verification.test.ts` (missing app URL → false); `return-to.test.ts` (`http://localhost.evil.com` → null).
+- **Staging spec:** `e2e/staging/auth-redirect.spec.ts` — signed-in host hits `/auth/complete-profile?next=…` (redirects straight to `next` when the profile exists); safe paths kept, unsafe ones land on `/account`. Signed out, an unsafe `next` is dropped from the sign-in link.
+- **Local dev note:** the email-verification skip now needs `NEXT_PUBLIC_APP_URL` set to a loopback URL (Doppler `dev` / `dev_personal` and `.env.example` already do).
 
 ### [ ] 4. Secret comparisons and origin check
 

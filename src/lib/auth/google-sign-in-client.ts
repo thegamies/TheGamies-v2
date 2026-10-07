@@ -3,6 +3,7 @@
 import { authClient } from "./client";
 import { publicAuthErrorMessage } from "./email-verification-copy";
 import { GOOGLE_COMPLETE_PROFILE_PATH } from "./return-to";
+import { safeNextPath } from "./safe-next";
 
 export const GOOGLE_SIGN_IN_FAILED = "Could not continue with Google.";
 
@@ -40,9 +41,8 @@ type SocialSignInClient = {
 export async function signInWithGoogle(input: {
   errorCallbackPath?: string;
 }): Promise<{ error: string } | { href: string } | { redirected: true }> {
-  const errorCallbackURL = input.errorCallbackPath?.startsWith("/")
-    ? input.errorCallbackPath
-    : "/auth/sign-in";
+  const errorCallbackURL =
+    safeNextPath(input.errorCallbackPath) ?? "/auth/sign-in";
 
   try {
     const { error, data } = await (

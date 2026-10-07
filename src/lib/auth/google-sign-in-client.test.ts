@@ -39,6 +39,14 @@ describe("signInWithGoogle", () => {
     });
   });
 
+  it("falls back to sign-in for an unsafe error return path", async () => {
+    signInSocial.mockResolvedValueOnce({ data: { url: "https://g" }, error: null });
+    await signInWithGoogle({ errorCallbackPath: "/\\evil.com" });
+    expect(signInSocial).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCallbackURL: "/auth/sign-in" }),
+    );
+  });
+
   it("returns product copy when Google OAuth fails", async () => {
     signInSocial.mockResolvedValueOnce({
       error: { message: "OAuth not configured" },
