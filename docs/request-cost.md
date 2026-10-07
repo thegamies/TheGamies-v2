@@ -26,7 +26,7 @@ If the answer is “load everything, then slice,” the design is wrong.
 
 The client receives **only the rows it paints**. A 50-row page is 50 rows over the wire—not 5,000 with 50 displayed.
 
-Game detail may show public lists that include the title: **capped** (`GAME_PUBLIC_LISTS_CAP`), never the full roster. The sitemap of game URLs is the valued set (GOTY / category #1 / public lists), not the IGDB dump.
+Game detail does not list every public list that includes the title; a capped public-list probe (`GAME_PUBLIC_LISTS_CAP`) still feeds ads / site-value signals. The sitemap of game URLs is the valued set (GOTY / category #1 / public lists), not the IGDB dump.
 
 ## Search is SQL, not a client filter
 

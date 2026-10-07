@@ -116,7 +116,8 @@ export const getGamePageData = cache(
       publicLists,
       hasPublicSiteValue: gameHasPublicSiteValueFromSignals({
         hasGotyPresence: hasGameGotyPresence(rankings),
-        categoryWinCount: awards.wins.length,
+        // Ads / site value stay #1-only; the page may list top-5 placements.
+        categoryWinCount: awards.wins.filter((win) => win.place === 1).length,
         publicListCount: publicLists.length,
       }),
     };

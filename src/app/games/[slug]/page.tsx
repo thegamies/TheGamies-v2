@@ -5,7 +5,6 @@ import { GameCategoryWins } from "@/components/games/GameCategoryWins";
 import { GameGotyRankings } from "@/components/games/GameGotyRankings";
 import { GameImagesSection } from "@/components/games/GameImagesSection";
 import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
-import { GameSiteContext } from "@/components/games/GameSiteContext";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameVideosSection } from "@/components/games/GameVideosSection";
 import { GameLibraryControls } from "@/components/library/GameLibraryControls";
@@ -47,8 +46,6 @@ export async function generateMetadata({
         description: data.game.summary?.slice(0, 160) ?? undefined,
         path: `/games/${slug}`,
         image: ogImagePath({ kind: "game", slug }),
-        index: data.hasPublicSiteValue,
-        follow: true,
       }),
       ...(data.hasPublicSiteValue ? adsenseAccountMetadata() : {}),
     };
@@ -72,7 +69,7 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   const { slug } = await params;
   const data = await getGamePageData(slug).catch(() => null);
   if (!data) notFound();
-  const { game, rankings, categoryWins, publicLists } = data;
+  const { game, rankings, categoryWins } = data;
 
   let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
   let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
@@ -144,12 +141,6 @@ export default async function GameDetailPage({ params }: { params: Params }) {
             </h1>
 
             {game.summary ? <GameSummary text={game.summary} /> : null}
-
-            <GameSiteContext
-              title={game.title}
-              rankings={rankings}
-              lists={publicLists}
-            />
 
             <GameGotyRankings
               stats={rankings}

@@ -5,6 +5,7 @@ export type GameCategoryWinItem = {
   year: number;
   categoryId: string;
   label: string;
+  place: number;
 };
 
 export function GameCategoryWins({
@@ -34,7 +35,7 @@ export function GameCategoryWins({
               })}
               className="text-ink hover:text-accent"
             >
-              {win.year} · {win.label}
+              #{win.place} · {win.year} · {win.label}
             </Link>
           </li>
         ))}

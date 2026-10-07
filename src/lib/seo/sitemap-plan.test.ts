@@ -72,7 +72,7 @@ describe("sitemap shards", () => {
     ]);
   });
 
-  it("indexes the games hub and not later catalog pages", () => {
+  it("treats games hub page 1 as the ad-eligible browse page", () => {
     expect(shouldIndexGamesHub(1)).toBe(true);
     expect(shouldIndexGamesHub(2)).toBe(false);
   });

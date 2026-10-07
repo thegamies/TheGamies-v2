@@ -46,7 +46,6 @@ export async function generateMetadata({
       description:
         "Browse titles on The Gamies and open the ones that appear on Game of the Year lists.",
       path: "/games",
-      index: shouldIndexGamesHub(pageRaw),
     }),
     ...(shouldIndexGamesHub(pageRaw) ? adsenseAccountMetadata() : {}),
   };

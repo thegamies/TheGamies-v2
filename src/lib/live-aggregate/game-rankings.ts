@@ -187,9 +187,14 @@ export type GameCategoryWin = {
   year: number;
   categoryId: string;
   label: string;
+  /** Displayed place on that award board (competition or dense). */
+  place: number;
 };
 
-/** Site awards where this game is tied for #1 on a public category year. */
+/** Public category placements shown on a game page (top N, not full boards). */
+export const GAME_CATEGORY_TOP_PLACES = 5;
+
+/** Site awards where this game places in the public top N for that category year. */
 export async function getGameCategoryWins(
   gameId: string,
   db: Db = getLiveAggregateDb(),
@@ -206,42 +211,55 @@ export async function getGameCategoryWins(
         5
       )::int as min
     ),
-    winners as (
+    ranked as (
       select
         s.year,
-        s.category_id,
-        s.game_id
+        s.category_id as "categoryId",
+        ac.label,
+        ac.sort_order as "sortOrder",
+        (
+          case
+            when coalesce(ss.rank_mode, 'competition') = 'dense' then (
+              select count(distinct other.vote_count)::int
+              from live_category_scores other
+              where other.year = s.year
+                and other.category_id = s.category_id
+                and other.vote_count > s.vote_count
+            )
+            else (
+              select count(*)::int
+              from live_category_scores other
+              where other.year = s.year
+                and other.category_id = s.category_id
+                and other.vote_count > s.vote_count
+            )
+          end
+        ) + 1 as place
       from live_category_scores s
-      where not exists (
-        select 1
-        from live_category_scores other
-        where other.year = s.year
-          and other.category_id = s.category_id
-          and other.vote_count > s.vote_count
-      )
+      inner join award_categories ac on ac.id = s.category_id
+      inner join category_votes cv
+        on cv.year = s.year and cv.category_id = s.category_id
+      cross join vote_floor f
+      left join site_settings ss on ss.id = 'default'
+      where s.game_id = ${gameId}
+        and cv.total >= f.min
     )
-    select
-      w.year,
-      w.category_id as "categoryId",
-      ac.label
-    from winners w
-    inner join award_categories ac on ac.id = w.category_id
-    inner join category_votes cv
-      on cv.year = w.year and cv.category_id = w.category_id
-    cross join vote_floor f
-    where w.game_id = ${gameId}
-      and cv.total >= f.min
-    order by w.year desc, ac.sort_order, ac.label
+    select year, "categoryId", label, place
+    from ranked
+    where place <= ${GAME_CATEGORY_TOP_PLACES}
+    order by year desc, place, "sortOrder", label
   `);
 
   return (result.rows as Array<{
     year: unknown;
     categoryId: unknown;
     label: unknown;
+    place: unknown;
   }>).map((row) => ({
     year: asInt(row.year),
     categoryId: String(row.categoryId),
     label: String(row.label),
+    place: asInt(row.place),
   }));
 }
 

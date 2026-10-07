@@ -8,21 +8,21 @@ describe("publicPageMetadata", () => {
     );
   });
 
-  it("noindexes catalog pagination without following the dump", () => {
+  it("noindexes without following when index is false", () => {
     expect(
       publicPageMetadata({
-        title: "Games",
-        path: "/games",
+        title: "Private",
+        path: "/private",
         index: false,
       }).robots,
     ).toEqual({ index: false, follow: false });
   });
 
-  it("noindexes thin game pages but still follows links", () => {
+  it("noindexes but follows when follow is kept true", () => {
     expect(
       publicPageMetadata({
         title: "A title",
-        path: "/games/a-title",
+        path: "/somewhere",
         index: false,
         follow: true,
       }).robots,
