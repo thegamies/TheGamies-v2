@@ -13,7 +13,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Tests:** existing suite + `src/lib/seo/og-image.test.ts`.
 - **Preview check:** `/api/og?kind=game&slug=…`, `kind=list`, `kind=community`; game covers and avatars load through image optimization.
 
-### [ ] 1b. Upgrade OpenNext to 1.20.9
+### [x] 1b. Upgrade OpenNext to 1.20.9
 
 - **Why:** `@opennextjs/cloudflare@1.20.9` requires `next >=16.3.8`, matching the same advisory round. Kept separate from step 1 so a Workers build regression is easy to isolate.
 - **Change:** bump `@opennextjs/cloudflare` to `^1.20.9` and `wrangler` to `^4.125.0`; refresh lockfile.
@@ -25,6 +25,28 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Change:** one shared helper (e.g. `loadBrowsableEdition(slug, year)`) that resolves viewer role and returns 404 unless `canBrowseCommunityBoards(visibility, joinsClosed, role)`. Use it in all three routes.
 - **Tests:** new route tests (mock community/edition/role): anon on private → 404; anon on public with joins open → 404; anon on public showcase → 200; member on private → 200.
 - **Preview check:** hit the comparison URL for a private community signed out.
+
+### [ ] 2b. Staging validation harness (signed-in checks)
+
+- **Why:** unit tests mock the session. Signed-in behavior (members see private boards, outsiders don't, Hosts see Host-only views) needs a real check on staging that runs with no manual setup and no one's personal password.
+- **Fully automated — no accounts, communities, or joins made by hand.** Runs in GitHub Actions after every staging deploy.
+- **One-time operator setup (only these two):**
+  - Add GitHub secret `QA_ACCOUNT_PASSWORD` (any long random string; shared by the QA accounts).
+  - Run `gh auth login` on the dev machine so the agent can read run results.
+- **Fixture script** (`scripts/qa/ensure-staging-fixtures.ts`, `pnpm qa:fixtures`) — idempotent, safe to rerun:
+  - **Accounts:** `qa-host`, `qa-member`, `qa-outsider`, created through staging's normal email sign-up endpoint on reserved non-deliverable addresses (e.g. `@example.com`), then marked verified with `markNeonAuthEmailVerified`. If sign-in with `QA_ACCOUNT_PASSWORD` fails (secret rotated), remove the auth user (`remove-neon-auth-user`) and recreate it.
+  - **Profiles:** created through the profile service (same fields as complete-profile).
+  - **Communities:** `qa-private` (private; host = qa-host, member = qa-member) and `qa-showcase` (public, joins closed; host = qa-host), via the communities service.
+  - **Results:** a published edition year on each — fill ballots with `seedCommunityEditionBallots`, publish with `publishEditionForSeed`, refresh with `refreshPublishedEditionResultsForSeed`. Skip when already published.
+  - **Guards:** refuses to run unless `QA_TARGET=staging`, and refuses if `NEXT_PUBLIC_APP_URL` or `DATABASE_URL` matches production. Never prints passwords or connection strings.
+- **Signed-in checks:**
+  - `playwright.staging.config.ts`: `baseURL` = staging app URL, no `webServer`, test dir `e2e/staging/`.
+  - Global setup signs in each QA account through `/auth/sign-in` and saves storage state to `e2e/.auth/*.json` (gitignored).
+  - `pnpm test:staging` runs them. Specs are **read-only** (GET pages and APIs, no writes), so they are safe after every deploy.
+- **CI:** new `qa` job in `.github/workflows/staging.yml`, `needs: cloudflare`, env from `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `STAGING_CF_APP_URL`, `QA_ACCOUNT_PASSWORD`. Steps: install → `pnpm qa:fixtures` → install Chromium → `pnpm test:staging` → upload Playwright report; pass/fail lines in the job summary. Also runnable via `workflow_dispatch`.
+- **First specs (covers step 2):** for standings / categories / comparison APIs and the edition page — signed out + outsider → 404 on `qa-private`; member + host → 200; everyone → 200 on `qa-showcase`.
+- **Later steps add specs here:** step 3 (redirect after sign-in), step 4 (account delete origin), step 6 (headers present, sign-in still works under CSP), step 7 (account page props, private metadata).
+- **Out of scope:** Google sign-in (needs a real Google login — stays a manual check).
 
 ## Phase 2 — Auth and secrets hardening
 

@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
-import {
-  getRequestProfileByAuthUserId,
-  getRequestSessionUser,
-} from "@/lib/auth/session";
+import { loadBrowsablePublishedEdition } from "@/lib/communities/edition-api-access";
 import {
   ensurePublishedEditionResults,
   getEditionComparisonBundle,
 } from "@/lib/communities/edition-results";
-import { getEditionByCommunityYear } from "@/lib/communities/editions";
-import { getCommunityBySlug } from "@/lib/communities/service";
 
 type Params = Promise<{ slug: string; year: string }>;
 
@@ -23,27 +18,16 @@ export async function GET(
   }
 
   try {
-    const community = await getCommunityBySlug(slug);
-    if (!community) {
+    const access = await loadBrowsablePublishedEdition(slug, Math.floor(year));
+    if (!access) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
-    const edition = await getEditionByCommunityYear(
-      community.id,
-      Math.floor(year),
-    );
-    if (!edition || edition.status !== "published") {
-      return NextResponse.json({ error: "Not found." }, { status: 404 });
-    }
+    const { community, edition, viewerProfileId } = access;
 
     await ensurePublishedEditionResults(community.id, edition.year);
 
-    const user = await getRequestSessionUser();
-    const profile = user
-      ? await getRequestProfileByAuthUserId(user.id)
-      : null;
-
     const data = await getEditionComparisonBundle(edition.id, {
-      viewerProfileId: profile?.id ?? null,
+      viewerProfileId,
       rankMode: edition.rankMode,
     });
 
