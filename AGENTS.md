@@ -40,6 +40,7 @@ Editions ≠ live rankings — see `docs/product.md`.
 | Design | `docs/design-system.md` |
 | Engineering / day-to-day | `docs/engineering.md` (includes App Router layout + `cache()` rules) |
 | Request cost (lists, search, scale) | `docs/request-cost.md` |
+| Hardening plan (security / privacy / perf audit) | `docs/hardening-plan.md` |
 | Deployment | `docs/deployment.md` |
 | Secrets (Doppler local / GitHub deploy) | `docs/secrets.md` |
 | GitHub Actions secrets (setup list) | `docs/github-secrets.md` |
