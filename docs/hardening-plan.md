@@ -70,7 +70,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Staging spec:** `e2e/staging/account-delete-origin.spec.ts` — signed out, foreign `Origin` + forged `X-Forwarded-Host` → 403; own origin → 401 (reaches the session check). Signed out so nothing can be deleted.
 - **Rotation:** not needed — `?secret=` was never used in a URL (confirmed 2026-10-07).
 
-### [ ] 5. Webhook and worker hardening
+### [x] 5. Webhook and worker hardening
 
 - **Body caps:** reject > ~256KB with 413 before buffering — `workers/igdb-webhooks/src/index.ts` and `src/app/api/webhooks/neon-auth-email/route.ts` (check `Content-Length`, then count bytes while reading).
 - **Redact IGDB registration:** register/delete responses return only `id, entity, method, url, active` (same shape as the overview endpoint) — never `secret` / `api_key`.
@@ -96,6 +96,13 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **CSP:** ship as `Content-Security-Policy-Report-Only` first; allowlist Neon Auth, Google sign-in, GA, AdSense, IGDB/R2 images. Enforce in a follow-up once preview is clean.
 - **Decision needed:** enforce CSP in this PR or report-only first (recommended: report-only).
 - **Preview check:** sign in (email + Google), ads, analytics, image upload, OG previews; browser console has no blocked resources.
+- **Decided 2026-10-07 — minimal version:** `src/lib/security-headers.ts`, applied to every path in `next.config.ts`:
+  - `Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'` (enforced; structural only — never blocks AdSense, Analytics, or embeds)
+  - `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Strict-Transport-Security: max-age=31536000` — this host only, no `includeSubDomains`, no `preload` (easy to undo)
+  - **Not doing:** source allowlist CSP (with `'unsafe-inline'` it adds little; AdSense domains change constantly), report endpoint, `Permissions-Policy`. A nonce-based CSP would be its own step — it forces every page to render per request.
+  - Before 2026-10-07 neither production nor staging sent any of these.
+  - Staging spec `e2e/staging/security-headers.spec.ts`: every header on pages, `/account`, and an API route, signed out and signed in.
 
 ## Phase 3 — Privacy
 

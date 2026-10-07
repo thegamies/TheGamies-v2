@@ -2,6 +2,7 @@ import os from "node:os";
 import path from "node:path";
 import type { NextConfig } from "next";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+import { SECURITY_HEADERS } from "./src/lib/security-headers";
 
 const nextLinkWithoutPrefetch = path.join(
   process.cwd(),
@@ -50,6 +51,9 @@ const nextConfig: NextConfig = {
   // Dev server blocks cross-origin /_next assets unless the browser host is
   // allowlisted (localhost alone is not enough for 127.0.0.1 or LAN IPs).
   allowedDevOrigins: [...lanDevOrigins(), ...extraDevOrigins],
+  async headers() {
+    return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
+  },
   // Old thegamies.gg catalog paths still in Google’s index, plus dropped recap URLs.
   async redirects() {
     return [
