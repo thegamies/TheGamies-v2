@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { neonAuthJwksUrl, verifyNeonAuthWebhook } from "@/lib/email/neon-webhook";
-import { buildAuthEmail, isIgnoredAuthEmail, sendAuthEmail } from "@/lib/email/send";
+import {
+  buildAuthEmail,
+  isIgnoredAuthEmail,
+  isUndeliverableEmailAddress,
+  sendAuthEmail,
+} from "@/lib/email/send";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -40,6 +45,10 @@ export async function POST(request: Request) {
         { status: 422 },
       );
     }
+    return NextResponse.json({ ok: true, skipped: true });
+  }
+
+  if (isUndeliverableEmailAddress(message.to)) {
     return NextResponse.json({ ok: true, skipped: true });
   }
 

@@ -332,8 +332,55 @@ jobs:
               ;;
           esac
 
+  qa:
+    needs: [cloudflare, auth_email]
+    runs-on: ubuntu-latest
+    if: needs.cloudflare.outputs.skipped != 'true'
+    outputs:
+      skipped: ${{ steps.guard.outputs.skipped }}
+    env:
+      QA_TARGET: staging
+      QA_STAGING_URL: ${{ secrets.STAGING_CF_APP_URL || needs.cloudflare.outputs.url }}
+      DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+      QA_ACCOUNT_PASSWORD: ${{ secrets.QA_ACCOUNT_PASSWORD }}
+    steps:
+      - id: guard
+        run: |
+          if [ -z "$QA_ACCOUNT_PASSWORD" ] || [ -z "$DATABASE_URL" ]; then
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+            echo "QA_ACCOUNT_PASSWORD or STAGING_DATABASE_URL missing; skipping signed-in staging checks."
+          else
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/checkout@v4
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.3
+      - if: steps.guard.outputs.skipped == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: steps.guard.outputs.skipped == 'false'
+        run: pnpm install --frozen-lockfile
+      - if: steps.guard.outputs.skipped == 'false'
+        name: Ensure QA accounts, communities, and published editions
+        run: pnpm qa:fixtures
+      - if: steps.guard.outputs.skipped == 'false'
+        name: Signed-in staging checks
+        run: pnpm test:staging
+      - if: always() && steps.guard.outputs.skipped == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-staging
+          path: playwright-report-staging/
+          retention-days: 14
+          if-no-files-found: ignore
+
   summary:
-    needs: [migrate, cloudflare, igdb_webhooks, auth_email]
+    needs: [migrate, cloudflare, igdb_webhooks, auth_email, qa]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -345,6 +392,8 @@ jobs:
           CF_SKIPPED: ${{ needs.cloudflare.outputs.skipped }}
           IGDB_RESULT: ${{ needs.igdb_webhooks.result }}
           IGDB_SKIPPED: ${{ needs.igdb_webhooks.outputs.skipped }}
+          QA_RESULT: ${{ needs.qa.result }}
+          QA_SKIPPED: ${{ needs.qa.outputs.skipped }}
         run: |
           {
             echo "## Staging deploy (develop)"
@@ -371,6 +420,13 @@ jobs:
               echo "| IGDB webhooks | deployed | \`thegamies-igdb-webhooks-develop\` |"
             else
               echo "| IGDB webhooks | $IGDB_RESULT | |"
+            fi
+            if [ "$QA_SKIPPED" = "true" ] || [ "$QA_RESULT" = "skipped" ]; then
+              echo "| Signed-in QA | skipped | set \`QA_ACCOUNT_PASSWORD\` |"
+            elif [ "$QA_RESULT" = "success" ]; then
+              echo "| Signed-in QA | passed | \`pnpm test:staging\` |"
+            else
+              echo "| Signed-in QA | $QA_RESULT | see \`playwright-report-staging\` artifact |"
             fi
             echo ""
             echo "Stable Cloudflare worker: \`thegamies-v2-develop\`."

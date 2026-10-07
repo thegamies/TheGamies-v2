@@ -23,6 +23,16 @@ export function authEmailFromAddress(): string {
   return process.env.AUTH_EMAIL_FROM?.trim() || AUTH_EMAIL_FROM_DEFAULT;
 }
 
+/** RFC 2606 / 6761 reserved names: never deliverable (QA accounts use these). */
+export function isUndeliverableEmailAddress(email: string | undefined): boolean {
+  const domain = email?.trim().toLowerCase().split("@")[1];
+  if (!domain) return false;
+  if (["example.com", "example.net", "example.org"].includes(domain)) {
+    return true;
+  }
+  return /(^|\.)(example|invalid|test|localhost)$/.test(domain);
+}
+
 /** OTP confirmation is unused: verification is a Neon magic link. */
 export function isIgnoredAuthEmail(payload: NeonAuthEmailPayload): boolean {
   return (

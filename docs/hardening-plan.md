@@ -19,7 +19,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Change:** bump `@opennextjs/cloudflare` to `^1.20.9` and `wrangler` to `^4.125.0`; refresh lockfile.
 - **Staging check:** same as step 1, plus confirm the staging deploy succeeds and image optimization still goes through the `IMAGES` binding.
 
-### [ ] 2. Board access checks on edition JSON routes
+### [x] 2. Board access checks on edition JSON routes
 
 - **Why:** `src/app/api/communities/[slug]/edition/[year]/{standings,categories,comparison}/route.ts` only check "community exists + edition published". Pages also require `canBrowseCommunityBoards`. Private communities' results (including the per-Host comparison) are readable by slug.
 - **Change:** one shared helper (e.g. `loadBrowsableEdition(slug, year)`) that resolves viewer role and returns 404 unless `canBrowseCommunityBoards(visibility, joinsClosed, role)`. Use it in all three routes.
@@ -33,18 +33,19 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **One-time operator setup (only these two):**
   - Add GitHub secret `QA_ACCOUNT_PASSWORD` (any long random string; shared by the QA accounts).
   - Run `gh auth login` on the dev machine so the agent can read run results.
+- **Config + guards** (`src/lib/qa/staging-fixtures.ts`): QA identities, community defs, and `resolveQaTarget` — refuses unless `QA_TARGET=staging`, `QA_STAGING_URL` is https and not a production host (`thegamies.gg`, `www.thegamies.gg`, the `thegamies-v2` Worker), and `QA_ACCOUNT_PASSWORD` passes the app's password rules. The CI job only ever receives `STAGING_*` secrets. Errors never echo secret values.
 - **Fixture script** (`scripts/qa/ensure-staging-fixtures.ts`, `pnpm qa:fixtures`) — idempotent, safe to rerun:
-  - **Accounts:** `qa-host`, `qa-member`, `qa-outsider`, created through staging's normal email sign-up endpoint on reserved non-deliverable addresses (e.g. `@example.com`), then marked verified with `markNeonAuthEmailVerified`. If sign-in with `QA_ACCOUNT_PASSWORD` fails (secret rotated), remove the auth user (`remove-neon-auth-user`) and recreate it.
-  - **Profiles:** created through the profile service (same fields as complete-profile).
-  - **Communities:** `qa-private` (private; host = qa-host, member = qa-member) and `qa-showcase` (public, joins closed; host = qa-host), via the communities service.
-  - **Results:** a published edition year on each — fill ballots with `seedCommunityEditionBallots`, publish with `publishEditionForSeed`, refresh with `refreshPublishedEditionResultsForSeed`. Skip when already published.
-  - **Guards:** refuses to run unless `QA_TARGET=staging`, and refuses if `NEXT_PUBLIC_APP_URL` or `DATABASE_URL` matches production. Never prints passwords or connection strings.
+  - **Accounts:** `gamies_qa_host`, `gamies_qa_member`, `gamies_qa_outsider` on `thegamies-qa-*@example.com`. Created through staging's `/api/auth/sign-up/email`, marked verified with `markNeonAuthEmailVerified`. If sign-in with `QA_ACCOUNT_PASSWORD` fails (secret rotated), the auth user is removed (`removeNeonAuthDirectoryUser`) and recreated; the profile is re-pointed to the new auth id.
+  - **No mail:** the Neon Auth email webhook skips reserved undeliverable domains (`example.com`, `.test`, `.invalid`, …) — `isUndeliverableEmailAddress` in `src/lib/email/send.ts`.
+  - **Profiles:** `ensureProfileForAuthUser`, then set private so QA accounts stay out of people search.
+  - **Communities:** `gamies_qa_private` (private; host + member) and `gamies_qa_showcase` (public, joins closed; host only) via `createCommunity` + `updateCommunityDirectoryFlags`. Outsider is never a member. Fails loudly if a slug belongs to a non-QA account.
+  - **Results:** when the year is not yet published, `seedCommunityEditionBallots` (8 seed ballots) then `publishEditionForSeed`. Writes `e2e/.auth/fixtures.json` (year, slugs, one enabled category id per community) for the specs.
 - **Signed-in checks:**
-  - `playwright.staging.config.ts`: `baseURL` = staging app URL, no `webServer`, test dir `e2e/staging/`.
-  - Global setup signs in each QA account through `/auth/sign-in` and saves storage state to `e2e/.auth/*.json` (gitignored).
-  - `pnpm test:staging` runs them. Specs are **read-only** (GET pages and APIs, no writes), so they are safe after every deploy.
-- **CI:** new `qa` job in `.github/workflows/staging.yml`, `needs: cloudflare`, env from `STAGING_DATABASE_URL`, `STAGING_NEON_AUTH_BASE_URL`, `STAGING_CF_APP_URL`, `QA_ACCOUNT_PASSWORD`. Steps: install → `pnpm qa:fixtures` → install Chromium → `pnpm test:staging` → upload Playwright report; pass/fail lines in the job summary. Also runnable via `workflow_dispatch`.
-- **First specs (covers step 2):** for standings / categories / comparison APIs and the edition page — signed out + outsider → 404 on `qa-private`; member + host → 200; everyone → 200 on `qa-showcase`.
+  - `playwright.staging.config.ts`: `baseURL` = `QA_STAGING_URL`, no `webServer`, test dir `e2e/staging/`. Local `playwright.config.ts` ignores `staging/**`.
+  - Global setup signs in each QA account via `POST /api/auth/sign-in/email` (the same endpoint the sign-in form uses) and saves cookies to `e2e/.auth/*.json` (gitignored).
+  - `pnpm test:staging`. Specs are **read-only** (GET pages and APIs, no writes). Current specs use API contexts only, so CI skips the browser download; add `playwright install chromium` when a spec needs a page.
+- **CI:** `qa` job in `.github/workflows/staging.yml`, `needs: [cloudflare, auth_email]` (Auth domain must be registered before sign-up), env from `STAGING_DATABASE_URL`, `STAGING_CF_APP_URL` (falls back to the deploy URL), `QA_ACCOUNT_PASSWORD`. Skips cleanly when the password secret is missing. Uploads `playwright-report-staging`; result row in the staging summary.
+- **First specs (covers step 2), 19 tests:** each signed-in viewer's session is recognized; standings / categories / comparison APIs → 404 for signed out + outsider on `gamies_qa_private`, 200 for member + host, 200 for everyone on `gamies_qa_showcase`; edition page shows the private view exactly when access is denied (the page answers 200 either way).
 - **Later steps add specs here:** step 3 (redirect after sign-in), step 4 (account delete origin), step 6 (headers present, sign-in still works under CSP), step 7 (account page props, private metadata).
 - **Out of scope:** Google sign-in (needs a real Google login — stays a manual check).
 
@@ -147,4 +148,5 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Community overview editions: capped SQL instead of load-all-then-slice.
 - Delete dead unbounded helpers: `listCommunityMemberOptions`, `listOwnedForProfile`.
 - Small-print fixes: join/ban race in `joinCommunityAsMember` (transaction).
+- Flaky unit test: `src/components/home/HomePitch.test.tsx` leaves React scheduler work running after jsdom teardown ("window is not defined"); failed CI once on 2026-10-07, passed on rerun. Unmount / flush timers in the test.
 - **Tests:** integration for freeze output parity.

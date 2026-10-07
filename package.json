@@ -12,6 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:staging": "playwright test -c playwright.staging.config.ts",
+    "qa:fixtures": "tsx scripts/qa/ensure-staging-fixtures.ts",
     "db:generate": "pnpm --filter @thegamies/db generate",
     "db:migrate": "pnpm --filter @thegamies/db migrate",
     "db:migrate:secrets": "doppler run -- pnpm db:migrate",
