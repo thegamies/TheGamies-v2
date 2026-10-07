@@ -12,7 +12,9 @@ for (const signedIn of [false, true]) {
     });
     try {
       for (const path of PATHS) {
-        const res = await api.get(path, { maxRedirects: 0 });
+        // Server-component redirect() responses (e.g. /account signed out) skip
+        // next.config headers on OpenNext; check the page the browser lands on.
+        const res = await api.get(path);
         const headers = res.headers();
         for (const { key, value } of SECURITY_HEADERS) {
           expect(headers[key.toLowerCase()], `${path} ${key}`).toBe(value);

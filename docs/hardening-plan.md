@@ -90,7 +90,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Staging spec `e2e/staging/webhook-limits.spec.ts`: 300KB POST → 413; small unsigned → 401.
   - **Optional follow-up:** rotate `IGDB_WEBHOOK_SECRET` and re-register slots — registration responses carried it to the admin browser before this step.
 
-### [ ] 6. Security headers
+### [x] 6. Security headers
 
 - **Change:** `headers()` in `next.config.ts`: `X-Frame-Options: DENY` (or CSP `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security`, `Permissions-Policy`.
 - **CSP:** ship as `Content-Security-Policy-Report-Only` first; allowlist Neon Auth, Google sign-in, GA, AdSense, IGDB/R2 images. Enforce in a follow-up once preview is clean.
@@ -103,6 +103,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - **Not doing:** source allowlist CSP (with `'unsafe-inline'` it adds little; AdSense domains change constantly), report endpoint, `Permissions-Policy`. A nonce-based CSP would be its own step — it forces every page to render per request.
   - Before 2026-10-07 neither production nor staging sent any of these.
   - Staging spec `e2e/staging/security-headers.spec.ts`: every header on pages, `/account`, and an API route, signed out and signed in.
+  - Known gap, accepted: 307s from a page's `redirect()` (e.g. `/account` signed out) carry none of these headers on OpenNext. A bodyless redirect can't be framed or sniffed, and the page it lands on has every header. Covering redirects would need middleware on every request. The spec follows redirects and checks the landing page.
 
 ## Phase 3 — Privacy
 
