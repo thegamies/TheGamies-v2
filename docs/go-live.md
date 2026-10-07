@@ -78,7 +78,7 @@ Empty browse is a launch-killer.
 
 ### 5. Edition freeze cron
 
-**Temporarily off (2026-09-01):** App Worker Cron Trigger is `[]` so the every-minute freeze job is not scheduled. The `scheduled` handler still POSTs `/api/cron/edition-freeze` via `WORKER_SELF_REFERENCE` when a trigger exists. Restore with `["* * * * *"]` in `wrangler.jsonc`. Until then, freeze still kicks from schedule `after()` (and a manual hit). Staging CI injects `CRON_SECRET` onto `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
+**Temporarily off (2026-09-01):** App Worker Cron Trigger is `[]` so the every-minute freeze job is not scheduled. The `scheduled` handler still POSTs `/api/cron/edition-freeze` via `WORKER_SELF_REFERENCE` when a trigger exists. Restore with `["* * * * *"]` in `wrangler.jsonc`. Until then, freeze still kicks from schedule `after()`, or a manual `POST` with `Authorization: Bearer $CRON_SECRET` (the route no longer accepts `?secret=` in the URL). Staging CI injects `CRON_SECRET` onto `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
 
 Still confirm `CRON_SECRET` exists in GitHub for when the trigger is restored. Without it, Cloudflare’s handler no-ops.
 

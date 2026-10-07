@@ -51,7 +51,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ## Phase 2 — Auth and secrets hardening
 
-### [ ] 3. Open redirect + email-verification skip
+### [x] 3. Open redirect + email-verification skip
 
 - **`safeNextPath`** (`src/lib/auth/safe-next.ts`): reject `\`, whitespace/control characters; decode once and re-check for `//` and `://`.
 - **`skipEmailVerification`** (`src/lib/auth/skip-email-verification.ts`): fail closed — only skip when `NEXT_PUBLIC_APP_URL` is set and its hostname is `localhost` / `127.0.0.1` / `::1`.
@@ -66,7 +66,9 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Check first: confirm nobody triggers freeze manually with `?secret=` (internal `scheduled` handler already uses Bearer). Update `docs/go-live.md` "manual hit" wording. Rotate `CRON_SECRET` if it was ever used in a URL.
 - **First-admin claim** (`src/lib/site-ops/service.ts`): constant-time compare (reuse helper from `packages/igdb/src/timing-safe.ts` or a shared one).
 - **Account delete origin check** (`originMatchesRequestHost` in `src/lib/auth/session-cookies.ts`): compare `Origin` against the configured app origin(s), not client `X-Forwarded-Host`.
-- **Tests:** cron route test (query secret → 401, Bearer → 200, empty secret → 401); `session-cookies.test.ts` (forged `X-Forwarded-Host` → false); `site-ops/service.test.ts` still passes.
+- **Tests:** cron route test (query secret → 401, Bearer → 200, empty secret → 401); `session-cookies.test.ts` (forged `X-Forwarded-Host` → false); `site-ops/service.test.ts` (wrong / missing secret never reaches the database).
+- **Staging spec:** `e2e/staging/account-delete-origin.spec.ts` — signed out, foreign `Origin` + forged `X-Forwarded-Host` → 403; own origin → 401 (reaches the session check). Signed out so nothing can be deleted.
+- **Rotation:** not needed — `?secret=` was never used in a URL (confirmed 2026-10-07).
 
 ### [ ] 5. Webhook and worker hardening
 
@@ -150,5 +152,5 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Community overview editions: capped SQL instead of load-all-then-slice.
 - Delete dead unbounded helpers: `listCommunityMemberOptions`, `listOwnedForProfile`.
 - Small-print fixes: join/ban race in `joinCommunityAsMember` (transaction).
-- Flaky unit test: `src/components/home/HomePitch.test.tsx` leaves React scheduler work running after jsdom teardown ("window is not defined"); failed CI once on 2026-10-07, passed on rerun. Unmount / flush timers in the test.
+- ~~Flaky unit test: `src/components/home/HomePitch.test.tsx`~~ — failed CI twice on 2026-10-07 ("window is not defined" after jsdom teardown); fixed early by adding `afterEach(cleanup)` like the other component tests. Reopen if it recurs.
 - **Tests:** integration for freeze output parity.

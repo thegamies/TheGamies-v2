@@ -1,3 +1,5 @@
+import { envAppOrigin } from "@/lib/seo/origin-env";
+
 /** Neon Auth / Better Auth session cookies we must drop after the user is closed. */
 export function isAuthSessionCookieName(name: string): boolean {
   const n = name.toLowerCase();
@@ -55,13 +57,8 @@ export function expireAuthCookies(
 }
 
 function requestHost(request: Request): string {
-  const forwarded = request.headers
-    .get("x-forwarded-host")
-    ?.split(",")[0]
-    ?.trim();
-  if (forwarded) return forwarded;
   const host = request.headers.get("host")?.trim();
-  if (host) return host;
+  if (host) return host.toLowerCase();
   try {
     return new URL(request.url).host;
   } catch {
@@ -69,14 +66,23 @@ function requestHost(request: Request): string {
   }
 }
 
-/** Same-site POST check that still works when the Worker URL differs from the public host. */
-export function originMatchesRequestHost(request: Request): boolean {
+/**
+ * Same-site POST check: `Origin` must be the configured app origin or the
+ * request's own host. `X-Forwarded-Host` is client-controlled and ignored.
+ */
+export function originMatchesRequestHost(
+  request: Request,
+  appOrigin: string = envAppOrigin(),
+): boolean {
   const origin = request.headers.get("origin");
   if (!origin) return false;
+  let parsed: URL;
   try {
-    return new URL(origin).host === requestHost(request);
+    parsed = new URL(origin);
   } catch {
     return false;
   }
+  if (appOrigin && parsed.origin === appOrigin) return true;
+  return parsed.host === requestHost(request);
 }
 

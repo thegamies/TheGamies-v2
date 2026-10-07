@@ -1,5 +1,6 @@
 import { and, asc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { createDb, profiles, type Db } from "@thegamies/db";
+import { timingSafeEqualString } from "@thegamies/igdb";
 import {
   LAST_SITE_OPERATOR_MESSAGE,
   SITE_OPS_CLAIM_FAILED_MESSAGE,
@@ -135,7 +136,7 @@ export async function claimFirstSiteAdmin(input: {
   secret: string;
 }): Promise<{ ok: true } | { error: string }> {
   const expected = process.env.ADMIN_SYNC_SECRET;
-  if (!expected || input.secret !== expected) {
+  if (!expected || !timingSafeEqualString(input.secret, expected)) {
     return { error: SITE_OPS_CLAIM_FAILED_MESSAGE };
   }
 
