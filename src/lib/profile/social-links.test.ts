@@ -99,4 +99,16 @@ describe("normalizeSocialLinks / merge", () => {
     });
     expect(normalizeSocialLinks({ x: "  ", extra: "nope" })).toEqual({});
   });
+
+  it("drops stored links that are not https when reading", () => {
+    expect(
+      normalizeSocialLinks({
+        x: "https://x.com/ada",
+        website: "javascript:alert(1)",
+        twitch: "http://twitch.tv/ada",
+        youtube: "data:text/html,hi",
+        bluesky: "not a url",
+      }),
+    ).toEqual({ x: "https://x.com/ada" });
+  });
 });

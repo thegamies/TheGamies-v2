@@ -13,8 +13,11 @@ import {
   TGA_LEADERBOARD_PAGE_SIZE,
   leaderboardPageCount,
 } from "./scoring";
-import { getTgaYear, listTgaBallot } from "./service";
+import { getTgaYear, isCommunityTgaOptedIn, listTgaBallot } from "./service";
 import { picksAreOpen } from "./status";
+
+export const COMMUNITY_TGA_NOT_RUNNING =
+  "This community isn’t running Pick’em for that year.";
 
 function getDb(db?: Db): Db {
   return db ?? createDb();
@@ -311,6 +314,9 @@ export async function saveCommunitySheet(
 ): Promise<{ ok: true } | { error: string }> {
   const blocked = assertOpen(await getTgaYear(year, db));
   if (blocked) return blocked;
+  if (!(await isCommunityTgaOptedIn(communityId, year, db))) {
+    return { error: COMMUNITY_TGA_NOT_RUNNING };
+  }
   const guess = parseGuess(input.worldPremieresGuess);
   if (typeof guess !== "number") return guess;
   const rows = await allowedPicks(year, input.picks, db);

@@ -17,6 +17,7 @@ import { shareLinkPublishError } from "@/lib/lists/auth-intent";
 import {
   clientDraftUpsertSchema,
   createDraftSchema,
+  LIST_MAX_ITEMS,
   replaceItemsSchema,
   updateListMetaSchema,
 } from "@/lib/lists/schema";
@@ -336,7 +337,9 @@ export async function hydrateGamesByIgdbIds(
   igdbIds: number[],
   db: Db = getDb(),
 ): Promise<HydratedDraftGame[]> {
-  const unique = [...new Set(igdbIds.filter((id) => Number.isFinite(id) && id > 0))];
+  const unique = [
+    ...new Set(igdbIds.filter((id) => Number.isInteger(id) && id > 0)),
+  ].slice(0, LIST_MAX_ITEMS);
   if (unique.length === 0) return [];
 
   const rows = await db

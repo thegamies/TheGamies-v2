@@ -358,7 +358,10 @@ export async function loadEditorState(publicId: string) {
 }
 
 export async function hydrateDraftGamesAction(igdbIds: number[]) {
-  return hydrateGamesByIgdbIds(igdbIds);
+  if (!Array.isArray(igdbIds)) return [];
+  return hydrateGamesByIgdbIds(
+    igdbIds.filter((id): id is number => typeof id === "number"),
+  );
 }
 
 /** Drop a local GOTY draft when the account already owns that year. */

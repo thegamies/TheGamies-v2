@@ -22,7 +22,7 @@ import {
   normalizeSocialLinks,
   socialLinkUrlToHandle,
 } from "@/lib/profile/social-links";
-import type { Profile } from "@/lib/profile/service";
+import type { AccountProfileFormProfile } from "./account-profile-dto";
 import {
   formatUsernameChangeAllowedOn,
   nextUsernameChangeAllowedAt,
@@ -31,7 +31,11 @@ import {
 const fieldClass =
   "mt-1 w-full border border-line bg-panel px-3 py-2 text-ink outline-none focus:border-accent";
 
-export function AccountProfileForm({ profile }: { profile: Profile }) {
+export function AccountProfileForm({
+  profile,
+}: {
+  profile: AccountProfileFormProfile;
+}) {
   const [state, formAction, pending] = useActionState(saveAccountProfile, null);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatarUrl);
   const [bannerUrl, setBannerUrl] = useState(profile.bannerUrl);

@@ -115,6 +115,13 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Input caps:** `hydrateDraftGamesAction` caps `igdbIds` to the list max.
 - **Social links on render:** `ProfileSocialLinks` only renders `https:` hrefs.
 - **Tests:** unit tests for each (sheets opt-in, metadata for private, DTO shape, cap, social link filter).
+- **As built (2026-10-07):**
+  - Private metadata: product follows the "closed but discoverable" model (Reddit / Facebook private groups) — the private view already shows the name, so metadata keeps the name and drops the description for non-public communities. Only the overview page used the description; the OG image route already refused private communities. No viewer lookup (link-preview bots are always signed out). Hiding names entirely ("secret" communities) would be a product decision, not hardening.
+  - `hydrateGamesByIgdbIds` caps at `LIST_MAX_ITEMS` (100) after de-duplicating; the action ignores non-array input.
+  - `saveCommunitySheet` (and so `importSiteSheetToCommunity`) refuses when the community hasn't opted in for the year.
+  - `normalizeSocialLinks` keeps only `https:` URLs.
+  - `/account` passes `toAccountProfileFormProfile(profile)` (8 fields) to the form.
+  - Staging spec `e2e/staging/community-metadata.spec.ts`: private page head has the name but not the description for signed out / outsider / member; showcase keeps its description.
 
 ## Phase 4 — Performance
 
