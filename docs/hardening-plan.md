@@ -138,7 +138,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Seed helpers (`src/test/integration/seed.ts`): profiles, games, follows, library entries, lists + items, communities, members, editions. Rows carry a random tag so files can share a database; `cleanup()` deletes only that seeder's rows.
   - First test `src/lib/follow/follow-graph.int.test.ts` pins today's follow-graph results (the baseline step 9 must keep).
 
-### [ ] 9. Stop loading full follow lists
+### [x] 9. Stop loading full follow lists
 
 - **Why:** `listFollowedProfileIds` (`src/lib/follow/service.ts`) loads every followed id, then queries with a huge `IN (...)` on game detail, following feed, games trending.
 - **Change:** replace with `EXISTS` / join on `profile_follows` inside `countFollowsLibraryForGame`, `listFollowingFeedPage`, `listTrendingBoard`. Remove the helper if unused.
@@ -154,12 +154,17 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Change:** per-action revalidation map (invite rotate → settings; role change → members + header; ballot save → that edition year; settings → community shell). Drop `"layout"` unless shell data changed.
 - **Tests:** unit — assert `revalidatePath` calls per action.
 - **Preview check:** each action's visible change still appears without a hard refresh.
+- **Deferred (2026-10-07):** no measurable gain today. OpenNext runs with the default no-op incremental/tag cache, and community pages are dynamic (session), so extra `revalidatePath` calls do no server work. In Server Functions any `revalidatePath` already purges the whole client router cache (Next docs: "temporary"), and the current page re-renders once either way. Revisit when an incremental cache (R2) or `"use cache"` is enabled for community data.
 
 ### [ ] 11. Batch live-aggregate dirty-key refresh
 
 - **Why:** `processDirtyKeys` (`src/lib/live-aggregate/refresh.ts`) does a sequential upsert + delete per dirty game and per dirty category.
 - **Change:** one `INSERT … SELECT … ON CONFLICT` for all dirty ids (capped batch per tick), then one `DELETE`.
 - **Tests:** integration — scores identical to the per-row path for a seeded year.
+- **As built (2026-10-07):**
+  - `refreshGotyBatch` / `refreshCategoryBatch`: one statement per batch (≤ `REFRESH_BATCH_SIZE` = 500 keys, ≤ 20 batches per run) — `DELETE … RETURNING` claims dirty keys, a `LEFT JOIN` aggregate recomputes absolute sums from contrib, positives upsert, zeros are deleted. A 10-game save goes from ~30 sequential round trips to 2.
+  - Ordering fix: claiming before computing means a save that re-marks a key mid-refresh leaves a fresh mark (previously the post-compute delete could erase it and leave that score stale). `contribGeneration` is read before processing (saves mark dirty before bumping it), and `scoresGeneration` uses `greatest(...)` so it never moves backwards.
+  - `src/lib/live-aggregate/refresh.int.test.ts` ran on the old code first, then the new: small batches, zero-score removal, category votes, list count, generation/version bump, parity with `rebuildYear`, a follow-up refresh, and "already current". The mid-refresh race itself is not reproducible deterministically without a test hook, so it is covered by the ordering, not a test.
 
 ### [ ] 12. Page locked live categories in SQL
 

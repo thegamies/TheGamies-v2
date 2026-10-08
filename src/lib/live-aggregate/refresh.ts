@@ -68,163 +68,141 @@ async function refreshListCount(year: number, db: Db) {
     .where(eq(liveGotyYearStats.year, year));
 }
 
-async function upsertGotyScoreFromContrib(
-  year: number,
-  gameId: string,
-  db: Db,
-) {
-  const [agg] = await db
-    .select({
-      score: sql<number>`coalesce(sum(${liveGotyContrib.points}), 0)::int`,
-      listMentions: count(),
-      rank1Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 1 then 1 else 0 end), 0)::int`,
-      rank2Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 2 then 1 else 0 end), 0)::int`,
-      rank3Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 3 then 1 else 0 end), 0)::int`,
-      rank4Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 4 then 1 else 0 end), 0)::int`,
-      rank5Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 5 then 1 else 0 end), 0)::int`,
-      rank6Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 6 then 1 else 0 end), 0)::int`,
-      rank7Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 7 then 1 else 0 end), 0)::int`,
-      rank8Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 8 then 1 else 0 end), 0)::int`,
-      rank9Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 9 then 1 else 0 end), 0)::int`,
-      rank10Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 10 then 1 else 0 end), 0)::int`,
-    })
-    .from(liveGotyContrib)
-    .where(
-      and(eq(liveGotyContrib.year, year), eq(liveGotyContrib.gameId, gameId)),
-    );
+export const REFRESH_BATCH_SIZE = 500;
+/** Bounds one refresh well inside REFRESH_LOCK_STALE_MS; leftovers wait for the next tick. */
+const REFRESH_MAX_BATCHES = 20;
 
-  const score = Number(agg?.score ?? 0);
-  if (score <= 0) {
-    await db
-      .delete(liveGotyScores)
-      .where(
-        and(eq(liveGotyScores.year, year), eq(liveGotyScores.gameId, gameId)),
-      );
-    return;
-  }
-
-  const values = {
-    year,
-    gameId,
-    score,
-    listMentions: Number(agg?.listMentions ?? 0),
-    rank1Count: Number(agg?.rank1Count ?? 0),
-    rank2Count: Number(agg?.rank2Count ?? 0),
-    rank3Count: Number(agg?.rank3Count ?? 0),
-    rank4Count: Number(agg?.rank4Count ?? 0),
-    rank5Count: Number(agg?.rank5Count ?? 0),
-    rank6Count: Number(agg?.rank6Count ?? 0),
-    rank7Count: Number(agg?.rank7Count ?? 0),
-    rank8Count: Number(agg?.rank8Count ?? 0),
-    rank9Count: Number(agg?.rank9Count ?? 0),
-    rank10Count: Number(agg?.rank10Count ?? 0),
-  };
-
-  await db
-    .insert(liveGotyScores)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [liveGotyScores.year, liveGotyScores.gameId],
-      set: {
-        score: values.score,
-        listMentions: values.listMentions,
-        rank1Count: values.rank1Count,
-        rank2Count: values.rank2Count,
-        rank3Count: values.rank3Count,
-        rank4Count: values.rank4Count,
-        rank5Count: values.rank5Count,
-        rank6Count: values.rank6Count,
-        rank7Count: values.rank7Count,
-        rank8Count: values.rank8Count,
-        rank9Count: values.rank9Count,
-        rank10Count: values.rank10Count,
-      },
-    });
+function claimedCount(result: unknown): number {
+  const rows = Array.isArray(result)
+    ? result
+    : ((result as { rows?: unknown[] })?.rows ?? []);
+  return Number((rows[0] as { claimed?: unknown } | undefined)?.claimed ?? 0);
 }
 
-async function upsertCategoryScoreFromContrib(
-  year: number,
-  categoryId: string,
-  gameId: string,
-  db: Db,
-) {
-  const [agg] = await db
-    .select({ voteCount: count() })
-    .from(liveCategoryContrib)
-    .where(
-      and(
-        eq(liveCategoryContrib.year, year),
-        eq(liveCategoryContrib.categoryId, categoryId),
-        eq(liveCategoryContrib.gameId, gameId),
-      ),
-    );
-
-  const voteCount = Number(agg?.voteCount ?? 0);
-  if (voteCount <= 0) {
-    await db
-      .delete(liveCategoryScores)
-      .where(
-        and(
-          eq(liveCategoryScores.year, year),
-          eq(liveCategoryScores.categoryId, categoryId),
-          eq(liveCategoryScores.gameId, gameId),
-        ),
-      );
-    return;
-  }
-
-  await db
-    .insert(liveCategoryScores)
-    .values({ year, categoryId, gameId, voteCount })
-    .onConflictDoUpdate({
-      target: [
-        liveCategoryScores.year,
-        liveCategoryScores.categoryId,
-        liveCategoryScores.gameId,
-      ],
-      set: { voteCount },
-    });
+/**
+ * One statement per batch: claim (delete) dirty games first, so a save that
+ * re-marks a game mid-refresh leaves a fresh mark for the next run; then
+ * recompute absolute sums from contrib, upsert positives, drop zeros.
+ */
+async function refreshGotyBatch(year: number, batchSize: number, db: Db) {
+  const result = await db.execute(sql`
+    WITH claimed AS (
+      DELETE FROM live_goty_dirty_games d
+      WHERE d.year = ${year}
+        AND d.game_id IN (
+          SELECT game_id FROM live_goty_dirty_games
+          WHERE year = ${year}
+          ORDER BY game_id
+          LIMIT ${batchSize}
+        )
+      RETURNING d.game_id
+    ),
+    agg AS (
+      SELECT
+        c.game_id,
+        coalesce(sum(lc.points), 0)::int AS score,
+        count(lc.game_id)::int AS list_mentions,
+        count(*) FILTER (WHERE lc.rank = 1)::int AS r1,
+        count(*) FILTER (WHERE lc.rank = 2)::int AS r2,
+        count(*) FILTER (WHERE lc.rank = 3)::int AS r3,
+        count(*) FILTER (WHERE lc.rank = 4)::int AS r4,
+        count(*) FILTER (WHERE lc.rank = 5)::int AS r5,
+        count(*) FILTER (WHERE lc.rank = 6)::int AS r6,
+        count(*) FILTER (WHERE lc.rank = 7)::int AS r7,
+        count(*) FILTER (WHERE lc.rank = 8)::int AS r8,
+        count(*) FILTER (WHERE lc.rank = 9)::int AS r9,
+        count(*) FILTER (WHERE lc.rank = 10)::int AS r10
+      FROM claimed c
+      LEFT JOIN live_goty_contrib lc
+        ON lc.year = ${year} AND lc.game_id = c.game_id
+      GROUP BY c.game_id
+    ),
+    upserted AS (
+      INSERT INTO live_goty_scores (
+        year, game_id, score, list_mentions,
+        rank_1_count, rank_2_count, rank_3_count, rank_4_count, rank_5_count,
+        rank_6_count, rank_7_count, rank_8_count, rank_9_count, rank_10_count
+      )
+      SELECT ${year}, game_id, score, list_mentions, r1, r2, r3, r4, r5, r6, r7, r8, r9, r10
+      FROM agg
+      WHERE score > 0
+      ON CONFLICT (year, game_id) DO UPDATE SET
+        score = excluded.score,
+        list_mentions = excluded.list_mentions,
+        rank_1_count = excluded.rank_1_count,
+        rank_2_count = excluded.rank_2_count,
+        rank_3_count = excluded.rank_3_count,
+        rank_4_count = excluded.rank_4_count,
+        rank_5_count = excluded.rank_5_count,
+        rank_6_count = excluded.rank_6_count,
+        rank_7_count = excluded.rank_7_count,
+        rank_8_count = excluded.rank_8_count,
+        rank_9_count = excluded.rank_9_count,
+        rank_10_count = excluded.rank_10_count
+      RETURNING 1
+    ),
+    removed AS (
+      DELETE FROM live_goty_scores s
+      USING agg
+      WHERE s.year = ${year} AND s.game_id = agg.game_id AND agg.score <= 0
+      RETURNING 1
+    )
+    SELECT count(*)::int AS claimed FROM claimed
+  `);
+  return claimedCount(result);
 }
 
-async function processDirtyKeys(year: number, db: Db) {
-  const dirtyGames = await db
-    .select()
-    .from(liveGotyDirtyGames)
-    .where(eq(liveGotyDirtyGames.year, year));
+async function refreshCategoryBatch(year: number, batchSize: number, db: Db) {
+  const result = await db.execute(sql`
+    WITH claimed AS (
+      DELETE FROM live_category_dirty d
+      WHERE d.year = ${year}
+        AND (d.category_id, d.game_id) IN (
+          SELECT category_id, game_id FROM live_category_dirty
+          WHERE year = ${year}
+          ORDER BY category_id, game_id
+          LIMIT ${batchSize}
+        )
+      RETURNING d.category_id, d.game_id
+    ),
+    agg AS (
+      SELECT c.category_id, c.game_id, count(lc.list_id)::int AS vote_count
+      FROM claimed c
+      LEFT JOIN live_category_contrib lc
+        ON lc.year = ${year}
+        AND lc.category_id = c.category_id
+        AND lc.game_id = c.game_id
+      GROUP BY c.category_id, c.game_id
+    ),
+    upserted AS (
+      INSERT INTO live_category_scores (year, category_id, game_id, vote_count)
+      SELECT ${year}, category_id, game_id, vote_count
+      FROM agg
+      WHERE vote_count > 0
+      ON CONFLICT (year, category_id, game_id) DO UPDATE SET
+        vote_count = excluded.vote_count
+      RETURNING 1
+    ),
+    removed AS (
+      DELETE FROM live_category_scores s
+      USING agg
+      WHERE s.year = ${year}
+        AND s.category_id = agg.category_id
+        AND s.game_id = agg.game_id
+        AND agg.vote_count <= 0
+      RETURNING 1
+    )
+    SELECT count(*)::int AS claimed FROM claimed
+  `);
+  return claimedCount(result);
+}
 
-  for (const row of dirtyGames) {
-    await upsertGotyScoreFromContrib(year, row.gameId, db);
-    await db
-      .delete(liveGotyDirtyGames)
-      .where(
-        and(
-          eq(liveGotyDirtyGames.year, year),
-          eq(liveGotyDirtyGames.gameId, row.gameId),
-        ),
-      );
+async function processDirtyKeys(year: number, batchSize: number, db: Db) {
+  for (let i = 0; i < REFRESH_MAX_BATCHES; i++) {
+    if ((await refreshGotyBatch(year, batchSize, db)) < batchSize) break;
   }
-
-  const dirtyCats = await db
-    .select()
-    .from(liveCategoryDirty)
-    .where(eq(liveCategoryDirty.year, year));
-
-  for (const row of dirtyCats) {
-    await upsertCategoryScoreFromContrib(
-      year,
-      row.categoryId,
-      row.gameId,
-      db,
-    );
-    await db
-      .delete(liveCategoryDirty)
-      .where(
-        and(
-          eq(liveCategoryDirty.year, year),
-          eq(liveCategoryDirty.categoryId, row.categoryId),
-          eq(liveCategoryDirty.gameId, row.gameId),
-        ),
-      );
+  for (let i = 0; i < REFRESH_MAX_BATCHES; i++) {
+    if ((await refreshCategoryBatch(year, batchSize, db)) < batchSize) break;
   }
 }
 
@@ -247,22 +225,25 @@ async function remainingDirtyCount(year: number, db: Db): Promise<number> {
 export async function tryRefreshYear(
   year: number,
   db: Db = getLiveAggregateDb(),
+  opts: { batchSize?: number } = {},
 ): Promise<{ refreshed: boolean; reason?: string }> {
   const locked = await tryAcquireRefreshLock(year, db);
   if (!locked) return { refreshed: false, reason: "lock_held" };
 
   try {
-    await processDirtyKeys(year, db);
-
-    if ((await remainingDirtyCount(year, db)) > 0) {
-      return { refreshed: true, reason: "partial_dirty_remaining" };
-    }
-
+    // Read before processing: dirty marks for every write up to this generation
+    // already exist, so the scores below cover it. Later writes leave new marks.
     const [stats] = await db
       .select()
       .from(liveGotyYearStats)
       .where(eq(liveGotyYearStats.year, year))
       .limit(1);
+
+    await processDirtyKeys(year, opts.batchSize ?? REFRESH_BATCH_SIZE, db);
+
+    if ((await remainingDirtyCount(year, db)) > 0) {
+      return { refreshed: true, reason: "partial_dirty_remaining" };
+    }
 
     await refreshListCount(year, db);
 
@@ -273,7 +254,7 @@ export async function tryRefreshYear(
     await db
       .update(liveGotyYearStats)
       .set({
-        scoresGeneration: stats.contribGeneration,
+        scoresGeneration: sql`greatest(${liveGotyYearStats.scoresGeneration}, ${stats.contribGeneration})`,
         standingsVersion: sql`${liveGotyYearStats.standingsVersion} + 1`,
       })
       .where(eq(liveGotyYearStats.year, year));
