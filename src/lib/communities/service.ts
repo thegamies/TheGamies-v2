@@ -1,7 +1,6 @@
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import {
   communities,
-  communityBans,
   communityMembers,
   createDb,
   profiles,
@@ -34,6 +33,7 @@ import {
   type CommunityVisibility,
 } from "./schema";
 import { parseScoresVisibleDateInput } from "./live-reveal";
+import { lockCommunityMembershipSql } from "./membership-lock";
 import {
   clearCommunityLiveLockSnapshots,
   upsertCommunityLiveLockSnapshot,
@@ -545,34 +545,6 @@ export async function listCommunityMembersPage(
   };
 }
 
-export async function listCommunityMemberOptions(
-  communityId: string,
-  db: Db = getDb(),
-): Promise<CommunityMemberPublic[]> {
-  const rows = await db
-    .select({
-      profileId: communityMembers.profileId,
-      role: communityMembers.role,
-      joinedAt: communityMembers.joinedAt,
-      username: profiles.username,
-      displayName: profiles.displayName,
-      avatarUrl: profiles.avatarUrl,
-    })
-    .from(communityMembers)
-    .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
-    .where(eq(communityMembers.communityId, communityId))
-    .orderBy(asc(profiles.displayName), asc(profiles.username));
-
-  return rows.map((row) => ({
-    profileId: row.profileId,
-    username: row.username,
-    displayName: row.displayName,
-    avatarUrl: row.avatarUrl,
-    role: asRole(row.role),
-    joinedAt: row.joinedAt,
-  }));
-}
-
 export async function createCommunity(
   profileId: string,
   input: unknown,
@@ -764,28 +736,38 @@ async function joinCommunityAsMember(
   if (existing) return { ok: true, slug };
   if (joinsClosed) return { error: COMMUNITY_JOINS_CLOSED_MESSAGE };
 
-  const [banned] = await db
-    .select({ profileId: communityBans.profileId })
-    .from(communityBans)
-    .where(
-      and(
-        eq(communityBans.communityId, communityId),
-        eq(communityBans.profileId, profileId),
-      ),
-    )
-    .limit(1);
-  if (banned) return { error: "You can’t join this community." };
-
+  let joined: boolean;
   try {
-    await db.insert(communityMembers).values({
-      communityId,
-      profileId,
-      role: "member",
-    });
+    const [, inserted] = await db.batch([
+      db.execute(lockCommunityMembershipSql(communityId, profileId)),
+      db.execute(sql`
+        INSERT INTO community_members (community_id, profile_id, role)
+        SELECT ${communityId}, ${profileId}, 'member'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM community_bans
+          WHERE community_id = ${communityId} AND profile_id = ${profileId}
+        )
+        ON CONFLICT DO NOTHING
+        RETURNING 1`),
+    ]);
+    joined = inserted.rows.length > 0;
   } catch {
     return { error: "Could not join that community." };
   }
-  return { ok: true, slug };
+  if (joined) return { ok: true, slug };
+
+  // Nothing inserted: a simultaneous join already added them, or they are banned.
+  const [member] = await db
+    .select({ profileId: communityMembers.profileId })
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.profileId, profileId),
+      ),
+    )
+    .limit(1);
+  return member ? { ok: true, slug } : { error: "You can’t join this community." };
 }
 
 export async function leaveCommunity(

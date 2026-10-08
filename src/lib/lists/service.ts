@@ -802,24 +802,6 @@ export async function getShareListByUsernameSlug(
   };
 }
 
-export async function listOwnedForProfile(
-  profileId: string,
-  db: Db = getDb(),
-) {
-  return db
-    .select({
-      publicId: lists.publicId,
-      title: lists.title,
-      year: lists.year,
-      listType: lists.listType,
-      slug: lists.slug,
-      publishedAt: lists.publishedAt,
-    })
-    .from(lists)
-    .where(eq(lists.profileId, profileId))
-    .orderBy(asc(lists.year), asc(lists.title));
-}
-
 /** Paged owned lists plus SQL-capped top-N covers per list (`rank <= 5`). */
 export async function listOwnedForProfilePage(
   profileId: string,

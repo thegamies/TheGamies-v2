@@ -193,28 +193,16 @@ async function addVoiceToEditions(
   db: Db,
 ): Promise<void> {
   if (editionIds.length === 0) return;
-  const designatedAt = new Date();
-  const eligible: string[] = [];
-  for (const editionId of editionIds) {
-    const [{ n }] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(communityEditionVoices)
-      .where(eq(communityEditionVoices.editionId, editionId));
-    if (Number(n ?? 0) >= COMMUNITY_HOSTS_MAX) continue;
-    eligible.push(editionId);
-  }
-  if (eligible.length === 0) return;
-  await db
-    .insert(communityEditionVoices)
-    .values(
-      eligible.map((editionId) => ({
-        editionId,
-        profileId,
-        designatedAt,
-        designatedByProfileId,
-      })),
-    )
-    .onConflictDoNothing();
+  await db.execute(sql`
+    INSERT INTO community_edition_voices (edition_id, profile_id, designated_by_profile_id)
+    SELECT community_editions.id, ${profileId}, ${designatedByProfileId}
+    FROM community_editions
+    WHERE ${inArray(communityEditions.id, editionIds)}
+      AND (
+        SELECT count(*) FROM community_edition_voices v
+        WHERE v.edition_id = community_editions.id
+      ) < ${COMMUNITY_HOSTS_MAX}
+    ON CONFLICT DO NOTHING`);
 }
 
 async function removeVoiceFromEditions(
