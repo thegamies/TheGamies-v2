@@ -54,7 +54,7 @@ A small mutation (add/remove one Host, one category) should not pay for a large 
 - Revalidate **the routes that show that row**, not the entire community (live, members, ballot, results, profile, …)
 - After save, reload a **page-sized** list—not the unbounded collection you just forbade on first load
 
-Neon HTTP is roughly **one round trip per query**. Serial `await`s stack. Don’t add extra community/edition/member fetches if you already have ids.
+Neon HTTP is roughly **one round trip per query**. Serial `await`s stack. Don’t add extra community/edition/member fetches if you already have ids. Independent Results reads (freeze meta, GOTY top 10, category podiums, TGA nav) start together; GOTY top-N is one window `RANK` / `DENSE_RANK` query, same as category podiums. Wait for freeze ensure before board reads only when `freezeStatus` is not already `ready`.
 
 ## Link prefetch
 
