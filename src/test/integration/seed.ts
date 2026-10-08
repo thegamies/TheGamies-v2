@@ -2,9 +2,19 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { inArray } from "drizzle-orm";
 import {
   activityEvents,
+  awardCategories,
   communities,
+  communityCustomCategories,
+  communityCustomCategoryEntries,
+  communityEditionBallotCategoryVotes,
+  communityEditionBallotCustomCategoryVotes,
+  communityEditionBallotItems,
+  communityEditionBallots,
+  communityEditionCategories,
   communityEditions,
+  communityEditionVoices,
   communityMembers,
+  covers,
   games,
   libraryEntries,
   listItems,
@@ -24,6 +34,8 @@ type GameInsert = typeof games.$inferInsert;
 type ListInsert = typeof lists.$inferInsert;
 type CommunityInsert = typeof communities.$inferInsert;
 type EditionInsert = typeof communityEditions.$inferInsert;
+type CustomCategoryInsert = typeof communityCustomCategories.$inferInsert;
+type CustomEntryInsert = typeof communityCustomCategoryEntries.$inferInsert;
 
 /**
  * Seeds rows under a random tag so files can run in parallel against a shared
@@ -41,6 +53,8 @@ export function createSeeder(db: Db) {
     games: [] as string[],
     lists: [] as string[],
     communities: [] as string[],
+    awardCategories: [] as string[],
+    covers: [] as number[],
   };
 
   return {
@@ -61,15 +75,22 @@ export function createSeeder(db: Db) {
       return row;
     },
 
-    async game(overrides: Partial<GameInsert> = {}) {
+    /** `coverImageId` adds a covers row linked through `games.cover_igdb_id`. */
+    async game(overrides: Partial<GameInsert> & { coverImageId?: string } = {}) {
       const n = next();
+      const { coverImageId, ...gameOverrides } = overrides;
+      if (coverImageId) {
+        await db.insert(covers).values({ igdbId: igdbBase + n, imageId: coverImageId });
+        created.covers.push(igdbBase + n);
+      }
       const [row] = await db
         .insert(games)
         .values({
           igdbId: igdbBase + n,
           slug: `int-${tag}-g${n}`,
           title: `Int Game ${tag} ${n}`,
-          ...overrides,
+          ...(coverImageId ? { coverIgdbId: igdbBase + n } : {}),
+          ...gameOverrides,
         })
         .returning();
       created.games.push(row.id);
@@ -163,10 +184,99 @@ export function createSeeder(db: Db) {
       return row;
     },
 
+    /** Edition ballot; `gameIds[i]` gets rank `i + 1` unless `ranks` is given. */
+    async ballot(input: {
+      editionId: string;
+      profileId: string;
+      gameIds?: string[];
+      ranks?: number[];
+    }) {
+      const [row] = await db
+        .insert(communityEditionBallots)
+        .values({ editionId: input.editionId, profileId: input.profileId })
+        .returning();
+      const gameIds = input.gameIds ?? [];
+      if (gameIds.length > 0) {
+        await db.insert(communityEditionBallotItems).values(
+          gameIds.map((gameId, i) => ({
+            ballotId: row.id,
+            gameId,
+            rank: input.ranks?.[i] ?? i + 1,
+          })),
+        );
+      }
+      return row;
+    },
+
+    async voice(editionId: string, profileId: string) {
+      await db.insert(communityEditionVoices).values({ editionId, profileId });
+    },
+
+    async awardCategory(label: string) {
+      const id = `int-${tag}-cat${next()}`;
+      await db.insert(awardCategories).values({ id, label, description: `${label} blurb`, active: false });
+      created.awardCategories.push(id);
+      return id;
+    },
+
+    async enableCategory(editionId: string, categoryId: string, sortOrder: number) {
+      await db.insert(communityEditionCategories).values({ editionId, categoryId, sortOrder });
+    },
+
+    async categoryVote(ballotId: string, categoryId: string, gameId: string) {
+      await db.insert(communityEditionBallotCategoryVotes).values({ ballotId, categoryId, gameId });
+    },
+
+    async customCategory(
+      editionId: string,
+      overrides: Partial<CustomCategoryInsert> = {},
+    ) {
+      const n = next();
+      const [row] = await db
+        .insert(communityCustomCategories)
+        .values({
+          editionId,
+          name: `Int Award ${tag} ${n}`,
+          description: `Int award ${n} blurb`,
+          answerType: "any_game",
+          ...overrides,
+        })
+        .returning();
+      return row;
+    },
+
+    async customEntry(categoryId: string, overrides: Partial<CustomEntryInsert> = {}) {
+      const n = next();
+      const [row] = await db
+        .insert(communityCustomCategoryEntries)
+        .values({ categoryId, title: `Int Entry ${tag} ${n}`, ...overrides })
+        .returning();
+      return row;
+    },
+
+    async customVote(input: {
+      ballotId: string;
+      categoryId: string;
+      gameId?: string;
+      entryId?: string;
+    }) {
+      await db.insert(communityEditionBallotCustomCategoryVotes).values({
+        ballotId: input.ballotId,
+        categoryId: input.categoryId,
+        gameId: input.gameId ?? null,
+        entryId: input.entryId ?? null,
+      });
+    },
+
     /** Communities first: edition ballots and hosts restrict profile deletes. */
     async cleanup() {
       if (created.communities.length > 0) {
         await db.delete(communities).where(inArray(communities.id, created.communities));
+      }
+      if (created.awardCategories.length > 0) {
+        await db
+          .delete(awardCategories)
+          .where(inArray(awardCategories.id, created.awardCategories));
       }
       if (created.lists.length > 0) {
         await db.delete(lists).where(inArray(lists.id, created.lists));
@@ -177,6 +287,9 @@ export function createSeeder(db: Db) {
       }
       if (created.games.length > 0) {
         await db.delete(games).where(inArray(games.id, created.games));
+      }
+      if (created.covers.length > 0) {
+        await db.delete(covers).where(inArray(covers.igdbId, created.covers));
       }
     },
   };

@@ -181,6 +181,37 @@ describe("live GOTY dirty-key refresh (integration)", () => {
     expect((await stats()).scoresGeneration).toBe(2);
   });
 
+  it("full rebuild drops stale scores, clears dirty marks and catches up generations", async () => {
+    const [g1, , , g4] = g;
+    const expectedGoty = await gotyScores();
+    const expectedCats = await categoryScores(categoryId);
+    await db.insert(liveGotyScores).values({ year: YEAR, gameId: g4.id, score: 5, listMentions: 1 });
+    await db
+      .update(liveGotyScores)
+      .set({ score: 1 })
+      .where(and(eq(liveGotyScores.year, YEAR), eq(liveGotyScores.gameId, g1.id)));
+    await db
+      .insert(liveCategoryScores)
+      .values({ year: YEAR, categoryId, gameId: g4.id, voteCount: 9 });
+    await db.insert(liveGotyDirtyGames).values({ year: YEAR, gameId: g4.id });
+    await db.insert(liveCategoryDirty).values({ year: YEAR, categoryId, gameId: g4.id });
+    await db
+      .update(liveGotyYearStats)
+      .set({ contribGeneration: 3 })
+      .where(eq(liveGotyYearStats.year, YEAR));
+    const before = await stats();
+
+    await rebuildYear(YEAR, db);
+
+    await expect(gotyScores()).resolves.toEqual(expectedGoty);
+    await expect(categoryScores(categoryId)).resolves.toEqual(expectedCats);
+    await expect(dirtyCounts()).resolves.toEqual({ goty: 0, categories: 0 });
+    const after = await stats();
+    expect(after.scoresGeneration).toBe(3);
+    expect(after.standingsVersion).toBe(before.standingsVersion + 1);
+    expect(after.refreshing).toBe(false);
+  });
+
   it("reports already current when nothing changed", async () => {
     await expect(tryRefreshYear(YEAR, db)).resolves.toEqual({
       refreshed: true,

@@ -1,8 +1,5 @@
-import { and, asc, desc, eq, gt, gte, inArray, lte, sql } from "drizzle-orm";
-import {
-  listEditionAwardCategories,
-  listEditionEnabledCategoryIds,
-} from "@/lib/communities/edition-categories";
+import { and, asc, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
+import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
 import {
   communityCustomCategories,
   communityCustomCategoryEntries,
@@ -18,17 +15,13 @@ import {
   communityEditionResultVoterCategoryPicks,
   communityEditionResultVoterRanks,
   communityEditionResultVoters,
-  communityEditionVoices,
   communityEditions,
   covers,
   createDb,
   games,
   profiles,
-  type CommunityCustomAnswerType,
-  type CommunityCustomSupportLinkKind,
   type Db,
 } from "@thegamies/db";
-import { insertInChunks } from "@/lib/db/insert-chunks";
 import {
   customResultDisplayTitle,
   customResultTallyKind,
@@ -46,11 +39,7 @@ import {
   type MatrixVoiceColumn,
 } from "./edition-ballot-matrix";
 import {
-  placeEditionCategoryTallies,
-  placeEditionGotyTallies,
   storageModeFor,
-  type AggregatedCategoryRow,
-  type AggregatedGotyRow,
   type EditionResultMode,
 } from "./edition-results-scoring";
 import {
@@ -58,8 +47,12 @@ import {
   withDisplayRanksOnPage,
   type SharedRankMode,
 } from "@/lib/standings/shared-rank";
+import {
+  backfillCustomCategoryFreeze,
+  rewriteEditionHostsSnapshot,
+  writeEditionFreezeSnapshot,
+} from "./edition-freeze-sql";
 import { getEditionByCommunityYear } from "./editions";
-import { listEditionVoiceProfileIds } from "./voices";
 
 export {
   parseEditionRankMode,
@@ -167,16 +160,18 @@ export async function ensureEditionResultsFrozen(
   editionId: string,
   db: Db = getDb(),
 ): Promise<EditionResultsMeta | { error: string }> {
-  return freezeEditionResults(editionId, db);
+  return freezeEditionResults(editionId, db, { replace: false });
 }
 
-/** Clear existing freeze rows and write a new snapshot from current ballots. */
+/**
+ * Replace the snapshot with one from current ballots, atomically: readers see
+ * the old results until the new ones commit, and a failure keeps the old ones.
+ */
 export async function rebuildEditionResultsFrozen(
   editionId: string,
   db: Db = getDb(),
 ): Promise<EditionResultsMeta | { error: string }> {
-  await clearEditionResultTables(editionId, db);
-  return freezeEditionResults(editionId, db);
+  return freezeEditionResults(editionId, db, { replace: true });
 }
 
 /**
@@ -189,150 +184,8 @@ export async function rebuildEditionHostsResultsFrozen(
 ): Promise<EditionResultsMeta | { ok: true } | { error: string }> {
   const existing = await getEditionResultsMeta(editionId, db);
   if (!existing) return { ok: true };
-
-  const ballots = await db
-    .select({
-      profileId: communityEditionBallots.profileId,
-    })
-    .from(communityEditionBallots)
-    .where(eq(communityEditionBallots.editionId, editionId));
-
-  const voiceIds = await listEditionVoiceProfileIds(editionId, db);
-  const [voicesGoty, voicesCats, editionCats, customFreezeRows] =
-    await Promise.all([
-      sqlAggregateEditionGoty(editionId, true, db),
-      sqlAggregateEditionCategories(editionId, true, db),
-      listEditionAwardCategories(editionId, db),
-      loadCustomCategoryFreezeRows(editionId, db),
-    ]);
-
-  const catDefById = new Map(editionCats.map((c) => [c.id, c]));
-  const enabledCategoryIds = new Set(editionCats.map((c) => c.id));
-  const ballotCountVoices = ballots.filter((b) =>
-    voiceIds.has(b.profileId),
-  ).length;
-
-  const gotyRows = voicesGoty.map((row) => ({
-    editionId,
-    mode: "voices" as const,
-    place: row.place,
-    gameId: row.gameId,
-    slug: row.slug,
-    title: row.title,
-    gameYear: row.gameYear,
-    coverUrl: row.coverUrl,
-    points: row.points,
-    firstPlaceVotes: row.firstPlaceVotes,
-    appearances: row.appearances,
-  }));
-
-  const categoryRows = voicesCats
-    .filter((row) => enabledCategoryIds.has(row.categoryId))
-    .map((row) => {
-      const def = catDefById.get(row.categoryId);
-      return {
-        editionId,
-        mode: "voices" as const,
-        categoryId: row.categoryId,
-        label: def?.label ?? row.categoryId,
-        description: def?.description ?? null,
-        sortOrder: def?.sortOrder ?? 0,
-        place: row.place,
-        gameId: row.gameId,
-        slug: row.slug,
-        title: row.title,
-        coverUrl: row.coverUrl,
-        votes: row.votes,
-      };
-    });
-
-  const customCategoryRows = customFreezeRows.filter(
-    (row) => row.mode === "voices",
-  );
-
   try {
-    await db
-      .delete(communityEditionResultGoty)
-      .where(
-        and(
-          eq(communityEditionResultGoty.editionId, editionId),
-          eq(communityEditionResultGoty.mode, "voices"),
-        ),
-      );
-    await db
-      .delete(communityEditionResultCategories)
-      .where(
-        and(
-          eq(communityEditionResultCategories.editionId, editionId),
-          eq(communityEditionResultCategories.mode, "voices"),
-        ),
-      );
-    await db
-      .delete(communityEditionResultCustomCategories)
-      .where(
-        and(
-          eq(communityEditionResultCustomCategories.editionId, editionId),
-          eq(communityEditionResultCustomCategories.mode, "voices"),
-        ),
-      );
-
-    if (gotyRows.length > 0) {
-      await insertInChunks(
-        gotyRows,
-        (chunk) => db.insert(communityEditionResultGoty).values(chunk),
-        100,
-      );
-    }
-    if (categoryRows.length > 0) {
-      await insertInChunks(
-        categoryRows,
-        (chunk) => db.insert(communityEditionResultCategories).values(chunk),
-        100,
-      );
-    }
-    if (customCategoryRows.length > 0) {
-      await insertInChunks(
-        customCategoryRows,
-        (chunk) =>
-          db.insert(communityEditionResultCustomCategories).values(chunk),
-        100,
-      );
-    }
-
-    await db
-      .update(communityEditionResultVoters)
-      .set({ isVoice: false })
-      .where(eq(communityEditionResultVoters.editionId, editionId));
-    if (voiceIds.size > 0) {
-      await db
-        .update(communityEditionResultVoters)
-        .set({ isVoice: true })
-        .where(
-          and(
-            eq(communityEditionResultVoters.editionId, editionId),
-            inArray(communityEditionResultVoters.profileId, [...voiceIds]),
-          ),
-        );
-    }
-
-    const [updated] = await db
-      .update(communityEditionResultMeta)
-      .set({
-        ballotCountVoices,
-        gotyTotalVoices: voicesGoty.length,
-      })
-      .where(eq(communityEditionResultMeta.editionId, editionId))
-      .returning();
-
-    return updated
-      ? {
-          frozenAt: updated.frozenAt,
-          ballotCountCommunity: updated.ballotCountCommunity,
-          ballotCountVoices: updated.ballotCountVoices,
-          gotyTotalCommunity: updated.gotyTotalCommunity,
-          gotyTotalVoices: updated.gotyTotalVoices,
-        }
-      : existing;
+    return (await rewriteEditionHostsSnapshot(editionId, db)) ?? existing;
   } catch (err) {
     const detail =
       err instanceof Error ? err.message : "Could not rebuild Hosts results.";
@@ -598,390 +451,15 @@ async function loadBallotCategoryComparisonPicks(
 }
 
 /**
- * GOTY board tallies via SQL GROUP BY (pointsForRank = 11 − rank for ranks 1–10).
- * Hosts board joins edition voices so only designated Host ballots count.
- */
-async function sqlAggregateEditionGoty(
-  editionId: string,
-  voicesOnly: boolean,
-  db: Db,
-): Promise<AggregatedGotyRow[]> {
-  const pointsExpr = sql<number>`coalesce(sum(11 - ${communityEditionBallotItems.rank}), 0)::int`;
-  const firstPlaceExpr = sql<number>`coalesce(sum(case when ${communityEditionBallotItems.rank} = 1 then 1 else 0 end), 0)::int`;
-  const appearancesExpr = sql<number>`count(*)::int`;
-
-  const base = db
-    .select({
-      gameId: communityEditionBallotItems.gameId,
-      slug: games.slug,
-      title: games.title,
-      gameYear: games.year,
-      coverImageId: covers.imageId,
-      points: pointsExpr,
-      firstPlaceVotes: firstPlaceExpr,
-      appearances: appearancesExpr,
-    })
-    .from(communityEditionBallotItems)
-    .innerJoin(
-      communityEditionBallots,
-      eq(communityEditionBallots.id, communityEditionBallotItems.ballotId),
-    )
-    .innerJoin(games, eq(games.id, communityEditionBallotItems.gameId))
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
-
-  const withVoices = voicesOnly
-    ? base.innerJoin(
-        communityEditionVoices,
-        and(
-          eq(
-            communityEditionVoices.editionId,
-            communityEditionBallots.editionId,
-          ),
-          eq(
-            communityEditionVoices.profileId,
-            communityEditionBallots.profileId,
-          ),
-        ),
-      )
-    : base;
-
-  const rows = await withVoices
-    .where(
-      and(
-        eq(communityEditionBallots.editionId, editionId),
-        gte(communityEditionBallotItems.rank, 1),
-        lte(communityEditionBallotItems.rank, 10),
-      ),
-    )
-    .groupBy(
-      communityEditionBallotItems.gameId,
-      games.slug,
-      games.title,
-      games.year,
-      covers.imageId,
-    )
-    .having(sql`sum(11 - ${communityEditionBallotItems.rank}) > 0`);
-
-  return placeEditionGotyTallies(
-    rows.map((r) => ({
-      gameId: r.gameId,
-      slug: r.slug,
-      title: r.title,
-      gameYear: r.gameYear,
-      coverUrl: coverUrlFrom(r.coverImageId),
-      points: Number(r.points),
-      firstPlaceVotes: Number(r.firstPlaceVotes),
-      appearances: Number(r.appearances),
-    })),
-  );
-}
-
-/** Category plurality tallies via SQL GROUP BY; Hosts board joins edition voices. */
-async function sqlAggregateEditionCategories(
-  editionId: string,
-  voicesOnly: boolean,
-  db: Db,
-): Promise<AggregatedCategoryRow[]> {
-  const votesExpr = sql<number>`count(*)::int`;
-
-  const base = db
-    .select({
-      categoryId: communityEditionBallotCategoryVotes.categoryId,
-      gameId: communityEditionBallotCategoryVotes.gameId,
-      slug: games.slug,
-      title: games.title,
-      gameYear: games.year,
-      coverImageId: covers.imageId,
-      votes: votesExpr,
-    })
-    .from(communityEditionBallotCategoryVotes)
-    .innerJoin(
-      communityEditionBallots,
-      eq(
-        communityEditionBallots.id,
-        communityEditionBallotCategoryVotes.ballotId,
-      ),
-    )
-    .innerJoin(games, eq(games.id, communityEditionBallotCategoryVotes.gameId))
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
-
-  const withVoices = voicesOnly
-    ? base.innerJoin(
-        communityEditionVoices,
-        and(
-          eq(
-            communityEditionVoices.editionId,
-            communityEditionBallots.editionId,
-          ),
-          eq(
-            communityEditionVoices.profileId,
-            communityEditionBallots.profileId,
-          ),
-        ),
-      )
-    : base;
-
-  const rows = await withVoices
-    .where(eq(communityEditionBallots.editionId, editionId))
-    .groupBy(
-      communityEditionBallotCategoryVotes.categoryId,
-      communityEditionBallotCategoryVotes.gameId,
-      games.slug,
-      games.title,
-      games.year,
-      covers.imageId,
-    );
-
-  return placeEditionCategoryTallies(
-    rows.map((r) => ({
-      gameId: r.gameId,
-      slug: r.slug,
-      title: r.title,
-      gameYear: r.gameYear,
-      coverUrl: coverUrlFrom(r.coverImageId),
-      categoryId: r.categoryId,
-      votes: Number(r.votes),
-    })),
-  );
-}
-
-type AggregatedCustomCategoryRow = {
-  categoryId: string;
-  place: number;
-  votes: number;
-  entryId: string | null;
-  gameId: string | null;
-  slug: string | null;
-  title: string;
-  subtitle: string | null;
-  imageUrl: string | null;
-  coverUrl: string | null;
-  supportLinkUrl: string | null;
-  supportLinkKind: CommunityCustomSupportLinkKind | null;
-};
-
-async function sqlAggregateEditionCustomCategories(
-  editionId: string,
-  voicesOnly: boolean,
-  db: Db,
-): Promise<AggregatedCustomCategoryRow[]> {
-  const votesExpr = sql<number>`count(*)::int`;
-
-  const base = db
-    .select({
-      categoryId: communityEditionBallotCustomCategoryVotes.categoryId,
-      gameId: communityEditionBallotCustomCategoryVotes.gameId,
-      entryId: communityEditionBallotCustomCategoryVotes.entryId,
-      entryTitle: communityCustomCategoryEntries.title,
-      entryImageUrl: communityCustomCategoryEntries.imageUrl,
-      supportLinkUrl: communityCustomCategoryEntries.supportLinkUrl,
-      supportLinkKind: communityCustomCategoryEntries.supportLinkKind,
-      gameTitle: games.title,
-      gameSlug: games.slug,
-      resolvedGameId: games.id,
-      coverImageId: covers.imageId,
-      votes: votesExpr,
-    })
-    .from(communityEditionBallotCustomCategoryVotes)
-    .innerJoin(
-      communityEditionBallots,
-      eq(
-        communityEditionBallots.id,
-        communityEditionBallotCustomCategoryVotes.ballotId,
-      ),
-    )
-    .innerJoin(
-      communityCustomCategories,
-      and(
-        eq(
-          communityCustomCategories.id,
-          communityEditionBallotCustomCategoryVotes.categoryId,
-        ),
-        eq(communityCustomCategories.editionId, editionId),
-      ),
-    )
-    .leftJoin(
-      communityCustomCategoryEntries,
-      eq(
-        communityCustomCategoryEntries.id,
-        communityEditionBallotCustomCategoryVotes.entryId,
-      ),
-    )
-    .leftJoin(
-      games,
-      eq(
-        games.id,
-        sql`coalesce(${communityEditionBallotCustomCategoryVotes.gameId}, ${communityCustomCategoryEntries.gameId})`,
-      ),
-    )
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId));
-
-  const withVoices = voicesOnly
-    ? base.innerJoin(
-        communityEditionVoices,
-        and(
-          eq(
-            communityEditionVoices.editionId,
-            communityEditionBallots.editionId,
-          ),
-          eq(
-            communityEditionVoices.profileId,
-            communityEditionBallots.profileId,
-          ),
-        ),
-      )
-    : base;
-
-  const rows = await withVoices
-    .where(eq(communityEditionBallots.editionId, editionId))
-    .groupBy(
-      communityEditionBallotCustomCategoryVotes.categoryId,
-      communityEditionBallotCustomCategoryVotes.gameId,
-      communityEditionBallotCustomCategoryVotes.entryId,
-      communityCustomCategoryEntries.title,
-      communityCustomCategoryEntries.imageUrl,
-      communityCustomCategoryEntries.supportLinkUrl,
-      communityCustomCategoryEntries.supportLinkKind,
-      games.title,
-      games.slug,
-      games.id,
-      covers.imageId,
-    );
-
-  type Tally = Omit<AggregatedCustomCategoryRow, "place">;
-  const byCategory = new Map<string, Tally[]>();
-  for (const r of rows) {
-    const votes = Number(r.votes);
-    if (votes <= 0) continue;
-    const isEntry = Boolean(r.entryId);
-    const tally: Tally = {
-      categoryId: r.categoryId,
-      votes,
-      entryId: r.entryId,
-      gameId: r.gameId ?? r.resolvedGameId,
-      slug: r.gameSlug,
-      title: isEntry ? (r.entryTitle ?? "Entry") : (r.gameTitle ?? "Game"),
-      subtitle: isEntry && r.gameTitle ? r.gameTitle : null,
-      imageUrl: r.entryImageUrl,
-      coverUrl: coverUrlFrom(r.coverImageId),
-      supportLinkUrl: r.supportLinkUrl,
-      supportLinkKind: r.supportLinkKind,
-    };
-    const list = byCategory.get(r.categoryId) ?? [];
-    list.push(tally);
-    byCategory.set(r.categoryId, list);
-  }
-
-  const out: AggregatedCustomCategoryRow[] = [];
-  for (const list of byCategory.values()) {
-    list.sort((a, b) => {
-      if (b.votes !== a.votes) return b.votes - a.votes;
-      const aKey = a.entryId ?? a.gameId ?? "";
-      const bKey = b.entryId ?? b.gameId ?? "";
-      return aKey.localeCompare(bKey);
-    });
-    list.forEach((row, i) => {
-      out.push({ ...row, place: i + 1 });
-    });
-  }
-  return out;
-}
-
-async function loadCustomCategoryFreezeRows(
-  editionId: string,
-  db: Db,
-): Promise<
-  Array<{
-    editionId: string;
-    mode: "community" | "voices";
-    categoryId: string;
-    label: string;
-    description: string | null;
-    answerType: CommunityCustomAnswerType;
-    sortOrder: number;
-    place: number;
-    entryId: string | null;
-    gameId: string | null;
-    slug: string | null;
-    title: string;
-    subtitle: string | null;
-    imageUrl: string | null;
-    coverUrl: string | null;
-    supportLinkUrl: string | null;
-    supportLinkKind: CommunityCustomSupportLinkKind | null;
-    votes: number;
-  }>
-> {
-  const [communityCustom, voicesCustom, customDefs] = await Promise.all([
-    sqlAggregateEditionCustomCategories(editionId, false, db),
-    sqlAggregateEditionCustomCategories(editionId, true, db),
-    db
-      .select()
-      .from(communityCustomCategories)
-      .where(eq(communityCustomCategories.editionId, editionId)),
-  ]);
-  const customDefById = new Map(customDefs.map((c) => [c.id, c]));
-  const enabledCustomIds = new Set(customDefs.map((c) => c.id));
-  return (["community", "voices"] as const).flatMap((mode) => {
-    const rows = mode === "community" ? communityCustom : voicesCustom;
-    return rows
-      .filter((row) => enabledCustomIds.has(row.categoryId))
-      .map((row) => {
-        const def = customDefById.get(row.categoryId);
-        return {
-          editionId,
-          mode,
-          categoryId: row.categoryId,
-          label: def?.name ?? row.categoryId,
-          description: def?.description ?? null,
-          answerType: (def?.answerType ??
-            "any_game") as CommunityCustomAnswerType,
-          sortOrder: def?.sortOrder ?? 0,
-          place: row.place,
-          entryId: row.entryId,
-          gameId: row.gameId,
-          slug: row.slug,
-          title: row.title,
-          subtitle: row.subtitle,
-          imageUrl: row.imageUrl,
-          coverUrl: row.coverUrl,
-          supportLinkUrl: row.supportLinkUrl,
-          supportLinkKind: row.supportLinkKind,
-          votes: row.votes,
-        };
-      });
-  });
-}
-
-/**
  * Write-once freeze can omit community awards if it ran before those votes
- * existed. Fill only the missing custom freeze slice — do not rebuild GOTY.
+ * existed. Fill only the missing custom freeze slice � do not rebuild GOTY.
  */
 export async function ensureCustomCategoryFreezeComplete(
   editionId: string,
   db: Db = getDb(),
 ): Promise<void> {
   try {
-    const [def] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(communityCustomCategories)
-      .where(eq(communityCustomCategories.editionId, editionId));
-    if (Number(def?.n ?? 0) === 0) return;
-    const meta = await getEditionResultsMeta(editionId, db);
-    if (!meta) return;
-    const [frozen] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(communityEditionResultCustomCategories)
-      .where(eq(communityEditionResultCustomCategories.editionId, editionId));
-    if (Number(frozen?.n ?? 0) > 0) return;
-    const rows = await loadCustomCategoryFreezeRows(editionId, db);
-    if (rows.length === 0) return;
-    await insertInChunks(
-      rows,
-      (chunk) =>
-        db.insert(communityEditionResultCustomCategories).values(chunk),
-      100,
-    );
+    await backfillCustomCategoryFreeze(editionId, db);
   } catch (err) {
     console.error("ensureCustomCategoryFreezeComplete failed", err);
   }
@@ -990,155 +468,28 @@ export async function ensureCustomCategoryFreezeComplete(
 async function freezeEditionResults(
   editionId: string,
   db: Db,
+  opts: { replace: boolean },
 ): Promise<EditionResultsMeta | { error: string }> {
-  const existing = await getEditionResultsMeta(editionId, db);
-  if (existing) return existing;
-
-  const ballots = await db
-    .select({
-      ballotId: communityEditionBallots.id,
-      profileId: communityEditionBallots.profileId,
-      displayName: profiles.displayName,
-      username: profiles.username,
-    })
-    .from(communityEditionBallots)
-    .innerJoin(profiles, eq(profiles.id, communityEditionBallots.profileId))
-    .where(eq(communityEditionBallots.editionId, editionId));
-
-  const voiceIds = await listEditionVoiceProfileIds(editionId, db);
-
-  const [communityGoty, voicesGoty, communityCats, voicesCats, editionCats, customCategoryRows] =
-    await Promise.all([
-      sqlAggregateEditionGoty(editionId, false, db),
-      sqlAggregateEditionGoty(editionId, true, db),
-      sqlAggregateEditionCategories(editionId, false, db),
-      sqlAggregateEditionCategories(editionId, true, db),
-      listEditionAwardCategories(editionId, db),
-      loadCustomCategoryFreezeRows(editionId, db),
-    ]);
-
-  const catDefById = new Map(editionCats.map((c) => [c.id, c]));
-  const enabledCategoryIds = new Set(editionCats.map((c) => c.id));
-
-  const ballotCountCommunity = ballots.length;
-  const ballotCountVoices = ballots.filter((b) =>
-    voiceIds.has(b.profileId),
-  ).length;
-
-  const frozenAt = new Date();
-  const meta = {
-    frozenAt,
-    ballotCountCommunity,
-    ballotCountVoices,
-    gotyTotalCommunity: communityGoty.length,
-    gotyTotalVoices: voicesGoty.length,
-  };
-
-  const gotyRows = (["community", "voices"] as const).flatMap((mode) => {
-    const rows = mode === "community" ? communityGoty : voicesGoty;
-    return rows.map((row) => ({
-      editionId,
-      mode,
-      place: row.place,
-      gameId: row.gameId,
-      slug: row.slug,
-      title: row.title,
-      gameYear: row.gameYear,
-      coverUrl: row.coverUrl,
-      points: row.points,
-      firstPlaceVotes: row.firstPlaceVotes,
-      appearances: row.appearances,
-    }));
-  });
-
-  const categoryRows = (["community", "voices"] as const).flatMap((mode) => {
-    const rows = mode === "community" ? communityCats : voicesCats;
-    return rows
-      .filter((row) => enabledCategoryIds.has(row.categoryId))
-      .map((row) => {
-        const def = catDefById.get(row.categoryId);
-        return {
-          editionId,
-          mode,
-          categoryId: row.categoryId,
-          label: def?.label ?? row.categoryId,
-          description: def?.description ?? null,
-          sortOrder: def?.sortOrder ?? 0,
-          place: row.place,
-          gameId: row.gameId,
-          slug: row.slug,
-          title: row.title,
-          coverUrl: row.coverUrl,
-          votes: row.votes,
-        };
-      });
-  });
-
-  const voterRows = ballots.map((b) => ({
-    editionId,
-    profileId: b.profileId,
-    isVoice: voiceIds.has(b.profileId),
-    displayName: b.displayName,
-    username: b.username,
-  }));
+  if (!opts.replace) {
+    const existing = await getEditionResultsMeta(editionId, db);
+    if (existing) return existing;
+  }
 
   try {
-    try {
-      await db.insert(communityEditionResultMeta).values({
-        editionId,
-        ...meta,
-      });
-    } catch {
-      const raced = await getEditionResultsMeta(editionId, db);
-      if (raced) return raced;
-      return { error: "Could not freeze edition results." };
-    }
-
-    if (gotyRows.length > 0) {
-      await insertInChunks(
-        gotyRows,
-        (chunk) => db.insert(communityEditionResultGoty).values(chunk),
-        100,
-      );
-    }
-    if (categoryRows.length > 0) {
-      await insertInChunks(
-        categoryRows,
-        (chunk) => db.insert(communityEditionResultCategories).values(chunk),
-        100,
-      );
-    }
-    if (customCategoryRows.length > 0) {
-      await insertInChunks(
-        customCategoryRows,
-        (chunk) =>
-          db.insert(communityEditionResultCustomCategories).values(chunk),
-        100,
-      );
-    }
-    if (voterRows.length > 0) {
-      await insertInChunks(
-        voterRows,
-        (chunk) => db.insert(communityEditionResultVoters).values(chunk),
-        200,
-      );
-    }
-    // Voter GOTY ranks + category picks stay on ballot tables (read-only after
-    // close). Freezing them duplicated tens of thousands of rows on rebuild.
+    return await writeEditionFreezeSnapshot(editionId, db, {
+      replaceMeta: opts.replace,
+    });
   } catch (err) {
-    // Meta-only / partial freezes would make later ensure() no-ops — clear so
-    // publish/rebuild can retry a complete snapshot.
-    try {
-      await clearEditionResultTables(editionId, db);
-    } catch {
-      // ignore cleanup errors; surface the original write failure
+    // The transaction rolled back. A first freeze that lost a race finds the
+    // winner's snapshot; a failed rebuild keeps the previous one.
+    if (!opts.replace) {
+      const raced = await getEditionResultsMeta(editionId, db).catch(() => null);
+      if (raced) return raced;
     }
     const detail =
       err instanceof Error ? err.message : "Could not freeze edition results.";
     return { error: detail };
   }
-
-  return meta;
 }
 
 /** Public ensure: kick freeze when published; return meta if ready (non-blocking). */

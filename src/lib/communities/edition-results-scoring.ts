@@ -163,6 +163,7 @@ export type CategoryTallyWithMeta = GameMeta & {
 /**
  * Board order for GOTY tallies.
  * Tie-break: more points, then more #1s, then more appearances, then gameId.
+ * The freeze applies the same order in SQL (`edition-freeze-sql.ts`); change both together.
  */
 export function placeEditionGotyTallies(
   tallies: GotyTallyWithMeta[],
@@ -179,7 +180,7 @@ export function placeEditionGotyTallies(
   return rows.map((row, i) => ({ ...row, place: i + 1 }));
 }
 
-/** Per-category board order; tie-break votes then gameId. */
+/** Per-category board order; tie-break votes then gameId. Mirrored in `edition-freeze-sql.ts`. */
 export function placeEditionCategoryTallies(
   tallies: CategoryTallyWithMeta[],
 ): AggregatedCategoryRow[] {
@@ -206,7 +207,7 @@ export function placeEditionCategoryTallies(
 
 /**
  * Aggregate GOTY points for a ballot pool (top-10 pointsForRank).
- * Freeze path aggregates in SQL then uses placeEditionGotyTallies.
+ * The freeze aggregates and places in SQL (`edition-freeze-sql.ts`).
  */
 export function aggregateEditionGoty(
   lines: RankedBallotLine[],
@@ -252,7 +253,7 @@ export function aggregateEditionGoty(
 
 /**
  * Plurality category tallies.
- * Freeze path aggregates in SQL then uses placeEditionCategoryTallies.
+ * The freeze aggregates and places in SQL (`edition-freeze-sql.ts`).
  */
 export function aggregateEditionCategories(
   votes: CategoryVoteLine[],

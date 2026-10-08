@@ -192,7 +192,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Skipped: `cache()` on `getPromotedTgaHref` — only the header calls it, once per request, so request memoization saves nothing. Narrower header profile select — the header and pages share the cached full profile row; a narrower header query would add a second profile query on pages that need the full row.
   - No new tests: behavior is unchanged (same reads and fallbacks, reordered); existing unit + integration suites pass.
 
-### [ ] 14. Indexes
+### [x] 14. Indexes
 
 - Migration: `pg_trgm` GIN indexes on `profiles.display_name` and `profiles.username`.
 - Mirror existing `games` search indexes (from `0000_modern_lockheed.sql`) in `packages/db/src/schema.ts` so drizzle-kit does not drop them.
@@ -207,7 +207,11 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ### [ ] 15. Cleanup and long-tail scale
 
-- Edition freeze (`src/lib/communities/edition-results.ts`) and `rebuildYear`: move to `INSERT … SELECT` / batched reads instead of loading everything into memory.
+- [x] Edition freeze (`src/lib/communities/edition-results.ts`) and `rebuildYear`: move to `INSERT … SELECT` / batched reads instead of loading everything into memory.
+  - **As built (2026-10-07):** `src/lib/communities/edition-freeze-sql.ts` computes tallies, board order (`row_number()` with the same tie-breaks), cover URLs, and voter rows in Postgres, and writes each operation as one `db.batch` transaction (one Neon HTTP request). Freeze: ~9 queries + one sequential insert per 100–200 rows → 2 requests. Hosts rebuild, the community-award backfill (now one statement on each results view instead of up to four), and `rebuildYear` are each one transaction too.
+  - **Bug fixed — partial freezes could publish:** the old freeze wrote the meta row first, then result rows in chunks. If the Worker was cut off mid-write (freeze usually runs in `after()`, ~30 s budget), meta existed with partial rows, and every later ensure treated it as done. Hosts rebuild could likewise leave an empty Hosts board, and `rebuildYear` emptied live standings while it ran. Now readers see the previous state until commit.
+  - A failed full rebuild now keeps the previous snapshot (previously it had cleared everything first). Concurrent first freezes: the loser's transaction fails on the unique keys and returns the winner's meta.
+  - Tests: `src/lib/communities/edition-freeze.int.test.ts` (ran on the old code first) — exact rows for both boards with every tie-break, enabled categories only, entry + game community awards, covers, voters, meta; no-op re-ensure; award backfill; Hosts-only rebuild; full rebuild; concurrent first freezes; and a failing write rolls back completely. `refresh.int.test.ts` adds a full rebuild over stale scores and dirty marks.
 - Host promote voice checks (`community-hosts.ts`): one grouped count.
 - Community overview editions: capped SQL instead of load-all-then-slice.
 - Delete dead unbounded helpers: `listCommunityMemberOptions`, `listOwnedForProfile`.

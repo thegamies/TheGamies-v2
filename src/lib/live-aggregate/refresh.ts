@@ -1,6 +1,5 @@
 import { and, count, countDistinct, eq, sql } from "drizzle-orm";
 import {
-  liveCategoryContrib,
   liveCategoryDirty,
   liveCategoryScores,
   liveGotyContrib,
@@ -9,7 +8,6 @@ import {
   liveGotyYearStats,
   type Db,
 } from "@thegamies/db";
-import { insertInChunks } from "@/lib/db/insert-chunks";
 import { getLiveAggregateDb } from "./contrib";
 
 const REFRESH_LOCK_STALE_MS = 60_000;
@@ -276,86 +274,40 @@ export async function rebuildYear(
   }
 
   try {
-    // Aggregate before deleting so a failed insert can be retried without
-    // depending on in-flight score rows, and so we minimize empty-cache time.
-    const gotyGroups = await db
-      .select({
-        gameId: liveGotyContrib.gameId,
-        score: sql<number>`coalesce(sum(${liveGotyContrib.points}), 0)::int`,
-        listMentions: count(),
-        rank1Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 1 then 1 else 0 end), 0)::int`,
-        rank2Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 2 then 1 else 0 end), 0)::int`,
-        rank3Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 3 then 1 else 0 end), 0)::int`,
-        rank4Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 4 then 1 else 0 end), 0)::int`,
-        rank5Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 5 then 1 else 0 end), 0)::int`,
-        rank6Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 6 then 1 else 0 end), 0)::int`,
-        rank7Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 7 then 1 else 0 end), 0)::int`,
-        rank8Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 8 then 1 else 0 end), 0)::int`,
-        rank9Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 9 then 1 else 0 end), 0)::int`,
-        rank10Count: sql<number>`coalesce(sum(case when ${liveGotyContrib.rank} = 10 then 1 else 0 end), 0)::int`,
-      })
-      .from(liveGotyContrib)
-      .where(eq(liveGotyContrib.year, year))
-      .groupBy(liveGotyContrib.gameId);
-
-    const catGroups = await db
-      .select({
-        categoryId: liveCategoryContrib.categoryId,
-        gameId: liveCategoryContrib.gameId,
-        voteCount: count(),
-      })
-      .from(liveCategoryContrib)
-      .where(eq(liveCategoryContrib.year, year))
-      .groupBy(liveCategoryContrib.categoryId, liveCategoryContrib.gameId);
-
-    const gotyRows = gotyGroups.map((g) => ({
-      year,
-      gameId: g.gameId,
-      score: Number(g.score),
-      listMentions: Number(g.listMentions),
-      rank1Count: Number(g.rank1Count),
-      rank2Count: Number(g.rank2Count),
-      rank3Count: Number(g.rank3Count),
-      rank4Count: Number(g.rank4Count),
-      rank5Count: Number(g.rank5Count),
-      rank6Count: Number(g.rank6Count),
-      rank7Count: Number(g.rank7Count),
-      rank8Count: Number(g.rank8Count),
-      rank9Count: Number(g.rank9Count),
-      rank10Count: Number(g.rank10Count),
-    }));
-    const catRows = catGroups.map((g) => ({
-      year,
-      categoryId: g.categoryId,
-      gameId: g.gameId,
-      voteCount: Number(g.voteCount),
-    }));
-
-    await db.delete(liveGotyScores).where(eq(liveGotyScores.year, year));
-    await db
-      .delete(liveCategoryScores)
-      .where(eq(liveCategoryScores.year, year));
-    await db
-      .delete(liveGotyDirtyGames)
-      .where(eq(liveGotyDirtyGames.year, year));
-    await db
-      .delete(liveCategoryDirty)
-      .where(eq(liveCategoryDirty.year, year));
-
-    if (gotyRows.length > 0) {
-      await insertInChunks(
-        gotyRows,
-        (chunk) => db.insert(liveGotyScores).values(chunk),
-        100,
-      );
-    }
-    if (catRows.length > 0) {
-      await insertInChunks(
-        catRows,
-        (chunk) => db.insert(liveCategoryScores).values(chunk),
-        200,
-      );
-    }
+    // One transaction: standings read the old scores until the new ones commit.
+    await db.batch([
+      db.delete(liveGotyScores).where(eq(liveGotyScores.year, year)),
+      db.delete(liveCategoryScores).where(eq(liveCategoryScores.year, year)),
+      db.delete(liveGotyDirtyGames).where(eq(liveGotyDirtyGames.year, year)),
+      db.delete(liveCategoryDirty).where(eq(liveCategoryDirty.year, year)),
+      db.execute(sql`
+        INSERT INTO live_goty_scores (
+          year, game_id, score, list_mentions,
+          rank_1_count, rank_2_count, rank_3_count, rank_4_count, rank_5_count,
+          rank_6_count, rank_7_count, rank_8_count, rank_9_count, rank_10_count
+        )
+        SELECT
+          ${year}, game_id, coalesce(sum(points), 0)::int, count(*)::int,
+          (count(*) FILTER (WHERE rank = 1))::int,
+          (count(*) FILTER (WHERE rank = 2))::int,
+          (count(*) FILTER (WHERE rank = 3))::int,
+          (count(*) FILTER (WHERE rank = 4))::int,
+          (count(*) FILTER (WHERE rank = 5))::int,
+          (count(*) FILTER (WHERE rank = 6))::int,
+          (count(*) FILTER (WHERE rank = 7))::int,
+          (count(*) FILTER (WHERE rank = 8))::int,
+          (count(*) FILTER (WHERE rank = 9))::int,
+          (count(*) FILTER (WHERE rank = 10))::int
+        FROM live_goty_contrib
+        WHERE year = ${year}
+        GROUP BY game_id`),
+      db.execute(sql`
+        INSERT INTO live_category_scores (year, category_id, game_id, vote_count)
+        SELECT ${year}, category_id, game_id, count(*)::int
+        FROM live_category_contrib
+        WHERE year = ${year}
+        GROUP BY category_id, game_id`),
+    ]);
 
     await refreshListCount(year, db);
 
