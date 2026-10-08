@@ -93,6 +93,8 @@ pnpm cost:journeys
 pnpm cost:report    # writes e2e/.cost/report.md
 ```
 
+Every staging deploy also runs the journeys in the `qa` job (non-blocking): the report lands in the job summary and the raw files in the `request-cost` artifact.
+
 Journeys live in `e2e/cost/`; each step is a real visit (first step a full page load, later steps click the in-page link when present). Playwright disables the HTTP cache while it routes requests, so every image counts. The report shows unique images separately because Cloudflare Images bills unique transformations. Static `/_next/static` assets are served by the assets binding and do not invoke the Worker.
 
 Current journeys: `edition-results` (Results → Full standings → Hosts standings → Categories → one category → Comparison → Voters → a voter's ballot), signed out and as a member.
