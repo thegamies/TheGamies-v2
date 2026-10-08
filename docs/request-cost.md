@@ -36,6 +36,7 @@ A search box that filters an already-downloaded list is **not search**. It is a 
 
 - Default state: a small, purposeful set (e.g. current Hosts + community hosts), still `LIMIT`ed
 - Typing: server query (`ILIKE` / indexes) with a **hit cap** (typically 20)
+- `%term%` `ILIKE` on a large table needs a `gin_trgm_ops` index on **every** column in the `OR`; one unindexed column makes Postgres scan the whole table (see `src/lib/people/search-indexes.int.test.ts`)
 - Blank query: return no search hits; show the default set—do not dump the catalog
 - Debounce typeahead; do not refetch the full collection
 

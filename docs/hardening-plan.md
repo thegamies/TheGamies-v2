@@ -178,7 +178,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Open decision logged in `docs/decisions.md`: locked category depth (podium vs full list).
   - `src/lib/communities/live-categories.int.test.ts`: tie lock (failed on old code with the duplicate key), category paging locked + unlocked (failed on old code).
 
-### [ ] 13. Request waterfalls and cache
+### [x] 13. Request waterfalls and cache
 
 - Game detail (`src/app/games/[slug]/page.tsx`) and edition page (`src/app/communities/[slug]/edition/[year]/page.tsx`): `Promise.all` independent reads.
 - Use `getRequestProfileByAuthUserId` in `/u/[username]`, `/create`, `/create/goty`, `/create/custom`, list share pages.
@@ -197,6 +197,13 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Migration: `pg_trgm` GIN indexes on `profiles.display_name` and `profiles.username`.
 - Mirror existing `games` search indexes (from `0000_modern_lockheed.sql`) in `packages/db/src/schema.ts` so drizzle-kit does not drop them.
 - **Tests:** `pnpm db:migrate` on branch DB; `EXPLAIN` people search uses the index.
+- **As built (2026-10-07):**
+  - `0058_search_trgm_indexes.sql`: trigram GIN indexes on `profiles.display_name`, `profiles.username`, and `games.slug`.
+  - **Found — catalog search was scanning all games:** catalog search matches `title ILIKE … OR slug ILIKE …`, and only `title` had a trigram index, so Postgres could not use it and scanned the table (~374k rows). With the slug index both sides use a bitmap OR: a less common title went from ~205–440 ms to ~10 ms warm on the personal branch.
+  - `schema.ts` now declares every index that existed only in SQL: the `0000` games indexes (title trigram, year, popularity, first release date), `profiles_is_seed_true_idx` (`0047`), and the new ones. Drizzle snapshots stop at `0005`, so later migrations stay hand-written; the schema mirror keeps a future generate from dropping them.
+  - The migration builds indexes inside drizzle's migration transaction (no `CONCURRENTLY`), so catalog sync writes to `games` wait for the slug index build (seconds); reads are unaffected.
+  - People search still seq-scans on the current ~280 profiles (cheaper than the index); the planner switches as profiles grow.
+  - `src/lib/people/search-indexes.int.test.ts` (failed on the old schema): indexes exist, and with seq scans disabled the people-search and catalog-search predicates are served by both trigram indexes.
 
 ### [ ] 15. Cleanup and long-tail scale
 

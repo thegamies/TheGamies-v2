@@ -407,6 +407,13 @@
       "when": 1790121600000,
       "tag": "0057_list_items_game_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790208000000,
+      "tag": "0058_search_trgm_indexes",
+      "breakpoints": true
     }
   ]
 }

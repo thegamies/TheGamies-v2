@@ -39,7 +39,14 @@ export const games = pgTable("games", {
   syncedAt: timestamp("synced_at", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+}, (t) => [
+  /** Catalog search ORs title and slug ILIKE; both need a trigram index or Postgres scans the table. */
+  index("games_title_trgm_idx").using("gin", t.title.op("gin_trgm_ops")),
+  index("games_slug_trgm_idx").using("gin", t.slug.op("gin_trgm_ops")),
+  index("games_year_idx").on(t.year),
+  index("games_popularity_idx").on(t.popularity.desc()),
+  index("games_first_release_date_idx").on(t.firstReleaseDate),
+]);
 
 export const covers = pgTable("covers", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -328,7 +335,12 @@ export const profiles = pgTable("profiles", {
   isSeed: boolean("is_seed").notNull().default(false),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
+}, (t) => [
+  /** People and member search OR display name and username ILIKE; both need a trigram index. */
+  index("profiles_display_name_trgm_idx").using("gin", t.displayName.op("gin_trgm_ops")),
+  index("profiles_username_trgm_idx").using("gin", t.username.op("gin_trgm_ops")),
+  index("profiles_is_seed_true_idx").on(t.id).where(sql`${t.isSeed}`),
+]);
 
 /** Community that hosts live rankings and editions. Default visibility is private. */
 export const communities = pgTable(
