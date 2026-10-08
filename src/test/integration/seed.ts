@@ -97,6 +97,21 @@ export function createSeeder(db: Db) {
       return row;
     },
 
+    /** Many games in one insert. */
+    async games(count: number) {
+      const values = Array.from({ length: count }, () => {
+        const n = next();
+        return {
+          igdbId: igdbBase + n,
+          slug: `int-${tag}-g${n}`,
+          title: `Int Game ${tag} ${n}`,
+        };
+      });
+      const rows = await db.insert(games).values(values).returning();
+      created.games.push(...rows.map((row) => row.id));
+      return rows;
+    },
+
     async follow(followerProfileId: string, followedProfileId: string, createdAt?: Date) {
       await db
         .insert(profileFollows)

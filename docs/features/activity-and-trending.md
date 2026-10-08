@@ -70,7 +70,7 @@ Community trending is **on even if Live Rankings are off**. It is a different bo
 
 **First slice:** Games browse **Trending** sort for the site board (Everyone, plus People you follow when signed in). Signed-in **Following** also has a **Trending** tab for people you follow only. Homepage `/` shows a **capped** site trending strip (same floor as Games trending, 12 covers) plus a capped **Upcoming** popularity strip — not a top-level Trending tab. Community trending is a community interior surface (placement next to Live Rankings when built).
 
-**Cache:** first slice is a windowed `GROUP BY` on `activity_events`. Add `library_trending_scores` + dirty keys later if site trending is hot — same idea as [live-aggregate.md](./live-aggregate.md), not a per-viewer cache. Following trending is always a read-time join.
+**Cache:** each board is one windowed SQL statement on `activity_events` (`listTrendingBoard`): latest counting event per (game, person) via `DISTINCT ON`, score and sort in SQL, and only the requested page (48 rows) plus totals come back to the Worker. `scoreTrending` in `src/lib/activity/trending.ts` is the reference for the same rules. Add `library_trending_scores` + dirty keys (or a cron-refreshed site board) later if site trending is hot — same idea as [live-aggregate.md](./live-aggregate.md), not a per-viewer cache. Following trending is always a read-time join.
 
 ## Retention
 
