@@ -1,5 +1,7 @@
 # Hardening plan — security, privacy, performance
 
+**Status: closed 2026-10-08.** Every step shipped except step 10 (deferred). See [Close-out](#close-out) for what was found and what's left.
+
 Source: codebase audit, 2026-10-06. Work top to bottom. Each step is one commit straight to `develop` (no PRs for this plan) → push → staging check. Tick the box when pushed.
 
 Every step ships with tests in the same commit (see `docs/engineering.md`). Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build` locally before pushing; CI runs the same.
@@ -205,7 +207,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - People search still seq-scans on the current ~280 profiles (cheaper than the index); the planner switches as profiles grow.
   - `src/lib/people/search-indexes.int.test.ts` (failed on the old schema): indexes exist, and with seq scans disabled the people-search and catalog-search predicates are served by both trigram indexes.
 
-### [ ] 15. Cleanup and long-tail scale
+### [x] 15. Cleanup and long-tail scale
 
 - [x] Edition freeze (`src/lib/communities/edition-results.ts`) and `rebuildYear`: move to `INSERT … SELECT` / batched reads instead of loading everything into memory.
   - **As built (2026-10-07):** `src/lib/communities/edition-freeze-sql.ts` computes tallies, board order (`row_number()` with the same tie-breaks), cover URLs, and voter rows in Postgres, and writes each operation as one `db.batch` transaction (one Neon HTTP request). Freeze: ~9 queries + one sequential insert per 100–200 rows → 2 requests. Hosts rebuild, the community-award backfill (now one statement on each results view instead of up to four), and `rebuildYear` are each one transaction too.
@@ -230,3 +232,32 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - `src/lib/communities/membership.int.test.ts` failed on the old code (race reproduced in one run, the double join in the others) and passes 3/3 on the new code: double join, banned join refused, join loops racing a ban, Host promote respecting a full edition.
 - ~~Flaky unit test: `src/components/home/HomePitch.test.tsx`~~ — failed CI twice on 2026-10-07 ("window is not defined" after jsdom teardown); fixed early by adding `afterEach(cleanup)` like the other component tests. Reopen if it recurs.
 - **Tests:** integration for freeze output parity.
+
+## Close-out
+
+Closed 2026-10-08, after three days on `develop`; each step was checked on staging. Steps 1–9 and 11–15 shipped. Step 10 is deferred (below).
+
+### Bugs found beyond the audit
+
+The audit listed security, privacy and performance work. Writing integration tests against the old code first turned up real bugs too:
+
+- **Live lock failed on ties** (step 12): any tied score or vote in a category's top 3 made locking throw a duplicate-key error.
+- **Community live category pager** (step 12): page count and "N games" came from the wrong board, and page 2 ranks restarted at 1.
+- **Catalog search scanned every game** (step 14): `title OR slug` matching couldn't use the title index, so each search scanned ~374k rows. With the slug index added it takes ~10 ms instead of ~200–440 ms.
+- **Partial edition freezes could publish** (step 15): a Worker cut off mid-freeze left a "frozen" edition with incomplete results that never repaired itself.
+- **Live score refresh could drop a fresh save** (step 11): a save landing mid-refresh could have its dirty mark erased, leaving that score stale.
+- **Banned people could stay members** (step 15): a join racing a ban could re-add the person. Separately, a double-clicked Join failed the second request.
+
+### Foundations added
+
+- Integration tests against a throwaway Neon branch per CI run (step 8), guarded so they can't run on staging or production.
+- Signed-in staging checks that run after every staging deploy with QA accounts that set themselves up (step 2b).
+- Worker typecheck in CI (step 15).
+
+### Left open
+
+- **Step 10 — narrow community revalidation:** deferred until an incremental cache or `"use cache"` covers community data; today the extra revalidations cost nothing.
+- **Optional:** rotate `IGDB_WEBHOOK_SECRET` and re-register slots (step 5). Registration responses sent it to the admin browser before the fix.
+- **Optional:** precompute the site trending board on the cron if home / games traffic makes it hot (step 15).
+- **Open decision:** locked category depth, podium vs full list (`docs/decisions.md`, from step 12).
+- **Not doing:** source-allowlist CSP and `Permissions-Policy` (step 6). A nonce-based CSP would be its own project.
