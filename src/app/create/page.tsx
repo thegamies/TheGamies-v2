@@ -3,9 +3,11 @@ import Link from "next/link";
 import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { Button } from "@/components/ui/Button";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
 import { getPromotedTgaYear } from "@/lib/tga-pickem/service";
 import { picksAreOpen } from "@/lib/tga-pickem/status";
 
@@ -14,16 +16,10 @@ export const metadata: Metadata = {
 };
 
 async function isSignedIn(): Promise<boolean> {
-  const auth = getAuthOrNull();
-  if (!auth) return false;
-  try {
-    const { data: session } = await auth.getSession();
-    if (!session?.user?.id) return false;
-    const profile = await getProfileByAuthUserId(session.user.id);
-    return Boolean(profile);
-  } catch {
-    return false;
-  }
+  const user = await getRequestSessionUser();
+  if (!user?.id) return false;
+  const profile = await getRequestProfileByAuthUserId(user.id).catch(() => null);
+  return Boolean(profile);
 }
 
 function resumeHref(draft: {

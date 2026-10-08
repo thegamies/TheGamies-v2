@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { SharedListView } from "@/components/lists/SharedListView";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
 import { getShareListByPublicId, getShareListCategoryPicks, getShareListItems } from "@/lib/lists/service";
@@ -13,7 +16,7 @@ import {
   viewerSeesListCategories,
   viewerSeesListRanks,
 } from "@/lib/lists/rank-visibility";
-import { getProfileByAuthUserId, getProfileByUsername } from "@/lib/profile/service";
+import { getProfileByUsername } from "@/lib/profile/service";
 import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
 import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
 
@@ -99,21 +102,12 @@ export default async function SharedListByPublicIdPage({
       : [];
 
   const cookie = await readListEditCookie();
-  let profileId: string | null = null;
-  let isSignedIn = false;
-  const auth = getAuthOrNull();
-  if (auth) {
-    try {
-      const { data: session } = await auth.getSession();
-      if (session?.user?.id) {
-        isSignedIn = true;
-        const profile = await getProfileByAuthUserId(session.user.id);
-        profileId = profile?.id ?? null;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const sessionUser = await getRequestSessionUser();
+  const isSignedIn = Boolean(sessionUser?.id);
+  const viewerProfile = sessionUser?.id
+    ? await getRequestProfileByAuthUserId(sessionUser.id).catch(() => null)
+    : null;
+  const profileId = viewerProfile?.id ?? null;
 
   const editSecret =
     cookie?.publicId === publicId ? cookie.secret : null;

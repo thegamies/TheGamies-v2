@@ -5,7 +5,10 @@ import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButto
 import { ListEditor } from "@/components/lists/ListEditor";
 import { StartCustomForm } from "@/components/lists/StartCustomForm";
 import { Button } from "@/components/ui/Button";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import {
   draftMatchesCustom,
   editorSeedFromDraft,
@@ -18,8 +21,6 @@ import {
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { parseStoredListFormat, parseStoredRankStyle, parseStoredRankVisibility } from "@/lib/lists/schema";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
-
 export const metadata: Metadata = {
   title: "Create custom list",
 };
@@ -31,16 +32,10 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 async function sessionProfileId(): Promise<string | null> {
-  const auth = getAuthOrNull();
-  if (!auth) return null;
-  try {
-    const { data: session } = await auth.getSession();
-    if (!session?.user?.id) return null;
-    const profile = await getProfileByAuthUserId(session.user.id);
-    return profile?.id ?? null;
-  } catch {
-    return null;
-  }
+  const user = await getRequestSessionUser();
+  if (!user?.id) return null;
+  const profile = await getRequestProfileByAuthUserId(user.id).catch(() => null);
+  return profile?.id ?? null;
 }
 
 export default async function CreateCustomPage({

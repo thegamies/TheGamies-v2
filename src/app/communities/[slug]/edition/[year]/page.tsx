@@ -208,9 +208,12 @@ export default async function CommunityEditionYearPage({
   let edition: CommunityEditionPublic | null = null;
   let publicEditions: CommunityEditionPublic[] = [];
   try {
-    const editions = await listEditionsForCommunity(community.id);
+    const [editions, found] = await Promise.all([
+      listEditionsForCommunity(community.id),
+      getEditionByCommunityYear(community.id, y),
+    ]);
     publicEditions = editions.filter((e) => showEditionNav(e.status));
-    edition = await getEditionByCommunityYear(community.id, y);
+    edition = found;
   } catch {
     edition = null;
   }
@@ -231,56 +234,48 @@ export default async function CommunityEditionYearPage({
     canManage && editionShowsHostBallotPreview(edition.status);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}/edition/${y}`;
 
-  let ballot = null;
-  if (profile && isMember) {
-    try {
-      ballot = await getEditionBallotForProfile(edition.id, profile.id);
-    } catch {
-      ballot = null;
-    }
-  }
+  const editionId = edition.id;
+  const editionYear = edition.year;
+  const needsBallotCategories =
+    edition.status === "open" ||
+    showHostBallotPreview ||
+    (profile && isMember && edition.status !== "scheduled") ||
+    (edition.status === "published" && voterUsername.length > 0);
 
-  let siteGotyItems: EditionBallotEditorItem[] | null = null;
-  if (profile && isMember && edition.status === "open") {
-    try {
-      const owned = await getOwnedGotyItemsForYear(profile.id, edition.year, {
-        limit: EDITION_BALLOT_MAX_ITEMS,
-      });
-      siteGotyItems =
-        owned && owned.length > 0
-          ? capEditionBallotItems(
-              owned.map((item) => ({
-                gameId: item.gameId,
-                igdbId: item.igdbId,
-                slug: item.slug,
-                title: item.title,
-                year: item.year,
-                coverUrl: item.coverUrl,
-                rank: item.rank,
-                blurb: item.blurb ?? "",
-              })),
+  const [ballot, siteGotyItems, awardCategories, ballotCustomCategories] =
+    await Promise.all([
+      profile && isMember
+        ? getEditionBallotForProfile(editionId, profile.id).catch(() => null)
+        : null,
+      profile && isMember && edition.status === "open"
+        ? getOwnedGotyItemsForYear(profile.id, editionYear, {
+            limit: EDITION_BALLOT_MAX_ITEMS,
+          })
+            .then((owned): EditionBallotEditorItem[] | null =>
+              owned && owned.length > 0
+                ? capEditionBallotItems(
+                    owned.map((item) => ({
+                      gameId: item.gameId,
+                      igdbId: item.igdbId,
+                      slug: item.slug,
+                      title: item.title,
+                      year: item.year,
+                      coverUrl: item.coverUrl,
+                      rank: item.rank,
+                      blurb: item.blurb ?? "",
+                    })),
+                  )
+                : null,
             )
-          : null;
-    } catch {
-      siteGotyItems = null;
-    }
-  }
-
-  const awardCategories =
-    edition.status === "open" ||
-    showHostBallotPreview ||
-    (profile && isMember && edition.status !== "scheduled") ||
-    (edition.status === "published" && voterUsername.length > 0)
-      ? await listEditionAwardCategories(edition.id).catch(() => [])
-      : [];
-
-  const ballotCustomCategories =
-    edition.status === "open" ||
-    showHostBallotPreview ||
-    (profile && isMember && edition.status !== "scheduled") ||
-    (edition.status === "published" && voterUsername.length > 0)
-      ? await listCustomCategoriesForEdition(edition.id).catch(() => [])
-      : [];
+            .catch(() => null)
+        : null,
+      needsBallotCategories
+        ? listEditionAwardCategories(editionId).catch(() => [])
+        : [],
+      needsBallotCategories
+        ? listCustomCategoriesForEdition(editionId).catch(() => [])
+        : [],
+    ]);
 
   const requestedViewEarly = parseEditionResultsView(viewParam);
   const resolvedHost = resolveEditionHostSettings(

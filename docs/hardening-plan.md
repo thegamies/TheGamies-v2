@@ -166,7 +166,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Ordering fix: claiming before computing means a save that re-marks a key mid-refresh leaves a fresh mark (previously the post-compute delete could erase it and leave that score stale). `contribGeneration` is read before processing (saves mark dirty before bumping it), and `scoresGeneration` uses `greatest(...)` so it never moves backwards.
   - `src/lib/live-aggregate/refresh.int.test.ts` ran on the old code first, then the new: small batches, zero-score removal, category votes, list count, generation/version bump, parity with `rebuildYear`, a follow-up refresh, and "already current". The mid-refresh race itself is not reproducible deterministically without a test hook, so it is covered by the ordering, not a test.
 
-### [ ] 12. Page locked live categories in SQL
+### [x] 12. Page locked live categories in SQL
 
 - **Why:** `src/lib/communities/live.ts` loads every frozen category row, then filters to one category in JS.
 - **Change:** `WHERE category_id = …` + `LIMIT/OFFSET` (or top-N for the list view).
@@ -184,6 +184,13 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - Use `getRequestProfileByAuthUserId` in `/u/[username]`, `/create`, `/create/goty`, `/create/custom`, list share pages.
 - Wrap `getPromotedTgaHref` in `cache()`; narrow the header profile select.
 - **Tests:** existing page/lib tests; preview timing comparison.
+- **As built (2026-10-07):**
+  - Header: session and promoted TGA link load in parallel; profile via the request-cached lookup.
+  - Game detail: artworks / screenshots / videos run together, alongside the viewer chain (session → profile → library entry + followed-library count in parallel). Each read keeps its own fallback.
+  - Edition page: editions list + edition in parallel, then ballot, site GOTY prefill, award categories and custom categories in parallel.
+  - `/u/[username]`, `/create`, `/create/goty`, `/create/custom`, `/u/[username]/[listSlug]`, `/l/[publicId]`: use `getRequestSessionUser` + `getRequestProfileByAuthUserId`, so the header and page share one session lookup and one profile query per request (previously each page did its own `auth.getSession()` and profile query). `/u/[username]` loads follow counts and the viewer's follow state in parallel.
+  - Skipped: `cache()` on `getPromotedTgaHref` — only the header calls it, once per request, so request memoization saves nothing. Narrower header profile select — the header and pages share the cached full profile row; a narrower header query would add a second profile query on pages that need the full row.
+  - No new tests: behavior is unchanged (same reads and fallbacks, reordered); existing unit + integration suites pass.
 
 ### [ ] 14. Indexes
 

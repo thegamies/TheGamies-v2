@@ -70,31 +70,33 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   if (!data) notFound();
   const { game, rankings, categoryWins } = data;
 
-  let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
-  let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
-  let videos: Awaited<ReturnType<typeof getGameVideosForDetail>> = [];
-  try {
-    [artworks, screenshots, videos] = await Promise.all([
-      getGameArtworksForDetail(game.id),
-      getGameScreenshotsForDetail(game.id),
-      getGameVideosForDetail(game.id),
-    ]);
-  } catch {
-    artworks = [];
-    screenshots = [];
-    videos = [];
-  }
+  const media = Promise.all([
+    getGameArtworksForDetail(game.id),
+    getGameScreenshotsForDetail(game.id),
+    getGameVideosForDetail(game.id),
+  ]).catch(
+    (): [
+      Awaited<ReturnType<typeof getGameArtworksForDetail>>,
+      Awaited<ReturnType<typeof getGameScreenshotsForDetail>>,
+      Awaited<ReturnType<typeof getGameVideosForDetail>>,
+    ] => [[], [], []],
+  );
 
-  const user = await getRequestSessionUser();
-  const profile = user?.id
-    ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
-    : null;
-  const libraryEntry = profile
-    ? await getLibraryEntry(profile.id, game.id).catch(() => null)
-    : null;
-  const followCounts = profile
-    ? await countFollowsLibraryForGame(game.id, profile.id).catch(() => null)
-    : null;
+  const viewer = (async () => {
+    const user = await getRequestSessionUser();
+    const profile = user?.id
+      ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
+      : null;
+    if (!profile) return { profile, libraryEntry: null, followCounts: null };
+    const [libraryEntry, followCounts] = await Promise.all([
+      getLibraryEntry(profile.id, game.id).catch(() => null),
+      countFollowsLibraryForGame(game.id, profile.id).catch(() => null),
+    ]);
+    return { profile, libraryEntry, followCounts };
+  })();
+
+  const [[artworks, screenshots, videos], { profile, libraryEntry, followCounts }] =
+    await Promise.all([media, viewer]);
 
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);

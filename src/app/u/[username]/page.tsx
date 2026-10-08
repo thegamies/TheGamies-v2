@@ -11,7 +11,10 @@ import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { UserAvatar } from "@/components/profile/UserAvatar";
 import { MastheadBanner } from "@/components/ui/MastheadBanner";
-import { getRequestSessionUser } from "@/lib/auth/session";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import { listCommunitiesForProfilePage } from "@/lib/communities/service";
 import {
   FOLLOW_ROSTER_PAGE_SIZE,
@@ -32,7 +35,6 @@ import {
   PROFILE_LISTS_PAGE_SIZE,
 } from "@/lib/profile/profile-page";
 import {
-  getProfileByAuthUserId,
   getProfileByUsername,
   ownsProfile,
 } from "@/lib/profile/service";
@@ -80,7 +82,7 @@ export default async function PublicProfilePage({
 
   const sessionUser = await getRequestSessionUser();
   const viewerProfile = sessionUser?.id
-    ? await getProfileByAuthUserId(sessionUser.id).catch(() => null)
+    ? await getRequestProfileByAuthUserId(sessionUser.id).catch(() => null)
     : null;
   const isOwner = ownsProfile(profile, sessionUser?.id);
 
@@ -91,10 +93,6 @@ export default async function PublicProfilePage({
   const sp = await searchParams;
   const tab = parseProfileTab(first(sp.tab));
   const pageRaw = parseProfilePage(first(sp.page));
-  const counts = await followCounts(profile.id).catch(() => ({
-    following: 0,
-    followers: 0,
-  }));
   const canFollowSeed = allowFollowSeedAccounts({
     isSiteAdmin: viewerProfile?.isSiteAdmin,
   });
@@ -103,9 +101,12 @@ export default async function PublicProfilePage({
     !isOwner &&
     profile.visibility === "public" &&
     (!profile.isSeed || canFollowSeed);
-  const viewerFollowing = canFollowProfile
-    ? await isFollowing(viewerProfile!.id, profile.id).catch(() => false)
-    : false;
+  const [counts, viewerFollowing] = await Promise.all([
+    followCounts(profile.id).catch(() => ({ following: 0, followers: 0 })),
+    canFollowProfile
+      ? isFollowing(viewerProfile!.id, profile.id).catch(() => false)
+      : false,
+  ]);
 
   return (
     <>
