@@ -17,6 +17,7 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     "design-references/**",
+    "workers/*/worker-configuration.d.ts",
   ]),
 ]);
 

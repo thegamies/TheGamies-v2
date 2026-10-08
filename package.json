@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "typecheck:igdb-webhooks": "pnpm --filter @thegamies/igdb-webhooks-worker types:check && pnpm --filter @thegamies/igdb-webhooks-worker typecheck",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run -c vitest.integration.config.mts",

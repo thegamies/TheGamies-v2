@@ -8,13 +8,16 @@
     "deploy": "wrangler deploy --env develop",
     "deploy:develop": "wrangler deploy --env develop",
     "deploy:production": "wrangler deploy --env production",
-    "types": "wrangler types"
+    "types": "wrangler types --env production --strict-vars=false",
+    "types:check": "wrangler types --env production --strict-vars=false --check",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@thegamies/db": "workspace:*",
     "@thegamies/igdb": "workspace:*"
   },
   "devDependencies": {
+    "@types/node": "^20",
     "typescript": "^5",
     "wrangler": "^4.125.0"
   }
