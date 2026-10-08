@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
 import {
   communityCustomCategories,
@@ -650,6 +650,9 @@ export async function getEditionGotyPage(
  * Every GOTY freeze row whose displayed rank is ≤ maxRank (default 10),
  * including the full tie at the cutoff. Not a board-order LIMIT — that
  * drops Voices (and Community) games that share rank 10 past the cap.
+ *
+ * Top-N uses a window `RANK` / `DENSE_RANK` (one pass) — same pattern as
+ * category podiums. Neon HTTP is one round trip per query.
  */
 export async function getEditionGotyThroughRank(
   editionId: string,
@@ -660,57 +663,58 @@ export async function getEditionGotyThroughRank(
   const storage = storageModeFor(mode);
   const maxRank = Math.max(1, Math.floor(opts.maxRank ?? BALLOT_MATRIX_TOP));
   const rankMode = opts.rankMode ?? "competition";
+  const displayRankExpr =
+    rankMode === "dense"
+      ? sql`dense_rank() over (order by r.points desc)`
+      : sql`rank() over (order by r.points desc)`;
 
-  const baseWhere = and(
-    eq(communityEditionResultGoty.editionId, editionId),
-    eq(communityEditionResultGoty.mode, storage),
-  );
+  const result = await db.execute(sql`
+    select
+      place,
+      game_id as "gameId",
+      slug,
+      title,
+      game_year as "year",
+      cover_url as "coverUrl",
+      points,
+      first_place_votes as "firstPlaceVotes",
+      appearances
+    from (
+      select
+        r.place,
+        r.game_id,
+        r.slug,
+        r.title,
+        r.game_year,
+        r.cover_url,
+        r.points,
+        r.first_place_votes,
+        r.appearances,
+        ${displayRankExpr} as display_rank
+      from community_edition_result_goty r
+      where r.edition_id = ${editionId}
+        and r.mode = ${storage}
+    ) ranked
+    where display_rank <= ${maxRank}
+    order by place asc
+  `);
 
-  let cutoffPoints: number | undefined;
-  if (rankMode === "dense") {
-    const distinct = await db
-      .select({ points: communityEditionResultGoty.points })
-      .from(communityEditionResultGoty)
-      .where(baseWhere)
-      .groupBy(communityEditionResultGoty.points)
-      .orderBy(desc(communityEditionResultGoty.points))
-      .limit(maxRank);
-    if (distinct.length === 0) return [];
-    cutoffPoints = distinct[distinct.length - 1]!.points;
-  } else {
-    const [nth] = await db
-      .select({ points: communityEditionResultGoty.points })
-      .from(communityEditionResultGoty)
-      .where(baseWhere)
-      .orderBy(asc(communityEditionResultGoty.place))
-      .limit(1)
-      .offset(maxRank - 1);
-    if (nth) cutoffPoints = nth.points;
-  }
+  const rawRows = (
+    Array.isArray(result)
+      ? result
+      : ((result as { rows?: unknown }).rows ?? [])
+  ) as Array<Record<string, unknown>>;
 
-  const rows = await db
-    .select()
-    .from(communityEditionResultGoty)
-    .where(
-      cutoffPoints != null
-        ? and(
-            baseWhere,
-            gte(communityEditionResultGoty.points, cutoffPoints),
-          )
-        : baseWhere,
-    )
-    .orderBy(asc(communityEditionResultGoty.place));
-
-  const mapped = rows.map((r) => ({
-    place: r.place,
-    gameId: r.gameId,
-    slug: r.slug,
-    title: r.title,
-    year: r.gameYear,
-    coverUrl: r.coverUrl,
-    points: r.points,
-    firstPlaceVotes: r.firstPlaceVotes,
-    appearances: r.appearances,
+  const mapped = rawRows.map((row) => ({
+    place: Number(row.place),
+    gameId: String(row.gameId),
+    slug: String(row.slug),
+    title: String(row.title),
+    year: row.year == null ? null : Number(row.year),
+    coverUrl: row.coverUrl == null ? null : String(row.coverUrl),
+    points: Number(row.points),
+    firstPlaceVotes: Number(row.firstPlaceVotes),
+    appearances: Number(row.appearances),
   }));
 
   return withDisplayRanks(mapped, (r) => r.points, rankMode).filter(

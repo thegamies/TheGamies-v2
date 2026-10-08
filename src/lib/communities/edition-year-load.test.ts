@@ -166,4 +166,70 @@ describe("loadEditionResultsOverview", () => {
       1,
     );
   });
+
+  it("starts GOTY and categories without waiting for ensure when freeze is ready", async () => {
+    let releaseEnsure: (value: typeof meta) => void = () => {};
+    mocks.ensurePublishedEditionResultsForEdition.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseEnsure = resolve;
+        }),
+    );
+    let gotyStarted = false;
+    mocks.getEditionGotyThroughRank.mockImplementation(async () => {
+      gotyStarted = true;
+      return [];
+    });
+    let categoriesStarted = false;
+    mocks.getEditionCategoryResults.mockImplementation(async () => {
+      categoriesStarted = true;
+      return [];
+    });
+
+    const pending = loadEditionResultsOverview({
+      edition: edition2025,
+      mode: "combined",
+      rankMode: "dense",
+    });
+    await Promise.resolve();
+    expect(gotyStarted).toBe(true);
+    expect(categoriesStarted).toBe(true);
+    expect(mocks.ensurePublishedEditionResultsForEdition).toHaveBeenCalledTimes(
+      1,
+    );
+
+    releaseEnsure(meta);
+    await expect(pending).resolves.toMatchObject({ meta });
+  });
+
+  it("waits for ensure before board reads when freeze is not ready", async () => {
+    const pendingFreeze: CommunityEditionPublic = {
+      ...edition2025,
+      freezeStatus: "computing",
+    };
+    let releaseEnsure: (value: typeof meta) => void = () => {};
+    mocks.ensurePublishedEditionResultsForEdition.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseEnsure = resolve;
+        }),
+    );
+    let gotyStarted = false;
+    mocks.getEditionGotyThroughRank.mockImplementation(async () => {
+      gotyStarted = true;
+      return [];
+    });
+
+    const pending = loadEditionResultsOverview({
+      edition: pendingFreeze,
+      mode: "combined",
+      rankMode: "dense",
+    });
+    await Promise.resolve();
+    expect(gotyStarted).toBe(false);
+
+    releaseEnsure(meta);
+    await pending;
+    expect(gotyStarted).toBe(true);
+  });
 });
