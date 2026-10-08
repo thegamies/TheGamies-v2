@@ -52,7 +52,10 @@ import {
   rewriteEditionHostsSnapshot,
   writeEditionFreezeSnapshot,
 } from "./edition-freeze-sql";
-import { getEditionByCommunityYear } from "./editions";
+import {
+  getEditionByCommunityYear,
+  type CommunityEditionPublic,
+} from "./editions";
 
 export {
   parseEditionRankMode,
@@ -492,14 +495,17 @@ async function freezeEditionResults(
   }
 }
 
-/** Public ensure: kick freeze when published; return meta if ready (non-blocking). */
-export async function ensurePublishedEditionResults(
-  communityId: string,
-  year: number,
+/**
+ * Same as {@link ensurePublishedEditionResults} when the edition row is
+ * already loaded — skip a second year lookup.
+ */
+export async function ensurePublishedEditionResultsForEdition(
+  edition: Pick<
+    CommunityEditionPublic,
+    "id" | "status" | "freezeStatus" | "opensAt" | "closesAt" | "publishesAt"
+  >,
   db: Db = getDb(),
 ): Promise<EditionResultsMeta | null | { error: string }> {
-  const edition = await getEditionByCommunityYear(communityId, year, db);
-  if (!edition) return null;
   if (edition.status !== "published" && edition.status !== "closed") {
     return null;
   }
@@ -519,6 +525,17 @@ export async function ensurePublishedEditionResults(
   return null;
 }
 
+/** Public ensure: kick freeze when published; return meta if ready (non-blocking). */
+export async function ensurePublishedEditionResults(
+  communityId: string,
+  year: number,
+  db: Db = getDb(),
+): Promise<EditionResultsMeta | null | { error: string }> {
+  const edition = await getEditionByCommunityYear(communityId, year, db);
+  if (!edition) return null;
+  return ensurePublishedEditionResultsForEdition(edition, db);
+}
+
 export async function getEditionGotyPage(
   editionId: string,
   mode: EditionResultMode,
@@ -527,6 +544,7 @@ export async function getEditionGotyPage(
     pageSize?: number;
     afterPlace?: number;
     rankMode?: SharedRankMode;
+    meta?: EditionResultsMeta | null;
   } = {},
   db: Db = getDb(),
 ): Promise<{
@@ -545,7 +563,10 @@ export async function getEditionGotyPage(
     opts.afterPlace != null && Number.isFinite(opts.afterPlace)
       ? Math.max(0, Math.floor(opts.afterPlace))
       : 0;
-  const meta = await getEditionResultsMeta(editionId, db);
+  const meta =
+    opts.meta !== undefined
+      ? opts.meta
+      : await getEditionResultsMeta(editionId, db);
   const fullTotal =
     storage === "voices"
       ? (meta?.gotyTotalVoices ?? 0)
@@ -709,10 +730,16 @@ export async function getEditionGotyThroughRank(
 export async function getEditionCategoryResults(
   editionId: string,
   mode: EditionResultMode,
-  opts: { maxRank?: number; rankMode?: SharedRankMode } = {},
+  opts: {
+    maxRank?: number;
+    rankMode?: SharedRankMode;
+    skipCustomBackfill?: boolean;
+  } = {},
   db: Db = getDb(),
 ): Promise<EditionCategoryStandingBlock[]> {
-  await ensureCustomCategoryFreezeComplete(editionId, db);
+  if (!opts.skipCustomBackfill) {
+    await ensureCustomCategoryFreezeComplete(editionId, db);
+  }
   const storage = storageModeFor(mode);
   const maxRank =
     opts.maxRank != null && Number.isFinite(opts.maxRank)

@@ -27,7 +27,7 @@ import {
   editionRevealsVoterBallots,
   validateEditionSchedule,
 } from "./edition-status";
-import { pickFeaturedEdition, pickOverviewEditions, parseEditionCreateRankMode, type CommunityEditionPublic } from "./editions";
+import { editionForYear, pickFeaturedEdition, pickOverviewEditions, parseEditionCreateRankMode, type CommunityEditionPublic } from "./editions";
 
 describe("computeEditionStatus", () => {
   const opensAt = new Date("2026-11-01T00:00:00.000Z");
@@ -349,6 +349,45 @@ describe("parseEditionCreateRankMode", () => {
     expect(parseEditionCreateRankMode("skip")).toEqual({
       error: "Choose how tied games are numbered.",
     });
+  });
+});
+
+describe("editionForYear", () => {
+  it("returns the matching year from an already-loaded list", () => {
+    const editions = [
+      {
+        id: "a",
+        communityId: "c",
+        year: 2025,
+        opensAt: null,
+        closesAt: null,
+        publishesAt: null,
+        rankMode: "dense" as const,
+        freezeStatus: "idle" as const,
+        freezeStartedAt: null,
+        freezeError: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: "published" as const,
+      },
+      {
+        id: "b",
+        communityId: "c",
+        year: 2026,
+        opensAt: null,
+        closesAt: null,
+        publishesAt: null,
+        rankMode: "dense" as const,
+        freezeStatus: "idle" as const,
+        freezeStartedAt: null,
+        freezeError: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: "open" as const,
+      },
+    ];
+    expect(editionForYear(editions, 2026)?.id).toBe("b");
+    expect(editionForYear(editions, 2024)).toBeNull();
   });
 });
 

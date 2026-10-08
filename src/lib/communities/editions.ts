@@ -1,4 +1,5 @@
 import { and, desc, eq } from "drizzle-orm";
+import { cache } from "react";
 import {
   communityEditions,
   createDb,
@@ -78,9 +79,9 @@ async function afterEditionWrite(
   return publicEdition;
 }
 
-export async function listEditionsForCommunity(
+async function queryEditionsForCommunity(
   communityId: string,
-  db: Db = getDb(),
+  db: Db,
 ): Promise<CommunityEditionPublic[]> {
   const rows = await db
     .select()
@@ -89,6 +90,25 @@ export async function listEditionsForCommunity(
     .orderBy(desc(communityEditions.year));
   const now = new Date();
   return rows.map((row) => withStatus(row, now));
+}
+
+const listEditionsForCommunityCached = cache((communityId: string) =>
+  queryEditionsForCommunity(communityId, getDb()),
+);
+
+export async function listEditionsForCommunity(
+  communityId: string,
+  db?: Db,
+): Promise<CommunityEditionPublic[]> {
+  if (db) return queryEditionsForCommunity(communityId, db);
+  return listEditionsForCommunityCached(communityId);
+}
+
+export function editionForYear(
+  editions: CommunityEditionPublic[],
+  year: number,
+): CommunityEditionPublic | null {
+  return editions.find((row) => row.year === year) ?? null;
 }
 
 export async function getFeaturedEditionForCommunity(

@@ -1,4 +1,5 @@
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { cache } from "react";
 import {
   communities,
   communityMembers,
@@ -440,10 +441,10 @@ export async function listCommunitiesForProfilePage(
   };
 }
 
-export async function getCommunityBySlug(
+async function queryCommunityBySlug(
   slug: string,
-  viewerProfileId?: string | null,
-  db: Db = getDb(),
+  viewerProfileId: string | null,
+  db: Db,
 ): Promise<CommunityDetail | null> {
   const [community] = await db
     .select()
@@ -482,6 +483,22 @@ export async function getCommunityBySlug(
     Number(hostCountRows[0]?.n ?? 0),
     viewerRows[0] ? asRole(viewerRows[0].role) : null,
   );
+}
+
+/** Per React request: metadata + page share one slug lookup. */
+const getCommunityBySlugCached = cache(
+  (slug: string, viewerProfileId: string | null) =>
+    queryCommunityBySlug(slug, viewerProfileId, getDb()),
+);
+
+export async function getCommunityBySlug(
+  slug: string,
+  viewerProfileId?: string | null,
+  db?: Db,
+): Promise<CommunityDetail | null> {
+  const viewer = viewerProfileId ?? null;
+  if (db) return queryCommunityBySlug(slug, viewer, db);
+  return getCommunityBySlugCached(slug, viewer);
 }
 
 export async function listCommunityMembersPage(
