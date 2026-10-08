@@ -199,7 +199,8 @@ jobs:
           NODE
 
           pnpm exec opennextjs-cloudflare build
-          DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
+          # Staging only: log per-request Neon/response cost (docs/request-cost.md).
+          DEPLOY_LOG=$(pnpm exec wrangler deploy --var REQUEST_COST_METER:1 2>&1 | tee /dev/stderr)
 
           if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
             pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER"
@@ -377,6 +378,37 @@ jobs:
           name: playwright-report-staging
           path: playwright-report-staging/
           retention-days: 14
+          if-no-files-found: ignore
+      - if: steps.guard.outputs.skipped == 'false'
+        name: Request cost journeys
+        continue-on-error: true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          COST_RUN_TAG: cost-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          pnpm exec playwright install --with-deps chromium
+          mkdir -p e2e/.cost
+          pnpm exec wrangler tail thegamies-v2-develop \
+            --header "x-cost-journey:$COST_RUN_TAG" --format json \
+            > e2e/.cost/tail.json 2> e2e/.cost/tail.log &
+          TAIL_PID=$!
+          # Give the tail session time to attach before traffic starts.
+          sleep 15
+          status=0
+          pnpm cost:journeys || status=$?
+          # Tail events arrive a few seconds after each request ends.
+          sleep 15
+          kill "$TAIL_PID" 2>/dev/null || true
+          pnpm cost:report > e2e/.cost/report.out || true
+          cat e2e/.cost/report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+          exit "$status"
+      - if: always() && steps.guard.outputs.skipped == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: request-cost
+          path: e2e/.cost/
+          retention-days: 30
           if-no-files-found: ignore
 
   summary:

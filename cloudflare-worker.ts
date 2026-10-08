@@ -1,10 +1,11 @@
 // `.open-next/worker.js` is generated at OpenNext build time.
 // @ts-expect-error generated output is not in the TypeScript project
 import { default as handler } from "./.open-next/worker.js";
+import { withRequestCost } from "./src/lib/cloudflare/request-cost";
 import { runCloudflareScheduledJobs } from "./src/lib/cloudflare/scheduled-jobs";
 
 export default {
-  fetch: handler.fetch,
+  fetch: withRequestCost(handler.fetch),
 
   async scheduled(
     _controller: unknown,

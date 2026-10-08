@@ -1,6 +1,9 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, neonConfig } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
+import { meteredNeonFetch } from "./request-cost";
 import * as schema from "./schema";
+
+neonConfig.fetchFunction = meteredNeonFetch;
 
 export type Db = ReturnType<typeof createDb>;
 

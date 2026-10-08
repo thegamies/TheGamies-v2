@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  // Staging checks run against a deploy via playwright.staging.config.ts.
-  testIgnore: ["staging/**"],
+  // Staging checks and cost journeys run against a deploy via their own configs.
+  testIgnore: ["staging/**", "cost/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
