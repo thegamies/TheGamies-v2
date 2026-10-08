@@ -156,7 +156,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Preview check:** each action's visible change still appears without a hard refresh.
 - **Deferred (2026-10-07):** no measurable gain today. OpenNext runs with the default no-op incremental/tag cache, and community pages are dynamic (session), so extra `revalidatePath` calls do no server work. In Server Functions any `revalidatePath` already purges the whole client router cache (Next docs: "temporary"), and the current page re-renders once either way. Revisit when an incremental cache (R2) or `"use cache"` is enabled for community data.
 
-### [ ] 11. Batch live-aggregate dirty-key refresh
+### [x] 11. Batch live-aggregate dirty-key refresh
 
 - **Why:** `processDirtyKeys` (`src/lib/live-aggregate/refresh.ts`) does a sequential upsert + delete per dirty game and per dirty category.
 - **Change:** one `INSERT … SELECT … ON CONFLICT` for all dirty ids (capped batch per tick), then one `DELETE`.
@@ -171,6 +171,12 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 - **Why:** `src/lib/communities/live.ts` loads every frozen category row, then filters to one category in JS.
 - **Change:** `WHERE category_id = …` + `LIMIT/OFFSET` (or top-N for the list view).
 - **Tests:** unit + integration on a seeded lock.
+- **As built (2026-10-07):**
+  - Scope note: the lock snapshot only stores each category's top 3 display places (≤ 12 rows per category), so the old load-all was bounded. The single-category page now filters to that category in SQL, counts its games, and pages with `LIMIT/OFFSET`; display ranks come from `rank()` before the limit.
+  - **Bug fixed — locking failed on ties:** `community_live_lock_goty` and `community_live_lock_category_rows` key on `place`, but the snapshot wrote the display rank (shared by ties), so any GOTY score tie or category vote tie in the top 3 made the lock (and lazy per-year snapshot) throw a duplicate-key error. The snapshot now stores row position; reads already recompute display ranks from score / votes. Existing snapshots without ties are unchanged (position = rank). The meta row is written last so a failed snapshot is rebuilt on the next read instead of serving a partial board.
+  - **Bug fixed — category pager:** community live category pages (locked and unlocked) took page count from the GOTY board and "N games" from the rows on the page. Both now use the category's own game total (unlocked: `count(distinct game_id)` for members, only on the single-category page); page 2 ranks no longer restart at 1.
+  - Open decision logged in `docs/decisions.md`: locked category depth (podium vs full list).
+  - `src/lib/communities/live-categories.int.test.ts`: tie lock (failed on old code with the duplicate key), category paging locked + unlocked (failed on old code).
 
 ### [ ] 13. Request waterfalls and cache
 

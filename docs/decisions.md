@@ -122,3 +122,4 @@ Record product and architecture decisions here. Do not invent answers to open it
 - Approval membership and extra eligibility beyond invite / public join
 - Ballot invalidation workflow (beyond kick/ban dropping unpublished ballots)
 - Auth JWT → Postgres role pattern for **RLS** (until then: app-layer session/ownership only)
+- Locked community live category depth: the lock snapshot stores only each category's top 3 display places, so a locked category page shows its podium while the unlocked page lists every game. Keep the podium, or freeze the full category list at lock time?

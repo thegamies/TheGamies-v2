@@ -90,7 +90,9 @@ type CategoryJsonRow = {
   description: string | null;
   sortOrder: number;
   totalVotes?: number;
+  gameTotal?: number;
   place: number | null;
+  displayRank?: number | null;
   gameId: string | null;
   slug: string | null;
   title: string | null;
@@ -186,6 +188,8 @@ async function queryCommunityLiveStandings(
   totalPages: number;
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
+  /** Games in the requested category (only when `categoryId` is set). */
+  categoryGameTotal: number;
 }> {
   const {
     pageSize,
@@ -205,6 +209,18 @@ async function queryCommunityLiveStandings(
   const categoryIdFilter = categoryId
     ? sql`and ac.id = ${categoryId}`
     : sql``;
+  // Only the single-category page needs its full game count (for paging).
+  const categoryGameTotalSql = categoryId
+    ? sql`(
+        select count(distinct c.game_id)::int
+        from live_category_contrib c
+        inner join community_members m
+          on m.profile_id = c.profile_id
+         and m.community_id = ${communityId}::uuid
+        where c.year = ${year}
+          and c.category_id = ac.id
+      )`
+    : sql`0`;
 
   const result = await db.execute(sql`
     with bounds as (
@@ -345,7 +361,9 @@ async function queryCommunityLiveStandings(
                   ),
                   0
                 ) as "totalVotes",
+                ${categoryGameTotalSql} as "gameTotal",
                 r.place as "place",
+                r.display_rank as "displayRank",
                 r.game_id as "gameId",
                 r.slug as "slug",
                 r.title as "title",
@@ -357,6 +375,7 @@ async function queryCommunityLiveStandings(
                   row_number() over (
                     order by tallies.vote_count desc, tallies.game_id asc
                   )::int as place,
+                  rank() over (order by tallies.vote_count desc)::int as display_rank,
                   tallies.game_id,
                   g.slug,
                   g.title,
@@ -410,6 +429,7 @@ async function queryCommunityLiveStandings(
       totalPages: 1,
       goty: [],
       categories: [],
+      categoryGameTotal: 0,
     };
   }
 
@@ -439,7 +459,9 @@ async function queryCommunityLiveStandings(
   const categoryRows = parseJsonArray<CategoryJsonRow>(row.categories);
   type CatAcc = CategoryStandingsBlock & { _total: number };
   const byId = new Map<string, CatAcc>();
+  let categoryGameTotal = 0;
   for (const cat of categoryRows) {
+    categoryGameTotal = Math.max(categoryGameTotal, asInt(cat.gameTotal));
     let block = byId.get(cat.categoryId);
     if (!block) {
       block = {
@@ -454,7 +476,8 @@ async function queryCommunityLiveStandings(
     }
     if (cat.gameId && cat.slug && cat.title && cat.place != null) {
       block.rows.push({
-        place: asInt(cat.place),
+        // Paged detail: SQL rank is absolute, so page 2 does not restart at 1.
+        place: trimTopRanks ? asInt(cat.place) : asInt(cat.displayRank, asInt(cat.place)),
         gameId: cat.gameId,
         slug: cat.slug,
         title: cat.title,
@@ -465,19 +488,19 @@ async function queryCommunityLiveStandings(
   }
   const categories: CategoryStandingsBlock[] = [];
   for (const block of byId.values()) {
-    const ranked = withDisplayRanks(
-      block.rows,
-      (r) => r.voteCount ?? 0,
-      "competition",
-    ).map((r) => ({ ...r, place: r.rank }));
     categories.push({
       categoryId: block.categoryId,
       label: block.label,
       description: block.description,
       totalVotes: block.totalVotes,
       rows: trimTopRanks
-        ? takeTopDisplayRanks(ranked, CATEGORY_LIST_TOP_RANKS)
-        : ranked,
+        ? takeTopDisplayRanks(
+            withDisplayRanks(block.rows, (r) => r.voteCount ?? 0, "competition").map(
+              (r) => ({ ...r, place: r.rank }),
+            ),
+            CATEGORY_LIST_TOP_RANKS,
+          )
+        : block.rows,
     });
   }
 
@@ -488,6 +511,7 @@ async function queryCommunityLiveStandings(
     totalPages,
     goty,
     categories,
+    categoryGameTotal,
   };
 }
 
@@ -553,21 +577,14 @@ export async function upsertCommunityLiveLockSnapshot(
 
   await clearLockYear(communityId, year, db);
 
-  const now = new Date();
-  await db.insert(communityLiveLockMeta).values({
-    communityId,
-    year,
-    listCount: live.listCount,
-    gotyTotal: live.goty.length,
-    lockedAt: now,
-  });
-
+  // `place` is the row position (unique key); display ranks with ties are
+  // recomputed from score / vote count on read.
   if (live.goty.length > 0) {
     await insertInChunks(
-      live.goty.map((row) => ({
+      live.goty.map((row, index) => ({
         communityId,
         year,
-        place: row.place,
+        place: index + 1,
         gameId: row.gameId,
         slug: row.slug,
         title: row.title,
@@ -596,7 +613,7 @@ export async function upsertCommunityLiveLockSnapshot(
     voteCount: number;
   }> = [];
   live.categories.forEach((block, sortOrder) => {
-    for (const row of block.rows) {
+    block.rows.forEach((row, index) => {
       categoryInserts.push({
         communityId,
         year,
@@ -604,14 +621,14 @@ export async function upsertCommunityLiveLockSnapshot(
         label: block.label,
         description: block.description,
         sortOrder,
-        place: row.place,
+        place: index + 1,
         gameId: row.gameId,
         slug: row.slug,
         title: row.title,
         coverUrl: row.coverUrl,
         voteCount: row.voteCount ?? 0,
       });
-    }
+    });
   });
   if (categoryInserts.length > 0) {
     await insertInChunks(
@@ -620,6 +637,16 @@ export async function upsertCommunityLiveLockSnapshot(
       100,
     );
   }
+
+  // Meta last: its presence means "snapshot built", so a failed insert above
+  // is retried on the next read instead of serving a partial board.
+  await db.insert(communityLiveLockMeta).values({
+    communityId,
+    year,
+    listCount: live.listCount,
+    gotyTotal: live.goty.length,
+    lockedAt: new Date(),
+  });
 
   return { listCount: live.listCount, gotyTotal: live.goty.length };
 }
@@ -658,6 +685,7 @@ async function queryLockedStandingsPage(
   requestedPage: number,
   categoryGroup: StandingsCategoryGroupFilter,
   view: LiveStandingsViewId,
+  categoryId: string | null,
   db: Db,
 ): Promise<{
   listCount: number;
@@ -666,8 +694,21 @@ async function queryLockedStandingsPage(
   totalPages: number;
   goty: StandingsGameRow[];
   categories: CategoryStandingsBlock[];
+  categoryGameTotal: number;
 }> {
   const meta = await ensureLockYear(communityId, year, db);
+  if (view === "category" && categoryId) {
+    const detail = await queryLockedCategoryDetail(
+      communityId,
+      year,
+      categoryId,
+      categoryGroup,
+      pageSize,
+      requestedPage,
+      db,
+    );
+    return { listCount: meta.listCount, gotyTotal: meta.gotyTotal, goty: [], ...detail };
+  }
   const totalPages = Math.max(1, Math.ceil(meta.gotyTotal / pageSize) || 1);
   const page = clampStandingsPage(requestedPage, totalPages);
   const offset = (page - 1) * pageSize;
@@ -761,6 +802,93 @@ async function queryLockedStandingsPage(
     totalPages,
     goty,
     categories: includeCategories ? groupCategoryBlocks(categoryRows) : [],
+    categoryGameTotal: 0,
+  };
+}
+
+/** One frozen category, paged in SQL; display ranks are computed before LIMIT. */
+async function queryLockedCategoryDetail(
+  communityId: string,
+  year: number,
+  categoryId: string,
+  categoryGroup: StandingsCategoryGroupFilter,
+  pageSize: number,
+  requestedPage: number,
+  db: Db,
+): Promise<{
+  page: number;
+  totalPages: number;
+  categories: CategoryStandingsBlock[];
+  categoryGameTotal: number;
+}> {
+  const where = and(
+    eq(communityLiveLockCategoryRows.communityId, communityId),
+    eq(communityLiveLockCategoryRows.year, year),
+    eq(communityLiveLockCategoryRows.categoryId, categoryId),
+    ...(categoryGroup === "all"
+      ? []
+      : [eq(awardCategories.categoryGroup, categoryGroup)]),
+  );
+  const [totals] = await db
+    .select({
+      games: sql<number>`count(*)::int`,
+      votes: sql<number>`coalesce(sum(${communityLiveLockCategoryRows.voteCount}), 0)::int`,
+      label: sql<string | null>`max(${communityLiveLockCategoryRows.label})`,
+      description: sql<string | null>`max(${communityLiveLockCategoryRows.description})`,
+    })
+    .from(communityLiveLockCategoryRows)
+    .innerJoin(
+      awardCategories,
+      eq(awardCategories.id, communityLiveLockCategoryRows.categoryId),
+    )
+    .where(where);
+
+  const gameTotal = Number(totals?.games ?? 0);
+  const totalPages = Math.max(1, Math.ceil(gameTotal / pageSize) || 1);
+  const page = clampStandingsPage(requestedPage, totalPages);
+  if (gameTotal === 0 || !totals?.label) {
+    return { page, totalPages, categories: [], categoryGameTotal: 0 };
+  }
+
+  const rows = await db
+    .select({
+      displayRank: sql<number>`rank() over (order by ${communityLiveLockCategoryRows.voteCount} desc)::int`,
+      gameId: communityLiveLockCategoryRows.gameId,
+      slug: communityLiveLockCategoryRows.slug,
+      title: communityLiveLockCategoryRows.title,
+      coverUrl: communityLiveLockCategoryRows.coverUrl,
+      voteCount: communityLiveLockCategoryRows.voteCount,
+    })
+    .from(communityLiveLockCategoryRows)
+    .innerJoin(
+      awardCategories,
+      eq(awardCategories.id, communityLiveLockCategoryRows.categoryId),
+    )
+    .where(where)
+    .orderBy(asc(communityLiveLockCategoryRows.place))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize);
+
+  return {
+    page,
+    totalPages,
+    categoryGameTotal: gameTotal,
+    categories: [
+      {
+        categoryId,
+        label: totals.label,
+        description: totals.description,
+        totalVotes: Number(totals.votes ?? 0),
+        rows: rows.map((row) => ({
+          place: Number(row.displayRank),
+          gameId: row.gameId,
+          slug: row.slug,
+          title: row.title,
+          coverUrl: row.coverUrl,
+          voteCount: row.voteCount,
+        })),
+      },
+    ],
   };
 }
 
@@ -808,15 +936,13 @@ export async function getCommunityLiveStandings(
       requestedPage,
       categoryGroup,
       view,
+      categoryId,
       db,
     );
-    let categories = locked.categories.map((block) => ({
+    const categories = locked.categories.map((block) => ({
       ...block,
       totalVotes: block.totalVotes ?? null,
     }));
-    if (view === "category" && categoryId) {
-      categories = categories.filter((c) => c.categoryId === categoryId);
-    }
     return redactStandingsPage({
       year,
       listCount: locked.listCount,
@@ -832,7 +958,7 @@ export async function getCommunityLiveStandings(
       categoryGroup,
       view,
       categoryId,
-      categoryGameTotal: categories[0]?.rows.length ?? 0,
+      categoryGameTotal: locked.categoryGameTotal,
       gotyPublic: true,
       categoriesPublic: true,
     });
@@ -857,6 +983,11 @@ export async function getCommunityLiveStandings(
     },
     db,
   );
+  const categoryDetail = view === "category" && categoryId !== null;
+  const detailTotalPages = Math.max(
+    1,
+    Math.ceil(live.categoryGameTotal / pageSize) || 1,
+  );
 
   return redactStandingsPage({
     year,
@@ -864,17 +995,18 @@ export async function getCommunityLiveStandings(
     detailedStatsRevealed: revealed,
     standingsVersion: 0,
     scoresFresh: true,
-    page: live.page,
+    page: categoryDetail
+      ? clampStandingsPage(requestedPage, detailTotalPages)
+      : live.page,
     pageSize,
     gotyTotal: live.gotyTotal,
-    totalPages: live.totalPages,
+    totalPages: categoryDetail ? detailTotalPages : live.totalPages,
     goty: live.goty,
     categories: live.categories,
     categoryGroup,
     view,
     categoryId,
-    categoryGameTotal:
-      view === "category" ? (live.categories[0]?.rows.length ?? 0) : 0,
+    categoryGameTotal: categoryDetail ? live.categoryGameTotal : 0,
     gotyPublic: true,
     categoriesPublic: true,
   });
