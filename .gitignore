@@ -47,3 +47,4 @@ yarn-error.log*
 /playwright/.cache/
 /playwright-report-staging/
 /e2e/.auth/
+/e2e/.cost/

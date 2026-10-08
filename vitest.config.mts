@@ -17,6 +17,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(root, "./src"),
       "@thegamies/db/schema": path.resolve(root, "./packages/db/src/schema.ts"),
+      "@thegamies/db/request-cost": path.resolve(
+        root,
+        "./packages/db/src/request-cost.ts",
+      ),
       "@thegamies/db": path.resolve(root, "./packages/db/src/index.ts"),
       "@thegamies/igdb": path.resolve(root, "./packages/igdb/src/index.ts"),
     },

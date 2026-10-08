@@ -17,6 +17,8 @@
     "test:e2e": "playwright test",
     "test:staging": "playwright test -c playwright.staging.config.ts",
     "qa:fixtures": "tsx scripts/qa/ensure-staging-fixtures.ts",
+    "cost:journeys": "playwright test -c playwright.cost.config.ts",
+    "cost:report": "tsx scripts/cost/report.ts",
     "db:generate": "pnpm --filter @thegamies/db generate",
     "db:migrate": "pnpm --filter @thegamies/db migrate",
     "db:migrate:secrets": "doppler run -- pnpm db:migrate",

@@ -199,7 +199,8 @@ jobs:
           NODE
 
           pnpm exec opennextjs-cloudflare build
-          DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
+          # Staging only: log per-request Neon/response cost (docs/request-cost.md).
+          DEPLOY_LOG=$(pnpm exec wrangler deploy --var REQUEST_COST_METER:1 2>&1 | tee /dev/stderr)
 
           if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
             pnpm exec wrangler secret bulk "$RUNNER_TEMP/wrangler-secrets.json" --name "$WORKER"

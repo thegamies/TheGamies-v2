@@ -64,6 +64,39 @@ Next.js `<Link>` prefetch is **off** (`src/lib/next-link.tsx`, aliased over `nex
 
 Live lock and edition results freeze into **tables of rows**, not one giant JSON payload you parse to serve 50 standings. Page those rows in SQL. See [community.md](./features/community.md) and [engineering.md](./engineering.md).
 
+## Measuring cost per visitor
+
+Staging deploys with `REQUEST_COST_METER=1` (`--var` in `.github/workflows/staging.yml`; never production). With it on, the Worker entry (`src/lib/cloudflare/request-cost.ts`) logs one JSON line per request:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `document`, `rsc` (in-app navigation), `action` (Server Function), `image` (`/_next/image` transform), `api`, `other` |
+| `dbRoundTrips` / `dbStatements` | Neon HTTP requests / SQL statements (a `db.batch` is one trip, several statements) |
+| `dbBytes` | Decoded Neon response bytes: an upper bound on billed transfer |
+| `responseBytes` | Uncompressed bytes the Worker sent |
+| `journey` / `step` | From the `x-cost-journey` / `x-cost-step` request headers |
+
+DB counting hooks `neonConfig.fetchFunction` (`packages/db/src/request-cost.ts`) and is a plain `fetch` when the meter is off. Worker CPU time is not visible from inside the Worker; read it from the invocation log Cloudflare records next to each line (Workers Logs, filter `journey`).
+
+Run a journey against staging:
+
+```bash
+# both terminals: one tag per run
+export COST_RUN_TAG=cost-$(date +%s)
+
+# terminal 1: capture this run's Worker lines
+mkdir -p e2e/.cost
+pnpm exec wrangler tail thegamies-v2-develop --header "x-cost-journey:$COST_RUN_TAG" --format json > e2e/.cost/tail.json
+
+# terminal 2 (same QA env as pnpm test:staging, plus COST_RUN_TAG)
+pnpm cost:journeys
+pnpm cost:report    # writes e2e/.cost/report.md
+```
+
+Journeys live in `e2e/cost/`; each step is a real visit (first step a full page load, later steps click the in-page link when present). Playwright disables the HTTP cache while it routes requests, so every image counts. The report shows unique images separately because Cloudflare Images bills unique transformations. Static `/_next/static` assets are served by the assets binding and do not invoke the Worker.
+
+Current journeys: `edition-results` (Results → Full standings → Hosts standings → Categories → one category → Comparison → Voters → a voter's ballot), signed out and as a member.
+
 ## Checklist (use on every list/search)
 
 - [ ] What is the maximum rows this request can return? Is there a `LIMIT`?
