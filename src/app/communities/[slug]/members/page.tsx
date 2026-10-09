@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound } from "next/navigation";
 import { MemberAdminActions } from "@/app/communities/[slug]/settings/MemberAdminActions";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";

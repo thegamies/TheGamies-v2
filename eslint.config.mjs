@@ -19,6 +19,28 @@ const eslintConfig = defineConfig([
     "design-references/**",
     "workers/*/worker-configuration.d.ts",
   ]),
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/lib/next-link.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/link",
+              message:
+                "Import Link from @/lib/next-link (prefetch off by default; see docs/request-cost.md).",
+            },
+            {
+              name: "next/dist/client/app-dir/link",
+              message: "Import Link from @/lib/next-link.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

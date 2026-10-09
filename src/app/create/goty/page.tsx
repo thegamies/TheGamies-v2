@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { ClearLocalGotyDraft } from "@/components/lists/ClearLocalGotyDraft";

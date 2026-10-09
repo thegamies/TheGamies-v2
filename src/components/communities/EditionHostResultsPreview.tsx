@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { EditionCategoryResults } from "@/components/communities/EditionCategoryResults";
 import { EditionFullStandings } from "@/components/communities/EditionFullStandings";
 import { EditionResultsCalculatingBanner } from "@/components/communities/EditionResultsCalculatingBanner";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import {
   LIVE_PUBLIC_LABEL,
   TGA_PUBLIC_LABEL,

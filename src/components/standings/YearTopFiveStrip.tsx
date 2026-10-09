@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import {
   StandingGameCard,

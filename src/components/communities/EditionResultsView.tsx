@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";

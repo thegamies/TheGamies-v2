@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 
 export function CommunityPrivateView({ name }: { name: string }) {
   return (

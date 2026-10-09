@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import { hasPasswordCredential } from "@/lib/auth/has-password-credential";
 import {

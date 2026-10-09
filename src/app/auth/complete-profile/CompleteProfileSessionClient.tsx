@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useEffect, useRef, useState } from "react";
 import { claimNeonAuthSession } from "@/lib/auth/claim-oauth-session";
 import { GOOGLE_SIGN_IN_FAILED } from "@/lib/auth/google-sign-in-client";

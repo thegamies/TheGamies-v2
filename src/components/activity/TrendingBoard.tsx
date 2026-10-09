@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { GameCover } from "@/components/ui/GameCover";
 import { navItemClass } from "@/components/ui/navLevels";
 import {

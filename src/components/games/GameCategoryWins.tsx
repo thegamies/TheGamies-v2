@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { liveStandingsHref } from "@/lib/live-aggregate/award-category-defs";
 
 export type GameCategoryWinItem = {

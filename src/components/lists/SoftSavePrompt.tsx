@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useSyncExternalStore } from "react";
 import { claimListAction } from "@/app/create/actions";
 import { Button } from "@/components/ui/Button";

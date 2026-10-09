@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import type { TgaEntrantRow } from "@/lib/tga-pickem/sheets";
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { publicPageMetadata } from "@/lib/seo/site";
 

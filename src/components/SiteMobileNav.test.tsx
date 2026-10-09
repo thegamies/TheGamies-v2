@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { SiteMobileNav } from "./SiteMobileNav";
 import { buildAccountMenuGroups } from "@/lib/site-nav";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/next-link", () => ({
   default: ({
     href,
     children,

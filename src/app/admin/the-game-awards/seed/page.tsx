@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 import { countTgaSheetSeeds } from "@/lib/tga-pickem/seed-sheets";

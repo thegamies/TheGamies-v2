@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { type CSSProperties } from "react";
 import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";

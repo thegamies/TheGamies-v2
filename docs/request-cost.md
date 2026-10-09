@@ -58,7 +58,7 @@ Neon HTTP is roughly **one round trip per query**. Serial `await`s stack. Don’
 
 ## Link prefetch
 
-Next.js `<Link>` prefetch is **off** (`src/lib/next-link.tsx`, aliased over `next/link`). Prefetch is not a free hint: it runs the destination route on the Worker (same queries as a real visit) and ships the RSC payload. A homepage of game covers would otherwise prefetch many `/games/[slug]` pages. Opt in with `prefetch={true}` only when the destination is cheap and a click is likely. Decorative art is not a link. Homepage discover strips (`Trending`, `Upcoming`) are SQL-capped (`HOME_DISCOVER_CAP`, 12). The trending helper reuses the existing windowed board query and ships only the first page of covers.
+Next.js `<Link>` prefetch is **off**: import `Link` from `@/lib/next-link` (lint bans `next/link`). A bundler alias over `next/link` did not apply in Turbopack production builds, so every link prefetched until imports were switched (found by the cost journey, 2026-10-08). Prefetch is not a free hint: it runs the destination route on the Worker (same queries as a real visit) and ships the RSC payload. A homepage of game covers would otherwise prefetch many `/games/[slug]` pages. Opt in with `prefetch={true}` only when the destination is cheap and a click is likely. Decorative art is not a link. Homepage discover strips (`Trending`, `Upcoming`) are SQL-capped (`HOME_DISCOVER_CAP`, 12). The trending helper reuses the existing windowed board query and ships only the first page of covers.
 
 ## Freeze and snapshots
 

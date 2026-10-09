@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { EditionCategoryDebugPopover } from "@/components/communities/EditionCategoryDebug";
 import { controlGroupBarClass, segmentFitBtnClass } from "@/components/ui/controls";
 import { ScrollableNav } from "@/components/ui/ScrollableNav";

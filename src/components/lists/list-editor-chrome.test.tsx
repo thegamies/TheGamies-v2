@@ -9,7 +9,7 @@ import { ListDragHandle } from "./ListDragHandle";
 import { GridListBuilder } from "./GridListBuilder";
 import { ListEditor } from "./ListEditor";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/next-link", () => ({
   default: ({
     children,
     href,

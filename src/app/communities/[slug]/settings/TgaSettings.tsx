@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { communityCreateTgaHref } from "@/lib/communities/community-settings-href";
 import { TGA_PUBLIC_LABEL } from "@/lib/tga-pickem/labels";
 import { tgaPromoTitle } from "@/lib/tga-pickem/promo";

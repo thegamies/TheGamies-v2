@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound, redirect } from "next/navigation";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { CreateEventForm } from "@/components/communities/CreateEventForm";

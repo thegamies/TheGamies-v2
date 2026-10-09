@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import { FollowingFeed } from "@/components/activity/FollowingFeed";
 import { TrendingBoard } from "@/components/activity/TrendingBoard";

@@ -400,7 +400,8 @@ jobs:
           # Tail events arrive a few seconds after each request ends.
           sleep 15
           kill "$TAIL_PID" 2>/dev/null || true
-          pnpm cost:report > e2e/.cost/report.out || true
+          echo "tail captured $(wc -c < e2e/.cost/tail.json) bytes"
+          pnpm cost:report || true
           cat e2e/.cost/report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
           exit "$status"
       - if: always() && steps.guard.outputs.skipped == 'false'
@@ -408,6 +409,7 @@ jobs:
         with:
           name: request-cost
           path: e2e/.cost/
+          include-hidden-files: true
           retention-days: 30
           if-no-files-found: ignore
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { CopyLinkButton } from "@/components/lists/CopyLinkButton";
 import { ListFormatControl } from "@/components/lists/ListFormatControl";
 import { RefreshOnBfcache } from "@/components/lists/RefreshOnBfcache";

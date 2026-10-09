@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { communitySettingsHref } from "@/lib/communities/community-settings-href";
 import { COMMUNITY_HOSTS_MAX } from "@/lib/communities/host-limits";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 
 export type TgaHostMemberOption = {
   profileId: string;
