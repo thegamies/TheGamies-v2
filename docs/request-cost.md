@@ -113,9 +113,29 @@ More journeys (homepage, game covers) and extra Neon HTTP `db.batch` on other bo
 
 ### Estimating traffic cost (load test)
 
-Neon bills **CU-hours** (compute size × time the endpoint is awake). Workers bill invocations and CPU. To turn a per-visit journey into “what does N people cost,” run a **load test on staging** (never production): warm the compute, then hold concurrent traffic long enough to read CU-hours and Worker CPU from the dashboards. Compare that to the journey’s trips/bytes so you know whether the bill is “many round trips” or “compute stayed awake.”
+Neon bills **CU-hours** (compute size × time the endpoint is awake). Workers bill invocations and CPU. Hold concurrent traffic on **staging** long enough to read those dashboards. Do not treat a single cold request × 3600 as an hour of CU. Suspend-on-idle (staging is five minutes) dominates quiet periods.
 
-Do not treat a single cold request × 3600 as an hour of CU. Suspend-on-idle (staging is five minutes) dominates quiet periods.
+**Never production. Not part of the staging `qa` job.** Same refuse path as QA (`QA_TARGET=staging`, HTTPS, not a production host).
+
+Dedicated fixtures (ensure repairs phases; you do not flip the live Pick’em year or QA showcase):
+
+- Community `gamies_qa_load`
+- TGA **open** year 2098 and **locked** year 2099 (enabled, not promoted)
+- Open edition 2026 (ballots) and published edition 2025 on that community (results)
+
+```bash
+# Doppler: QA_TARGET=staging, QA_STAGING_URL, DATABASE_URL, QA_ACCOUNT_PASSWORD
+# Writers also need LOADTEST_SECRET (GitHub → staging Worker; local Doppler)
+
+pnpm qa:loadtest:ensure -- --writers 50
+pnpm cost:load -- --scenario=pickem-open --duration=10m --vus-read=20 --writers=50
+# or --all (five scenarios, ~50 minutes)
+# teardown: pnpm qa:loadtest:purge
+```
+
+Scenarios (each includes a general mix of home, `/games`, a game, `/rankings`): `general`, `pickem-open`, `pickem-locked`, `editions-filling`, `editions-results`. Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only.
+
+Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p95, errors, UTC window). Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount.
 
 ## Checklist (use on every list/search)
 

@@ -35,6 +35,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | `NEON_AUTH_COOKIE_SECRET` | same | 32+ chars. Staging + previews |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging public origin |
 | `CRON_SECRET` | same | Edition freeze Cron (Cloudflare Worker). Shared with production |
+| `LOADTEST_SECRET` | same | Optional. Staging-only Bearer for `/api/qa/loadtest` writes. **Never** set on production |
 | `ADMIN_SYNC_SECRET` | same | Site-operator claim + IGDB Worker proxy |
 | `IGDB_CLIENT_ID` | same | Twitch / IGDB |
 | `IGDB_CLIENT_SECRET` | same | Twitch / IGDB |

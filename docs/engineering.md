@@ -84,7 +84,7 @@ Before choosing freeze/cache/**search**/list storage, walk the request:
 
 Live lock and edition results freeze into **tables**, not one giant payload.
 
-Journeys in [request-cost.md](./request-cost.md) measure **one visit**. Traffic cost (Neon CU-hours, Worker CPU) is a **staging load test**, not more Playwright walks. Extra journeys and HTTP batching are paused.
+Journeys in [request-cost.md](./request-cost.md) measure **one visit**. Traffic cost (Neon CU-hours, Worker CPU) is a **staging load test** (`pnpm cost:load`, never CI, never production). Extra journeys and HTTP batching are paused.
 
 ## Deployment
 

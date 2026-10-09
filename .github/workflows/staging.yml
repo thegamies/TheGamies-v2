@@ -110,6 +110,7 @@ jobs:
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LOADTEST_SECRET: ${{ secrets.LOADTEST_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
           IGDB_WEBHOOKS_WORKER_URL: ${{ secrets.IGDB_WEBHOOKS_WORKER_URL }}
@@ -164,6 +165,7 @@ jobs:
             "NEON_AUTH_COOKIE_SECRET",
             "ADMIN_SYNC_SECRET",
             "CRON_SECRET",
+            "LOADTEST_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
             "IGDB_WEBHOOKS_WORKER_URL",
