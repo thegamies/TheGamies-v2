@@ -101,6 +101,22 @@ Journeys live in `e2e/cost/`; each step is a real visit (first step a full page 
 
 Current journeys: `edition-results` (Results → Full standings → Hosts standings → Categories → one category → Comparison → Voters → a voter's ballot), signed out and as a member.
 
+Staging `qa` always runs that journey. Wrangler tail on CI often captures no `request_cost` lines (the report falls back to browser counts). For DB trips, bytes, and wall time, run locally with `wrangler tail` as above.
+
+### What edition Results showed (2026-10-08–09)
+
+- Duplicate community/edition/freeze reads were cut; independent board reads start together; GOTY top-N is one window `RANK` / `DENSE_RANK` query.
+- Warm Worker + Neon: Results document is on the order of **11–13** DB round trips and **~350–500 ms** wall. A cold first hit can look like a regression; always warm (or ignore document 1).
+- Link prefetch was still running destination RSC until imports switched to `@/lib/next-link`. After that, the Results step has **no prefetch RSC**; remaining RSC are real in-app clicks.
+
+More journeys (homepage, game covers) and extra Neon HTTP `db.batch` on other boards are **paused**. A Playwright walk measures **one visit**. It does not estimate a traffic bill.
+
+### Estimating traffic cost (load test)
+
+Neon bills **CU-hours** (compute size × time the endpoint is awake). Workers bill invocations and CPU. To turn a per-visit journey into “what does N people cost,” run a **load test on staging** (never production): warm the compute, then hold concurrent traffic long enough to read CU-hours and Worker CPU from the dashboards. Compare that to the journey’s trips/bytes so you know whether the bill is “many round trips” or “compute stayed awake.”
+
+Do not treat a single cold request × 3600 as an hour of CU. Suspend-on-idle (staging is five minutes) dominates quiet periods.
+
 ## Checklist (use on every list/search)
 
 - [ ] What is the maximum rows this request can return? Is there a `LIMIT`?
