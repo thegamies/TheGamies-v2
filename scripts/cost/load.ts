@@ -251,7 +251,11 @@ async function main() {
     throw new Error("LOADTEST_SECRET is required when --writers is set.");
   }
 
-  await repairPhases(fixtures, target.databaseUrl);
+  if (process.env.COST_LOAD_SKIP_REPAIR === "1") {
+    console.log("cost-load: skipping phase repair");
+  } else {
+    await repairPhases(fixtures, target.databaseUrl);
+  }
   const tag = process.env.COST_RUN_TAG?.trim() || `load-${Date.now()}`;
 
   for (const scenario of args.scenarios) {

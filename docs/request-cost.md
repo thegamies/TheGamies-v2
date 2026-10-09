@@ -135,7 +135,7 @@ pnpm cost:load -- --scenario=pickem-open --duration=10m --vus-read=20 --writers=
 
 Scenarios (each includes a general mix of home, `/games`, a game, `/rankings`): `general`, `pickem-open`, `pickem-locked`, `editions-filling`, `editions-results`. Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only.
 
-Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p95, errors, UTC window). Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount.
+Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p95, errors, UTC window). Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount. `COST_LOAD_SKIP_REPAIR=1` skips repairing load-test years (GET-only smoke when fixtures already exist).
 
 ## Checklist (use on every list/search)
 
