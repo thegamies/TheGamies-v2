@@ -1,7 +1,9 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import {
   emptyDbRequestCost,
+  encodeMeteredDbTripsHeader,
   setDbRequestCostSlot,
+  unionIntervalMs,
   type DbRequestCost,
 } from "@thegamies/db/request-cost";
 
@@ -14,6 +16,8 @@ export const REQUEST_COST_LOG_TYPE = "request_cost";
 export const REQUEST_COST_WALL_MS_HEADER = "x-cost-wall-ms";
 export const REQUEST_COST_DB_MS_HEADER = "x-cost-db-ms";
 export const REQUEST_COST_DB_TRIPS_HEADER = "x-cost-db-trips";
+export const REQUEST_COST_DB_SPAN_MS_HEADER = "x-cost-db-span-ms";
+export const REQUEST_COST_DB_TRIP_DETAIL_HEADER = "x-cost-db-trip-detail";
 
 export type RequestCostEnv = {
   REQUEST_COST_METER?: string;
@@ -38,6 +42,8 @@ export type RequestCostRecord = DbRequestCost & {
   /** Uncompressed body bytes the Worker sent; Cloudflare compresses after this. */
   responseBytes: number;
   wallMs: number;
+  /** Overlap union of Neon trips. */
+  dbSpanMs: number;
 };
 
 type FetchHandler<Env, Ctx> = (
@@ -114,6 +120,7 @@ export function withRequestCost<Env extends RequestCostEnv, Ctx>(
         status,
         responseBytes,
         wallMs,
+        dbSpanMs: unionIntervalMs(cost.trips),
         ...cost,
       };
       log(JSON.stringify(record));
@@ -126,7 +133,12 @@ export function withRequestCost<Env extends RequestCostEnv, Ctx>(
     const headers = new Headers(response.headers);
     headers.set(REQUEST_COST_WALL_MS_HEADER, String(wallMs));
     headers.set(REQUEST_COST_DB_MS_HEADER, String(cost.dbMs));
+    headers.set(REQUEST_COST_DB_SPAN_MS_HEADER, String(unionIntervalMs(cost.trips)));
     headers.set(REQUEST_COST_DB_TRIPS_HEADER, String(cost.dbRoundTrips));
+    headers.set(
+      REQUEST_COST_DB_TRIP_DETAIL_HEADER,
+      encodeMeteredDbTripsHeader(cost.trips),
+    );
     if (!response.body || response.status === 101) {
       emit(response.status, 0, wallMs);
       return new Response(response.body, {

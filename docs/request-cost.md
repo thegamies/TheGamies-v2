@@ -75,7 +75,7 @@ Staging deploys with `REQUEST_COST_METER=1` (`--var` in `.github/workflows/stagi
 | `dbBytes` | Decoded Neon response bytes: an upper bound on billed transfer |
 | `responseBytes` | Uncompressed bytes the Worker sent |
 | `journey` / `step` | From the `x-cost-journey` / `x-cost-step` request headers |
-| Response headers | `x-cost-wall-ms`, `x-cost-db-ms`, `x-cost-db-trips` (load runner; not product UI) |
+| Response headers | `x-cost-wall-ms`, `x-cost-db-ms` (sum / work), `x-cost-db-span-ms` (overlap union / clock), `x-cost-db-trips`, `x-cost-db-trip-detail` (SQL fingerprints, no binds; load runner; not product UI) |
 
 DB counting hooks `neonConfig.fetchFunction` (`packages/db/src/request-cost.ts`) and is a plain `fetch` when the meter is off. Worker CPU time is not visible from inside the Worker; read it from the invocation log Cloudflare records next to each line (Workers Logs, filter `journey`).
 
@@ -148,7 +148,7 @@ pnpm cost:load -- --scenario=pickem-open --duration=10m --vus-read=20 --writers=
 
 Scenarios (each includes a general mix of home, `/games`, a game, `/rankings`): `general`, `pickem-open`, `pickem-locked`, `editions-filling`, `editions-results`. Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only.
 
-Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p95 by group and by path/op, errors, UTC window), plus `.json` samples and `.html` with filters for group, kind (`/games/:slug` rolls up game pages; Path chips drill into one slug), and status. Client times are the load runner’s HTTP round-trip. After this Worker is on staging, samples also store `x-cost-wall-ms`, `x-cost-db-ms`, and `x-cost-db-trips` (handler wall vs Neon wait; `dbMs` can exceed wall when trips overlap). Rebuild HTML from JSON with `pnpm exec tsx scripts/cost/render-load-html.ts e2e/.cost/load-….json`. Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount. `COST_LOAD_SKIP_REPAIR=1` skips repairing load-test years (GET-only smoke when fixtures already exist). Previous runs that only wrote markdown cannot be split by path.
+Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p90/p95 by group and by path/op, errors, UTC window), plus `.json` samples and `.html` with filters for group, kind (`/games/:slug` rolls up game pages; Path chips drill into one slug), and status. Client times are the load runner’s HTTP round-trip. After this Worker is on staging, samples store wall, **db clock** (`x-cost-db-span-ms`, overlap union), **db sum** (`x-cost-db-ms`, parallel trips add), and per-trip SQL fingerprints (`x-cost-db-trip-detail`, no bind params). Rebuild HTML from JSON with `pnpm exec tsx scripts/cost/render-load-html.ts e2e/.cost/load-….json`. Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount. `COST_LOAD_SKIP_REPAIR=1` skips repairing load-test years (GET-only smoke when fixtures already exist). Previous runs that only wrote markdown cannot be split by path.
 
 Writers ping `/api/auth/get-session` on the same **4 minute** interval as `SessionKeepAlive` (and once more after a 401) so the 300s Neon session-cache cookie is refreshed. Without that, a 10-minute write mix looks signed out. The load runner is not a browser; it applies `Set-Cookie` itself.
 

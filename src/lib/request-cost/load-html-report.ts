@@ -7,26 +7,47 @@ type CompactSample = [
   ms: number,
   wallMs: number,
   dbMs: number,
+  dbSpanMs: number,
   dbTrips: number,
+  trips: Array<[qIndex: number, ms: number]>,
 ];
 
 function jsonForScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c");
 }
 
-function compactSamples(samples: LoadSample[]): CompactSample[] {
-  return samples.map((s) => [
-    s.group,
-    s.step,
-    s.status,
-    s.ms,
-    s.wallMs ?? -1,
-    s.dbMs ?? -1,
-    s.dbTrips ?? -1,
-  ]);
+function compactSamples(samples: LoadSample[]): {
+  queries: string[];
+  samples: CompactSample[];
+} {
+  const queries: string[] = [];
+  const index = new Map<string, number>();
+  const qid = (sql: string) => {
+    const existing = index.get(sql);
+    if (existing != null) return existing;
+    const id = queries.length;
+    queries.push(sql);
+    index.set(sql, id);
+    return id;
+  };
+  return {
+    queries,
+    samples: samples.map((s) => [
+      s.group,
+      s.step,
+      s.status,
+      s.ms,
+      s.wallMs ?? -1,
+      s.dbMs ?? -1,
+      s.dbSpanMs ?? -1,
+      s.dbTrips ?? -1,
+      (s.trips ?? []).map((trip) => [qid(trip.sql), trip.ms] as [number, number]),
+    ]),
+  };
 }
 
 export function formatLoadHtmlReport(stats: LoadRunStats): string {
+  const compact = compactSamples(stats.samples);
   const payload = {
     scenario: stats.scenario,
     durationMs: stats.durationMs,
@@ -34,7 +55,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     writers: stats.writers,
     startedAt: stats.startedAt,
     endedAt: stats.endedAt,
-    samples: compactSamples(stats.samples),
+    queries: compact.queries,
+    samples: compact.samples,
   };
 
   return `<!DOCTYPE html>
@@ -129,7 +151,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       · ${Math.round(stats.durationMs / 1000)}s
       · ${stats.vusRead} readers · ${stats.writers} writers
     </p>
-    <p class="meta">Filter by group, kind (<code>/games/:slug</code> rolls up game pages), then a path. Client is the runner round-trip. Wall and db wait come from staging meter headers after that Worker is deployed.</p>
+    <p class="meta">Filter by group, kind (<code>/games/:slug</code> rolls up game pages), then a path. Client is the runner round-trip. Wall is Worker time. Db clock is overlap-union of Neon trips; db sum adds parallel trips. Trip table is SQL fingerprints (no bind params).</p>
   </header>
   <main>
     <fieldset>
@@ -156,14 +178,29 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         <tr>
           <th>Slice</th>
           <th class="num">n</th>
-          <th class="num">p50 client</th>
-          <th class="num">p95 client</th>
-          <th class="num">p50 wall</th>
-          <th class="num">p50 db</th>
+          <th class="num">client p50 / p90 / p95</th>
+          <th class="num">wall p50 / p90 / p95</th>
+          <th class="num">db clock p50 / p90 / p95</th>
+          <th class="num">db sum p50 / p90 / p95</th>
           <th class="num">max</th>
         </tr>
       </thead>
       <tbody id="rows"></tbody>
+    </table>
+    <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.5rem">Neon trips</h2>
+    <p class="meta">Same filter as above. One HTTP trip to Neon; a batch is several statements joined with <code>|</code>.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>SQL</th>
+          <th class="num">n</th>
+          <th class="num">p50</th>
+          <th class="num">p90</th>
+          <th class="num">p95</th>
+          <th class="num">max</th>
+        </tr>
+      </thead>
+      <tbody id="trips"></tbody>
     </table>
   </main>
   <script>
@@ -183,21 +220,30 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     function col(rows, idx) {
       return rows.map((r) => r[idx]).filter((n) => typeof n === "number" && n >= 0).sort((a, b) => a - b);
     }
+    function band(sorted) {
+      if (!sorted.length) return null;
+      return {
+        p50: percentile(sorted, 50),
+        p90: percentile(sorted, 90),
+        p95: percentile(sorted, 95),
+        p99: percentile(sorted, 99),
+        max: sorted[sorted.length - 1] || 0,
+      };
+    }
+    function fmtBand(b) {
+      return b ? b.p50 + " / " + b.p90 + " / " + b.p95 : "—";
+    }
     function summary(rows) {
-      const ms = col(rows, 3);
-      const wall = col(rows, 4);
-      const db = col(rows, 5);
+      const client = band(col(rows, 3)) || { p50: 0, p90: 0, p95: 0, p99: 0, max: 0 };
       const ok = rows.filter((r) => r[2] >= 200 && r[2] < 300).length;
       return {
         n: rows.length,
         ok,
         errors: rows.length - ok,
-        p50: percentile(ms, 50),
-        p95: percentile(ms, 95),
-        p99: percentile(ms, 99),
-        max: ms[ms.length - 1] || 0,
-        wallP50: wall.length ? percentile(wall, 50) : null,
-        dbP50: db.length ? percentile(db, 50) : null,
+        client,
+        wall: band(col(rows, 4)),
+        db: band(col(rows, 5)),
+        dbSpan: band(col(rows, 6)),
       };
     }
     function unique(values) {
@@ -269,12 +315,12 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         stat("Success", s.ok.toLocaleString()) +
         stat("Errors", s.errors.toLocaleString()) +
         stat("RPS", rps) +
-        stat("p50 client", s.p50 + " ms") +
-        stat("p95 client", s.p95 + " ms") +
-        (s.wallP50 != null ? stat("p50 wall", s.wallP50 + " ms") : "") +
-        (s.dbP50 != null ? stat("p50 db wait", s.dbP50 + " ms") : "") +
-        stat("max", s.max + " ms");
-      const cap = Math.max(s.p95 * 1.5, 200);
+        stat("client p50 / p90 / p95", fmtBand(s.client) + " ms") +
+        (s.wall ? stat("wall p50 / p90 / p95", fmtBand(s.wall) + " ms") : "") +
+        (s.dbSpan ? stat("db clock p50 / p90 / p95", fmtBand(s.dbSpan) + " ms") : "") +
+        (s.db ? stat("db sum p50 / p90 / p95", fmtBand(s.db) + " ms") : "") +
+        stat("max client", s.client.max + " ms");
+      const cap = Math.max(s.client.p95 * 1.5, 200);
       const buckets = Array(24).fill(0);
       for (const r of rows) {
         const i = Math.min(buckets.length - 1, Math.floor((r[3] / cap) * buckets.length));
@@ -304,20 +350,57 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 "</code></td><td class=\\"num\\">" +
                 sl.n +
                 "</td><td class=\\"num\\">" +
-                sl.p50 +
+                fmtBand(sl.client) +
                 "</td><td class=\\"num\\">" +
-                sl.p95 +
+                fmtBand(sl.wall) +
                 "</td><td class=\\"num\\">" +
-                (sl.wallP50 != null ? sl.wallP50 : "—") +
+                fmtBand(sl.dbSpan) +
                 "</td><td class=\\"num\\">" +
-                (sl.dbP50 != null ? sl.dbP50 : "—") +
+                fmtBand(sl.db) +
                 "</td><td class=\\"num\\">" +
-                sl.max +
+                sl.client.max +
                 "</td></tr>"
               );
             })
             .join("")
         : "<tr><td class=\\"empty\\" colspan=\\"7\\">No requests in this filter.</td></tr>";
+      const tripMs = new Map();
+      for (const r of rows) {
+        for (const pair of r[8] || []) {
+          const sql = DATA.queries[pair[0]] || "(unknown)";
+          const list = tripMs.get(sql);
+          if (list) list.push(pair[1]);
+          else tripMs.set(sql, [pair[1]]);
+        }
+      }
+      const tripKeys = [...tripMs.keys()].sort((a, b) => {
+        const as = tripMs.get(a).slice().sort((x, y) => x - y);
+        const bs = tripMs.get(b).slice().sort((x, y) => x - y);
+        return percentile(bs, 50) - percentile(as, 50);
+      });
+      const tripBody = document.getElementById("trips");
+      tripBody.innerHTML = tripKeys.length
+        ? tripKeys
+            .map((sql) => {
+              const sorted = tripMs.get(sql).slice().sort((a, b) => a - b);
+              return (
+                "<tr><td><code>" +
+                String(sql).replace(/</g, "&lt;") +
+                "</code></td><td class=\\"num\\">" +
+                sorted.length +
+                "</td><td class=\\"num\\">" +
+                percentile(sorted, 50) +
+                "</td><td class=\\"num\\">" +
+                percentile(sorted, 90) +
+                "</td><td class=\\"num\\">" +
+                percentile(sorted, 95) +
+                "</td><td class=\\"num\\">" +
+                sorted[sorted.length - 1] +
+                "</td></tr>"
+              );
+            })
+            .join("")
+        : "<tr><td class=\\"empty\\" colspan=\\"6\\">No trip fingerprints in this filter (deploy staging meter, then re-run).</td></tr>";
     }
     render();
   </script>

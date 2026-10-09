@@ -71,7 +71,9 @@ describe("withRequestCost", () => {
     const res = await wrapped(new Request("https://x.test/"), ON, {});
     expect(res.headers.get("x-cost-db-trips")).toBe("1");
     expect(Number(res.headers.get("x-cost-db-ms"))).toBeGreaterThanOrEqual(0);
+    expect(Number(res.headers.get("x-cost-db-span-ms"))).toBeGreaterThanOrEqual(0);
     expect(Number(res.headers.get("x-cost-wall-ms"))).toBeGreaterThanOrEqual(0);
+    expect(res.headers.get("x-cost-db-trip-detail")).toContain("ms");
     expect(await res.text()).toBe("ok");
   });
 

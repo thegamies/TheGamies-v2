@@ -4,6 +4,8 @@ import {
   emptyDbRequestCost,
   meteredNeonFetch,
   setDbRequestCostSlot,
+  sqlFromNeonBody,
+  unionIntervalMs,
   type DbRequestCost,
 } from "./request-cost";
 
@@ -54,6 +56,11 @@ describe("meteredNeonFetch", () => {
       dbBytes: 2 * '{"rows":[1,2,3]}'.length,
     });
     expect(cost.dbMs).toBeGreaterThanOrEqual(0);
+    expect(cost.trips).toHaveLength(2);
+    expect(cost.trips[0]?.sql).toBe("select 1");
+    expect(cost.trips[1]?.sql).toContain("select 1");
+    expect(cost.trips[1]?.sql).toContain("select 2");
+    expect(cost.trips[1]?.statements).toBe(2);
   });
 
   it("keeps the Neon status and headers on the rebuilt response", async () => {
@@ -75,5 +82,39 @@ describe("meteredNeonFetch", () => {
 
     expect(res.status).toBe(400);
     expect(res.headers.get("content-type")).toBe("application/json");
+  });
+});
+
+describe("sqlFromNeonBody", () => {
+  it("fingerprints a single query without params", () => {
+    expect(
+      sqlFromNeonBody(
+        JSON.stringify({ query: "  select   *\nfrom games  ", params: [1] }),
+      ),
+    ).toBe("select * from games");
+  });
+});
+
+describe("unionIntervalMs", () => {
+  it("merges overlapping trips into one clock", () => {
+    expect(
+      unionIntervalMs([
+        { startMs: 1000, endMs: 1100 },
+        { startMs: 1050, endMs: 1150 },
+      ]),
+    ).toBe(150);
+  });
+
+  it("adds sequential trips with a gap", () => {
+    expect(
+      unionIntervalMs([
+        { startMs: 0, endMs: 100 },
+        { startMs: 200, endMs: 300 },
+      ]),
+    ).toBe(200);
+  });
+
+  it("is zero with no trips", () => {
+    expect(unionIntervalMs([])).toBe(0);
   });
 });

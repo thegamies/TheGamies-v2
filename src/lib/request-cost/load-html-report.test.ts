@@ -10,7 +10,7 @@ const stats: LoadRunStats = {
   startedAt: "2026-10-09T17:00:00.000Z",
   endedAt: "2026-10-09T17:01:00.000Z",
   samples: [
-    { group: "general", step: "/", status: 200, ms: 80, ok: true, wallMs: 40, dbMs: 90, dbTrips: 4 },
+    { group: "general", step: "/", status: 200, ms: 80, ok: true, wallMs: 40, dbMs: 90, dbSpanMs: 50, dbTrips: 4, trips: [{ ms: 50, sql: "select count(*) from games" }] },
     { group: "general", step: "/rankings", status: 200, ms: 400, ok: true },
     { group: "write", step: "list", status: 401, ms: 20, ok: false },
   ],
@@ -27,8 +27,11 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="statuses"');
     expect(html).toContain("/rankings");
     expect(html).toContain('"scenario":"general"');
-    expect(html).toContain("p50 wall");
-    expect(html).toContain("p50 db");
+    expect(html).toContain("wall p50 / p90 / p95");
+    expect(html).toContain("db clock p50 / p90 / p95");
+    expect(html).toContain("db sum p50 / p90 / p95");
+    expect(html).toContain("select count(*) from games");
+    expect(html).toContain('id="trips"');
     expect(html).not.toContain("</script></script>");
   });
 

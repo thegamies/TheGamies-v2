@@ -12,12 +12,18 @@ describe("readLoadCostHeaders", () => {
     const headers = new Headers({
       "x-cost-wall-ms": "120",
       "x-cost-db-ms": "80",
+      "x-cost-db-span-ms": "40",
       "x-cost-db-trips": "4",
+      "x-cost-db-trip-detail": JSON.stringify([
+        { ms: 40, sql: "select 1 from games" },
+      ]),
     });
     expect(readLoadCostHeaders(headers)).toEqual({
       wallMs: 120,
       dbMs: 80,
+      dbSpanMs: 40,
       dbTrips: 4,
+      trips: [{ ms: 40, sql: "select 1 from games" }],
     });
   });
 
@@ -55,17 +61,21 @@ describe("formatLoadReport", () => {
           ok: true,
           wallMs: 40,
           dbMs: 90,
+          dbSpanMs: 45,
+          trips: [{ ms: 45, sql: "select count(*) from games" }],
         },
         { group: "write", step: "list", status: 401, ms: 20, ok: false },
       ],
     });
     expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
     expect(md).toContain("Writers: 10");
-    expect(md).toContain("- general: 1 · p50 80 ms · p95 80 ms");
+    expect(md).toContain("- general: 1 · p50 80 ms · p90 80 ms · p95 80 ms");
     expect(md).toContain("- /rankings: 1 · p50 80 ms");
     expect(md).toContain("- Errors: 1");
-    expect(md).toContain("Worker wall p50: 40 ms");
-    expect(md).toContain("Neon db wait p50: 90 ms");
+    expect(md).toContain("Worker wall p50 40 ms · p90 40 ms · p95 40 ms");
+    expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms");
+    expect(md).toContain("Neon db sum p50 90 ms · p90 90 ms · p95 90 ms");
+    expect(md).toContain("select count(*) from games");
   });
 
   it("rolls game detail paths into one family", () => {
