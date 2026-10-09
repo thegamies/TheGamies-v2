@@ -118,10 +118,14 @@ describe("formatJourneyReport", () => {
       tag: "run-1",
       baseUrl: "https://staging.test",
       startedAt: "2026-10-08T00:00:00.000Z",
+      warmupHits: 3,
       steps: [step],
     };
     const md = formatJourneyReport(run, [summarizeStep(step, "run-1", [])]);
     expect(md).toContain("### edition-results — signed out");
+    expect(md).toContain(
+      "3 unmetered warm-up hits of the first path before recording.",
+    );
     expect(md).toContain("| overview | document | 4* |");
     expect(md).toContain("| **Total** |  | 4 |");
     expect(md).toContain("Browser estimate");

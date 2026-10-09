@@ -93,6 +93,8 @@ pnpm cost:journeys
 pnpm cost:report    # writes e2e/.cost/report.md
 ```
 
+Each journey warms the first path **three** times (no `x-cost-journey` header) so Neon and the Worker are awake before the recorded document. Staging can sit idle for five minutes; a cold first hit is not comparable to a warm baseline. Set `COST_WARMUP_HITS=0` to skip.
+
 Every staging deploy also runs the journeys in the `qa` job (non-blocking): the report lands in the job summary and the raw files in the `request-cost` artifact.
 
 Journeys live in `e2e/cost/`; each step is a real visit (first step a full page load, later steps click the in-page link when present). Playwright disables the HTTP cache while it routes requests, so every image counts. The report shows unique images separately because Cloudflare Images bills unique transformations. Static `/_next/static` assets are served by the assets binding and do not invoke the Worker.

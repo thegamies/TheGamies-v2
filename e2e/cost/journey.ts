@@ -12,6 +12,7 @@ import type {
   JourneyRun,
   JourneyStep,
 } from "../../src/lib/request-cost/report";
+import { costWarmupHits } from "../../src/lib/request-cost/warmup";
 
 export const COST_DIR = path.resolve("e2e/.cost");
 
@@ -38,9 +39,13 @@ function browserKind(req: PwRequest, url: URL): BrowserRequestKind {
   ) {
     return "asset";
   }
-  return classifyRequest(
-    new Request(url, { method: req.method(), headers: req.headers() }),
-  );
+  try {
+    return classifyRequest(
+      new Request(url, { method: req.method(), headers: req.headers() }),
+    );
+  } catch {
+    return "other";
+  }
 }
 
 /**
@@ -54,6 +59,20 @@ export async function recordJourney(
 ): Promise<JourneyRun> {
   const tag = costRunTag();
   const origin = new URL(meta.baseUrl).origin;
+  const warmupHits = costWarmupHits();
+  const firstPath = steps[0]?.path;
+  if (firstPath && warmupHits > 0) {
+    const warmUrl = new URL(firstPath, origin).href;
+    for (let i = 0; i < warmupHits; i++) {
+      const res = await page.request.get(warmUrl);
+      if (!res.ok()) {
+        throw new Error(
+          `Cost warm-up hit ${i + 1}/${warmupHits} returned HTTP ${res.status()}.`,
+        );
+      }
+    }
+  }
+
   let current: JourneyStep | null = null;
   const pending: Promise<void>[] = [];
 
@@ -83,7 +102,19 @@ export async function recordJourney(
       })().catch(() => undefined),
     );
   };
+  // Aborted requests (superseded navigations, cancelled prefetches) still reach the Worker.
+  const onFailed = (req: PwRequest) => {
+    const url = new URL(req.url());
+    if (url.origin !== origin || !current) return;
+    current.requests.push({
+      kind: browserKind(req, url),
+      url: `${url.pathname}${url.search}`,
+      status: 0,
+      transferBytes: 0,
+    });
+  };
   page.on("requestfinished", onFinished);
+  page.on("requestfailed", onFailed);
 
   const run: JourneyRun = {
     journey: meta.journey,
@@ -91,6 +122,7 @@ export async function recordJourney(
     tag,
     baseUrl: origin,
     startedAt: new Date().toISOString(),
+    warmupHits,
     steps: [],
   };
 
@@ -118,6 +150,7 @@ export async function recordJourney(
   }
 
   page.off("requestfinished", onFinished);
+  page.off("requestfailed", onFailed);
   await page.unroute(`${origin}/**`);
   current = null;
   return run;

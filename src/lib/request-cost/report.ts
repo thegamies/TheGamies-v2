@@ -30,6 +30,8 @@ export type JourneyRun = {
   tag: string;
   baseUrl: string;
   startedAt: string;
+  /** First-path GETs before recording (Neon / Worker wake). */
+  warmupHits?: number;
   steps: JourneyStep[];
 };
 
@@ -222,6 +224,11 @@ export function formatJourneyReport(
     `### ${run.journey} — ${run.viewer}`,
     "",
     `Run \`${run.tag}\` against ${run.baseUrl} at ${run.startedAt}.`,
+    ...(run.warmupHits
+      ? [
+          `${run.warmupHits} unmetered warm-up hit${run.warmupHits === 1 ? "" : "s"} of the first path before recording.`,
+        ]
+      : []),
     "",
     "| Step | Nav | Worker req | DB trips | DB stmts | DB KB | Resp KB | CPU ms | Images (unique) | Browser KB |",
     "|---|---|---|---|---|---|---|---|---|---|",
