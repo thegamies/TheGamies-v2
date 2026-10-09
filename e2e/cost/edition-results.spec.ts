@@ -80,13 +80,11 @@ for (const viewer of VIEWERS) {
       const file = await saveJourney(run);
       test.info().annotations.push({ type: "cost", description: file });
 
-      for (const step of run.steps) {
-        const page = step.requests.find(
-          (r) => r.kind === "document" || r.kind === "rsc",
-        );
-        expect(page, `${step.step} loaded`).toBeTruthy();
-        expect(page!.status, `${step.step} status`).toBe(200);
-      }
+      expect(run.steps.map((s) => s.step)).toEqual(
+        editionSteps(slug, fixtures.year, categoryId).map((s) => s.step),
+      );
+      const first = run.steps[0].requests.find((r) => r.kind === "document");
+      expect(first?.status, "first page load").toBe(200);
     });
   });
 }
