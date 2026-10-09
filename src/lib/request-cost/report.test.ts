@@ -24,6 +24,8 @@ function record(over: Partial<RequestCostRecord>): RequestCostRecord {
     dbStatements: 5,
     dbBytes: 2048,
     dbMs: 30,
+    dbSpanMs: 30,
+    trips: [],
     ...over,
   };
 }
