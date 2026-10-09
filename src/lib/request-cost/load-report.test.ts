@@ -1,5 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { formatLoadReport, percentile } from "./load-report";
+import {
+  formatLoadReport,
+  loadStepFamily,
+  partitionLoadSamples,
+  percentile,
+  readLoadCostHeaders,
+} from "./load-report";
+
+describe("readLoadCostHeaders", () => {
+  it("parses staging meter headers", () => {
+    const headers = new Headers({
+      "x-cost-wall-ms": "120",
+      "x-cost-db-ms": "80",
+      "x-cost-db-trips": "4",
+    });
+    expect(readLoadCostHeaders(headers)).toEqual({
+      wallMs: 120,
+      dbMs: 80,
+      dbTrips: 4,
+    });
+  });
+
+  it("omits missing or invalid values", () => {
+    expect(readLoadCostHeaders(new Headers())).toEqual({});
+    expect(
+      readLoadCostHeaders(new Headers({ "x-cost-wall-ms": "nope" })),
+    ).toEqual({});
+  });
+});
 
 describe("percentile", () => {
   it("reads from a sorted series", () => {
@@ -19,13 +47,65 @@ describe("formatLoadReport", () => {
       startedAt: "2026-10-09T17:00:00.000Z",
       endedAt: "2026-10-09T17:01:00.000Z",
       samples: [
-        { group: "general", status: 200, ms: 80, ok: true },
-        { group: "write", status: 401, ms: 20, ok: false },
+        {
+          group: "general",
+          step: "/rankings",
+          status: 200,
+          ms: 80,
+          ok: true,
+          wallMs: 40,
+          dbMs: 90,
+        },
+        { group: "write", step: "list", status: 401, ms: 20, ok: false },
       ],
     });
     expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
     expect(md).toContain("Writers: 10");
-    expect(md).toContain("- general: 1");
+    expect(md).toContain("- general: 1 · p50 80 ms · p95 80 ms");
+    expect(md).toContain("- /rankings: 1 · p50 80 ms");
     expect(md).toContain("- Errors: 1");
+    expect(md).toContain("Worker wall p50: 40 ms");
+    expect(md).toContain("Neon db wait p50: 90 ms");
+  });
+
+  it("rolls game detail paths into one family", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 0,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        { group: "general", step: "/games/a", status: 200, ms: 10, ok: true },
+        { group: "general", step: "/games/b", status: 200, ms: 20, ok: true },
+      ],
+    });
+    expect(md).toContain("- /games/:slug: 2");
+  });
+});
+
+describe("loadStepFamily", () => {
+  it("groups game detail paths", () => {
+    expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
+    expect(loadStepFamily("/games")).toBe("/games");
+    expect(loadStepFamily("list")).toBe("list");
+  });
+});
+
+describe("partitionLoadSamples", () => {
+  it("splits p95 by path", () => {
+    const rows = partitionLoadSamples(
+      [
+        { group: "general", step: "/", status: 200, ms: 10, ok: true },
+        { group: "general", step: "/", status: 200, ms: 20, ok: true },
+        { group: "general", step: "/games", status: 200, ms: 500, ok: true },
+      ],
+      "step",
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({ label: "/", n: 2, p95: 20 }),
+      expect.objectContaining({ label: "/games", n: 1, p95: 500 }),
+    ]);
   });
 });

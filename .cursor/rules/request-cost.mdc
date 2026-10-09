@@ -33,4 +33,5 @@ Before freezing data, caching, **searching**, or serving lists, ask how the **ho
 ## Related
 
 - Live lock and edition freeze: store paged standings as rows, not one giant payload
+- Neon query time (not Worker `dbMs`): MCP `inspect_database` `outliers` / `calls`, or `list_slow_queries` on **develop** (`pg_stat_statements` one-off, not production). See `docs/request-cost.md`
 - `docs/request-cost.md` · `docs/engineering.md` → Request cost

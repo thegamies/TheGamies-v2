@@ -39,6 +39,9 @@ describe("buildLoadGets", () => {
       expect(paths).toContain("/");
       expect(paths).toContain("/games");
       expect(paths).toContain("/games/hades");
+      expect(buildLoadGets(scenario, urls).some((item) => item.pickGame)).toBe(
+        true,
+      );
       expect(paths).toContain("/rankings");
       expect(mixUsesShowcaseSlug(buildLoadGets(scenario, urls))).toBe(false);
     }

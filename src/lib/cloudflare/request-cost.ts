@@ -10,6 +10,10 @@ export const REQUEST_COST_JOURNEY_HEADER = "x-cost-journey";
 /** Names the step inside a journey (e.g. `standings`). */
 export const REQUEST_COST_STEP_HEADER = "x-cost-step";
 export const REQUEST_COST_LOG_TYPE = "request_cost";
+/** Staging meter only. Load runner reads these; not shown in product UI. */
+export const REQUEST_COST_WALL_MS_HEADER = "x-cost-wall-ms";
+export const REQUEST_COST_DB_MS_HEADER = "x-cost-db-ms";
+export const REQUEST_COST_DB_TRIPS_HEADER = "x-cost-db-trips";
 
 export type RequestCostEnv = {
   REQUEST_COST_METER?: string;
@@ -104,12 +108,12 @@ export function withRequestCost<Env extends RequestCostEnv, Ctx>(
       path: `${url.pathname}${url.search}`,
     } as const;
 
-    const emit = (status: number, responseBytes: number) => {
+    const emit = (status: number, responseBytes: number, wallMs: number) => {
       const record: RequestCostRecord = {
         ...base,
         status,
         responseBytes,
-        wallMs: Date.now() - started,
+        wallMs,
         ...cost,
       };
       log(JSON.stringify(record));
@@ -118,13 +122,28 @@ export function withRequestCost<Env extends RequestCostEnv, Ctx>(
     const response = await storage.run(cost, () =>
       handler(request, env, ctx),
     );
+    const wallMs = Date.now() - started;
+    const headers = new Headers(response.headers);
+    headers.set(REQUEST_COST_WALL_MS_HEADER, String(wallMs));
+    headers.set(REQUEST_COST_DB_MS_HEADER, String(cost.dbMs));
+    headers.set(REQUEST_COST_DB_TRIPS_HEADER, String(cost.dbRoundTrips));
     if (!response.body || response.status === 101) {
-      emit(response.status, 0);
-      return response;
+      emit(response.status, 0, wallMs);
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
     }
     return new Response(
-      countBytes(response.body, (bytes) => emit(response.status, bytes)),
-      response,
+      countBytes(response.body, (bytes) =>
+        emit(response.status, bytes, Date.now() - started),
+      ),
+      {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      },
     );
   };
 }

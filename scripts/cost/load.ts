@@ -15,12 +15,27 @@ import {
   pickWeighted,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
-import { formatLoadReport, type LoadSample } from "@/lib/request-cost/load-report";
+import { formatLoadHtmlReport } from "@/lib/request-cost/load-html-report";
+import {
+  formatLoadReport,
+  readLoadCostHeaders,
+  type LoadSample,
+} from "@/lib/request-cost/load-report";
+import {
+  ensureLoadSessionCookie,
+  type LoadCookieSlot,
+} from "@/lib/request-cost/load-session";
 import {
   assertLoadtestFixturesSafe,
+  LOADTEST_BALLOT_ITEM_COUNT,
   LOADTEST_EDITION_FILLING_YEAR,
+  LOADTEST_LIST_ITEM_COUNT,
   LOADTEST_TGA_LOCKED_YEAR,
   LOADTEST_TGA_OPEN_YEAR,
+  loadtestBallotGames,
+  loadtestWriteGames,
+  pickLoadtestGame,
+  pickLoadtestGames,
   type LoadtestFixturesFile,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
@@ -46,29 +61,41 @@ function writeBody(
   fixtures: LoadtestFixturesFile,
 ): unknown {
   if (op === "list") {
+    const items = pickLoadtestGames(
+      loadtestWriteGames(fixtures),
+      LOADTEST_LIST_ITEM_COUNT,
+    ).map((game, rank) => ({ igdbId: game.igdbId, rank: rank + 1 }));
     return {
       op,
       draft: {
         listType: "custom",
         title: "Load test list",
-        items: [{ igdbId: fixtures.game.igdbId, rank: 1 }],
+        items:
+          items.length > 0
+            ? items
+            : [{ igdbId: fixtures.game.igdbId, rank: 1 }],
       },
     };
   }
   if (op === "library") {
+    const game = pickLoadtestGame(loadtestWriteGames(fixtures));
     return {
       op,
-      gameId: fixtures.game.id,
-      gameSlug: fixtures.game.slug,
+      gameId: game.id,
+      gameSlug: game.slug,
       status: "playing",
     };
   }
   if (op === "ballot") {
+    const items = pickLoadtestGames(
+      loadtestBallotGames(fixtures),
+      LOADTEST_BALLOT_ITEM_COUNT,
+    ).map((game, rank) => ({ gameId: game.id, rank: rank + 1 }));
     return {
       op,
       slug: fixtures.communitySlug,
       year: fixtures.fillingYear,
-      items: fixtures.ballotItems,
+      items: items.length > 0 ? items : fixtures.ballotItems,
       categoryVotes: [],
       customCategoryVotes: [],
     };
@@ -134,25 +161,31 @@ async function runScenario(input: {
   const readers = Array.from({ length: input.vusRead }, async () => {
     while (Date.now() < end) {
       const item = pickWeighted(gets);
+      const path = item.pickGame
+        ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
+        : item.path;
       const t0 = Date.now();
       try {
-        const res = await fetch(`${input.appUrl}${item.path}`, {
+        const res = await fetch(`${input.appUrl}${path}`, {
           headers: {
             accept: "text/html",
             "x-cost-journey": journey,
-            "x-cost-step": item.path,
+            "x-cost-step": path,
           },
         });
         await res.arrayBuffer().catch(() => null);
         samples.push({
           group: item.group,
+          step: path,
           status: res.status,
           ms: Date.now() - t0,
           ok: res.ok,
+          ...readLoadCostHeaders(res.headers),
         });
       } catch {
         samples.push({
           group: item.group,
+          step: path,
           status: 0,
           ms: Date.now() - t0,
           ok: false,
@@ -161,35 +194,54 @@ async function runScenario(input: {
     }
   });
 
+  const cookieSlots: LoadCookieSlot[] = input.cookies.map((cookie) => ({
+    cookie,
+    refreshedAt: 0,
+    inflight: null,
+  }));
+
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
-    const cookie = input.cookies[i % input.cookies.length];
-    if (!cookie || !input.secret || writes.length === 0) return;
+    const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
+    if (!slot?.cookie || !input.secret || writes.length === 0) return;
+
+    const postWrite = (op: LoadWriteOp) =>
+      fetch(`${input.appUrl}/api/qa/loadtest`, {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          "content-type": "application/json",
+          authorization: `Bearer ${input.secret}`,
+          cookie: slot.cookie,
+          "x-cost-journey": journey,
+          "x-cost-step": op,
+        },
+        body: JSON.stringify(writeBody(op, input.fixtures)),
+      });
+
     while (Date.now() < end) {
       const item = pickWeighted(writes);
+      await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), false);
       const t0 = Date.now();
       try {
-        const res = await fetch(`${input.appUrl}/api/qa/loadtest`, {
-          method: "POST",
-          headers: {
-            accept: "application/json",
-            "content-type": "application/json",
-            authorization: `Bearer ${input.secret}`,
-            cookie,
-            "x-cost-journey": journey,
-            "x-cost-step": item.op,
-          },
-          body: JSON.stringify(writeBody(item.op, input.fixtures)),
-        });
+        let res = await postWrite(item.op);
         await res.arrayBuffer().catch(() => null);
+        if (res.status === 401) {
+          await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), true);
+          res = await postWrite(item.op);
+          await res.arrayBuffer().catch(() => null);
+        }
         samples.push({
           group: item.group,
+          step: item.op,
           status: res.status,
           ms: Date.now() - t0,
           ok: res.ok,
+          ...readLoadCostHeaders(res.headers),
         });
       } catch {
         samples.push({
           group: item.group,
+          step: item.op,
           status: 0,
           ms: Date.now() - t0,
           ok: false,
@@ -200,7 +252,7 @@ async function runScenario(input: {
 
   await Promise.all([...readers, ...writerLoops]);
   const ended = new Date();
-  const report = formatLoadReport({
+  const stats = {
     scenario: input.scenario,
     durationMs: ended.getTime() - started.getTime(),
     vusRead: input.vusRead,
@@ -208,16 +260,19 @@ async function runScenario(input: {
     startedAt: started.toISOString(),
     endedAt: ended.toISOString(),
     samples,
-  });
+  };
+  const report = formatLoadReport(stats);
+  const html = formatLoadHtmlReport(stats);
   const dir = path.resolve("e2e/.cost");
   await mkdir(dir, { recursive: true });
-  const file = path.join(
-    dir,
-    `load-${input.scenario}-${stampUtc(started)}.md`,
-  );
+  const stem = `load-${input.scenario}-${stampUtc(started)}`;
+  const file = path.join(dir, `${stem}.md`);
   await writeFile(file, report);
+  await writeFile(path.join(dir, `${stem}.json`), JSON.stringify(stats));
+  await writeFile(path.join(dir, `${stem}.html`), html);
   console.log(report);
   console.log(`wrote ${path.relative(process.cwd(), file)}`);
+  console.log(`wrote ${path.relative(process.cwd(), path.join(dir, `${stem}.html`))}`);
   return file;
 }
 

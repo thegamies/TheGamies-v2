@@ -54,7 +54,25 @@ describe("withRequestCost", () => {
     const res = await wrapped(new Request("https://x.test/"), {}, {});
 
     expect(res).toBe(original);
+    expect(res.headers.has("x-cost-wall-ms")).toBe(false);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("exposes wall and db wait on staging meter headers", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response('{"rows":[]}')),
+    );
+    const wrapped = withRequestCost(async () => {
+      await meteredNeonFetch("https://db.test/sql", { body: "{}" });
+      return new Response("ok", { status: 200 });
+    }, vi.fn());
+
+    const res = await wrapped(new Request("https://x.test/"), ON, {});
+    expect(res.headers.get("x-cost-db-trips")).toBe("1");
+    expect(Number(res.headers.get("x-cost-db-ms"))).toBeGreaterThanOrEqual(0);
+    expect(Number(res.headers.get("x-cost-wall-ms"))).toBeGreaterThanOrEqual(0);
+    expect(await res.text()).toBe("ok");
   });
 
   it("logs one line after the body finishes, with DB work done while streaming", async () => {

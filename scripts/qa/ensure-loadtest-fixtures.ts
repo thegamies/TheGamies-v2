@@ -6,7 +6,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { neon } from "@neondatabase/serverless";
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, lte, notInArray } from "drizzle-orm";
 import {
   communities,
   communityMembers,
@@ -30,13 +30,18 @@ import { createCommunity } from "@/lib/communities/service";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import { parseWriterCount } from "@/lib/qa/loadtest";
 import {
+  LOADTEST_BALLOT_POPULAR_POOL,
+  LOADTEST_BALLOT_UNPOPULAR_POOL,
   LOADTEST_COMMUNITY,
   LOADTEST_EDITION_FILLING_YEAR,
   LOADTEST_EDITION_RESULTS_YEAR,
+  LOADTEST_POPULAR_POOL,
   LOADTEST_TGA_LOCKED_YEAR,
   LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_UNPOPULAR_POOL,
   loadtestAccount,
   loadtestEditionOpenSchedule,
+  mergeLoadtestGameBands,
   type LoadtestFixturesFile,
 } from "@/lib/qa/loadtest";
 import {
@@ -104,15 +109,21 @@ async function ensureAuthUser(
   const account = loadtestAccount(index);
   let authUserId = await findAuthUserId(query, account.email);
   if (!authUserId) {
-    const res = await authPost(appUrl, "sign-up/email", {
-      email: account.email,
-      password,
-      name: account.displayName,
-    });
-    if (!res.ok) {
-      throw new Error(`sign-up ${account.username} failed HTTP ${res.status}`);
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      res = await authPost(appUrl, "sign-up/email", {
+        email: account.email,
+        password,
+        name: account.displayName,
+      });
+      if (res.ok) break;
+      if (res.status !== 429 || attempt === 5) {
+        throw new Error(`sign-up ${account.username} failed HTTP ${res.status}`);
+      }
+      log(`${account.username}: sign-up rate limited, waiting`);
+      await sleep(4000 * (attempt + 1));
     }
-    await sleep(400);
+    await sleep(1500);
     authUserId = await findAuthUserId(query, account.email);
     log(`${account.username}: created auth user`);
   }
@@ -217,8 +228,26 @@ async function ensureCommunity(db: Db, hostProfileId: string): Promise<string> {
   return row.id;
 }
 
-async function pickCatalogGames(db: Db, year: number) {
+async function pickCatalogBand(
+  db: Db,
+  input: {
+    year?: number;
+    limit: number;
+    band: "popular" | "unpopular";
+    excludeIds?: string[];
+  },
+) {
   const now = new Date();
+  const filters = [
+    isNull(games.igdbRemovedAt),
+    eq(games.isAdult, false),
+    isNull(games.versionParentIgdbId),
+    lte(games.firstReleaseDate, now),
+  ];
+  if (input.year != null) filters.push(eq(games.year, input.year));
+  if (input.excludeIds && input.excludeIds.length > 0) {
+    filters.push(notInArray(games.id, input.excludeIds));
+  }
   return db
     .select({
       id: games.id,
@@ -226,16 +255,32 @@ async function pickCatalogGames(db: Db, year: number) {
       igdbId: games.igdbId,
     })
     .from(games)
-    .where(
-      and(
-        eq(games.year, year),
-        isNull(games.igdbRemovedAt),
-        eq(games.isAdult, false),
-        isNull(games.versionParentIgdbId),
-        lte(games.firstReleaseDate, now),
-      ),
+    .where(and(...filters))
+    .orderBy(
+      input.band === "popular"
+        ? desc(games.popularity)
+        : asc(games.popularity),
+      games.id,
     )
-    .limit(8);
+    .limit(input.limit);
+}
+
+async function pickCatalogPool(
+  db: Db,
+  input: { year?: number; popular: number; unpopular: number },
+) {
+  const popular = await pickCatalogBand(db, {
+    year: input.year,
+    limit: input.popular,
+    band: "popular",
+  });
+  const unpopular = await pickCatalogBand(db, {
+    year: input.year,
+    limit: input.unpopular,
+    band: "unpopular",
+    excludeIds: popular.map((row) => row.id),
+  });
+  return mergeLoadtestGameBands(popular, unpopular);
 }
 
 async function main() {
@@ -264,7 +309,7 @@ async function main() {
       cookies.push({ index, cookie });
     }
     if (index > 1) {
-      await sleep(250);
+      await sleep(2000);
     }
   }
   if (writers === 0) cookies.length = 0;
@@ -282,14 +327,22 @@ async function main() {
       });
   }
 
-  const catalog = await pickCatalogGames(db, LOADTEST_EDITION_FILLING_YEAR);
-  const game = catalog[0];
-  if (!game) {
+  const catalogGames = await pickCatalogPool(db, {
+    popular: LOADTEST_POPULAR_POOL,
+    unpopular: LOADTEST_UNPOPULAR_POOL,
+  });
+  const ballotGames = await pickCatalogPool(db, {
+    year: LOADTEST_EDITION_FILLING_YEAR,
+    popular: LOADTEST_BALLOT_POPULAR_POOL,
+    unpopular: LOADTEST_BALLOT_UNPOPULAR_POOL,
+  });
+  const game = ballotGames[0] ?? catalogGames[0];
+  if (!game || ballotGames.length === 0) {
     throw new Error(
-      `Need released ${LOADTEST_EDITION_FILLING_YEAR} catalog games for load-test ballots.`,
+      `Need released catalog games for load-test lists and ${LOADTEST_EDITION_FILLING_YEAR} ballots.`,
     );
   }
-  const ballotItems = catalog.slice(0, 3).map((row, i) => ({
+  const ballotItems = ballotGames.slice(0, 3).map((row, i) => ({
     gameId: row.id,
     rank: i + 1,
   }));
@@ -381,6 +434,8 @@ async function main() {
     tgaOpenPicks,
     tgaLockedPicks,
     game: { id: game.id, slug: game.slug, igdbId: game.igdbId },
+    games: catalogGames.length > 0 ? catalogGames : ballotGames,
+    ballotGames,
     ballotItems,
     writerCount: writers,
   };

@@ -21,6 +21,8 @@ export type LoadGetItem = {
   method: "GET";
   path: string;
   weight: number;
+  /** Resolve `/games/:slug` from the popular/unpopular fixture pool at request time. */
+  pickGame?: boolean;
 };
 
 export type LoadWriteOp = "list" | "library" | "ballot" | "pickem";
@@ -64,6 +66,7 @@ function generalGets(urls: LoadMixUrls): LoadGetItem[] {
       method: "GET",
       path: `/games/${encodeURIComponent(urls.game.slug)}`,
       weight: 4,
+      pickGame: true,
     },
     { group: "general", method: "GET", path: "/rankings", weight: 2 },
   ];

@@ -105,6 +105,22 @@ export function loadtestEditionOpenSchedule(now: Date): {
   };
 }
 
+export const LOADTEST_POPULAR_POOL = 40;
+export const LOADTEST_UNPOPULAR_POOL = 10;
+export const LOADTEST_BALLOT_POPULAR_POOL = 20;
+export const LOADTEST_BALLOT_UNPOPULAR_POOL = 5;
+/** Chance a rotated pick comes from the popular band. */
+export const LOADTEST_POPULAR_PICK_RATE = 0.8;
+export const LOADTEST_LIST_ITEM_COUNT = 5;
+export const LOADTEST_BALLOT_ITEM_COUNT = 10;
+
+export type LoadtestGame = {
+  id: string;
+  slug: string;
+  igdbId: number;
+  band: "popular" | "unpopular";
+};
+
 export type LoadtestFixturesFile = {
   communitySlug: string;
   communityId: string;
@@ -116,9 +132,96 @@ export type LoadtestFixturesFile = {
   tgaOpenPicks: Record<string, string>;
   tgaLockedPicks: Record<string, string>;
   game: { id: string; slug: string; igdbId: number };
+  /** Catalog pool for list/library/GET rotation. Optional on older fixture files. */
+  games?: LoadtestGame[];
+  /** Filling-year pool for ballot rotation. */
+  ballotGames?: LoadtestGame[];
   ballotItems: Array<{ gameId: string; rank: number }>;
   writerCount: number;
 };
+
+export function mergeLoadtestGameBands(
+  popular: Array<{ id: string; slug: string; igdbId: number }>,
+  unpopular: Array<{ id: string; slug: string; igdbId: number }>,
+): LoadtestGame[] {
+  const seen = new Set<string>();
+  const out: LoadtestGame[] = [];
+  for (const row of popular) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push({ ...row, band: "popular" });
+  }
+  for (const row of unpopular) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    out.push({ ...row, band: "unpopular" });
+  }
+  return out;
+}
+
+export function loadtestWriteGames(
+  fixtures: Pick<LoadtestFixturesFile, "game" | "games">,
+): LoadtestGame[] {
+  if (fixtures.games && fixtures.games.length > 0) return fixtures.games;
+  return [{ ...fixtures.game, band: "popular" }];
+}
+
+export function loadtestBallotGames(
+  fixtures: Pick<LoadtestFixturesFile, "ballotItems" | "ballotGames" | "game">,
+): LoadtestGame[] {
+  if (fixtures.ballotGames && fixtures.ballotGames.length > 0) {
+    return fixtures.ballotGames;
+  }
+  return fixtures.ballotItems.map((row, i) => ({
+    id: row.gameId,
+    slug: fixtures.game.slug,
+    igdbId: fixtures.game.igdbId,
+    band: i === 0 ? "popular" : "unpopular",
+  }));
+}
+
+export function pickLoadtestGame(
+  pool: LoadtestGame[],
+  random: () => number = Math.random,
+): LoadtestGame {
+  if (pool.length === 0) {
+    throw new Error("Load-test game pool is empty.");
+  }
+  const popular = pool.filter((row) => row.band === "popular");
+  const unpopular = pool.filter((row) => row.band === "unpopular");
+  const usePopular =
+    popular.length > 0 &&
+    (unpopular.length === 0 || random() < LOADTEST_POPULAR_PICK_RATE);
+  const band = usePopular ? popular : unpopular.length > 0 ? unpopular : pool;
+  return band[Math.min(band.length - 1, Math.floor(random() * band.length))]!;
+}
+
+export function pickLoadtestGames(
+  pool: LoadtestGame[],
+  count: number,
+  random: () => number = Math.random,
+): LoadtestGame[] {
+  const want = Math.min(Math.max(0, count), pool.length);
+  const picked: LoadtestGame[] = [];
+  const used = new Set<string>();
+  let guard = 0;
+  while (picked.length < want && guard < want * 40) {
+    guard += 1;
+    const row = pickLoadtestGame(pool, random);
+    if (used.has(row.id)) continue;
+    used.add(row.id);
+    picked.push(row);
+  }
+  if (picked.length < want) {
+    for (const row of pool) {
+      if (used.has(row.id)) continue;
+      used.add(row.id);
+      picked.push(row);
+      if (picked.length === want) break;
+    }
+  }
+  return picked;
+}
 
 export function assertLoadtestFixturesSafe(
   fixtures: Pick<LoadtestFixturesFile, "communitySlug">,
