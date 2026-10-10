@@ -33,7 +33,25 @@ export type LoadGetItem = {
   pickCategory?: boolean;
 };
 
-export type LoadWriteOp = "list" | "library" | "ballot" | "pickem";
+export type LoadWriteOp =
+  | "list-create"
+  | "list-edit"
+  | "list-reorder"
+  | "list-delete"
+  | "library"
+  | "ballot"
+  | "pickem";
+
+export function isListWriteOp(
+  op: LoadWriteOp,
+): op is "list-create" | "list-edit" | "list-reorder" | "list-delete" {
+  return (
+    op === "list-create" ||
+    op === "list-edit" ||
+    op === "list-reorder" ||
+    op === "list-delete"
+  );
+}
 
 export type LoadWriteItem = {
   group: "write";
@@ -202,7 +220,10 @@ function editionResultsGets(urls: LoadMixUrls): LoadGetItem[] {
 
 function generalWrites(): LoadWriteItem[] {
   return [
-    { group: "write", method: "POST", op: "list", weight: 2 },
+    { group: "write", method: "POST", op: "list-create", weight: 2 },
+    { group: "write", method: "POST", op: "list-edit", weight: 2 },
+    { group: "write", method: "POST", op: "list-reorder", weight: 1 },
+    { group: "write", method: "POST", op: "list-delete", weight: 1 },
     { group: "write", method: "POST", op: "library", weight: 2 },
   ];
 }

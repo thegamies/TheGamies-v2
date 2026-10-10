@@ -111,7 +111,9 @@ export const LOADTEST_BALLOT_POPULAR_POOL = 20;
 export const LOADTEST_BALLOT_UNPOPULAR_POOL = 5;
 /** Chance a rotated pick comes from the popular band. */
 export const LOADTEST_POPULAR_PICK_RATE = 0.8;
-export const LOADTEST_LIST_ITEM_COUNT = 5;
+export const LOADTEST_LIST_ITEM_MIN = 1;
+export const LOADTEST_LIST_ITEM_MAX = 10;
+export const LOADTEST_LIST_ITEM_COUNT = LOADTEST_LIST_ITEM_MAX;
 export const LOADTEST_BALLOT_ITEM_COUNT = 10;
 
 export type LoadtestGame = {

@@ -19,13 +19,18 @@ import {
   loadtestBodyTooLarge,
 } from "@/lib/qa/loadtest-guard";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
+import { isListWriteOp } from "@/lib/request-cost/load-mix";
 
 export const runtime = "nodejs";
 
-const listOp = z.object({
-  op: z.literal("list"),
-  draft: z.unknown(),
+const listDraft = z.unknown();
+const listCreateOp = z.object({ op: z.literal("list-create"), draft: listDraft });
+const listEditOp = z.object({ op: z.literal("list-edit"), draft: listDraft });
+const listReorderOp = z.object({
+  op: z.literal("list-reorder"),
+  draft: listDraft,
 });
+const listDeleteOp = z.object({ op: z.literal("list-delete"), draft: listDraft });
 
 const libraryOp = z.object({
   op: z.literal("library"),
@@ -52,7 +57,10 @@ const pickemOp = z.object({
 });
 
 const bodySchema = z.discriminatedUnion("op", [
-  listOp,
+  listCreateOp,
+  listEditOp,
+  listReorderOp,
+  listDeleteOp,
   libraryOp,
   ballotOp,
   pickemOp,
@@ -94,14 +102,14 @@ export async function POST(request: Request) {
   }
 
   const body = parsed.data;
-  if (body.op === "list") {
+  if (isListWriteOp(body.op)) {
     const result = await saveOwnedListFromClientDraft(body.draft, {
       profileId: profile.id,
     });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, publicId: result.list.publicId });
   }
 
   if (body.op === "library") {

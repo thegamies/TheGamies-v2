@@ -12,11 +12,22 @@ import {
 import {
   buildLoadGets,
   buildLoadWrites,
+  isListWriteOp,
   pickLoadtestGotyCategory,
   pickWeighted,
   siteGotyCategoryPath,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
+import {
+  applyListWriteState,
+  emptyWriterListState,
+  listDraftForOp,
+  listWriteJsonBody,
+  listWriteNeedsSeed,
+  parseListWritePublicId,
+  seedListDraft,
+  type WriterListState,
+} from "@/lib/request-cost/load-list-writes";
 import { formatLoadHtmlReport } from "@/lib/request-cost/load-html-report";
 import {
   formatLoadReport,
@@ -31,7 +42,6 @@ import {
   assertLoadtestFixturesSafe,
   LOADTEST_BALLOT_ITEM_COUNT,
   LOADTEST_EDITION_FILLING_YEAR,
-  LOADTEST_LIST_ITEM_COUNT,
   LOADTEST_TGA_LOCKED_YEAR,
   LOADTEST_TGA_OPEN_YEAR,
   loadtestBallotGames,
@@ -50,6 +60,8 @@ import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
 type CookieFile = { writers: Array<{ index: number; cookie: string }> };
 
+type WriterSlot = LoadCookieSlot & { list: WriterListState };
+
 function stampUtc(d: Date): string {
   return d.toISOString().replace(/[:.]/g, "-");
 }
@@ -62,22 +74,8 @@ function writeBody(
   op: LoadWriteOp,
   fixtures: LoadtestFixturesFile,
 ): unknown {
-  if (op === "list") {
-    const items = pickLoadtestGames(
-      loadtestWriteGames(fixtures),
-      LOADTEST_LIST_ITEM_COUNT,
-    ).map((game, rank) => ({ igdbId: game.igdbId, rank: rank + 1 }));
-    return {
-      op,
-      draft: {
-        listType: "custom",
-        title: "Load test list",
-        items:
-          items.length > 0
-            ? items
-            : [{ igdbId: fixtures.game.igdbId, rank: 1 }],
-      },
-    };
+  if (isListWriteOp(op)) {
+    throw new Error(`List writes use listWriteJsonBody, not writeBody (${op}).`);
   }
   if (op === "library") {
     const game = pickLoadtestGame(loadtestWriteGames(fixtures));
@@ -200,17 +198,18 @@ async function runScenario(input: {
     }
   });
 
-  const cookieSlots: LoadCookieSlot[] = input.cookies.map((cookie) => ({
+  const cookieSlots: WriterSlot[] = input.cookies.map((cookie) => ({
     cookie,
     refreshedAt: 0,
     inflight: null,
+    list: emptyWriterListState(),
   }));
 
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
     const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
     if (!slot?.cookie || !input.secret || writes.length === 0) return;
 
-    const postWrite = (op: LoadWriteOp) =>
+    const postWrite = (op: LoadWriteOp, body: unknown) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
         method: "POST",
         headers: {
@@ -221,20 +220,53 @@ async function runScenario(input: {
           "x-cost-journey": journey,
           "x-cost-step": op,
         },
-        body: JSON.stringify(writeBody(op, input.fixtures)),
+        body: JSON.stringify(body),
       });
+
+    const postOnce = async (op: LoadWriteOp, body: unknown) => {
+      let res = await postWrite(op, body);
+      let text = await res.text().catch(() => "");
+      if (res.status === 401) {
+        await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), true);
+        res = await postWrite(op, body);
+        text = await res.text().catch(() => "");
+      }
+      return { res, text };
+    };
+
+    const seedListIfNeeded = async (op: LoadWriteOp) => {
+      if (!listWriteNeedsSeed(op, slot.list)) return true;
+      const draft = seedListDraft(op, input.fixtures);
+      const { res, text } = await postOnce(
+        "list-create",
+        listWriteJsonBody("list-create", draft),
+      );
+      if (!res.ok) return false;
+      applyListWriteState(slot.list, draft, parseListWritePublicId(text));
+      return Boolean(slot.list.publicId);
+    };
 
     while (Date.now() < end) {
       const item = pickWeighted(writes);
       await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), false);
-      const t0 = Date.now();
+      let t0 = Date.now();
       try {
-        let res = await postWrite(item.op);
-        await res.arrayBuffer().catch(() => null);
-        if (res.status === 401) {
-          await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), true);
-          res = await postWrite(item.op);
-          await res.arrayBuffer().catch(() => null);
+        if (isListWriteOp(item.op) && !(await seedListIfNeeded(item.op))) {
+          continue;
+        }
+        const listDraft = isListWriteOp(item.op)
+          ? listDraftForOp(item.op, input.fixtures, slot.list)
+          : null;
+        const body = isListWriteOp(item.op)
+          ? listDraft
+            ? listWriteJsonBody(item.op, listDraft)
+            : null
+          : writeBody(item.op, input.fixtures);
+        if (!body) continue;
+        t0 = Date.now();
+        const { res, text } = await postOnce(item.op, body);
+        if (listDraft && res.ok) {
+          applyListWriteState(slot.list, listDraft, parseListWritePublicId(text));
         }
         samples.push({
           group: item.group,

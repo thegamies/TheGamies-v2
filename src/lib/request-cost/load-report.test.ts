@@ -99,7 +99,10 @@ describe("loadStepFamily", () => {
   it("groups game detail paths", () => {
     expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
     expect(loadStepFamily("/games")).toBe("/games");
-    expect(loadStepFamily("list")).toBe("list");
+    expect(loadStepFamily("list-create")).toBe("list-create");
+    expect(loadStepFamily("list-edit")).toBe("list-edit");
+    expect(loadStepFamily("list-reorder")).toBe("list-reorder");
+    expect(loadStepFamily("list-delete")).toBe("list-delete");
   });
 
   it("groups site GOTY category boards", () => {

@@ -93,6 +93,46 @@ describe("POST /api/qa/loadtest", () => {
     expect(saves.upsertEditionBallot).not.toHaveBeenCalled();
   });
 
+  it("creates a list and returns publicId", async () => {
+    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
+    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
+    saves.saveOwnedListFromClientDraft.mockResolvedValue({
+      list: { publicId: "lst_load" },
+    });
+    const draft = {
+      listType: "custom",
+      title: "Load test list",
+      items: [{ igdbId: 1, rank: 1 }],
+    };
+    const res = await POST(
+      req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
+        op: "list-create",
+        draft,
+      }),
+    );
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({
+      ok: true,
+      publicId: "lst_load",
+    });
+    expect(saves.saveOwnedListFromClientDraft).toHaveBeenCalledWith(draft, {
+      profileId: "p1",
+    });
+  });
+
+  it("rejects the old list op name", async () => {
+    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
+    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
+    const res = await POST(
+      req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
+        op: "list",
+        draft: { listType: "custom", title: "x", items: [] },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(saves.saveOwnedListFromClientDraft).not.toHaveBeenCalled();
+  });
+
   it("saves a library row when authorized", async () => {
     session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
     session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });

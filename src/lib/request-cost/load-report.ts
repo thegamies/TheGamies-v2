@@ -3,7 +3,7 @@ import { parseMeteredDbTripsHeader } from "@thegamies/db/request-cost";
 
 export type LoadSample = {
   group: string;
-  /** GET path or write op (`list`, `library`, `ballot`, `pickem`). */
+  /** GET path or write op (`list-create`, `list-edit`, `list-reorder`, `list-delete`, `library`, `ballot`, `pickem`). */
   step: string;
   status: number;
   /** Load-runner HTTP round trip. */

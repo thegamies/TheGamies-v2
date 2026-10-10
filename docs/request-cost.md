@@ -154,6 +154,8 @@ Writers ping `/api/auth/get-session` on the same **4 minute** interval as `Sessi
 
 Ensure builds a **capped** catalog pool (40 popular + 10 obscure by `popularity`, plus a 2026 ballot pool). List/library/GET game pages rotate across it (~80% popular). Re-run `pnpm qa:loadtest:ensure` to refresh `fixtures.json`. Pick’em still uses the repaired nominee set.
 
+List writes are four labeled ops (`x-cost-step` and report `step`): **list-create** (new custom list, 1–10 games), **list-edit** (replace 1–10 games on that writer’s list), **list-reorder** (same games, shuffled ranks), **list-delete** (drop one or more remaining games). Edit/reorder/delete seed an untimed create if the writer has no list yet; only the labeled op is sampled. The API returns `publicId` so later writes reuse the list.
+
 ## Checklist (use on every list/search)
 
 - [ ] What is the maximum rows this request can return? Is there a `LIMIT`?

@@ -84,11 +84,17 @@ describe("buildLoadGets", () => {
 describe("buildLoadWrites", () => {
   it("omits pickem and ballot writes on locked results", () => {
     expect(buildLoadWrites("pickem-locked").map((item) => item.op)).toEqual([
-      "list",
+      "list-create",
+      "list-edit",
+      "list-reorder",
+      "list-delete",
       "library",
     ]);
     expect(buildLoadWrites("editions-results").map((item) => item.op)).toEqual([
-      "list",
+      "list-create",
+      "list-edit",
+      "list-reorder",
+      "list-delete",
       "library",
     ]);
     expect(buildLoadWrites("pickem-open").some((item) => item.op === "pickem")).toBe(
