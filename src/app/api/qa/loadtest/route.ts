@@ -19,7 +19,6 @@ import {
   loadtestBodyTooLarge,
 } from "@/lib/qa/loadtest-guard";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
-import { isListWriteOp } from "@/lib/request-cost/load-mix";
 
 export const runtime = "nodejs";
 
@@ -102,7 +101,12 @@ export async function POST(request: Request) {
   }
 
   const body = parsed.data;
-  if (isListWriteOp(body.op)) {
+  if (
+    body.op === "list-create" ||
+    body.op === "list-edit" ||
+    body.op === "list-reorder" ||
+    body.op === "list-delete"
+  ) {
     const result = await saveOwnedListFromClientDraft(body.draft, {
       profileId: profile.id,
     });
