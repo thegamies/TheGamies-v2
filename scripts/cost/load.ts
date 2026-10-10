@@ -180,6 +180,7 @@ async function runScenario(input: {
           status: res.status,
           ms: Date.now() - t0,
           ok: res.ok,
+          at: Date.now(),
           ...readLoadCostHeaders(res.headers),
         });
       } catch {
@@ -189,6 +190,7 @@ async function runScenario(input: {
           status: 0,
           ms: Date.now() - t0,
           ok: false,
+          at: Date.now(),
         });
       }
     }
@@ -236,6 +238,7 @@ async function runScenario(input: {
           status: res.status,
           ms: Date.now() - t0,
           ok: res.ok,
+          at: Date.now(),
           ...readLoadCostHeaders(res.headers),
         });
       } catch {
@@ -245,6 +248,7 @@ async function runScenario(input: {
           status: 0,
           ms: Date.now() - t0,
           ok: false,
+          at: Date.now(),
         });
       }
     }

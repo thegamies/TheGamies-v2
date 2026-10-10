@@ -27,11 +27,15 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="statuses"');
     expect(html).toContain("/rankings");
     expect(html).toContain('"scenario":"general"');
-    expect(html).toContain("wall p50 / p90 / p95");
-    expect(html).toContain("db clock p50 / p90 / p95");
-    expect(html).toContain("db sum p50 / p90 / p95");
+    expect(html).toContain("table-scroll");
+    expect(html).toContain('data-table');
+    expect(html).toContain("p99");
+    expect(html).toContain("Db clock");
     expect(html).toContain("select count(*) from games");
     expect(html).toContain('id="trips"');
+    expect(html).toContain('id="pcts"');
+    expect(html).toContain('id="timeline"');
+    expect(html).toContain('id="buckets"');
     expect(html).not.toContain("</script></script>");
   });
 

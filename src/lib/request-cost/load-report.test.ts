@@ -69,12 +69,12 @@ describe("formatLoadReport", () => {
     });
     expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
     expect(md).toContain("Writers: 10");
-    expect(md).toContain("- general: 1 · p50 80 ms · p90 80 ms · p95 80 ms");
+    expect(md).toContain("- general: 1 · p50 80 ms · p90 80 ms · p95 80 ms · p99 80 ms");
     expect(md).toContain("- /rankings: 1 · p50 80 ms");
     expect(md).toContain("- Errors: 1");
-    expect(md).toContain("Worker wall p50 40 ms · p90 40 ms · p95 40 ms");
-    expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms");
-    expect(md).toContain("Neon db sum p50 90 ms · p90 90 ms · p95 90 ms");
+    expect(md).toContain("Worker wall p50 40 ms · p90 40 ms · p95 40 ms · p99 40 ms");
+    expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms · p99 45 ms");
+    expect(md).toContain("Neon db sum p50 90 ms · p90 90 ms · p95 90 ms · p99 90 ms");
     expect(md).toContain("select count(*) from games");
   });
 

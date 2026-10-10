@@ -17,6 +17,8 @@ export type LoadSample = {
   dbSpanMs?: number;
   dbTrips?: number;
   trips?: Array<{ ms: number; sql: string }>;
+  /** Epoch ms when the runner finished the request. */
+  at?: number;
 };
 
 export function readLoadCostHeaders(headers: Headers): {
@@ -114,7 +116,7 @@ function optionalMsBand(
 }
 
 function formatMsBand(band: LoadMsBand): string {
-  return `p50 ${band.p50} ms · p90 ${band.p90} ms · p95 ${band.p95} ms`;
+  return `p50 ${band.p50} ms · p90 ${band.p90} ms · p95 ${band.p95} ms · p99 ${band.p99} ms`;
 }
 
 export function latencySummary(
@@ -142,6 +144,7 @@ export type LoadTripSummary = {
   p50: number;
   p90: number;
   p95: number;
+  p99: number;
   max: number;
 };
 
@@ -163,6 +166,7 @@ export function summarizeLoadTrips(samples: LoadSample[]): LoadTripSummary[] {
         p50: percentile(sorted, 50),
         p90: percentile(sorted, 90),
         p95: percentile(sorted, 95),
+        p99: percentile(sorted, 99),
         max: sorted[sorted.length - 1] ?? 0,
       };
     })
@@ -206,7 +210,7 @@ function summaryLines(rows: LoadLatencySummary[]): string {
   return rows
     .map(
       (row) =>
-        `- ${row.label}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · max ${row.max} ms`,
+        `- ${row.label}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
     )
     .join("\n");
 }
@@ -223,7 +227,7 @@ export function formatLoadReport(stats: LoadRunStats): string {
     .slice(0, 25)
     .map(
       (row) =>
-        `- ${row.sql}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · max ${row.max} ms`,
+        `- ${row.sql}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
     )
     .join("\n");
 
