@@ -101,6 +101,20 @@ describe("loadStepFamily", () => {
     expect(loadStepFamily("/games")).toBe("/games");
     expect(loadStepFamily("list")).toBe("list");
   });
+
+  it("groups site GOTY category boards", () => {
+    expect(
+      loadStepFamily(
+        "/game-of-the-year/2025/categories?category=best-gameplay",
+      ),
+    ).toBe("/game-of-the-year/:year/categories?category=:id");
+    expect(loadStepFamily("/game-of-the-year/2025/categories")).toBe(
+      "/game-of-the-year/2025/categories",
+    );
+    expect(loadStepFamily("/game-of-the-year/2025")).toBe(
+      "/game-of-the-year/2025",
+    );
+  });
 });
 
 describe("partitionLoadSamples", () => {

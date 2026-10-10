@@ -11,7 +11,9 @@ import {
   buildLoadWrites,
   mixUsesPromotedTgaYear,
   mixUsesShowcaseSlug,
+  pickLoadtestGotyCategory,
   pickWeighted,
+  siteGotyCategoryPath,
 } from "./load-mix";
 
 const urls = {
@@ -43,6 +45,12 @@ describe("buildLoadGets", () => {
         true,
       );
       expect(paths).toContain("/rankings");
+      expect(paths).toContain("/game-of-the-year");
+      expect(paths).toContain("/game-of-the-year/2025");
+      expect(paths).toContain("/game-of-the-year/2025/categories");
+      expect(buildLoadGets(scenario, urls).some((item) => item.pickCategory)).toBe(
+        true,
+      );
       expect(mixUsesShowcaseSlug(buildLoadGets(scenario, urls))).toBe(false);
     }
   });
@@ -89,6 +97,15 @@ describe("buildLoadWrites", () => {
     expect(
       buildLoadWrites("editions-filling").some((item) => item.op === "ballot"),
     ).toBe(true);
+  });
+});
+
+describe("site GOTY category mix", () => {
+  it("opens a 2025 category board", () => {
+    expect(siteGotyCategoryPath("narrative")).toBe(
+      "/game-of-the-year/2025/categories?category=narrative",
+    );
+    expect(pickLoadtestGotyCategory(() => 0)).toBe("best-gameplay");
   });
 });
 

@@ -12,7 +12,9 @@ import {
 import {
   buildLoadGets,
   buildLoadWrites,
+  pickLoadtestGotyCategory,
   pickWeighted,
+  siteGotyCategoryPath,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
 import { formatLoadHtmlReport } from "@/lib/request-cost/load-html-report";
@@ -163,7 +165,9 @@ async function runScenario(input: {
       const item = pickWeighted(gets);
       const path = item.pickGame
         ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
-        : item.path;
+        : item.pickCategory
+          ? siteGotyCategoryPath(pickLoadtestGotyCategory())
+          : item.path;
       const t0 = Date.now();
       try {
         const res = await fetch(`${input.appUrl}${path}`, {

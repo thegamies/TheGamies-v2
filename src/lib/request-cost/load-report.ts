@@ -178,6 +178,9 @@ export function loadStepFamily(step: string): string {
   if (step.startsWith("/games/") && step.length > "/games/".length) {
     return "/games/:slug";
   }
+  if (/^\/game-of-the-year\/\d+\/categories\?category=/.test(step)) {
+    return "/game-of-the-year/:year/categories?category=:id";
+  }
   return step;
 }
 

@@ -193,7 +193,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       · ${Math.round(stats.durationMs / 1000)}s
       · ${stats.vusRead} readers · ${stats.writers} writers
     </p>
-    <p class="meta">Filter by group, kind, path, status, and which percentiles to show. Client is the runner round-trip. Wall is Worker time. Db clock is overlap-union of Neon trips; db sum adds parallel trips. The timeline is client p50–p99 in each time bucket.</p>
+    <p class="meta">Filter by group, kind, path, status, and which percentiles to show. Client is the runner round-trip. Wall is Worker time. Db clock is overlap-union of Neon trips; db sum adds parallel trips. The timeline is how many requests in each bucket were at least as slow as the run’s p50 / p90 / p95 / p99.</p>
   </header>
   <main>
     <div class="filters">
@@ -225,10 +225,10 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     <div class="stats" id="stats"></div>
     <div class="hist" id="hist" aria-hidden="true"></div>
     <div class="axis"><span>0 ms</span><span id="hist-max"></span></div>
-    <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:1.5rem 0 0.35rem">Client pxx over time</h2>
-    <p class="meta">Same request filter. Each point is p50 / p90 / p95 / p99 of client latency in that bucket.</p>
+    <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:1.5rem 0 0.35rem">When slow requests happened</h2>
+    <p class="meta">X is time in the run. Y is <strong>how many</strong> client requests in that bucket were at least as slow as the run’s p50 / p90 / p95 / p99 (thresholds from the current filter). Empty buckets are zero.</p>
     <div class="chart-wrap" id="chart-wrap">
-      <svg id="timeline" viewBox="0 0 800 260" role="img" aria-label="Client percentiles over the run"></svg>
+      <svg id="timeline" viewBox="0 0 800 260" role="img" aria-label="Count of requests at or above each percentile, over time"></svg>
     </div>
     <div class="legend" id="legend"></div>
     <div class="table-scroll">
@@ -250,6 +250,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const DATA = ${jsonForScript(payload)};
     const ALL = "all";
     const GAME_FAMILY = "/games/:slug";
+    const GOTY_CAT_FAMILY = "/game-of-the-year/:year/categories?category=:id";
     const PCTS = ["p50", "p90", "p95", "p99", "max"];
     const LINES = ["p50", "p90", "p95", "p99"];
     const LINE_COLOR = { p50: "#1f6b3a", p90: "#8a6d3b", p95: "#8b1e1e", p99: "#3b1a4a" };
@@ -267,7 +268,12 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     };
 
     function familyOf(step) {
-      return step.indexOf("/games/") === 0 && step.length > 7 ? GAME_FAMILY : step;
+      if (step.indexOf("/games/") === 0 && step.length > 7) return GAME_FAMILY;
+      if (/^\\/game-of-the-year\\/\\d+\\/categories\\?category=/.test(step)) return GOTY_CAT_FAMILY;
+      return step;
+    }
+    function isRolledFamily(family) {
+      return family === GAME_FAMILY || family === GOTY_CAT_FAMILY;
     }
     function percentile(sorted, p) {
       if (!sorted.length) return 0;
@@ -336,7 +342,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     }
     function rowKey(r) {
       if (filters.step !== ALL) return r[0] + " · " + r[1];
-      if (filters.family === GAME_FAMILY) return r[0] + " · " + r[1];
+      if (isRolledFamily(filters.family)) return r[0] + " · " + r[1];
       return r[0] + " · " + familyOf(r[1]);
     }
     function num(v) {
@@ -433,31 +439,37 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       const n = Math.max(1, Math.ceil(DATA.durationMs / size));
       const buckets = Array.from({ length: n }, () => []);
       let timed = 0;
+      const allMs = [];
       for (const r of rows) {
         const t = r[9];
         if (typeof t !== "number" || t < 0) continue;
         timed += 1;
+        allMs.push(r[3]);
         const i = Math.min(n - 1, Math.floor(t / size));
         buckets[i].push(r[3]);
       }
       const lines = visibleLines();
+      const overall = band(allMs.slice().sort((a, b) => a - b));
+      const cuts = overall
+        ? { p50: overall.p50, p90: overall.p90, p95: overall.p95, p99: overall.p99 }
+        : { p50: 0, p90: 0, p95: 0, p99: 0 };
       legend.innerHTML = lines
-        .map((k) => "<span><i style=\\"background:" + LINE_COLOR[k] + "\\"></i>" + k + "</span>")
+        .map((k) => "<span><i style=\\"background:" + LINE_COLOR[k] + "\\"></i>" + k + " (≥ " + cuts[k] + " ms)</span>")
         .join("");
       if (!timed) {
         svg.innerHTML =
-          "<text class=\\"chart-note\\" x=\\"24\\" y=\\"130\\" fill=\\"#6b6560\\">No sample times in this run. Re-run load to plot pxx over the clock.</text>";
+          "<text class=\\"chart-note\\" x=\\"24\\" y=\\"130\\" fill=\\"#6b6560\\">No sample times in this run. Re-run load to plot counts over the clock.</text>";
         return;
       }
-      const points = buckets.map((ms, i) => ({
-        t: i * size,
-        band: band(ms.slice().sort((a, b) => a - b)),
-      }));
-      const yMax = Math.max(
-        1,
-        ...points.flatMap((p) => (p.band ? lines.map((k) => p.band[k]) : [0])),
-      );
-      const left = 48, top = 16, right = 16, bottom = 36;
+      const points = buckets.map((ms, i) => {
+        const counts = {};
+        for (const k of LINES) {
+          counts[k] = ms.filter((v) => v >= cuts[k]).length;
+        }
+        return { t: i * size, n: ms.length, counts };
+      });
+      const yMax = Math.max(1, ...points.flatMap((p) => lines.map((k) => p.counts[k])));
+      const left = 52, top = 16, right = 16, bottom = 36;
       const w = 800 - left - right, h = 260 - top - bottom;
       const x = (t) => left + (t / Math.max(1, DATA.durationMs)) * w;
       const y = (v) => top + h - (v / yMax) * h;
@@ -485,11 +497,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         .join("");
       const polylines = lines
         .map((k) => {
-          const pts = points
-            .filter((p) => p.band)
-            .map((p) => x(p.t + size / 2) + "," + y(p.band[k]))
-            .join(" ");
-          if (!pts) return "";
+          const pts = points.map((p) => x(p.t + size / 2) + "," + y(p.counts[k])).join(" ");
           return (
             "<polyline fill=\\"none\\" stroke=\\"" +
             LINE_COLOR[k] +
@@ -505,6 +513,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         "<line x1=\\"" + left + "\\" y1=\\"" + (top + h) + "\\" x2=\\"" + (left + w) + "\\" y2=\\"" + (top + h) + "\\" stroke=\\"#161513\\" />" +
         polylines +
         ticks +
+        "<text x=\\"" + 8 + "\\" y=\\"" + 14 + "\\" font-size=\\"11\\" fill=\\"#6b6560\\">requests</text>" +
         "<text x=\\"" + (left + w) + "\\" y=\\"" + (top + h + 22) + "\\" text-anchor=\\"end\\" font-size=\\"11\\" fill=\\"#6b6560\\">" +
         formatBucket(size) +
         " buckets</text>";
@@ -535,13 +544,13 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       });
       const inFamily = inGroup.filter((r) => filters.family === ALL || familyOf(r[1]) === filters.family);
       const stepValues =
-        filters.family === GAME_FAMILY
+        isRolledFamily(filters.family)
           ? unique(inFamily.map((r) => r[1]))
           : filters.family !== ALL
             ? unique(inFamily.map((r) => r[1]))
             : unique(
                 inGroup
-                  .filter((r) => familyOf(r[1]) !== GAME_FAMILY)
+                  .filter((r) => !isRolledFamily(familyOf(r[1])))
                   .map((r) => r[1]),
               );
       chips(document.getElementById("steps"), stepValues, "step");

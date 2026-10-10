@@ -2,6 +2,12 @@ import {
   editionCategoryStandingsHref,
   editionResultsHref,
 } from "@/lib/communities/edition-results-href";
+import {
+  AWARD_CATEGORY_DEFS,
+  liveStandingsHref,
+  siteGotyCategoriesPath,
+  siteGotyYearPath,
+} from "@/lib/live-aggregate/award-category-defs";
 import { tgaYearHref } from "@/lib/tga-pickem/year-href";
 import {
   LOADTEST_COMMUNITY,
@@ -23,6 +29,8 @@ export type LoadGetItem = {
   weight: number;
   /** Resolve `/games/:slug` from the popular/unpopular fixture pool at request time. */
   pickGame?: boolean;
+  /** Resolve a 2025 site category board from the award catalog. */
+  pickCategory?: boolean;
 };
 
 export type LoadWriteOp = "list" | "library" | "ballot" | "pickem";
@@ -57,7 +65,31 @@ const sampleUrls: LoadMixUrls = {
   game: { id: "g1", slug: "sample-game", igdbId: 1 },
 };
 
+/** Site live GOTY year the general mix hammers (real 2025 boards, not load-test years). */
+export const LOADTEST_SITE_GOTY_YEAR = 2025;
+const LOADTEST_GOTY_CATEGORY_CAP = 12;
+
+export function loadtestGotyCategoryIds(): string[] {
+  return AWARD_CATEGORY_DEFS.slice(0, LOADTEST_GOTY_CATEGORY_CAP).map(
+    (row) => row.id,
+  );
+}
+
+export function pickLoadtestGotyCategory(random: () => number = Math.random): string {
+  const ids = loadtestGotyCategoryIds();
+  return ids[Math.floor(random() * ids.length)]!;
+}
+
+export function siteGotyCategoryPath(categoryId: string, year = LOADTEST_SITE_GOTY_YEAR): string {
+  return liveStandingsHref(siteGotyYearPath(year), {
+    view: "category",
+    category: categoryId,
+  });
+}
+
 function generalGets(urls: LoadMixUrls): LoadGetItem[] {
+  const year = LOADTEST_SITE_GOTY_YEAR;
+  const yearPath = siteGotyYearPath(year);
   return [
     { group: "general", method: "GET", path: "/", weight: 5 },
     { group: "general", method: "GET", path: "/games", weight: 3 },
@@ -68,7 +100,22 @@ function generalGets(urls: LoadMixUrls): LoadGetItem[] {
       weight: 4,
       pickGame: true,
     },
-    { group: "general", method: "GET", path: "/rankings", weight: 2 },
+    { group: "general", method: "GET", path: "/rankings", weight: 1 },
+    { group: "general", method: "GET", path: "/game-of-the-year", weight: 3 },
+    { group: "general", method: "GET", path: yearPath, weight: 5 },
+    {
+      group: "general",
+      method: "GET",
+      path: siteGotyCategoriesPath(year),
+      weight: 3,
+    },
+    {
+      group: "general",
+      method: "GET",
+      path: siteGotyCategoryPath(AWARD_CATEGORY_DEFS[0]!.id, year),
+      weight: 4,
+      pickCategory: true,
+    },
   ];
 }
 
