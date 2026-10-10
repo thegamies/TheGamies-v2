@@ -10,6 +10,7 @@ import {
   emptyWriterListState,
   listDraftForOp,
   listWriteNeedsSeed,
+  listWriteStep,
   parseListWritePublicId,
   randomLoadListSize,
   reorderListItems,
@@ -42,13 +43,24 @@ describe("list write mix helpers", () => {
     expect(next.map((row) => row.igdbId)).not.toEqual([1, 2, 3]);
   });
 
-  it("deletes at least one game", () => {
+  it("deletes an exact number of games", () => {
     const items = [
       { igdbId: 1, rank: 1 },
       { igdbId: 2, rank: 2 },
+      { igdbId: 3, rank: 3 },
     ];
-    expect(deleteSomeListItems(items, () => 0)).toEqual([{ igdbId: 1, rank: 1 }]);
-    expect(deleteSomeListItems(items, () => 0.99)).toEqual([]);
+    expect(deleteSomeListItems(items, () => 0, 1)).toEqual([
+      { igdbId: 1, rank: 1 },
+      { igdbId: 2, rank: 2 },
+    ]);
+    expect(deleteSomeListItems(items, () => 0, 3)).toEqual([]);
+  });
+
+  it("labels counted writes like /games/:slug", () => {
+    expect(listWriteStep("list-create", 5)).toBe("list-create/5");
+    expect(listWriteStep("list-edit", 1)).toBe("list-edit/1");
+    expect(listWriteStep("list-delete", 10)).toBe("list-delete/10");
+    expect(listWriteStep("list-reorder", 4)).toBe("list-reorder");
   });
 
   it("labels create vs edit vs reorder vs delete", () => {
@@ -87,6 +99,13 @@ describe("list write mix helpers", () => {
     ).toBe(true);
     expect(
       listWriteNeedsSeed("list-delete", { publicId: "x", items: [] }),
+    ).toBe(true);
+    expect(
+      listWriteNeedsSeed(
+        "list-delete",
+        { publicId: "x", items: [{ igdbId: 1, rank: 1 }] },
+        3,
+      ),
     ).toBe(true);
   });
 

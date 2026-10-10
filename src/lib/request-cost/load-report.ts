@@ -3,7 +3,7 @@ import { parseMeteredDbTripsHeader } from "@thegamies/db/request-cost";
 
 export type LoadSample = {
   group: string;
-  /** GET path or write op (`list-create`, `list-edit`, `list-reorder`, `list-delete`, `library`, `ballot`, `pickem`). */
+  /** GET path or write op (`list-create/5`, `list-reorder`, `library`, …). */
   step: string;
   status: number;
   /** Load-runner HTTP round trip. */
@@ -173,13 +173,18 @@ export function summarizeLoadTrips(samples: LoadSample[]): LoadTripSummary[] {
     .sort((a, b) => b.p50 - a.p50 || b.n - a.n);
 }
 
-/** Roll `/games/portal-2` into `/games/:slug`; leave `/games` and writes as-is. */
+const LIST_COUNTED_STEP = /^(list-create|list-edit|list-delete)\/\d+$/;
+
+/** Roll `/games/portal-2` into `/games/:slug`; `list-create/5` into `list-create/:n`. */
 export function loadStepFamily(step: string): string {
   if (step.startsWith("/games/") && step.length > "/games/".length) {
     return "/games/:slug";
   }
   if (/^\/game-of-the-year\/\d+\/categories\?category=/.test(step)) {
     return "/game-of-the-year/:year/categories?category=:id";
+  }
+  if (LIST_COUNTED_STEP.test(step)) {
+    return step.replace(/\/\d+$/, "/:n");
   }
   return step;
 }

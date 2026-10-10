@@ -72,23 +72,40 @@ export function reorderListItems(
 export function deleteSomeListItems(
   items: LoadListDraftItem[],
   random: () => number = Math.random,
+  dropCount?: number,
 ): LoadListDraftItem[] {
   if (items.length === 0) return [];
-  const drop = 1 + Math.floor(random() * items.length);
+  const drop = Math.min(
+    items.length,
+    Math.max(1, dropCount ?? 1 + Math.floor(random() * items.length)),
+  );
   return items
     .slice(0, items.length - drop)
     .map((item, rank) => ({ igdbId: item.igdbId, rank: rank + 1 }));
+}
+
+export function listWriteStep(op: LoadWriteOp, games: number): string {
+  if (op === "list-create" || op === "list-edit" || op === "list-delete") {
+    return `${op}/${games}`;
+  }
+  return op;
 }
 
 export function listWriteNeedsExisting(op: LoadWriteOp): boolean {
   return op === "list-edit" || op === "list-reorder" || op === "list-delete";
 }
 
-export function listWriteNeedsSeed(op: LoadWriteOp, state: WriterListState): boolean {
+export function listWriteNeedsSeed(
+  op: LoadWriteOp,
+  state: WriterListState,
+  games?: number,
+): boolean {
   if (!listWriteNeedsExisting(op)) return false;
   if (!state.publicId) return true;
   if (op === "list-reorder") return state.items.length < 2;
-  if (op === "list-delete") return state.items.length === 0;
+  if (op === "list-delete") {
+    return state.items.length < Math.max(1, games ?? 1);
+  }
   return false;
 }
 
@@ -96,13 +113,15 @@ export function seedListDraft(
   op: LoadWriteOp,
   fixtures: LoadtestFixturesFile,
   random: () => number = Math.random,
+  games?: number,
 ): { title: string; items: LoadListDraftItem[] } {
-  const min = op === "list-reorder" ? 2 : 1;
+  const min =
+    op === "list-reorder" ? 2 : op === "list-delete" ? Math.max(1, games ?? 1) : 1;
   return {
     title: uniqueLoadListTitle(random),
     items: pickListDraftItems(
       fixtures,
-      Math.max(min, randomLoadListSize(random)),
+      Math.max(min, games ?? randomLoadListSize(random)),
       random,
     ),
   };
@@ -119,11 +138,13 @@ export function listDraftForOp(
   fixtures: LoadtestFixturesFile,
   state: WriterListState,
   random: () => number = Math.random,
+  games?: number,
 ): ListWriteDraft | null {
+  const count = games ?? randomLoadListSize(random);
   if (op === "list-create") {
     return {
       title: uniqueLoadListTitle(random),
-      items: pickListDraftItems(fixtures, randomLoadListSize(random), random),
+      items: pickListDraftItems(fixtures, count, random),
     };
   }
   if (op === "list-edit") {
@@ -131,7 +152,7 @@ export function listDraftForOp(
     return {
       title: "Load test list",
       publicId: state.publicId,
-      items: pickListDraftItems(fixtures, randomLoadListSize(random), random),
+      items: pickListDraftItems(fixtures, count, random),
     };
   }
   if (op === "list-reorder") {
@@ -143,11 +164,11 @@ export function listDraftForOp(
     };
   }
   if (op === "list-delete") {
-    if (!state.publicId || state.items.length === 0) return null;
+    if (!state.publicId || state.items.length < count) return null;
     return {
       title: "Load test list",
       publicId: state.publicId,
-      items: deleteSomeListItems(state.items, random),
+      items: deleteSomeListItems(state.items, random, count),
     };
   }
   return null;

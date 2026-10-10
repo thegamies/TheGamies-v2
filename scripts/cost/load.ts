@@ -24,7 +24,9 @@ import {
   listDraftForOp,
   listWriteJsonBody,
   listWriteNeedsSeed,
+  listWriteStep,
   parseListWritePublicId,
+  randomLoadListSize,
   seedListDraft,
   type WriterListState,
 } from "@/lib/request-cost/load-list-writes";
@@ -209,7 +211,7 @@ async function runScenario(input: {
     const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
     if (!slot?.cookie || !input.secret || writes.length === 0) return;
 
-    const postWrite = (op: LoadWriteOp, body: unknown) =>
+    const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
         method: "POST",
         headers: {
@@ -218,28 +220,29 @@ async function runScenario(input: {
           authorization: `Bearer ${input.secret}`,
           cookie: slot.cookie,
           "x-cost-journey": journey,
-          "x-cost-step": op,
+          "x-cost-step": step,
         },
         body: JSON.stringify(body),
       });
 
-    const postOnce = async (op: LoadWriteOp, body: unknown) => {
-      let res = await postWrite(op, body);
+    const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
+      let res = await postWrite(op, body, step);
       let text = await res.text().catch(() => "");
       if (res.status === 401) {
         await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), true);
-        res = await postWrite(op, body);
+        res = await postWrite(op, body, step);
         text = await res.text().catch(() => "");
       }
       return { res, text };
     };
 
-    const seedListIfNeeded = async (op: LoadWriteOp) => {
-      if (!listWriteNeedsSeed(op, slot.list)) return true;
-      const draft = seedListDraft(op, input.fixtures);
+    const seedListIfNeeded = async (op: LoadWriteOp, games?: number) => {
+      if (!listWriteNeedsSeed(op, slot.list, games)) return true;
+      const draft = seedListDraft(op, input.fixtures, Math.random, games);
       const { res, text } = await postOnce(
         "list-create",
         listWriteJsonBody("list-create", draft),
+        "list-create",
       );
       if (!res.ok) return false;
       applyListWriteState(slot.list, draft, parseListWritePublicId(text));
@@ -249,13 +252,20 @@ async function runScenario(input: {
     while (Date.now() < end) {
       const item = pickWeighted(writes);
       await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), false);
+      const games =
+        item.op === "list-create" ||
+        item.op === "list-edit" ||
+        item.op === "list-delete"
+          ? randomLoadListSize()
+          : undefined;
+      const step = games != null ? listWriteStep(item.op, games) : item.op;
       let t0 = Date.now();
       try {
-        if (isListWriteOp(item.op) && !(await seedListIfNeeded(item.op))) {
+        if (isListWriteOp(item.op) && !(await seedListIfNeeded(item.op, games))) {
           continue;
         }
         const listDraft = isListWriteOp(item.op)
-          ? listDraftForOp(item.op, input.fixtures, slot.list)
+          ? listDraftForOp(item.op, input.fixtures, slot.list, Math.random, games)
           : null;
         const body = isListWriteOp(item.op)
           ? listDraft
@@ -263,14 +273,20 @@ async function runScenario(input: {
             : null
           : writeBody(item.op, input.fixtures);
         if (!body) continue;
+        const recorded =
+          item.op === "list-delete" && listDraft
+            ? listWriteStep(item.op, slot.list.items.length - listDraft.items.length)
+            : item.op === "list-create" || item.op === "list-edit"
+              ? listWriteStep(item.op, listDraft?.items.length ?? games ?? 0)
+              : step;
         t0 = Date.now();
-        const { res, text } = await postOnce(item.op, body);
+        const { res, text } = await postOnce(item.op, body, recorded);
         if (listDraft && res.ok) {
           applyListWriteState(slot.list, listDraft, parseListWritePublicId(text));
         }
         samples.push({
           group: item.group,
-          step: item.op,
+          step: recorded,
           status: res.status,
           ms: Date.now() - t0,
           ok: res.ok,
@@ -280,7 +296,7 @@ async function runScenario(input: {
       } catch {
         samples.push({
           group: item.group,
-          step: item.op,
+          step,
           status: 0,
           ms: Date.now() - t0,
           ok: false,

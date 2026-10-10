@@ -25,6 +25,7 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="families"');
     expect(html).toContain("/games/:slug");
     expect(html).toContain("/game-of-the-year/:year/categories?category=:id");
+    expect(html).toContain("list-create/:n");
     expect(html).toContain('id="statuses"');
     expect(html).toContain("/rankings");
     expect(html).toContain('"scenario":"general"');

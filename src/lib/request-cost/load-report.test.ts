@@ -93,16 +93,34 @@ describe("formatLoadReport", () => {
     });
     expect(md).toContain("- /games/:slug: 2");
   });
+
+  it("rolls counted list writes into list-create/:n", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 1,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        { group: "write", step: "list-create/1", status: 200, ms: 10, ok: true },
+        { group: "write", step: "list-create/10", status: 200, ms: 20, ok: true },
+        { group: "write", step: "list-edit/3", status: 200, ms: 15, ok: true },
+      ],
+    });
+    expect(md).toContain("- list-create/:n: 2");
+    expect(md).toContain("- list-edit/:n: 1");
+  });
 });
 
 describe("loadStepFamily", () => {
   it("groups game detail paths", () => {
     expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
     expect(loadStepFamily("/games")).toBe("/games");
-    expect(loadStepFamily("list-create")).toBe("list-create");
-    expect(loadStepFamily("list-edit")).toBe("list-edit");
+    expect(loadStepFamily("list-create/5")).toBe("list-create/:n");
+    expect(loadStepFamily("list-edit/1")).toBe("list-edit/:n");
+    expect(loadStepFamily("list-delete/10")).toBe("list-delete/:n");
     expect(loadStepFamily("list-reorder")).toBe("list-reorder");
-    expect(loadStepFamily("list-delete")).toBe("list-delete");
   });
 
   it("groups site GOTY category boards", () => {

@@ -251,6 +251,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const ALL = "all";
     const GAME_FAMILY = "/games/:slug";
     const GOTY_CAT_FAMILY = "/game-of-the-year/:year/categories?category=:id";
+    const LIST_COUNT_FAMILIES = ["list-create/:n", "list-edit/:n", "list-delete/:n"];
     const PCTS = ["p50", "p90", "p95", "p99", "max"];
     const LINES = ["p50", "p90", "p95", "p99"];
     const LINE_COLOR = { p50: "#1f6b3a", p90: "#8a6d3b", p95: "#8b1e1e", p99: "#3b1a4a" };
@@ -270,10 +271,17 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     function familyOf(step) {
       if (step.indexOf("/games/") === 0 && step.length > 7) return GAME_FAMILY;
       if (/^\\/game-of-the-year\\/\\d+\\/categories\\?category=/.test(step)) return GOTY_CAT_FAMILY;
+      if (/^(list-create|list-edit|list-delete)\\/\\d+$/.test(step)) {
+        return step.replace(/\\/\\d+$/, "/:n");
+      }
       return step;
     }
     function isRolledFamily(family) {
-      return family === GAME_FAMILY || family === GOTY_CAT_FAMILY;
+      return (
+        family === GAME_FAMILY ||
+        family === GOTY_CAT_FAMILY ||
+        LIST_COUNT_FAMILIES.indexOf(family) >= 0
+      );
     }
     function percentile(sorted, p) {
       if (!sorted.length) return 0;
@@ -309,6 +317,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     function unique(values) {
       return [...new Set(values)].sort((a, b) => {
         if (/^\\d+$/.test(a) && /^\\d+$/.test(b)) return Number(a) - Number(b);
+        const am = /^(.*\\/)(\\d+)$/.exec(a);
+        const bm = /^(.*\\/)(\\d+)$/.exec(b);
+        if (am && bm && am[1] === bm[1]) return Number(am[2]) - Number(bm[2]);
         return a.localeCompare(b);
       });
     }
