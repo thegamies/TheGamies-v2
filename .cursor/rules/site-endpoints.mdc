@@ -1,0 +1,33 @@
+---
+description: Keep the site route inventory current when adding or changing URLs
+globs: src/app/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Site endpoints catalog
+
+When you add, rename, or delete a `page.tsx`, `route.ts`, or an important save (list, library, ballot, Pick’em), update **`src/lib/site-endpoints/catalog.ts` in the same change**.
+
+## Required fields
+
+- `path` + `method` (unique)
+- `kind`: page | api | action | cron | webhook
+- `usage` 1–5 (how often people hit it; 5 = home / game / GOTY night)
+- `dbImpact` 1–5 (Neon work per hit; 5 = many trips or fat SQL)
+- `testPriority` 1–4 (4 = test first in load/integration)
+- `cacheEase` / `cacheComplexity` 1–5 (OpenNext+R2: easy keys vs purge on a person saving)
+- `notes` in product language (no CLI, env vars, or file-path setup in the **admin UI** copy)
+
+## Ranking
+
+High **use** or high **database** → test priority 4. Rare but expensive (edition freeze) → 3. Legal/redirects/ops chrome → 1.
+
+Do not invent a second list. `docs/endpoints.md` and `e2e/.cost/endpoints.html` (regenerate with `pnpm exec tsx scripts/cost/render-endpoints-html.ts`) read this catalog.
+
+```ts
+// ❌ page added, catalog unchanged
+// src/app/awards/page.tsx
+
+// ✅ same PR: row in SITE_ENDPOINTS
+{ method: "GET", path: "/awards", usage: 4, dbImpact: 3, testPriority: 3, notes: "…" }
+```

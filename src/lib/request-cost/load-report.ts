@@ -77,6 +77,8 @@ export type LoadLatencySummary = {
 export type LoadRunStats = {
   scenario: LoadtestScenario;
   durationMs: number;
+  /** Linear VU start window. Omitted on older JSON = all VUs at t=0. */
+  rampMs?: number;
   vusRead: number;
   writers: number;
   startedAt: string;
@@ -177,6 +179,12 @@ const LIST_COUNTED_STEP = /^(list-create|list-edit|list-delete)\/\d+$/;
 
 /** Roll `/games/portal-2` into `/games/:slug`; `list-create/5` into `list-create/:n`. */
 export function loadStepFamily(step: string): string {
+  if (step.startsWith("/games?q=")) {
+    return "/games?q=:q";
+  }
+  if (step.startsWith("/api/games/search?")) {
+    return "/api/games/search?q=:q";
+  }
   if (step.startsWith("/games/") && step.length > "/games/".length) {
     return "/games/:slug";
   }
@@ -242,6 +250,11 @@ export function formatLoadReport(stats: LoadRunStats): string {
   return `# Load test ${stats.scenario}
 
 - Duration: ${Math.round(stats.durationMs / 1000)}s
+- Ramp: ${Math.round((stats.rampMs ?? 0) / 1000)}s${
+    (stats.rampMs ?? 0) > 0
+      ? " (linear VU start, then hold)"
+      : " (all VUs at t=0)"
+  }
 - Readers (vus-read): ${stats.vusRead}
 - Writers: ${stats.writers}
 - Started (UTC): ${stats.startedAt}

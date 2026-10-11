@@ -24,6 +24,8 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="steps"');
     expect(html).toContain('id="families"');
     expect(html).toContain("/games/:slug");
+    expect(html).toContain("/games?q=:q");
+    expect(html).toContain("/api/games/search?q=:q");
     expect(html).toContain("/game-of-the-year/:year/categories?category=:id");
     expect(html).toContain("list-create/:n");
     expect(html).toContain('id="statuses"');
@@ -38,8 +40,10 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="pcts"');
     expect(html).toContain('id="timeline"');
     expect(html).toContain("how many");
+    expect(html).toContain("ramp 0s");
     expect(html).toContain("requests");
     expect(html).toContain('id="buckets"');
+    expect(html).toContain("--bg: #121110");
     expect(html).not.toContain("</script></script>");
   });
 

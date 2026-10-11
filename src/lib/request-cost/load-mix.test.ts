@@ -51,6 +51,12 @@ describe("buildLoadGets", () => {
       expect(buildLoadGets(scenario, urls).some((item) => item.pickCategory)).toBe(
         true,
       );
+      expect(
+        buildLoadGets(scenario, urls).some((item) => item.pickSearch === "browse"),
+      ).toBe(true);
+      expect(
+        buildLoadGets(scenario, urls).some((item) => item.pickSearch === "api"),
+      ).toBe(true);
       expect(mixUsesShowcaseSlug(buildLoadGets(scenario, urls))).toBe(false);
     }
   });

@@ -89,6 +89,23 @@ async function authPost(appUrl: string, endpoint: string, body: unknown) {
   });
 }
 
+async function authPostRetrying(
+  appUrl: string,
+  endpoint: string,
+  body: unknown,
+  label: string,
+) {
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    res = await authPost(appUrl, endpoint, body);
+    if (res.ok) return res;
+    if (res.status !== 429 || attempt === 7) return res;
+    log(`${label}: HTTP 429, waiting`);
+    await sleep(4000 * (attempt + 1));
+  }
+  return res!;
+}
+
 async function findAuthUserId(query: NeonSql, email: string) {
   const result =
     await query`SELECT id FROM neon_auth."user" WHERE lower(email) = lower(${email}) LIMIT 1`;
@@ -109,19 +126,13 @@ async function ensureAuthUser(
   const account = loadtestAccount(index);
   let authUserId = await findAuthUserId(query, account.email);
   if (!authUserId) {
-    let res: Response | null = null;
-    for (let attempt = 0; attempt < 6; attempt++) {
-      res = await authPost(appUrl, "sign-up/email", {
-        email: account.email,
-        password,
-        name: account.displayName,
-      });
-      if (res.ok) break;
-      if (res.status !== 429 || attempt === 5) {
-        throw new Error(`sign-up ${account.username} failed HTTP ${res.status}`);
-      }
-      log(`${account.username}: sign-up rate limited, waiting`);
-      await sleep(4000 * (attempt + 1));
+    const res = await authPostRetrying(appUrl, "sign-up/email", {
+      email: account.email,
+      password,
+      name: account.displayName,
+    }, account.username);
+    if (!res.ok) {
+      throw new Error(`sign-up ${account.username} failed HTTP ${res.status}`);
     }
     await sleep(1500);
     authUserId = await findAuthUserId(query, account.email);
@@ -130,33 +141,35 @@ async function ensureAuthUser(
   if (!authUserId) throw new Error(`${account.username}: auth user missing`);
   await markNeonAuthEmailVerified({ authUserId, query });
 
-  let signIn = await authPost(appUrl, "sign-in/email", {
+  let signIn = await authPostRetrying(appUrl, "sign-in/email", {
     email: account.email,
     password,
-  });
+  }, account.username);
   if (!signIn.ok) {
-    log(`${account.username}: sign-in failed, recreating`);
+    log(`${account.username}: sign-in failed HTTP ${signIn.status}, recreating`);
     await removeNeonAuthDirectoryUser(authUserId, {
       query,
       email: account.email,
     });
-    const res = await authPost(appUrl, "sign-up/email", {
+    const res = await authPostRetrying(appUrl, "sign-up/email", {
       email: account.email,
       password,
       name: account.displayName,
-    });
+    }, account.username);
     if (!res.ok) {
       throw new Error(`re-sign-up ${account.username} failed HTTP ${res.status}`);
     }
     authUserId = await findAuthUserId(query, account.email);
     if (!authUserId) throw new Error(`${account.username}: missing after recreate`);
     await markNeonAuthEmailVerified({ authUserId, query });
-    signIn = await authPost(appUrl, "sign-in/email", {
+    signIn = await authPostRetrying(appUrl, "sign-in/email", {
       email: account.email,
       password,
-    });
+    }, account.username);
     if (!signIn.ok) {
-      throw new Error(`${account.username}: sign-in still failing`);
+      throw new Error(
+        `${account.username}: sign-in still failing HTTP ${signIn.status}`,
+      );
     }
   }
   const cookie = cookieHeaderFromResponse(signIn);
@@ -253,6 +266,7 @@ async function pickCatalogBand(
       id: games.id,
       slug: games.slug,
       igdbId: games.igdbId,
+      title: games.title,
     })
     .from(games)
     .where(and(...filters))
@@ -309,7 +323,7 @@ async function main() {
       cookies.push({ index, cookie });
     }
     if (index > 1) {
-      await sleep(2000);
+      await sleep(3000);
     }
   }
   if (writers === 0) cookies.length = 0;

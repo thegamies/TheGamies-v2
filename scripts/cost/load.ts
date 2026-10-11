@@ -6,6 +6,7 @@ import path from "node:path";
 import { createDb } from "@thegamies/db";
 import { costWarmupHits } from "@/lib/request-cost/warmup";
 import {
+  loadVuStartOffsetMs,
   parseLoadArgs,
   refuseLoadAppUrl,
 } from "@/lib/request-cost/load-cli";
@@ -18,6 +19,7 @@ import {
   siteGotyCategoryPath,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
+import { loadGamesSearchPath } from "@/lib/request-cost/load-search";
 import {
   applyListWriteState,
   emptyWriterListState,
@@ -66,6 +68,12 @@ type WriterSlot = LoadCookieSlot & { list: WriterListState };
 
 function stampUtc(d: Date): string {
   return d.toISOString().replace(/[:.]/g, "-");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 async function readJson<T>(file: string): Promise<T> {
@@ -144,6 +152,7 @@ async function runScenario(input: {
   scenario: LoadtestScenario;
   appUrl: string;
   durationMs: number;
+  rampMs: number;
   vusRead: number;
   writers: number;
   fixtures: LoadtestFixturesFile;
@@ -158,21 +167,26 @@ async function runScenario(input: {
   const samples: LoadSample[] = [];
   const started = new Date();
   const end = started.getTime() + input.durationMs;
+  const rampMs = Math.min(Math.max(0, input.rampMs), input.durationMs);
   const journey = `${input.tag}-${input.scenario}`;
 
-  const readers = Array.from({ length: input.vusRead }, async () => {
+  const readers = Array.from({ length: input.vusRead }, async (_, i) => {
+    const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
+    if (delay > 0) await sleep(delay);
     while (Date.now() < end) {
       const item = pickWeighted(gets);
-      const path = item.pickGame
-        ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
-        : item.pickCategory
-          ? siteGotyCategoryPath(pickLoadtestGotyCategory())
-          : item.path;
+      const path = item.pickSearch
+        ? loadGamesSearchPath(item.pickSearch, input.fixtures)
+        : item.pickGame
+          ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
+          : item.pickCategory
+            ? siteGotyCategoryPath(pickLoadtestGotyCategory())
+            : item.path;
       const t0 = Date.now();
       try {
         const res = await fetch(`${input.appUrl}${path}`, {
           headers: {
-            accept: "text/html",
+            accept: item.pickSearch === "api" ? "application/json" : "text/html",
             "x-cost-journey": journey,
             "x-cost-step": path,
           },
@@ -210,6 +224,8 @@ async function runScenario(input: {
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
     const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
     if (!slot?.cookie || !input.secret || writes.length === 0) return;
+    const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
+    if (delay > 0) await sleep(delay);
 
     const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
@@ -311,6 +327,7 @@ async function runScenario(input: {
   const stats = {
     scenario: input.scenario,
     durationMs: ended.getTime() - started.getTime(),
+    rampMs,
     vusRead: input.vusRead,
     writers: input.writers,
     startedAt: started.toISOString(),
@@ -374,6 +391,7 @@ async function main() {
       scenario,
       appUrl: target.appUrl,
       durationMs: args.durationMs,
+      rampMs: args.rampMs,
       vusRead: args.vusRead,
       writers: args.writers,
       fixtures,

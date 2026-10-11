@@ -121,6 +121,8 @@ export type LoadtestGame = {
   slug: string;
   igdbId: number;
   band: "popular" | "unpopular";
+  /** Catalog title for search queries. Older fixture files omit it. */
+  title?: string;
 };
 
 export type LoadtestFixturesFile = {

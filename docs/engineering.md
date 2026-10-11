@@ -69,7 +69,7 @@ On that personal branch only: delete the extra journal rows whose `created_at` i
 
 ## Request cost (compute · egress · scale)
 
-Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`.
+Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`. Route inventory and load-test order: [endpoints.md](./endpoints.md) (`.cursor/rules/site-endpoints.mdc`).
 
 Before choosing freeze/cache/**search**/list storage, walk the request:
 

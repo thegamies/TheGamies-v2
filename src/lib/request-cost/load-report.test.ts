@@ -68,6 +68,7 @@ describe("formatLoadReport", () => {
       ],
     });
     expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
+    expect(md).toContain("Ramp: 0s (all VUs at t=0)");
     expect(md).toContain("Writers: 10");
     expect(md).toContain("- general: 1 · p50 80 ms · p90 80 ms · p95 80 ms · p99 80 ms");
     expect(md).toContain("- /rankings: 1 · p50 80 ms");
@@ -76,6 +77,22 @@ describe("formatLoadReport", () => {
     expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms · p99 45 ms");
     expect(md).toContain("Neon db sum p50 90 ms · p90 90 ms · p95 90 ms · p99 90 ms");
     expect(md).toContain("select count(*) from games");
+  });
+
+  it("labels a linear VU ramp", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 90_000,
+      rampMs: 30_000,
+      vusRead: 50,
+      writers: 25,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:01:30.000Z",
+      samples: [
+        { group: "general", step: "/", status: 200, ms: 80, ok: true },
+      ],
+    });
+    expect(md).toContain("Ramp: 30s (linear VU start, then hold)");
   });
 
   it("rolls game detail paths into one family", () => {
@@ -117,6 +134,10 @@ describe("loadStepFamily", () => {
   it("groups game detail paths", () => {
     expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
     expect(loadStepFamily("/games")).toBe("/games");
+    expect(loadStepFamily("/games?q=Hades")).toBe("/games?q=:q");
+    expect(loadStepFamily("/api/games/search?q=ha")).toBe(
+      "/api/games/search?q=:q",
+    );
     expect(loadStepFamily("list-create/5")).toBe("list-create/:n");
     expect(loadStepFamily("list-edit/1")).toBe("list-edit/:n");
     expect(loadStepFamily("list-delete/10")).toBe("list-delete/:n");

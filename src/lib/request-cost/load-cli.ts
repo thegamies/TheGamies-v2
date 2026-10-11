@@ -9,14 +9,27 @@ import { isProductionAppHost } from "@/lib/qa/staging-fixtures";
 
 export const DEFAULT_LOAD_DURATION_MS = 10 * 60 * 1000;
 export const DEFAULT_LOAD_VUS_READ = 20;
+/** Linear VU start, like k6 `ramping-vus`. `0` starts every loop at t=0. */
+export const DEFAULT_LOAD_RAMP_MS = 30_000;
 export const MAX_LOAD_DURATION_MS = 60 * 60 * 1000;
 
 export type LoadCliArgs = {
   scenarios: LoadtestScenario[];
   durationMs: number;
+  rampMs: number;
   vusRead: number;
   writers: number;
 };
+
+/** VU `index` of `total` starts this many ms into the run. Index 0 is immediate. */
+export function loadVuStartOffsetMs(
+  index: number,
+  total: number,
+  rampMs: number,
+): number {
+  if (index <= 0 || total <= 1 || rampMs <= 0) return 0;
+  return Math.floor((index / total) * rampMs);
+}
 
 export function parseDurationMs(raw: string): number | { error: string } {
   const trimmed = raw.trim().toLowerCase();
@@ -39,8 +52,19 @@ export function parseDurationMs(raw: string): number | { error: string } {
   return ms;
 }
 
+export function parseRampMs(raw: string): number | { error: string } {
+  const trimmed = raw.trim().toLowerCase();
+  if (trimmed === "0" || trimmed === "0s" || trimmed === "0ms") return 0;
+  const parsed = parseDurationMs(raw);
+  if (typeof parsed !== "number") {
+    return { error: "Ramp must look like 30s, 0, or 1m." };
+  }
+  return parsed;
+}
+
 export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
   let durationMs = DEFAULT_LOAD_DURATION_MS;
+  let rampMs = DEFAULT_LOAD_RAMP_MS;
   let vusRead = DEFAULT_LOAD_VUS_READ;
   let writers = 0;
   let all = false;
@@ -53,7 +77,13 @@ export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
       all = true;
       continue;
     }
-    if (arg === "--scenario" || arg === "--duration" || arg === "--vus-read" || arg === "--writers") {
+    if (
+      arg === "--scenario" ||
+      arg === "--duration" ||
+      arg === "--ramp" ||
+      arg === "--vus-read" ||
+      arg === "--writers"
+    ) {
       if (next == null || next.startsWith("--")) {
         return { error: `${arg} needs a value.` };
       }
@@ -67,6 +97,10 @@ export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
         const parsed = parseDurationMs(next);
         if (typeof parsed !== "number") return parsed;
         durationMs = parsed;
+      } else if (arg === "--ramp") {
+        const parsed = parseRampMs(next);
+        if (typeof parsed !== "number") return parsed;
+        rampMs = parsed;
       } else if (arg === "--vus-read") {
         const n = Number(next);
         if (!Number.isInteger(n) || n < 0 || n > 500) {
@@ -91,7 +125,7 @@ export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
       ? scenarios
       : (["general"] as LoadtestScenario[]);
 
-  return { scenarios: resolved, durationMs, vusRead, writers };
+  return { scenarios: resolved, durationMs, rampMs, vusRead, writers };
 }
 
 export function refuseLoadAppUrl(appUrl: string): string | null {

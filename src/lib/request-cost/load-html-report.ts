@@ -59,6 +59,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
   const payload = {
     scenario: stats.scenario,
     durationMs: stats.durationMs,
+    rampMs: stats.rampMs ?? 0,
     vusRead: stats.vusRead,
     writers: stats.writers,
     startedAt: stats.startedAt,
@@ -75,13 +76,13 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
   <title>Load ${escapeHtml(stats.scenario)} · ${escapeHtml(stats.startedAt)}</title>
   <style>
     :root {
-      --bg: #f4efe6;
-      --ink: #161513;
-      --muted: #6b6560;
-      --line: #d9d1c5;
-      --card: #fffdf8;
-      --accent: #8b1e1e;
-      --ok: #1f6b3a;
+      --bg: #121110;
+      --ink: #efe8dc;
+      --muted: #9a938a;
+      --line: #3a3530;
+      --card: #1c1a18;
+      --accent: #e07070;
+      --ok: #7dce9a;
     }
     * { box-sizing: border-box; }
     body {
@@ -191,6 +192,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     <p class="meta">
       ${escapeHtml(stats.startedAt)} → ${escapeHtml(stats.endedAt)}
       · ${Math.round(stats.durationMs / 1000)}s
+      · ramp ${Math.round((stats.rampMs ?? 0) / 1000)}s
       · ${stats.vusRead} readers · ${stats.writers} writers
     </p>
     <p class="meta">Filter by group, kind, path, status, and which percentiles to show. Client is the runner round-trip. Wall is Worker time. Db clock is overlap-union of Neon trips; db sum adds parallel trips. The timeline is how many requests in each bucket were at least as slow as the run’s p50 / p90 / p95 / p99.</p>
@@ -250,11 +252,13 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const DATA = ${jsonForScript(payload)};
     const ALL = "all";
     const GAME_FAMILY = "/games/:slug";
+    const GAMES_SEARCH_FAMILY = "/games?q=:q";
+    const GAMES_SEARCH_API_FAMILY = "/api/games/search?q=:q";
     const GOTY_CAT_FAMILY = "/game-of-the-year/:year/categories?category=:id";
     const LIST_COUNT_FAMILIES = ["list-create/:n", "list-edit/:n", "list-delete/:n"];
     const PCTS = ["p50", "p90", "p95", "p99", "max"];
     const LINES = ["p50", "p90", "p95", "p99"];
-    const LINE_COLOR = { p50: "#1f6b3a", p90: "#8a6d3b", p95: "#8b1e1e", p99: "#3b1a4a" };
+    const LINE_COLOR = { p50: "#7dce9a", p90: "#d4b06a", p95: "#e07070", p99: "#c4a0e0" };
     const BUCKETS = [
       { id: "auto", label: "Auto" },
       { id: 1000, label: "1s" },
@@ -269,6 +273,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     };
 
     function familyOf(step) {
+      if (step.indexOf("/games?q=") === 0) return GAMES_SEARCH_FAMILY;
+      if (step.indexOf("/api/games/search?") === 0) return GAMES_SEARCH_API_FAMILY;
       if (step.indexOf("/games/") === 0 && step.length > 7) return GAME_FAMILY;
       if (/^\\/game-of-the-year\\/\\d+\\/categories\\?category=/.test(step)) return GOTY_CAT_FAMILY;
       if (/^(list-create|list-edit|list-delete)\\/\\d+$/.test(step)) {
@@ -279,6 +285,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     function isRolledFamily(family) {
       return (
         family === GAME_FAMILY ||
+        family === GAMES_SEARCH_FAMILY ||
+        family === GAMES_SEARCH_API_FAMILY ||
         family === GOTY_CAT_FAMILY ||
         LIST_COUNT_FAMILIES.indexOf(family) >= 0
       );

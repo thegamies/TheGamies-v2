@@ -31,6 +31,8 @@ export type LoadGetItem = {
   pickGame?: boolean;
   /** Resolve a 2025 site category board from the award catalog. */
   pickCategory?: boolean;
+  /** Catalog `/games?q=` or list-editor `/api/games/search`. */
+  pickSearch?: "browse" | "api";
 };
 
 export type LoadWriteOp =
@@ -111,6 +113,20 @@ function generalGets(urls: LoadMixUrls): LoadGetItem[] {
   return [
     { group: "general", method: "GET", path: "/", weight: 5 },
     { group: "general", method: "GET", path: "/games", weight: 3 },
+    {
+      group: "general",
+      method: "GET",
+      path: "/games?q=",
+      weight: 4,
+      pickSearch: "browse",
+    },
+    {
+      group: "general",
+      method: "GET",
+      path: "/api/games/search",
+      weight: 2,
+      pickSearch: "api",
+    },
     {
       group: "general",
       method: "GET",
