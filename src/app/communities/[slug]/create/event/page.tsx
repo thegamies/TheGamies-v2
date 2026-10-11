@@ -78,6 +78,7 @@ export default async function CreateCommunityEventPage({
       categoryGroup: c.categoryGroup,
       eligibility: c.eligibility,
       allowEditions: c.allowEditions,
+      allowDlcAddon: c.allowDlcAddon,
     }));
   } catch {
     siteCategoryCatalog = [];

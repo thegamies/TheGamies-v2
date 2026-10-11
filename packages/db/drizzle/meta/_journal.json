@@ -414,6 +414,13 @@
       "when": 1790208000000,
       "tag": "0058_search_trgm_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790380800000,
+      "tag": "0059_award_category_admin_flags",
+      "breakpoints": true
     }
   ]
 }

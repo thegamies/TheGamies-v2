@@ -40,6 +40,11 @@ const ADMIN_LINKS = [
     description: "Reveal scores, refresh dirty keys, or rebuild a year.",
   },
   {
+    href: "/admin/awards",
+    title: "Site awards",
+    description: "Add and edit Game of the Year award categories.",
+  },
+  {
     href: "/admin/the-game-awards",
     title: "Video Game Awards Pick’em",
     description: "Set up the year, nominees, and call winners during the show.",

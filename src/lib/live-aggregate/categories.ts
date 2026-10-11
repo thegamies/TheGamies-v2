@@ -1,4 +1,4 @@
-import { asc, eq, notInArray, sql } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import {
   awardCategories,
   covers,
@@ -9,18 +9,32 @@ import {
 import { AWARD_CATEGORY_DEFS } from "./award-category-defs";
 import { getLiveAggregateDb } from "./contrib";
 
+const awardCategorySelect = {
+  id: awardCategories.id,
+  label: awardCategories.label,
+  description: awardCategories.description,
+  sortOrder: awardCategories.sortOrder,
+  categoryGroup: awardCategories.categoryGroup,
+  eligibility: awardCategories.eligibility,
+  allowEditions: awardCategories.allowEditions,
+  allowDlcAddon: awardCategories.allowDlcAddon,
+  currentOrPreviousYear: awardCategories.currentOrPreviousYear,
+} as const;
+
 export async function listActiveAwardCategories(
   db: Db = getLiveAggregateDb(),
 ) {
   return db
     .select({
-      id: awardCategories.id,
-      label: awardCategories.label,
-      description: awardCategories.description,
-      sortOrder: awardCategories.sortOrder,
-      categoryGroup: awardCategories.categoryGroup,
-      eligibility: awardCategories.eligibility,
-      allowEditions: awardCategories.allowEditions,
+      id: awardCategorySelect.id,
+      label: awardCategorySelect.label,
+      description: awardCategorySelect.description,
+      sortOrder: awardCategorySelect.sortOrder,
+      categoryGroup: awardCategorySelect.categoryGroup,
+      eligibility: awardCategorySelect.eligibility,
+      allowEditions: awardCategorySelect.allowEditions,
+      allowDlcAddon: awardCategorySelect.allowDlcAddon,
+      currentOrPreviousYear: awardCategorySelect.currentOrPreviousYear,
     })
     .from(awardCategories)
     .where(eq(awardCategories.active, true))
@@ -28,49 +42,39 @@ export async function listActiveAwardCategories(
 }
 
 /**
- * Upsert canonical `AWARD_CATEGORY_DEFS` into `award_categories` and deactivate
- * rows that are no longer in the catalog. Safe to call from admin seed / ops.
+ * Insert the bootstrap catalog when `award_categories` is empty.
+ * Does not overwrite admin edits or deactivate extra rows.
  */
 export async function ensureAwardCategories(
   db: Db = getLiveAggregateDb(),
 ): Promise<{ upserted: number; active: number }> {
+  const [{ count }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(awardCategories);
+  if (Number(count) > 0) {
+    const active = await listActiveAwardCategories(db);
+    return { upserted: 0, active: active.length };
+  }
+
   const defs = AWARD_CATEGORY_DEFS;
   if (defs.length === 0) {
     return { upserted: 0, active: 0 };
   }
 
-  await db
-    .insert(awardCategories)
-    .values(
-      defs.map((def) => ({
-        id: def.id,
-        label: def.label,
-        description: def.description,
-        sortOrder: def.sortOrder,
-        active: true,
-        categoryGroup: def.group,
-        eligibility: def.eligibility,
-        allowEditions: def.allowEditions,
-      })),
-    )
-    .onConflictDoUpdate({
-      target: awardCategories.id,
-      set: {
-        label: sql`excluded.label`,
-        description: sql`excluded.description`,
-        sortOrder: sql`excluded.sort_order`,
-        active: sql`excluded.active`,
-        categoryGroup: sql`excluded.category_group`,
-        eligibility: sql`excluded.eligibility`,
-        allowEditions: sql`excluded.allow_editions`,
-      },
-    });
-
-  const keepIds = defs.map((def) => def.id);
-  await db
-    .update(awardCategories)
-    .set({ active: false })
-    .where(notInArray(awardCategories.id, keepIds));
+  await db.insert(awardCategories).values(
+    defs.map((def) => ({
+      id: def.id,
+      label: def.label,
+      description: def.description,
+      sortOrder: def.sortOrder,
+      active: true,
+      categoryGroup: def.group,
+      eligibility: def.eligibility,
+      allowEditions: def.allowEditions,
+      allowDlcAddon: def.allowDlcAddon,
+      currentOrPreviousYear: def.currentOrPreviousYear,
+    })),
+  );
 
   const active = await listActiveAwardCategories(db);
   return { upserted: defs.length, active: active.length };

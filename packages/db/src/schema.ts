@@ -788,6 +788,10 @@ export const awardCategories = pgTable("award_categories", {
   categoryGroup: text("category_group").notNull().default("premier"),
   eligibility: text("eligibility").notNull().default("current_year"),
   allowEditions: boolean("allow_editions").notNull().default(false),
+  allowDlcAddon: boolean("allow_dlc_addon").notNull().default(false),
+  currentOrPreviousYear: boolean("current_or_previous_year")
+    .notNull()
+    .default(false),
 });
 
 /**

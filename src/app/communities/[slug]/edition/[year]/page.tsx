@@ -465,6 +465,7 @@ export default async function CommunityEditionYearPage({
         categoryGroup: c.categoryGroup,
         eligibility: c.eligibility,
         allowEditions: c.allowEditions,
+        allowDlcAddon: c.allowDlcAddon,
       }));
       customCategories = customCats;
     } catch {

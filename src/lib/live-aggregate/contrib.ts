@@ -176,6 +176,8 @@ export async function syncOwnedGotyContribFromList(
             id: awardCategories.id,
             eligibility: awardCategories.eligibility,
             allowEditions: awardCategories.allowEditions,
+            allowDlcAddon: awardCategories.allowDlcAddon,
+            currentOrPreviousYear: awardCategories.currentOrPreviousYear,
           })
           .from(awardCategories)
           .where(inArray(awardCategories.id, voteCategoryIds));
@@ -198,7 +200,7 @@ export async function syncOwnedGotyContribFromList(
         parseAwardCategoryEligibility(cat.eligibility),
         {
           allowEditions: cat.allowEditions,
-          allowDlcAddon: awardAllowsDlcAddon(cat.id),
+          allowDlcAddon: awardAllowsDlcAddon(cat),
         },
       ) == null
     );
@@ -317,9 +319,31 @@ export async function replaceCategoryVotesForList(
 
   if (votes.length > 0) {
     const categoryIds = [...new Set(votes.map((v) => v.categoryId))];
+    const activeCats = await db
+      .select({
+        id: awardCategories.id,
+        eligibility: awardCategories.eligibility,
+        allowEditions: awardCategories.allowEditions,
+        allowDlcAddon: awardCategories.allowDlcAddon,
+        currentOrPreviousYear: awardCategories.currentOrPreviousYear,
+        active: awardCategories.active,
+      })
+      .from(awardCategories)
+      .where(inArray(awardCategories.id, categoryIds));
+    if (activeCats.length !== categoryIds.length) {
+      return { error: "One or more categories are not available." };
+    }
+    const catById = new Map(activeCats.map((c) => [c.id, c]));
     for (const categoryId of categoryIds) {
+      const cat = catById.get(categoryId);
+      if (!cat) {
+        return { error: "One or more categories are not available." };
+      }
+      if (!cat.active && !previousCategoryIds.has(categoryId)) {
+        return { error: "One or more categories are not available." };
+      }
       if (
-        !awardOfferedOnListYear(categoryId, year) &&
+        !awardOfferedOnListYear(cat, year) &&
         !previousCategoryIds.has(categoryId)
       ) {
         return {
@@ -328,23 +352,6 @@ export async function replaceCategoryVotesForList(
         };
       }
     }
-    const activeCats = await db
-      .select({
-        id: awardCategories.id,
-        eligibility: awardCategories.eligibility,
-        allowEditions: awardCategories.allowEditions,
-      })
-      .from(awardCategories)
-      .where(
-        and(
-          inArray(awardCategories.id, categoryIds),
-          eq(awardCategories.active, true),
-        ),
-      );
-    if (activeCats.length !== categoryIds.length) {
-      return { error: "One or more categories are not available." };
-    }
-    const catById = new Map(activeCats.map((c) => [c.id, c]));
 
     const gameIds = [...new Set(votes.map((v) => v.gameId))];
     const found = await db
@@ -376,7 +383,7 @@ export async function replaceCategoryVotesForList(
         game,
         year,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat.id) },
+        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat) },
       );
       if (err) return { error: err };
     }

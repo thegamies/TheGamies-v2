@@ -15,6 +15,7 @@ type CategoryMeta = {
   categoryGroup?: string;
   eligibility?: string;
   allowEditions?: boolean;
+  allowDlcAddon?: boolean;
 };
 
 type BallotItem = {
@@ -85,6 +86,7 @@ export function EditionBallotReadonly({
       categoryGroup: c.categoryGroup ?? "premier",
       eligibility: c.eligibility ?? "current_year",
       allowEditions: c.allowEditions === true,
+      allowDlcAddon: c.allowDlcAddon === true,
     })),
     custom: customCategories,
   });

@@ -195,6 +195,7 @@ export function EditionBallotEditor({
           categoryGroup: c.categoryGroup ?? "premier",
           eligibility: c.eligibility ?? "current_year",
           allowEditions: c.allowEditions === true,
+          allowDlcAddon: c.allowDlcAddon === true,
         })),
         custom: customCategories,
       }),
@@ -413,6 +414,7 @@ export function EditionBallotEditor({
                         categoryGroup: item.categoryGroup,
                         eligibility: item.eligibility,
                         allowEditions: item.allowEditions,
+                        allowDlcAddon: item.allowDlcAddon,
                       }}
                       pick={pick}
                       year={year}

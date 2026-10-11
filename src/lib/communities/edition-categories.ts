@@ -123,6 +123,7 @@ export async function listEditionAwardCategories(
     categoryGroup: string;
     eligibility: string;
     allowEditions: boolean;
+    allowDlcAddon: boolean;
   }>
 > {
   const rows = await db
@@ -134,6 +135,7 @@ export async function listEditionAwardCategories(
       categoryGroup: awardCategories.categoryGroup,
       eligibility: awardCategories.eligibility,
       allowEditions: awardCategories.allowEditions,
+      allowDlcAddon: awardCategories.allowDlcAddon,
     })
     .from(communityEditionCategories)
     .innerJoin(
@@ -154,6 +156,7 @@ export async function listEditionAwardCategories(
     categoryGroup: r.categoryGroup,
     eligibility: r.eligibility,
     allowEditions: r.allowEditions,
+    allowDlcAddon: r.allowDlcAddon,
   }));
 }
 
@@ -264,7 +267,7 @@ export async function searchSiteAwardCategories(
     .orderBy(asc(awardCategories.sortOrder), asc(awardCategories.label))
     .limit(limit);
 
-  // Rare: empty catalog — upsert defs once, then retry the same query.
+  // Rare: empty catalog — seed bootstrap defs once, then retry the same query.
   if (rows.length === 0) {
     const [{ count }] = await database
       .select({ count: sql<number>`count(*)::int` })
@@ -339,6 +342,7 @@ export async function addEditionCategory(
     .select({
       id: awardCategories.id,
       sortOrder: awardCategories.sortOrder,
+      currentOrPreviousYear: awardCategories.currentOrPreviousYear,
     })
     .from(awardCategories)
     .where(
@@ -347,7 +351,7 @@ export async function addEditionCategory(
     .limit(1);
   if (!siteCat) return { error: "That category was not found." };
 
-  if (!awardOfferedOnListYear(categoryId, gate.year)) {
+  if (!awardOfferedOnListYear(siteCat, gate.year)) {
     const previousIds = await listEditionEnabledCategoryIds(
       gate.edition.id,
       db,
@@ -427,12 +431,14 @@ export async function setCommunityEditionCategories(
     await ensureAwardCategories(db);
     active = await listActiveAwardCategories(db);
   }
-  const activeIds = new Set(active.map((c) => c.id));
+  const activeById = new Map(active.map((c) => [c.id, c]));
   const previousIds = await listEditionEnabledCategoryIds(gate.edition.id, db);
   const previousSet = new Set(previousIds);
-  const allowSite = (id: string) =>
-    activeIds.has(id) &&
-    (awardOfferedOnListYear(id, gate.year) || previousSet.has(id));
+  const allowSite = (id: string) => {
+    const cat = activeById.get(id);
+    if (!cat) return false;
+    return awardOfferedOnListYear(cat, gate.year) || previousSet.has(id);
+  };
 
   const uniqueFromForm = [
     ...new Set(
