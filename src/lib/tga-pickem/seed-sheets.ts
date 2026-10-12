@@ -4,21 +4,24 @@ import {
   communityMembers,
   createDb,
   profiles,
-  tgaCommunityPicks,
   tgaCommunityScores,
   tgaCommunitySheets,
   tgaCommunityYears,
-  tgaSitePicks,
   tgaSiteScores,
   tgaSiteSheets,
   tgaYears,
   type Db,
 } from "@thegamies/db";
-import { insertInChunks } from "@/lib/db/insert-chunks";
 import { seedAccountsWhere } from "@/lib/seed-accounts";
+import { encodeBallotMask, type PickCountDelta } from "./ballot-mask";
+import {
+  applyCommunityPickCountDeltas,
+  applySitePickCountDeltas,
+  recountCommunityPickCounts,
+  recountSitePickCounts,
+} from "./sheets";
 import { listTgaBallot } from "./service";
 import {
-  SEED_TGA_INSERT_CHUNK,
   SEED_TGA_MAX_BATCH,
   tgaCommunitySeedSlugError,
 } from "./seed-sheets-rules";
@@ -31,6 +34,18 @@ export {
 
 function getDb(db?: Db): Db {
   return db ?? createDb();
+}
+
+function tallyPickCounts(
+  counts: Map<string, PickCountDelta>,
+  picks: Record<string, string>,
+) {
+  for (const [categoryId, nomineeId] of Object.entries(picks)) {
+    const key = `${categoryId}\0${nomineeId}`;
+    const current = counts.get(key);
+    if (current) current.delta += 1;
+    else counts.set(key, { categoryId, nomineeId, delta: 1 });
+  }
 }
 
 export function pickSeedNomineeId(
@@ -223,12 +238,13 @@ async function rescoreSiteSheets(
       s.profile_id,
       coalesce((
         select count(*)::int
-        from tga_site_picks p
-        join tga_winners w
-          on w.category_id = p.category_id
-         and w.nominee_id = p.nominee_id
-        where p.profile_id = s.profile_id
-          and p.year = ${year}
+        from tga_winners w
+        join tga_categories c on c.id = w.category_id and c.year = s.year
+        join tga_category_nominees cn
+          on cn.category_id = w.category_id
+         and cn.nominee_id = w.nominee_id
+        where s.ballot_mask is not null
+          and get_byte(s.ballot_mask, c.slot) = cn.slot
       ), 0),
       case
         when ${officialWp}::int is null or s.world_premieres_guess is null then null
@@ -295,34 +311,24 @@ export async function seedTgaSheets(
     .limit(count);
 
   const now = new Date();
-  const pickRows: Array<{
-    profileId: string;
-    year: number;
-    categoryId: string;
-    nomineeId: string;
-  }> = [];
+  const counts = new Map<string, PickCountDelta>();
 
   for (const profile of targets) {
     const picks = buildSeedTgaPicks(categories);
     const guess = seedWorldPremieresGuess();
+    tallyPickCounts(counts, picks);
     await db.insert(tgaSiteSheets).values({
       profileId: profile.id,
       year,
       worldPremieresGuess: guess,
+      ballotMask: encodeBallotMask(ballot, picks),
       updatedAt: now,
     });
-    for (const [categoryId, nomineeId] of Object.entries(picks)) {
-      pickRows.push({ profileId: profile.id, year, categoryId, nomineeId });
-    }
   }
 
   const targetIds = targets.map((row) => row.id);
   if (targetIds.length > 0) {
-    await insertInChunks(
-      pickRows,
-      (chunk) => db.insert(tgaSitePicks).values(chunk),
-      SEED_TGA_INSERT_CHUNK,
-    );
+    await applySitePickCountDeltas(year, [...counts.values()], db);
     await rescoreSiteSheets(year, targetIds, slate.worldPremieresOfficial, db);
   }
 
@@ -349,13 +355,13 @@ async function rescoreCommunitySheets(
       s.profile_id,
       coalesce((
         select count(*)::int
-        from tga_community_picks p
-        join tga_winners w
-          on w.category_id = p.category_id
-         and w.nominee_id = p.nominee_id
-        where p.community_id = ${communityId}::uuid
-          and p.profile_id = s.profile_id
-          and p.year = ${year}
+        from tga_winners w
+        join tga_categories c on c.id = w.category_id and c.year = s.year
+        join tga_category_nominees cn
+          on cn.category_id = w.category_id
+         and cn.nominee_id = w.nominee_id
+        where s.ballot_mask is not null
+          and get_byte(s.ballot_mask, c.slot) = cn.slot
       ), 0),
       case
         when ${officialWp}::int is null or s.world_premieres_guess is null then null
@@ -450,41 +456,29 @@ export async function seedTgaCommunitySheets(
     .limit(count);
 
   const now = new Date();
-  const pickRows: Array<{
-    communityId: string;
-    profileId: string;
-    year: number;
-    categoryId: string;
-    nomineeId: string;
-  }> = [];
+  const counts = new Map<string, PickCountDelta>();
 
   for (const profile of targets) {
     const picks = buildSeedTgaPicks(categories);
     const guess = seedWorldPremieresGuess();
+    tallyPickCounts(counts, picks);
     await db.insert(tgaCommunitySheets).values({
       communityId: community.id,
       profileId: profile.id,
       year,
       worldPremieresGuess: guess,
+      ballotMask: encodeBallotMask(ballot, picks),
       updatedAt: now,
     });
-    for (const [categoryId, nomineeId] of Object.entries(picks)) {
-      pickRows.push({
-        communityId: community.id,
-        profileId: profile.id,
-        year,
-        categoryId,
-        nomineeId,
-      });
-    }
   }
 
   const targetIds = targets.map((row) => row.id);
   if (targetIds.length > 0) {
-    await insertInChunks(
-      pickRows,
-      (chunk) => db.insert(tgaCommunityPicks).values(chunk),
-      SEED_TGA_INSERT_CHUNK,
+    await applyCommunityPickCountDeltas(
+      community.id,
+      year,
+      [...counts.values()],
+      db,
     );
     await rescoreCommunitySheets(
       community.id,
@@ -514,17 +508,6 @@ export async function clearTgaSheetsForSeedVoters(
   if (ids.length === 0) return { deletedSheets: 0 };
 
   await db
-    .delete(tgaSitePicks)
-    .where(and(eq(tgaSitePicks.year, year), inArray(tgaSitePicks.profileId, ids)));
-  await db
-    .delete(tgaCommunityPicks)
-    .where(
-      and(
-        eq(tgaCommunityPicks.year, year),
-        inArray(tgaCommunityPicks.profileId, ids),
-      ),
-    );
-  await db
     .delete(tgaSiteScores)
     .where(and(eq(tgaSiteScores.year, year), inArray(tgaSiteScores.profileId, ids)));
   await db
@@ -547,6 +530,8 @@ export async function clearTgaSheetsForSeedVoters(
         inArray(tgaCommunitySheets.profileId, ids),
       ),
     );
+  await recountSitePickCounts(year, db);
+  await recountCommunityPickCounts(year, db);
   return { deletedSheets: deleted.length };
 }
 
@@ -573,15 +558,6 @@ export async function clearTgaCommunitySheetsForSeedVoters(
   if (ids.length === 0) return { deletedSheets: 0 };
 
   await db
-    .delete(tgaCommunityPicks)
-    .where(
-      and(
-        eq(tgaCommunityPicks.communityId, community.id),
-        eq(tgaCommunityPicks.year, year),
-        inArray(tgaCommunityPicks.profileId, ids),
-      ),
-    );
-  await db
     .delete(tgaCommunityScores)
     .where(
       and(
@@ -600,5 +576,6 @@ export async function clearTgaCommunitySheetsForSeedVoters(
       ),
     )
     .returning({ profileId: tgaCommunitySheets.profileId });
+  await recountCommunityPickCounts(year, db, community.id);
   return { deletedSheets: deleted.length };
 }

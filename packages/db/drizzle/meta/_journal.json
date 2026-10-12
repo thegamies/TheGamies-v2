@@ -442,6 +442,13 @@
       "when": 1790640000000,
       "tag": "0062_tga_score_backfill",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1790726400000,
+      "tag": "0063_tga_ballot_mask",
+      "breakpoints": true
     }
   ]
 }

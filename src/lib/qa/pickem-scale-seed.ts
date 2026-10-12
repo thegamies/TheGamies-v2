@@ -8,6 +8,7 @@ import {
 import { generateInviteCode } from "@/lib/communities/invite-code";
 import { insertInChunks } from "@/lib/db/insert-chunks";
 import { seedProfileCreateFields } from "@/lib/seed-accounts";
+import { recountCommunityPickCounts } from "@/lib/tga-pickem/sheets";
 import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
 import {
   PICKEM_SCALE_AUTH_PREFIX,
@@ -180,40 +181,33 @@ export async function seedPickemScale(
     `);
     await db.execute(sql`
       insert into tga_community_sheets (
-        community_id, profile_id, year, world_premieres_guess, updated_at
+        community_id, profile_id, year, world_premieres_guess, ballot_mask, updated_at
       )
       select
         ${community.id}::uuid,
         p.id,
         ${year},
         abs(hashtext(p.id::text)) % 21,
+        (
+          select decode(
+            string_agg(lpad(to_hex(coalesce(n.slot, 0)), 2, '0'), '' order by g.i),
+            'hex'
+          )
+          from generate_series(
+            0,
+            (select coalesce(max(slot), 0) from tga_categories where year = ${year})
+          ) as g(i)
+          left join tga_categories c on c.year = ${year} and c.slot = g.i
+          left join lateral (
+            select cn.slot
+            from tga_category_nominees cn
+            where cn.category_id = c.id
+            order by md5(p.id::text || c.id::text)
+            limit 1
+          ) n on c.id is not null
+        ),
         now()
       from profiles p
-      where p.is_seed = true
-        and p.deleted_at is null
-        and p.auth_user_id >= ${bounds.first}
-        and p.auth_user_id <= ${bounds.last}
-      on conflict do nothing
-    `);
-    await db.execute(sql`
-      insert into tga_community_picks (
-        community_id, profile_id, year, category_id, nominee_id
-      )
-      select
-        ${community.id}::uuid,
-        p.id,
-        ${year},
-        cat.id,
-        n.nominee_id
-      from profiles p
-      join tga_categories cat on cat.year = ${year}
-      join lateral (
-        select cn.nominee_id
-        from tga_category_nominees cn
-        where cn.category_id = cat.id
-        order by md5(p.id::text || cat.id::text)
-        limit 1
-      ) n on true
       where p.is_seed = true
         and p.deleted_at is null
         and p.auth_user_id >= ${bounds.first}
@@ -230,13 +224,13 @@ export async function seedPickemScale(
         s.profile_id,
         coalesce((
           select count(*)::int
-          from tga_community_picks pk
-          join tga_winners w
-            on w.category_id = pk.category_id
-           and w.nominee_id = pk.nominee_id
-          where pk.community_id = ${community.id}::uuid
-            and pk.profile_id = s.profile_id
-            and pk.year = ${year}
+          from tga_winners w
+          join tga_categories c on c.id = w.category_id and c.year = s.year
+          join tga_category_nominees cn
+            on cn.category_id = w.category_id
+           and cn.nominee_id = w.nominee_id
+          where s.ballot_mask is not null
+            and get_byte(s.ballot_mask, c.slot) = cn.slot
         ), 0),
         case
           when ${officialWp}::int is null or s.world_premieres_guess is null then null
@@ -257,6 +251,8 @@ export async function seedPickemScale(
       onProgress(`community ${done}/${rows.length}`);
     }
   }
+
+  await recountCommunityPickCounts(year, db);
 
   return {
     year,
