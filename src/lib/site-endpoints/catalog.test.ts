@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SITE_ENDPOINTS,
   compareEndpointsForTest,
+  endpointCoverage,
   endpointKey,
 } from "./catalog";
 
@@ -17,7 +18,7 @@ describe("SITE_ENDPOINTS", () => {
     expect(compareEndpointsForTest(home, terms)).toBeLessThan(0);
     expect(home.testPriority).toBe(4);
     expect(home.usage).toBe(5);
-    expect(home.dbImpact).toBe(5);
+    expect(home.dbImpact).toBe(4);
   });
 
   it("keeps scale fields in 1–5", () => {
@@ -34,6 +35,22 @@ describe("SITE_ENDPOINTS", () => {
       expect(row.cacheComplexity).toBeLessThanOrEqual(5);
       expect(row.cacheNotes.length).toBeGreaterThan(8);
     }
+  });
+
+  it("records load-mix coverage on home and not on legal pages", () => {
+    const home = SITE_ENDPOINTS.find((row) => row.path === "/")!;
+    const terms = SITE_ENDPOINTS.find((row) => row.path === "/terms")!;
+    const createGoty = SITE_ENDPOINTS.find((row) => row.path === "/create/goty")!;
+    expect(endpointCoverage(home).label).toBe("Load mix");
+    expect(endpointCoverage(terms).label).toBe("Not yet");
+    expect(createGoty.loadMix).toBe(true);
+    expect(endpointCoverage(createGoty).label).toContain("Load mix");
+    expect(SITE_ENDPOINTS.find((row) => row.path === "/l/:publicId")!.loadMix).toBe(
+      true,
+    );
+    expect(
+      SITE_ENDPOINTS.find((row) => row.path === "/u/:username/:listSlug")!.loadMix,
+    ).toBe(true);
   });
 
   it("marks rankings easy to cache and home hard to keep fresh", () => {

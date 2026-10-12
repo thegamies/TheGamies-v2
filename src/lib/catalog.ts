@@ -24,6 +24,8 @@ import {
   gameTypes,
   genres,
   platforms,
+  readCatalogGameCount,
+  refreshCatalogGameCount,
   type Db,
 } from "@thegamies/db";
 import { coverUrlFromImageId, wideImageUrlFromImageId, youtubePosterUrl } from "@thegamies/igdb";
@@ -163,10 +165,42 @@ function browseGamesWhere(input: BrowseGamesInput) {
   return conditions.length ? and(...conditions) : undefined;
 }
 
+/** Matches the stored `site_settings.catalog_game_count` snapshot. */
+export function isDefaultCatalogCountInput(
+  input: BrowseGamesInput = {},
+): boolean {
+  if (input.q?.trim()) return false;
+  if (input.year != null) return false;
+  if (input.yearAtMost != null) return false;
+  if (input.yearAtLeast != null) return false;
+  if (input.yearKnownAtLeast != null) return false;
+  if (input.releaseStatus != null && input.releaseStatus !== "all") {
+    return false;
+  }
+  if (input.excludeEditions) return false;
+  if (input.gotyEligibleTypes) return false;
+  if (input.includeAdult) return false;
+  return true;
+}
+
+export function sliceSearchPage<T>(
+  rows: T[],
+  pageSize: number,
+): { items: T[]; hasMore: boolean } {
+  const size = Math.max(1, pageSize);
+  const hasMore = rows.length > size;
+  return { items: hasMore ? rows.slice(0, size) : rows, hasMore };
+}
+
 export async function countBrowseGames(
   input: BrowseGamesInput = {},
 ): Promise<number> {
   const db = getDb();
+  if (isDefaultCatalogCountInput(input)) {
+    const stored = await readCatalogGameCount(db);
+    if (stored != null) return stored;
+    return refreshCatalogGameCount(db);
+  }
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(games)

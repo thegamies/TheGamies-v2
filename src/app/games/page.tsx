@@ -24,6 +24,7 @@ import {
   GAMES_BROWSE_PAGE_SIZE,
   browseGames,
   countBrowseGames,
+  sliceSearchPage,
 } from "@/lib/catalog";
 import { followsAnyone } from "@/lib/follow/service";
 import { paginateProfileItems, parseProfilePage } from "@/lib/profile/profile-page";
@@ -260,23 +261,42 @@ async function GamesCatalogGrid({
   };
 
   let games: Awaited<ReturnType<typeof browseGames>> = [];
-  let total = 0;
+  let total: number | null = 0;
   let error: string | null = null;
   let page = 1;
   let totalPages = 1;
+  let hasMore = false;
+  const searching = Boolean(q.trim());
   try {
-    total = await countBrowseGames(filters);
-    if (total === 0) {
-      games = [];
-    } else {
-      const paging = paginateProfileItems(pageRaw, total, GAMES_BROWSE_PAGE_SIZE);
-      page = paging.page;
-      totalPages = paging.totalPages;
-      games = await browseGames({
+    if (searching) {
+      page = Math.max(1, Math.floor(pageRaw) || 1);
+      const rows = await browseGames({
         ...filters,
-        limit: GAMES_BROWSE_PAGE_SIZE,
-        offset: paging.offset,
+        limit: GAMES_BROWSE_PAGE_SIZE + 1,
+        offset: (page - 1) * GAMES_BROWSE_PAGE_SIZE,
       });
+      const sliced = sliceSearchPage(rows, GAMES_BROWSE_PAGE_SIZE);
+      games = sliced.items;
+      hasMore = sliced.hasMore;
+      total = null;
+    } else {
+      total = await countBrowseGames(filters);
+      if (total === 0) {
+        games = [];
+      } else {
+        const paging = paginateProfileItems(
+          pageRaw,
+          total,
+          GAMES_BROWSE_PAGE_SIZE,
+        );
+        page = paging.page;
+        totalPages = paging.totalPages;
+        games = await browseGames({
+          ...filters,
+          limit: GAMES_BROWSE_PAGE_SIZE,
+          offset: paging.offset,
+        });
+      }
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
@@ -288,11 +308,17 @@ async function GamesCatalogGrid({
     );
   }
   if (games.length === 0) {
-    return <p className="mt-8 text-muted">No games in the catalog yet.</p>;
+    return (
+      <p className="mt-8 text-muted">
+        {searching
+          ? "No titles match that search."
+          : "No games in the catalog yet."}
+      </p>
+    );
   }
 
   const from = (page - 1) * GAMES_BROWSE_PAGE_SIZE + 1;
-  const to = Math.min(page * GAMES_BROWSE_PAGE_SIZE, total);
+  const to = from + games.length - 1;
 
   return (
     <>
@@ -313,18 +339,22 @@ async function GamesCatalogGrid({
         label="Games pages"
         from={from}
         to={to}
-        total={total}
+        total={total ?? undefined}
         page={page}
-        totalPages={totalPages}
+        totalPages={searching ? undefined : totalPages}
         prevHref={
           page > 1
             ? gamesBrowseHref({ ...filters, page: page - 1 })
             : null
         }
         nextHref={
-          page < totalPages
-            ? gamesBrowseHref({ ...filters, page: page + 1 })
-            : null
+          searching
+            ? hasMore
+              ? gamesBrowseHref({ ...filters, page: page + 1 })
+              : null
+            : page < totalPages
+              ? gamesBrowseHref({ ...filters, page: page + 1 })
+              : null
         }
       />
     </>

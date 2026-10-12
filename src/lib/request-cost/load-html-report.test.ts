@@ -24,6 +24,8 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="steps"');
     expect(html).toContain('id="families"');
     expect(html).toContain("/games/:slug");
+    expect(html).toContain("/l/:publicId");
+    expect(html).toContain("/u/:username/:listSlug");
     expect(html).toContain("/games?q=:q");
     expect(html).toContain("/api/games/search?q=:q");
     expect(html).toContain("/game-of-the-year/:year/categories?category=:id");
@@ -37,6 +39,8 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain("Db clock");
     expect(html).toContain("select count(*) from games");
     expect(html).toContain('id="trips"');
+    expect(html).toContain("% time");
+    expect(html).toContain("Endpoints");
     expect(html).toContain('id="pcts"');
     expect(html).toContain('id="timeline"');
     expect(html).toContain("how many");

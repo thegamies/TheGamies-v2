@@ -62,6 +62,8 @@ export type LoadMsBand = {
 export type LoadLatencySummary = {
   label: string;
   n: number;
+  /** Sum of client round-trip ms in this slice. */
+  sumMs: number;
   ok: number;
   errors: number;
   p50: number;
@@ -73,6 +75,15 @@ export type LoadLatencySummary = {
   db: LoadMsBand | null;
   dbSpan: LoadMsBand | null;
 };
+
+/** Share of `totalMs` as a percentage string (`12.4%`). */
+export function formatTimeSharePct(partMs: number, totalMs: number): string {
+  if (!(totalMs > 0) || !(partMs >= 0) || !Number.isFinite(partMs)) return "—";
+  const pct = (100 * partMs) / totalMs;
+  if (pct === 0) return "0%";
+  if (pct < 1) return `${pct.toFixed(2)}%`;
+  return `${pct.toFixed(1)}%`;
+}
 
 export type LoadRunStats = {
   scenario: LoadtestScenario;
@@ -128,9 +139,11 @@ export function latencySummary(
   const latencies = samples.map((s) => s.ms).sort((a, b) => a - b);
   const client = msBand(latencies);
   const ok = samples.filter((s) => s.ok).length;
+  const sumMs = samples.reduce((sum, sample) => sum + sample.ms, 0);
   return {
     label,
     n: samples.length,
+    sumMs,
     ok,
     errors: samples.length - ok,
     ...client,
@@ -143,6 +156,8 @@ export function latencySummary(
 export type LoadTripSummary = {
   sql: string;
   n: number;
+  /** Sum of this fingerprint’s trip ms. */
+  sumMs: number;
   p50: number;
   p90: number;
   p95: number;
@@ -165,6 +180,7 @@ export function summarizeLoadTrips(samples: LoadSample[]): LoadTripSummary[] {
       return {
         sql,
         n: sorted.length,
+        sumMs: values.reduce((sum, ms) => sum + ms, 0),
         p50: percentile(sorted, 50),
         p90: percentile(sorted, 90),
         p95: percentile(sorted, 95),
@@ -187,6 +203,18 @@ export function loadStepFamily(step: string): string {
   }
   if (step.startsWith("/games/") && step.length > "/games/".length) {
     return "/games/:slug";
+  }
+  if (step.startsWith("/create/goty")) {
+    return "/create/goty";
+  }
+  if (step.startsWith("/l/") && step.length > "/l/".length) {
+    return "/l/:publicId";
+  }
+  if (/^\/u\/[^/]+\/[^/]+$/.test(step)) {
+    return "/u/:username/:listSlug";
+  }
+  if (/^\/u\/[^/]+$/.test(step)) {
+    return "/u/:username";
   }
   if (/^\/game-of-the-year\/\d+\/categories\?category=/.test(step)) {
     return "/game-of-the-year/:year/categories?category=:id";
@@ -222,11 +250,11 @@ export function partitionLoadSamples(
   return labels.map((label) => latencySummary(buckets.get(label) ?? [], label));
 }
 
-function summaryLines(rows: LoadLatencySummary[]): string {
+function summaryLines(rows: LoadLatencySummary[], totalMs: number): string {
   return rows
     .map(
       (row) =>
-        `- ${row.label}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
+        `- ${row.label}: ${row.n} · ${formatTimeSharePct(row.sumMs, totalMs)} time · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
     )
     .join("\n");
 }
@@ -236,14 +264,16 @@ export function formatLoadReport(stats: LoadRunStats): string {
   const all = latencySummary(samples);
   const elapsedSec = Math.max(0.001, stats.durationMs / 1000);
   const rps = samples.length / elapsedSec;
-  const groupLines = summaryLines(partitionLoadSamples(samples, "group"));
-  const stepLines = summaryLines(partitionLoadSamples(samples, "family"));
-  const statusLines = summaryLines(partitionLoadSamples(samples, "status"));
-  const tripLines = summarizeLoadTrips(samples)
+  const groupLines = summaryLines(partitionLoadSamples(samples, "group"), all.sumMs);
+  const stepLines = summaryLines(partitionLoadSamples(samples, "family"), all.sumMs);
+  const statusLines = summaryLines(partitionLoadSamples(samples, "status"), all.sumMs);
+  const tripRows = summarizeLoadTrips(samples);
+  const tripTotal = tripRows.reduce((sum, row) => sum + row.sumMs, 0);
+  const tripLines = tripRows
     .slice(0, 25)
     .map(
       (row) =>
-        `- ${row.sql}: ${row.n} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
+        `- ${row.sql}: ${row.n} · ${formatTimeSharePct(row.sumMs, tripTotal)} time · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
     )
     .join("\n");
 

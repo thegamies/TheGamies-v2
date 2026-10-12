@@ -19,7 +19,11 @@ import {
   mergeLoadtestGameBands,
   pickLoadtestGame,
   pickLoadtestGames,
+  pickLoadtestShareList,
+  LOADTEST_SHARE_LIST_SLUG,
+  LOADTEST_SHARE_LIST_TITLE,
 } from "./loadtest";
+import { slugifyListTitle } from "@/lib/lists/rules";
 
 describe("loadtest identities", () => {
   it("uses undeliverable emails and valid usernames through the writer cap", () => {
@@ -103,6 +107,23 @@ describe("loadtest game pool", () => {
     const pool = mergeLoadtestGameBands(popular, unpopular);
     const picked = pickLoadtestGames(pool, 3, () => 0.5);
     expect(new Set(picked.map((row) => row.id)).size).toBe(3);
+  });
+});
+
+describe("loadtest share lists", () => {
+  it("keeps the planted slug aligned with the title", () => {
+    expect(slugifyListTitle(LOADTEST_SHARE_LIST_TITLE)).toBe(
+      LOADTEST_SHARE_LIST_SLUG,
+    );
+  });
+
+  it("picks from the whole planted group", () => {
+    const lists = [
+      { username: "gamies_qa_load_001", slug: "load-share", publicId: "a" },
+      { username: "gamies_qa_load_002", slug: "load-share", publicId: "b" },
+    ];
+    expect(pickLoadtestShareList(lists, () => 0).publicId).toBe("a");
+    expect(pickLoadtestShareList(lists, () => 0.99).publicId).toBe("b");
   });
 });
 

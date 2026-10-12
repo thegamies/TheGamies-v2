@@ -16,6 +16,14 @@ vi.mock("./upsert-games", () => ({
   upsertGamesWithLinks: vi.fn(async () => 1),
 }));
 
+vi.mock("@thegamies/db", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@thegamies/db")>();
+  return {
+    ...actual,
+    refreshCatalogGameCount: vi.fn(async () => 0),
+  };
+});
+
 import { applyGameCreateUpdates, applyWebhook } from "./webhook-apply";
 import { upsertGamesWithLinks } from "./upsert-games";
 

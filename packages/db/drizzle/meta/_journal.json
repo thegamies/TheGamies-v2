@@ -421,6 +421,13 @@
       "when": 1790380800000,
       "tag": "0059_award_category_admin_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790467200000,
+      "tag": "0060_catalog_game_count",
+      "breakpoints": true
     }
   ]
 }

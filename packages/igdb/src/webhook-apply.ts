@@ -7,6 +7,7 @@ import {
   gameCompanies,
   games,
   gameScreenshots,
+  refreshCatalogGameCount,
   gameTimeToBeats,
   gameTypes,
   gameVideoLinks,
@@ -73,6 +74,7 @@ async function softDelistGame(db: Db, igdbId: number): Promise<void> {
     .update(games)
     .set({ igdbRemovedAt: new Date(), updatedAt: new Date() })
     .where(eq(games.igdbId, igdbId));
+  await refreshCatalogGameCount(db).catch(() => undefined);
 }
 
 export async function applyGameCreateUpdates(
@@ -91,6 +93,7 @@ export async function applyGameCreateUpdates(
     mapped.push(row);
   }
   await upsertGamesWithLinks(db, mapped);
+  await refreshCatalogGameCount(db).catch(() => undefined);
 }
 
 async function applyGameCreateUpdate(db: Db, payload: unknown): Promise<void> {

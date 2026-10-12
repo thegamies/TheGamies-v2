@@ -233,6 +233,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       <svg id="timeline" viewBox="0 0 800 260" role="img" aria-label="Count of requests at or above each percentile, over time"></svg>
     </div>
     <div class="legend" id="legend"></div>
+    <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.35rem">Endpoints</h2>
+    <p class="meta"><strong>% time</strong> is this row’s share of summed client round-trip time in the current filter (adds to 100%). Click a column header to sort.</p>
     <div class="table-scroll">
     <table>
       <thead id="slice-head"></thead>
@@ -240,7 +242,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     </table>
     </div>
     <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.5rem">Neon trips</h2>
-    <p class="meta">Same filter as above. One HTTP trip to Neon; a batch is several statements joined with <code>|</code>. Click a column header to sort.</p>
+    <p class="meta">Same filter as above. One HTTP trip to Neon; a batch is several statements joined with <code>|</code>. <strong>% time</strong> is this fingerprint’s share of summed trip wait in the filter (adds to 100%). Click a column header to sort.</p>
     <div class="table-scroll">
     <table>
       <thead id="trip-head"></thead>
@@ -255,6 +257,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const GAMES_SEARCH_FAMILY = "/games?q=:q";
     const GAMES_SEARCH_API_FAMILY = "/api/games/search?q=:q";
     const GOTY_CAT_FAMILY = "/game-of-the-year/:year/categories?category=:id";
+    const SHARE_L_FAMILY = "/l/:publicId";
+    const SHARE_OWNED_FAMILY = "/u/:username/:listSlug";
+    const PROFILE_FAMILY = "/u/:username";
     const LIST_COUNT_FAMILIES = ["list-create/:n", "list-edit/:n", "list-delete/:n"];
     const PCTS = ["p50", "p90", "p95", "p99", "max"];
     const LINES = ["p50", "p90", "p95", "p99"];
@@ -268,14 +273,17 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const filters = { group: ALL, family: ALL, step: ALL, status: ALL, bucket: "auto" };
     const shown = { p50: true, p90: true, p95: true, p99: true, max: true };
     const sorts = {
-      slice: { key: "label", dir: 1 },
-      trip: { key: "p50", dir: -1 },
+      slice: { key: "timePct", dir: -1 },
+      trip: { key: "timePct", dir: -1 },
     };
 
     function familyOf(step) {
       if (step.indexOf("/games?q=") === 0) return GAMES_SEARCH_FAMILY;
       if (step.indexOf("/api/games/search?") === 0) return GAMES_SEARCH_API_FAMILY;
       if (step.indexOf("/games/") === 0 && step.length > 7) return GAME_FAMILY;
+      if (step.indexOf("/l/") === 0 && step.length > 3) return SHARE_L_FAMILY;
+      if (/^\\/u\\/[^/]+\\/[^/]+$/.test(step)) return SHARE_OWNED_FAMILY;
+      if (/^\\/u\\/[^/]+$/.test(step)) return PROFILE_FAMILY;
       if (/^\\/game-of-the-year\\/\\d+\\/categories\\?category=/.test(step)) return GOTY_CAT_FAMILY;
       if (/^(list-create|list-edit|list-delete)\\/\\d+$/.test(step)) {
         return step.replace(/\\/\\d+$/, "/:n");
@@ -288,6 +296,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         family === GAMES_SEARCH_FAMILY ||
         family === GAMES_SEARCH_API_FAMILY ||
         family === GOTY_CAT_FAMILY ||
+        family === SHARE_L_FAMILY ||
+        family === SHARE_OWNED_FAMILY ||
+        family === PROFILE_FAMILY ||
         LIST_COUNT_FAMILIES.indexOf(family) >= 0
       );
     }
@@ -366,6 +377,24 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     }
     function num(v) {
       return v == null ? "—" : v;
+    }
+    function sumCol(list, idx) {
+      let total = 0;
+      for (const r of list) {
+        const n = r[idx];
+        if (typeof n === "number" && n > 0) total += n;
+      }
+      return total;
+    }
+    function timePct(part, total) {
+      if (!(total > 0) || !(part >= 0)) return 0;
+      return (100 * part) / total;
+    }
+    function formatTimePct(pct) {
+      if (!(pct >= 0) || !isFinite(pct)) return "—";
+      if (pct === 0) return "0%";
+      if (pct < 1) return pct.toFixed(2) + "%";
+      return pct.toFixed(1) + "%";
     }
     function visiblePcts() {
       return PCTS.filter((k) => shown[k]);
@@ -625,10 +654,20 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         if (list) list.push(r);
         else by.set(k, [r]);
       }
+      const clientTotal = sumCol(rows, 3);
       const sliceRows = sortRows(
         [...by.keys()].map((k) => {
-          const sl = summary(by.get(k));
-          return { label: k, n: sl.n, client: sl.client, wall: sl.wall, dbSpan: sl.dbSpan, db: sl.db };
+          const list = by.get(k);
+          const sl = summary(list);
+          return {
+            label: k,
+            n: sl.n,
+            timePct: timePct(sumCol(list, 3), clientTotal),
+            client: sl.client,
+            wall: sl.wall,
+            dbSpan: sl.dbSpan,
+            db: sl.db,
+          };
         }),
         sorts.slice,
       );
@@ -641,6 +680,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         "<th rowspan=\\"2\\" class=\\"num sort\\" data-table=\\"slice\\" data-key=\\"n\\" aria-sort=\\"" +
         ariaSort("slice", "n") +
         "\\">n</th>" +
+        "<th rowspan=\\"2\\" class=\\"num sort\\" data-table=\\"slice\\" data-key=\\"timePct\\" aria-sort=\\"" +
+        ariaSort("slice", "timePct") +
+        "\\">% time</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Client</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Wall</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Db clock</th>" +
@@ -661,6 +703,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 sl.label.replace(/</g, "&lt;") +
                 "</code></td><td class=\\"num\\">" +
                 sl.n +
+                "</td><td class=\\"num\\">" +
+                formatTimePct(sl.timePct) +
                 "</td>" +
                 pctCells(sl.client) +
                 pctCells(sl.wall) +
@@ -670,21 +714,25 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
               );
             })
             .join("")
-        : "<tr><td class=\\"empty\\" colspan=\\"" + (2 + pctColspan() * 4) + "\\">No requests in this filter.</td></tr>";
+        : "<tr><td class=\\"empty\\" colspan=\\"" + (3 + pctColspan() * 4) + "\\">No requests in this filter.</td></tr>";
       const tripMs = new Map();
+      let tripTotal = 0;
       for (const r of rows) {
         for (const pair of r[8] || []) {
           const sql = DATA.queries[pair[0]] || "(unknown)";
           const list = tripMs.get(sql);
           if (list) list.push(pair[1]);
           else tripMs.set(sql, [pair[1]]);
+          if (typeof pair[1] === "number" && pair[1] > 0) tripTotal += pair[1];
         }
       }
       const tripRows = sortRows(
         [...tripMs.keys()].map((sql) => {
-          const sorted = tripMs.get(sql).slice().sort((a, b) => a - b);
+          const values = tripMs.get(sql);
+          const sorted = values.slice().sort((a, b) => a - b);
           const b = band(sorted);
-          return { sql, n: sorted.length, ...b };
+          const sumMs = values.reduce((acc, ms) => acc + ms, 0);
+          return { sql, n: sorted.length, timePct: timePct(sumMs, tripTotal), ...b };
         }),
         sorts.trip,
       );
@@ -695,6 +743,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         ariaSort("trip", "sql") +
         "\\">SQL</th>" +
         sortTh("trip", "n", "n") +
+        sortTh("trip", "timePct", "% time") +
         visiblePcts().map((k) => sortTh("trip", k, k)).join("") +
         "</tr>";
       bindSort(tripHead);
@@ -707,13 +756,15 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 String(t.sql).replace(/</g, "&lt;") +
                 "</code></td><td class=\\"num\\">" +
                 t.n +
+                "</td><td class=\\"num\\">" +
+                formatTimePct(t.timePct) +
                 "</td>" +
                 visiblePcts().map((k) => "<td class=\\"num\\">" + t[k] + "</td>").join("") +
                 "</tr>"
               );
             })
             .join("")
-        : "<tr><td class=\\"empty\\" colspan=\\"" + (2 + pctColspan()) + "\\">No trip fingerprints in this filter (deploy staging meter, then re-run).</td></tr>";
+        : "<tr><td class=\\"empty\\" colspan=\\"" + (3 + pctColspan()) + "\\">No trip fingerprints in this filter (deploy staging meter, then re-run).</td></tr>";
     }
     render();
   </script>

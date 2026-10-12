@@ -1337,6 +1337,7 @@ export const liveCategoryDirty = pgTable(
  * `publicBoardMinLists` — GOTY years stay hidden until this many lists.
  * `publicBoardMinCategoryVotes` — a category board stays hidden until that award has this many votes.
  * `standingFillMinVisible` — temporary: covers in view on homepage / all-years strips (decimals peek).
+ * `catalogGameCount` — listed non-adult games for the default `/games` pager.
  * Trending recency weights order Games / Following / community boards; people count stays a headcount.
  * `trendingKindWeights` multiplies recency per event kind; zero omits that kind.
  */
@@ -1376,6 +1377,8 @@ export const siteSettings = pgTable("site_settings", {
   standingFillMinVisible: real("standing_fill_min_visible")
     .notNull()
     .default(2.2),
+  /** Listed non-adult games; refreshed after IGDB game upserts. */
+  catalogGameCount: integer("catalog_game_count"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 

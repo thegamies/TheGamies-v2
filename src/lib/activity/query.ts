@@ -54,6 +54,11 @@ import {
 } from "@/lib/activity/trending";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { paginateProfileItems } from "@/lib/profile/profile-page";
+import {
+  canUseSiteTrendingWorkersCache,
+  matchSiteTrendingBoard,
+  putSiteTrendingBoard,
+} from "@/lib/activity/site-trending-cache";
 
 export const FEED_PAGE_SIZE = 40;
 export const TRENDING_PAGE_SIZE = 48;
@@ -309,7 +314,17 @@ function trendingKindWeightSql(raw: TrendingKindWeights): SQL {
   return sql`(CASE kind ${sql.join(branches, sql` `)} ELSE 0::float8 END)`;
 }
 
-export async function listTrendingBoard(opts: {
+export type TrendingBoardResult = {
+  rows: TrendingBoardRow[];
+  windowHours: TrendingWindowHours;
+  publicReady: boolean;
+  distinctPeople: number;
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
+type ListTrendingBoardOpts = {
   windowHours?: TrendingWindowHours;
   /** Restrict to people this profile follows. */
   followerProfileId?: string | null;
@@ -321,15 +336,38 @@ export async function listTrendingBoard(opts: {
   now?: Date;
   page?: number;
   db?: Db;
-}): Promise<{
-  rows: TrendingBoardRow[];
-  windowHours: TrendingWindowHours;
-  publicReady: boolean;
-  distinctPeople: number;
-  total: number;
-  page: number;
-  totalPages: number;
-}> {
+};
+
+export async function listTrendingBoard(
+  opts: ListTrendingBoardOpts,
+): Promise<TrendingBoardResult> {
+  const windowHours = parseTrendingWindowHours(opts.windowHours);
+  const minPeople = parsePublicTrendingMinPeople(
+    opts.minPeople ?? DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+  );
+  const page = Number.isFinite(opts.page)
+    ? Math.floor(opts.page as number)
+    : 1;
+  const cacheInput = {
+    windowHours,
+    page,
+    minPeople,
+    applySiteFloor: opts.applySiteFloor === true,
+  };
+  if (canUseSiteTrendingWorkersCache(opts)) {
+    const hit = await matchSiteTrendingBoard(cacheInput);
+    if (hit) return hit;
+  }
+  const result = await listTrendingBoardFromDb(opts);
+  if (canUseSiteTrendingWorkersCache(opts)) {
+    await putSiteTrendingBoard(cacheInput, result);
+  }
+  return result;
+}
+
+async function listTrendingBoardFromDb(
+  opts: ListTrendingBoardOpts,
+): Promise<TrendingBoardResult> {
   const db = opts.db ?? getDb();
   const now = opts.now ?? new Date();
   const windowHours = parseTrendingWindowHours(opts.windowHours);

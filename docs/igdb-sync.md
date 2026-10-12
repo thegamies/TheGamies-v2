@@ -52,6 +52,8 @@ A queue can have only one consumer type. This Worker is the consumer — do not 
 
 Game create/update upserts already clear `igdb_removed_at`; there is no extra update after that.
 
+After game upserts, backfill, catalog/updated game walks, and game deletes, sync recounts listed non-adult games into `site_settings.catalog_game_count` so `/games` does not `COUNT(*)` the catalog on every visit.
+
 **Game deletes** set `games.igdb_removed_at` (soft delist) so list and standings rows are not cascaded away. Create/update clears that timestamp.
 
 **Secrets / URLs:** see [secrets.md](./secrets.md) and [deployment.md](./deployment.md). Point IGDB registrations only at the Cloudflare webhook Worker URL. Staging and production use **different** webhook slot bases. `/admin/webhooks` only shows slots for that environment’s callback URL. Do not auto-register PR preview workers against production IGDB slots. Staging and production CI deploy the Worker when `workers/igdb-webhooks`, `packages/igdb`, `packages/db`, or the lockfile change.

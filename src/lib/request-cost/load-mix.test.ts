@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import {
   LOADTEST_COMMUNITY,
+  LOADTEST_SHARE_LIST_SLUG,
   LOADTEST_TGA_LOCKED_YEAR,
   LOADTEST_TGA_OPEN_YEAR,
+  loadtestAccount,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
 import {
@@ -11,7 +13,9 @@ import {
   buildLoadWrites,
   mixUsesPromotedTgaYear,
   mixUsesShowcaseSlug,
+  loadShareListPath,
   pickLoadtestGotyCategory,
+  pickLoadtestUsername,
   pickWeighted,
   siteGotyCategoryPath,
 } from "./load-mix";
@@ -24,6 +28,19 @@ const urls = {
   tgaOpenYear: LOADTEST_TGA_OPEN_YEAR,
   tgaLockedYear: LOADTEST_TGA_LOCKED_YEAR,
   game: { id: "g1", slug: "hades", igdbId: 99 },
+  writerCount: 10,
+  lists: [
+    {
+      username: loadtestAccount(1).username,
+      slug: LOADTEST_SHARE_LIST_SLUG,
+      publicId: "share1",
+    },
+    {
+      username: loadtestAccount(2).username,
+      slug: LOADTEST_SHARE_LIST_SLUG,
+      publicId: "share2",
+    },
+  ],
 };
 
 const scenarios: LoadtestScenario[] = [
@@ -56,6 +73,18 @@ describe("buildLoadGets", () => {
       ).toBe(true);
       expect(
         buildLoadGets(scenario, urls).some((item) => item.pickSearch === "api"),
+      ).toBe(true);
+      expect(paths).toContain("/create");
+      expect(paths.some((path) => path.startsWith("/create/goty"))).toBe(true);
+      expect(paths).toContain("/create/custom");
+      expect(buildLoadGets(scenario, urls).some((item) => item.pickProfile)).toBe(
+        true,
+      );
+      expect(buildLoadGets(scenario, urls).some((item) => item.pickShare === "l")).toBe(
+        true,
+      );
+      expect(
+        buildLoadGets(scenario, urls).some((item) => item.pickShare === "owned"),
       ).toBe(true);
       expect(mixUsesShowcaseSlug(buildLoadGets(scenario, urls))).toBe(false);
     }
@@ -109,6 +138,30 @@ describe("buildLoadWrites", () => {
     expect(
       buildLoadWrites("editions-filling").some((item) => item.op === "ballot"),
     ).toBe(true);
+  });
+});
+
+describe("share list mix", () => {
+  it("omits share URLs when ensure has not planted lists", () => {
+    const { lists: _lists, ...withoutLists } = urls;
+    expect(
+      buildLoadGets("general", withoutLists).some((item) => item.pickShare),
+    ).toBe(false);
+  });
+
+  it("builds share paths from a planted list", () => {
+    const list = urls.lists[0]!;
+    expect(loadShareListPath("l", list)).toBe("/l/share1");
+    expect(loadShareListPath("owned", list)).toBe(
+      `/u/${loadtestAccount(1).username}/${LOADTEST_SHARE_LIST_SLUG}`,
+    );
+  });
+});
+
+describe("pickLoadtestUsername", () => {
+  it("stays inside the writer roster", () => {
+    expect(pickLoadtestUsername(10, () => 0)).toBe("gamies_qa_load_001");
+    expect(pickLoadtestUsername(10, () => 0.99)).toBe("gamies_qa_load_010");
   });
 });
 

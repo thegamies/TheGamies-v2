@@ -28,9 +28,9 @@ Hit these in staging traffic mixes and keep an eye on round trips (`docs/request
 
 | Route | Use | Database | Why |
 |---|---|---|---|
-| `GET /` | 5 | 5 | Land + activity feed. Streamer-link risk. |
-| `GET /games` | 5 | 4 | Paged catalog + `count(*)`. |
-| `GET /games?q=` | 4 | 4 | SQL title search. |
+| `GET /` | 5 | 4 | Land + standings; site trending strip is Workers Cache. |
+| `GET /games` | 5 | 3 | Paged catalog; default total from `site_settings`. |
+| `GET /games?q=` | 4 | 4 | SQL title search, no `COUNT(*)`. |
 | `GET /games/:slug` | 5 | 5 | ~12 sequential trips. |
 | `GET /api/games/search` | 4 | 3 | List-editor typeahead. |
 | `GET /game-of-the-year` | 5 | 4 | GOTY hub. |
@@ -39,11 +39,13 @@ Hit these in staging traffic mixes and keep an eye on round trips (`docs/request
 | `GET /create/goty` | 4 | 3 | Editor; save is the heavy part. |
 | list save (`saveOwnedListAction`) | 4 | 5 | ~10–13 trips per save. |
 
-Already in the general load mix: `/`, `/games`, search, `/games/:slug`, GOTY, list/library writes.
+Already in the general load mix: `/`, `/games`, search, `/games/:slug`, GOTY, **`/create`**, **`/create/goty`**, **`/create/custom`**, **`/u/:username`**, **`/l/:publicId`**, **`/u/:username/:listSlug`** (one planted custom list per load-test account; readers pick at random), list/library writes.
+
+The routes HTML (`e2e/.cost/endpoints.html`) has a **Covered** column: Load mix, Unit, Playwright, or **Not yet**. Filter by Covered to see gaps. `loadMix` / `unitTests` / `e2eTests` on `SITE_ENDPOINTS` feed that column.
 
 ## Should test (priority 3)
 
-Shared list URLs, profiles, community live/results/ballot, Pick’em year pages, Auth proxy, edition freeze cron (rare clock, expensive SQL).
+Community live/results/ballot, Pick’em year pages, Auth proxy, and edition freeze cron stay on their own scenarios or clocks.
 
 ## Cover when touched (priority 2)
 

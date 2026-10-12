@@ -64,6 +64,10 @@ export type SiteEndpoint = {
   notes: string;
   /** True when the staging traffic mix already hammers this shape. */
   loadMix?: boolean;
+  /** Dedicated unit tests for this route’s behavior (not a shared helper). */
+  unitTests?: boolean;
+  /** Playwright (or staging spec) exercises this URL. */
+  e2eTests?: boolean;
 };
 
 type SiteEndpointInput = Omit<
@@ -87,19 +91,19 @@ function cacheHints(input: SiteEndpointInput): Pick<
       cacheEase: 3,
       cacheComplexity: 5,
       cacheNotes:
-        "Anonymous shell could sit in R2 for a few seconds. Activity rail is wrong the moment anyone saves a list or library row.",
+        "Site trending strip uses Workers Cache (60s, colo-local). Full HTML still session-aware. Following/community trending stay live.",
     },
     "/games": {
       cacheEase: 4,
       cacheComplexity: 2,
       cacheNotes:
-        "Default popularity page is one key. Invalidate on catalog sync, not a person saving a list. First real OpenNext/R2 win among hot pages.",
+        "Default pager total is site_settings.catalog_game_count (refreshed on IGDB game upserts), not COUNT(*) per visit. First page of covers still hits games.",
     },
     "/games?q=": {
       cacheEase: 2,
       cacheComplexity: 3,
       cacheNotes:
-        "One R2 object per query string. Short prefixes explode. Cache the blank browse; leave q= on a short TTL if at all.",
+        "SQL title search, LIMIT page+1, no COUNT(*). Do not cache unique q= keys.",
     },
     "/games/:slug": {
       cacheEase: 4,
@@ -262,11 +266,11 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     group: "home",
     audience: "public",
     usage: 5,
-    dbImpact: 5,
+    dbImpact: 4,
     testPriority: 4,
     loadMix: true,
     notes:
-      "Default land. Activity feed plus standings rails; many round trips. Streamer-link risk.",
+      "Default land. Standings rails plus a Workers-cached site trending strip. Streamer-link risk.",
   }),
   row({
     method: "GET",
@@ -275,10 +279,11 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     group: "catalog",
     audience: "public",
     usage: 5,
-    dbImpact: 4,
+    dbImpact: 3,
     testPriority: 4,
     loadMix: true,
-    notes: "Paged catalog plus count. Trending and upcoming variants share this page.",
+    notes:
+      "Paged catalog. Default total from site_settings; year/release filters still COUNT(*). Trending uses Workers Cache on the public site board.",
   }),
   row({
     method: "GET",
@@ -290,7 +295,8 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     dbImpact: 4,
     testPriority: 4,
     loadMix: true,
-    notes: "Title search in SQL with a hit cap. Short queries scan more loosely.",
+    notes:
+      "Title search in SQL. Page via LIMIT+1; no catalog COUNT(*). Short queries scan more loosely.",
   }),
   row({
     method: "GET",
@@ -398,6 +404,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 3,
     dbImpact: 2,
     testPriority: 3,
+    loadMix: true,
     notes: "Start a list. Search typeahead hits /api/games/search.",
   }),
   row({
@@ -409,6 +416,8 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 4,
     dbImpact: 3,
     testPriority: 4,
+    loadMix: true,
+    unitTests: true,
     notes: "GOTY editor. Hydrates games; save is the heavy mutation.",
   }),
   row({
@@ -420,6 +429,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 3,
     dbImpact: 3,
     testPriority: 3,
+    loadMix: true,
     notes: "Custom list editor.",
   }),
   row({
@@ -431,6 +441,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 4,
     dbImpact: 3,
     testPriority: 3,
+    loadMix: true,
     notes: "Share link. List plus covers.",
   }),
   row({
@@ -442,6 +453,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 4,
     dbImpact: 3,
     testPriority: 3,
+    loadMix: true,
     notes: "Canonical list URL on a profile.",
   }),
   row({
@@ -453,6 +465,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 4,
     dbImpact: 3,
     testPriority: 3,
+    loadMix: true,
     notes: "Profile and paged lists.",
   }),
   row({
@@ -1313,6 +1326,28 @@ export function compareEndpointsForTest(a: SiteEndpoint, b: SiteEndpoint): numbe
 
 export function endpointsByTestPriority(): SiteEndpoint[] {
   return [...SITE_ENDPOINTS].sort(compareEndpointsForTest);
+}
+
+/** What automated coverage this row has today. */
+export function endpointCoverage(row: SiteEndpoint): {
+  load: boolean;
+  unit: boolean;
+  e2e: boolean;
+  label: string;
+} {
+  const load = Boolean(row.loadMix);
+  const unit = Boolean(row.unitTests);
+  const e2e = Boolean(row.e2eTests);
+  const parts: string[] = [];
+  if (load) parts.push("Load mix");
+  if (unit) parts.push("Unit");
+  if (e2e) parts.push("Playwright");
+  return {
+    load,
+    unit,
+    e2e,
+    label: parts.length > 0 ? parts.join(" · ") : "Not yet",
+  };
 }
 
 export const TEST_PRIORITY_LABEL: Record<SiteEndpointTestPriority, string> = {

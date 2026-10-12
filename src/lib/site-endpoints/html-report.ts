@@ -3,6 +3,7 @@ import {
   SITE_ENDPOINTS,
   TEST_PRIORITY_LABEL,
   compareEndpointsForTest,
+  endpointCoverage,
   type SiteEndpoint,
 } from "./catalog";
 
@@ -32,6 +33,7 @@ export function formatEndpointsHtml(
     cacheNotes: row.cacheNotes,
     notes: row.notes,
     loadMix: Boolean(row.loadMix),
+    coverage: endpointCoverage(row).label,
     cacheFirst: Math.round(
       (row.usage * row.dbImpact * row.cacheEase) / row.cacheComplexity,
     ),
@@ -106,7 +108,7 @@ export function formatEndpointsHtml(
 <body>
   <header>
     <h1>Routes</h1>
-    <p class="meta">Use is traffic. Database is Neon work per hit. Cache easy is how readily this GET fits OpenNext incremental cache on R2 (public, few keys). Cache hard is invalidation — especially a person saving a list, library row, or Pick’em sheet. Cache first is use × database × easy ÷ hard — sort that column to pick R2 work. Scores are editorial.</p>
+    <p class="meta">Use is traffic. Database is Neon work per hit. Covered is what we already run: the staging load mix, unit tests, or Playwright. Not yet means no automated coverage recorded for this row. Cache easy is how readily this GET fits OpenNext incremental cache on R2 (public, few keys). Cache hard is invalidation — especially a person saving a list, library row, or Pick’em sheet. Cache first is use × database × easy ÷ hard — sort that column to pick R2 work. Scores are editorial.</p>
   </header>
   <div class="filters">
     <fieldset>
@@ -116,6 +118,10 @@ export function formatEndpointsHtml(
     <fieldset>
       <legend>Area</legend>
       <div class="chips" id="groups"></div>
+    </fieldset>
+    <fieldset>
+      <legend>Covered</legend>
+      <div class="chips" id="coverage"></div>
     </fieldset>
   </div>
   <main>
@@ -137,13 +143,14 @@ export function formatEndpointsHtml(
       { key: "usage", label: "Use", kind: "scale" },
       { key: "dbImpact", label: "Database", kind: "scale" },
       { key: "testPriority", label: "Test", kind: "num" },
+      { key: "coverage", label: "Covered", kind: "text" },
       { key: "cacheEase", label: "Cache easy", kind: "scale" },
       { key: "cacheComplexity", label: "Cache hard", kind: "scale" },
       { key: "cacheFirst", label: "Cache first", kind: "num" },
       { key: "cacheNotes", label: "Cache why", kind: "text" },
       { key: "notes", label: "Why", kind: "text" },
     ];
-    const filters = { priority: ALL, group: ALL };
+    const filters = { priority: ALL, group: ALL, coverage: ALL };
     const sort = { key: "cacheFirst", dir: -1 };
 
     function chips(el, values, key) {
@@ -198,14 +205,17 @@ export function formatEndpointsHtml(
     function render() {
       const prios = [...new Set(DATA.map((r) => r.priorityLabel))];
       const groups = [...new Set(DATA.map((r) => r.groupLabel))];
+      const covered = [...new Set(DATA.map((r) => r.coverage))].sort();
       chips(document.getElementById("priorities"), prios, "priority");
       chips(document.getElementById("groups"), groups, "group");
+      chips(document.getElementById("coverage"), covered, "coverage");
       renderHead();
       const tbody = document.getElementById("rows");
       tbody.innerHTML = "";
       const shown = DATA.filter((r) => {
         if (filters.priority !== ALL && r.priorityLabel !== filters.priority) return false;
         if (filters.group !== ALL && r.groupLabel !== filters.group) return false;
+        if (filters.coverage !== ALL && r.coverage !== filters.coverage) return false;
         return true;
       }).sort(cmp);
       for (const r of shown) {
@@ -229,6 +239,9 @@ export function formatEndpointsHtml(
         test.className = "num";
         test.textContent = r.priorityLabel;
         tr.appendChild(test);
+        const coveredTd = document.createElement("td");
+        coveredTd.textContent = r.coverage;
+        tr.appendChild(coveredTd);
         tr.appendChild(tdScale(r.cacheEase));
         tr.appendChild(tdScale(r.cacheComplexity));
         const first = document.createElement("td");

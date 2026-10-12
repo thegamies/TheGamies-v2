@@ -19,6 +19,7 @@ import {
   imageTypes,
   keywords,
   platforms,
+  refreshCatalogGameCount,
   screenshots,
   syncRuns,
   themes,
@@ -156,6 +157,8 @@ export async function runBackfillSync(
       },
     });
     throw error;
+  } finally {
+    await refreshCatalogGameCount(db).catch(() => undefined);
   }
 }
 

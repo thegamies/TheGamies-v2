@@ -14,7 +14,9 @@ import {
   buildLoadGets,
   buildLoadWrites,
   isListWriteOp,
+  loadShareListPath,
   pickLoadtestGotyCategory,
+  pickLoadtestUsername,
   pickWeighted,
   siteGotyCategoryPath,
   type LoadWriteOp,
@@ -52,6 +54,7 @@ import {
   loadtestWriteGames,
   pickLoadtestGame,
   pickLoadtestGames,
+  pickLoadtestShareList,
   type LoadtestFixturesFile,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
@@ -181,7 +184,14 @@ async function runScenario(input: {
           ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
           : item.pickCategory
             ? siteGotyCategoryPath(pickLoadtestGotyCategory())
-            : item.path;
+            : item.pickProfile
+              ? `/u/${pickLoadtestUsername(input.fixtures.writerCount)}`
+              : item.pickShare
+                ? loadShareListPath(
+                    item.pickShare,
+                    pickLoadtestShareList(input.fixtures.lists ?? []),
+                  )
+                : item.path;
       const t0 = Date.now();
       try {
         const res = await fetch(`${input.appUrl}${path}`, {

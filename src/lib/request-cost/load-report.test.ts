@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatLoadReport,
+  formatTimeSharePct,
   loadStepFamily,
   partitionLoadSamples,
   percentile,
@@ -32,6 +33,15 @@ describe("readLoadCostHeaders", () => {
     expect(
       readLoadCostHeaders(new Headers({ "x-cost-wall-ms": "nope" })),
     ).toEqual({});
+  });
+});
+
+describe("formatTimeSharePct", () => {
+  it("formats a slice of total time", () => {
+    expect(formatTimeSharePct(80, 100)).toBe("80.0%");
+    expect(formatTimeSharePct(0.4, 100)).toBe("0.40%");
+    expect(formatTimeSharePct(0, 100)).toBe("0%");
+    expect(formatTimeSharePct(10, 0)).toBe("—");
   });
 });
 
@@ -70,8 +80,9 @@ describe("formatLoadReport", () => {
     expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
     expect(md).toContain("Ramp: 0s (all VUs at t=0)");
     expect(md).toContain("Writers: 10");
-    expect(md).toContain("- general: 1 · p50 80 ms · p90 80 ms · p95 80 ms · p99 80 ms");
-    expect(md).toContain("- /rankings: 1 · p50 80 ms");
+    expect(md).toContain("- general: 1 · 80.0% time · p50 80 ms · p90 80 ms · p95 80 ms · p99 80 ms");
+    expect(md).toContain("- /rankings: 1 · 80.0% time · p50 80 ms");
+    expect(md).toContain("select count(*) from games: 1 · 100.0% time");
     expect(md).toContain("- Errors: 1");
     expect(md).toContain("Worker wall p50 40 ms · p90 40 ms · p95 40 ms · p99 40 ms");
     expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms · p99 45 ms");
@@ -135,6 +146,12 @@ describe("loadStepFamily", () => {
     expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
     expect(loadStepFamily("/games")).toBe("/games");
     expect(loadStepFamily("/games?q=Hades")).toBe("/games?q=:q");
+    expect(loadStepFamily("/create/goty?year=2025")).toBe("/create/goty");
+    expect(loadStepFamily("/u/gamies_qa_load_001")).toBe("/u/:username");
+    expect(loadStepFamily("/u/gamies_qa_load_001/goty-2025")).toBe(
+      "/u/:username/:listSlug",
+    );
+    expect(loadStepFamily("/l/abc123")).toBe("/l/:publicId");
     expect(loadStepFamily("/api/games/search?q=ha")).toBe(
       "/api/games/search?q=:q",
     );

@@ -125,6 +125,16 @@ export type LoadtestGame = {
   title?: string;
 };
 
+/** Public custom list planted by ensure so readers can hit share URLs. */
+export type LoadtestShareList = {
+  username: string;
+  slug: string;
+  publicId: string;
+};
+
+export const LOADTEST_SHARE_LIST_TITLE = "Load share";
+export const LOADTEST_SHARE_LIST_SLUG = "load-share";
+
 export type LoadtestFixturesFile = {
   communitySlug: string;
   communityId: string;
@@ -142,6 +152,8 @@ export type LoadtestFixturesFile = {
   ballotGames?: LoadtestGame[];
   ballotItems: Array<{ gameId: string; rank: number }>;
   writerCount: number;
+  /** One public custom list per load-test account. Readers pick at random. */
+  lists?: LoadtestShareList[];
 };
 
 export function mergeLoadtestGameBands(
@@ -198,6 +210,16 @@ export function pickLoadtestGame(
     (unpopular.length === 0 || random() < LOADTEST_POPULAR_PICK_RATE);
   const band = usePopular ? popular : unpopular.length > 0 ? unpopular : pool;
   return band[Math.min(band.length - 1, Math.floor(random() * band.length))]!;
+}
+
+export function pickLoadtestShareList(
+  lists: LoadtestShareList[],
+  random: () => number = Math.random,
+): LoadtestShareList {
+  if (lists.length === 0) {
+    throw new Error("Load-test share list pool is empty.");
+  }
+  return lists[Math.min(lists.length - 1, Math.floor(random() * lists.length))]!;
 }
 
 export function pickLoadtestGames(

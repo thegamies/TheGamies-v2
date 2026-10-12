@@ -1,7 +1,7 @@
 /**
- * Idempotently create load-test accounts, gamies_qa_load, open + published
- * editions, and reserved TGA years. Never touches QA showcase or the promoted
- * TGA year. Refuses production.
+ * Idempotently create load-test accounts, gamies_qa_load, one public custom
+ * share list per account, open + published editions, and reserved TGA years.
+ * Never touches QA showcase or the promoted TGA year. Refuses production.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -28,7 +28,6 @@ import {
 } from "@/lib/communities/seed-community";
 import { createCommunity } from "@/lib/communities/service";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
-import { parseWriterCount } from "@/lib/qa/loadtest";
 import {
   LOADTEST_BALLOT_POPULAR_POOL,
   LOADTEST_BALLOT_UNPOPULAR_POOL,
@@ -42,8 +41,11 @@ import {
   loadtestAccount,
   loadtestEditionOpenSchedule,
   mergeLoadtestGameBands,
+  parseWriterCount,
   type LoadtestFixturesFile,
+  type LoadtestShareList,
 } from "@/lib/qa/loadtest";
+import { ensureLoadtestShareList } from "@/lib/qa/loadtest-share-lists";
 import {
   repairLoadtestOpenEdition,
   repairLoadtestTgaYear,
@@ -198,7 +200,7 @@ async function ensureProfile(db: Db, index: number, authUserId: string) {
   if ("error" in ensured) throw new Error(`${account.username}: ${ensured.error}`);
   await db
     .update(profiles)
-    .set({ visibility: "private" })
+    .set({ visibility: "public" })
     .where(eq(profiles.id, ensured.profile.id));
   return ensured.profile.id;
 }
@@ -360,6 +362,20 @@ async function main() {
     gameId: row.id,
     rank: i + 1,
   }));
+  const shareGameIds = (catalogGames.length > 0 ? catalogGames : ballotGames).map(
+    (row) => row.id,
+  );
+  const lists: LoadtestShareList[] = [];
+  for (let i = 0; i < profileIds.length; i++) {
+    lists.push(
+      await ensureLoadtestShareList(db, {
+        profileId: profileIds[i]!,
+        username: loadtestAccount(i + 1).username,
+        gameIds: shareGameIds,
+      }),
+    );
+  }
+  log(`share lists ${lists.length}`);
 
   const filling = await getEditionByCommunityYear(
     communityId,
@@ -452,6 +468,7 @@ async function main() {
     ballotGames,
     ballotItems,
     writerCount: writers,
+    lists,
   };
   await writeFile(
     path.join(outDir, "fixtures.json"),

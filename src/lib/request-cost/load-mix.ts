@@ -13,10 +13,14 @@ import {
   LOADTEST_COMMUNITY,
   LOADTEST_EDITION_FILLING_YEAR,
   LOADTEST_EDITION_RESULTS_YEAR,
+  LOADTEST_SHARE_LIST_SLUG,
   LOADTEST_TGA_LOCKED_YEAR,
   LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_WRITERS_MAX,
+  loadtestAccount,
   type LoadtestFixturesFile,
   type LoadtestScenario,
+  type LoadtestShareList,
 } from "@/lib/qa/loadtest";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 
@@ -33,6 +37,10 @@ export type LoadGetItem = {
   pickCategory?: boolean;
   /** Catalog `/games?q=` or list-editor `/api/games/search`. */
   pickSearch?: "browse" | "api";
+  /** Resolve `/u/:username` from load-test accounts. */
+  pickProfile?: boolean;
+  /** Resolve a planted share list at random from `fixtures.lists`. */
+  pickShare?: "l" | "owned";
 };
 
 export type LoadWriteOp =
@@ -73,6 +81,8 @@ export type LoadMixUrls = Pick<
   | "tgaOpenYear"
   | "tgaLockedYear"
   | "game"
+  | "writerCount"
+  | "lists"
 >;
 
 const sampleUrls: LoadMixUrls = {
@@ -83,6 +93,14 @@ const sampleUrls: LoadMixUrls = {
   tgaOpenYear: LOADTEST_TGA_OPEN_YEAR,
   tgaLockedYear: LOADTEST_TGA_LOCKED_YEAR,
   game: { id: "g1", slug: "sample-game", igdbId: 1 },
+  writerCount: 1,
+  lists: [
+    {
+      username: loadtestAccount(1).username,
+      slug: LOADTEST_SHARE_LIST_SLUG,
+      publicId: "share1",
+    },
+  ],
 };
 
 /** Site live GOTY year the general mix hammers (real 2025 boards, not load-test years). */
@@ -98,6 +116,25 @@ export function loadtestGotyCategoryIds(): string[] {
 export function pickLoadtestGotyCategory(random: () => number = Math.random): string {
   const ids = loadtestGotyCategoryIds();
   return ids[Math.floor(random() * ids.length)]!;
+}
+
+export function pickLoadtestUsername(
+  writerCount: number,
+  random: () => number = Math.random,
+): string {
+  const n = Math.max(1, Math.min(LOADTEST_WRITERS_MAX, Math.floor(writerCount) || 1));
+  const index = 1 + Math.floor(random() * n);
+  return loadtestAccount(index).username;
+}
+
+export function loadShareListPath(
+  kind: "l" | "owned",
+  list: LoadtestShareList,
+): string {
+  if (kind === "l") {
+    return `/l/${encodeURIComponent(list.publicId)}`;
+  }
+  return `/u/${encodeURIComponent(list.username)}/${encodeURIComponent(list.slug)}`;
 }
 
 export function siteGotyCategoryPath(categoryId: string, year = LOADTEST_SITE_GOTY_YEAR): string {
@@ -149,6 +186,43 @@ function generalGets(urls: LoadMixUrls): LoadGetItem[] {
       path: siteGotyCategoryPath(AWARD_CATEGORY_DEFS[0]!.id, year),
       weight: 4,
       pickCategory: true,
+    },
+    { group: "general", method: "GET", path: "/create", weight: 2 },
+    {
+      group: "general",
+      method: "GET",
+      path: `/create/goty?year=${year}`,
+      weight: 4,
+    },
+    { group: "general", method: "GET", path: "/create/custom", weight: 2 },
+    {
+      group: "general",
+      method: "GET",
+      path: `/u/${loadtestAccount(1).username}`,
+      weight: 3,
+      pickProfile: true,
+    },
+    ...shareGets(urls),
+  ];
+}
+
+function shareGets(urls: LoadMixUrls): LoadGetItem[] {
+  const first = urls.lists?.[0];
+  if (!first) return [];
+  return [
+    {
+      group: "general",
+      method: "GET",
+      path: loadShareListPath("l", first),
+      weight: 3,
+      pickShare: "l",
+    },
+    {
+      group: "general",
+      method: "GET",
+      path: loadShareListPath("owned", first),
+      weight: 3,
+      pickShare: "owned",
     },
   ];
 }

@@ -14,6 +14,9 @@ describe("formatEndpointsHtml", () => {
     expect(html).toContain("Cache hard");
     expect(html).toContain("cacheFirst");
     expect(html).toContain("th.sort");
+    expect(html).toContain("Covered");
+    expect(html).toContain("Not yet");
+    expect(html).toContain('id="coverage"');
     expect(html).toContain("--bg: #121110");
     expect(html).not.toContain("</script></script>");
   });
