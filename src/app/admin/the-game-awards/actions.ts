@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import { readR2AvatarConfigFromEnv } from "@/lib/profile/avatar-upload";
 import { uploadTgaNomineeImageObject } from "@/lib/tga-pickem/nominee-image";
-import { callTgaWinner, setOfficialWorldPremieres } from "@/lib/tga-pickem/scores";
+import {
+  callTgaWinner,
+  rebuildPickemScores,
+  setOfficialWorldPremieres,
+} from "@/lib/tga-pickem/scores";
 import {
   addGameNominee,
   addOtherNominee,
@@ -252,11 +256,16 @@ export async function saveTgaShowAction(
   const denied = await requireAdmin();
   if (denied) return denied;
   for (const [categoryId, nomineeId] of Object.entries(input.winners)) {
-    const result = await callTgaWinner(year, categoryId, nomineeId);
+    const result = await callTgaWinner(year, categoryId, nomineeId, undefined, {
+      rebuild: false,
+    });
     if ("error" in result) return result;
   }
-  const wp = await setOfficialWorldPremieres(year, input.worldPremieres);
+  const wp = await setOfficialWorldPremieres(year, input.worldPremieres, undefined, {
+    rebuild: false,
+  });
   if ("error" in wp) return wp;
+  await rebuildPickemScores(year);
   revalidateTga(year);
   return { ok: true as const };
 }
