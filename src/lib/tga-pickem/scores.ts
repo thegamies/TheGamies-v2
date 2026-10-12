@@ -17,47 +17,6 @@ function getDb(db?: Db): Db {
   return db ?? createDb();
 }
 
-async function ensureSiteScoreRows(year: number, officialWp: number | null, db: Db) {
-  await db.execute(sql`
-    insert into tga_site_scores (year, profile_id, points, wp_delta, updated_at)
-    select
-      ${year},
-      s.profile_id,
-      0,
-      case
-        when ${officialWp}::int is null or s.world_premieres_guess is null then null
-        else abs(s.world_premieres_guess - ${officialWp}::int)
-      end,
-      now()
-    from tga_site_sheets s
-    where s.year = ${year}
-    on conflict (year, profile_id) do nothing
-  `);
-}
-
-async function ensureCommunityScoreRows(
-  year: number,
-  officialWp: number | null,
-  db: Db,
-) {
-  await db.execute(sql`
-    insert into tga_community_scores (community_id, year, profile_id, points, wp_delta, updated_at)
-    select
-      s.community_id,
-      ${year},
-      s.profile_id,
-      0,
-      case
-        when ${officialWp}::int is null or s.world_premieres_guess is null then null
-        else abs(s.world_premieres_guess - ${officialWp}::int)
-      end,
-      now()
-    from tga_community_sheets s
-    where s.year = ${year}
-    on conflict (community_id, year, profile_id) do nothing
-  `);
-}
-
 async function applyWinnerDelta(
   year: number,
   categoryId: string,
@@ -167,9 +126,6 @@ export async function callTgaWinner(
     .select()
     .from(tgaWinners)
     .where(eq(tgaWinners.categoryId, categoryId));
-
-  await ensureSiteScoreRows(year, slate.worldPremieresOfficial, db);
-  await ensureCommunityScoreRows(year, slate.worldPremieresOfficial, db);
 
   if (nomineeId) {
     await db

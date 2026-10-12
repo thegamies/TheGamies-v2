@@ -435,6 +435,13 @@
       "when": 1790553600000,
       "tag": "0061_tga_community_picks_nominee_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1790640000000,
+      "tag": "0062_tga_score_backfill",
+      "breakpoints": true
     }
   ]
 }

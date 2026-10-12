@@ -38,7 +38,7 @@ Picks lock at **show start**. The nominee ballot is hidden while the year is sch
 
 1 point per correct **called** category. Uncalled awards do not score. World Premieres (absolute difference) is the competition tie-break. Equal points and equal WP share a place (1–2–2–4). After picks lock, a name on Standings opens that entry.
 
-Saving a ballot writes that person’s score row at 0 points, including the World Premieres delta when the official count is already set. Saving again refreshes the delta and leaves points alone. Winner calls still add or remove one point for that category. A sheet from before this still receives its score row on the next winner call.
+Saving a ballot writes that person’s score row at 0 points, including the World Premieres delta when the official count is already set. Saving again refreshes the delta and leaves points alone. Winner calls only add or remove one point for that category. They do not scan sheets to create score rows. A migration backfills any sheet that does not yet have one, counting picks that already match called winners, and leaves existing score rows unchanged.
 
 ## Community
 
