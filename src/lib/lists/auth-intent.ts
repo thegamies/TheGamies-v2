@@ -2,7 +2,7 @@
 
 export type ListAuthIntent = "save" | "share";
 
-/** Share-with-link publish requires an owned profile (no new anon `/l/` rows). */
+/** Share-with-link publish requires an owned profile. */
 export function shareLinkPublishError(
   profileId: string | null | undefined,
 ): string | null {

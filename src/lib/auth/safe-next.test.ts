@@ -3,7 +3,7 @@ import { safeNextPath } from "./safe-next";
 
 describe("safeNextPath", () => {
   it("keeps same-site paths with query and hash", () => {
-    expect(safeNextPath("/l/abc")).toBe("/l/abc");
+    expect(safeNextPath("/u/alex/goty-2026")).toBe("/u/alex/goty-2026");
     expect(safeNextPath("/create/goty?year=2026&intent=save")).toBe(
       "/create/goty?year=2026&intent=save",
     );

@@ -189,7 +189,6 @@ describe("loadStepFamily", () => {
     expect(loadStepFamily("/u/gamies_qa_load_001/goty-2025")).toBe(
       "/u/:username/:listSlug",
     );
-    expect(loadStepFamily("/l/abc123")).toBe("/l/:publicId");
     expect(loadStepFamily("/api/games/search?q=ha")).toBe(
       "/api/games/search?q=:q",
     );

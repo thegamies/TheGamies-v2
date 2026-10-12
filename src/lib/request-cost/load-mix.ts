@@ -40,7 +40,7 @@ export type LoadGetItem = {
   /** Resolve `/u/:username` from load-test accounts. */
   pickProfile?: boolean;
   /** Resolve a planted share list at random from `fixtures.lists`. */
-  pickShare?: "l" | "owned";
+  pickShare?: boolean;
 };
 
 export type LoadWriteOp =
@@ -127,13 +127,7 @@ export function pickLoadtestUsername(
   return loadtestAccount(index).username;
 }
 
-export function loadShareListPath(
-  kind: "l" | "owned",
-  list: LoadtestShareList,
-): string {
-  if (kind === "l") {
-    return `/l/${encodeURIComponent(list.publicId)}`;
-  }
+export function loadShareListPath(list: LoadtestShareList): string {
   return `/u/${encodeURIComponent(list.username)}/${encodeURIComponent(list.slug)}`;
 }
 
@@ -213,16 +207,9 @@ function shareGets(urls: LoadMixUrls): LoadGetItem[] {
     {
       group: "general",
       method: "GET",
-      path: loadShareListPath("l", first),
-      weight: 3,
-      pickShare: "l",
-    },
-    {
-      group: "general",
-      method: "GET",
-      path: loadShareListPath("owned", first),
-      weight: 3,
-      pickShare: "owned",
+      path: loadShareListPath(first),
+      weight: 6,
+      pickShare: true,
     },
   ];
 }

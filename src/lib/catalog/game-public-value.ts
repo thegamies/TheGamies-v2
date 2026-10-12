@@ -83,9 +83,10 @@ export async function listPublicListsForGame(
       const username = typeof row.username === "string" ? row.username : null;
       if (!publicId || !username) return null;
       const slug = typeof row.slug === "string" ? row.slug : null;
+      if (!slug) return null;
       const hideRank = row.rankVisibility === "games_only";
       return {
-        href: listSharePath({ publicId, slug, username }),
+        href: listSharePath({ slug, username }),
         title: typeof row.title === "string" ? row.title : "List",
         ownerName:
           typeof row.displayName === "string" ? row.displayName : username,

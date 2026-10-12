@@ -23,6 +23,7 @@ import {
   getOwnedGotyForYear,
   getOwnedGotyItemsForYear,
   getEditableList,
+  getListShareTarget,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
@@ -121,6 +122,7 @@ export default async function CreateGotyPage({
 
   let editor: {
     publicId: string | null;
+    sharePath?: string | null;
     title: string;
     year: number | null;
     slotCount: number;
@@ -202,6 +204,10 @@ export default async function CreateGotyPage({
             ? await getCategoryVotesForList(result.list.id).catch(() => [])
             : [],
       };
+      if (signedIn) {
+        const share = await getListShareTarget(result.list);
+        if (share.path !== "/create") editor.sharePath = share.path;
+      }
 
       // Prefer the device draft when it matches — anon edits land in the
       // cookie immediately and may be ahead of the last DB sync.
@@ -389,6 +395,7 @@ export default async function CreateGotyPage({
         ) : null}
         <ListEditor
           publicId={editor.publicId}
+          sharePath={editor.sharePath}
           listType="goty"
           initialTitle={editor.title}
           initialYear={editor.year}

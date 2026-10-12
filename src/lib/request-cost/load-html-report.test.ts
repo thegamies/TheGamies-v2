@@ -24,7 +24,6 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('id="steps"');
     expect(html).toContain('id="families"');
     expect(html).toContain("/games/:slug");
-    expect(html).toContain("/l/:publicId");
     expect(html).toContain("/u/:username/:listSlug");
     expect(html).toContain("/games?q=:q");
     expect(html).toContain("/api/games/search?q=:q");

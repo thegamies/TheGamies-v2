@@ -23,10 +23,6 @@ vi.mock("@/components/lists/RefreshOnBfcache", () => ({
   RefreshOnBfcache: () => null,
 }));
 
-vi.mock("@/components/lists/SoftSavePrompt", () => ({
-  SoftSavePrompt: () => null,
-}));
-
 vi.mock("@/components/list-export/ShareExportButton", () => ({
   ShareExportButton: () => null,
 }));
@@ -78,8 +74,6 @@ describe("SharedListView", () => {
       <SharedListView
         data={data}
         canEdit
-        canClaim={false}
-        isSignedIn
         alreadyOwned
         editHref="/create/goty?id=pub"
         sharePath={sharePath}
@@ -100,8 +94,6 @@ describe("SharedListView", () => {
       <SharedListView
         data={data}
         canEdit={false}
-        canClaim={false}
-        isSignedIn
         alreadyOwned={false}
         editHref="/create/goty?id=pub"
         sharePath={sharePath}
@@ -115,8 +107,6 @@ describe("SharedListView", () => {
       <SharedListView
         data={data}
         canEdit
-        canClaim={false}
-        isSignedIn
         alreadyOwned
         editHref="/create/goty?id=pub"
         sharePath={sharePath}
@@ -137,8 +127,6 @@ describe("SharedListView", () => {
       <SharedListView
         data={data}
         canEdit
-        canClaim={false}
-        isSignedIn
         alreadyOwned
         editHref="/create/goty?id=pub"
         sharePath={sharePath}
@@ -173,8 +161,6 @@ describe("SharedListView", () => {
           list: { ...data.list, listType: "custom", title: "Favorites" },
         }}
         canEdit={false}
-        canClaim={false}
-        isSignedIn
         alreadyOwned={false}
         editHref="/create/custom?id=pub"
         sharePath="/u/eric4/favorites"

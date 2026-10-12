@@ -46,9 +46,8 @@ export async function generateMetadata({
   ]);
   if (!data) return { title: "List", robots: noIndexRobots };
   const path = listSharePath({
-    publicId: data.list.publicId,
-    slug: data.list.slug,
-    username: data.owner?.username,
+    slug: data.list.slug ?? listSlug,
+    username: data.owner?.username ?? username,
   });
   const index =
     Boolean(profile && shouldIndexProfile(profile)) &&
@@ -102,7 +101,6 @@ export default async function OwnedListBySlugPage({
 
   const cookie = await readListEditCookie();
   const sessionUser = await getRequestSessionUser();
-  const isSignedIn = Boolean(sessionUser?.id);
   const viewerProfile = sessionUser?.id
     ? await getRequestProfileByAuthUserId(sessionUser.id).catch(() => null)
     : null;
@@ -132,9 +130,8 @@ export default async function OwnedListBySlugPage({
       ? `/create/goty?id=${publicId}`
       : `/create/custom?id=${publicId}`;
   const sharePath = listSharePath({
-    publicId,
-    slug: data.list.slug,
-    username: data.owner?.username,
+    slug: data.list.slug ?? listSlug,
+    username: data.owner?.username ?? username,
   });
 
   return (
@@ -142,8 +139,6 @@ export default async function OwnedListBySlugPage({
       <SharedListView
         data={data}
         canEdit={canEdit}
-        canClaim={false}
-        isSignedIn={isSignedIn}
         alreadyOwned={alreadyOwned}
         editHref={editHref}
         sharePath={sharePath}

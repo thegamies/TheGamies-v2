@@ -274,7 +274,6 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     const GAMES_SEARCH_FAMILY = "/games?q=:q";
     const GAMES_SEARCH_API_FAMILY = "/api/games/search?q=:q";
     const GOTY_CAT_FAMILY = "/game-of-the-year/:year/categories?category=:id";
-    const SHARE_L_FAMILY = "/l/:publicId";
     const SHARE_OWNED_FAMILY = "/u/:username/:listSlug";
     const PROFILE_FAMILY = "/u/:username";
     const LIST_COUNT_FAMILIES = ["list-create/:n", "list-edit/:n", "list-delete/:n"];
@@ -298,7 +297,6 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       if (step.indexOf("/games?q=") === 0) return GAMES_SEARCH_FAMILY;
       if (step.indexOf("/api/games/search?") === 0) return GAMES_SEARCH_API_FAMILY;
       if (step.indexOf("/games/") === 0 && step.length > 7) return GAME_FAMILY;
-      if (step.indexOf("/l/") === 0 && step.length > 3) return SHARE_L_FAMILY;
       if (/^\\/u\\/[^/]+\\/[^/]+$/.test(step)) return SHARE_OWNED_FAMILY;
       if (/^\\/u\\/[^/]+$/.test(step)) return PROFILE_FAMILY;
       if (/^\\/game-of-the-year\\/\\d+\\/categories\\?category=/.test(step)) return GOTY_CAT_FAMILY;
@@ -313,7 +311,6 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         family === GAMES_SEARCH_FAMILY ||
         family === GAMES_SEARCH_API_FAMILY ||
         family === GOTY_CAT_FAMILY ||
-        family === SHARE_L_FAMILY ||
         family === SHARE_OWNED_FAMILY ||
         family === PROFILE_FAMILY ||
         LIST_COUNT_FAMILIES.indexOf(family) >= 0

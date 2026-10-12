@@ -17,6 +17,7 @@ import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import {
   getEditableList,
+  getListShareTarget,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
@@ -55,6 +56,7 @@ export default async function CreateCustomPage({
 
   let editor: {
     publicId: string | null;
+    sharePath?: string | null;
     title: string;
     year: number | null;
     slotCount: number;
@@ -105,6 +107,10 @@ export default async function CreateCustomPage({
           blurb: signedIn ? (item.blurb ?? "") : "",
         })),
       };
+      if (signedIn) {
+        const share = await getListShareTarget(result.list);
+        if (share.path !== "/create") editor.sharePath = share.path;
+      }
 
       if (!signedIn) {
         const draft = await readListDraftCookie();
@@ -255,6 +261,7 @@ export default async function CreateCustomPage({
       <div>
         <ListEditor
           publicId={editor.publicId}
+          sharePath={editor.sharePath}
           listType="custom"
           initialTitle={editor.title}
           initialYear={editor.year}

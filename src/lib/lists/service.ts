@@ -732,43 +732,6 @@ export async function getShareListCategoryPicks(
   }));
 }
 
-export async function getShareListByPublicId(
-  publicId: string,
-  opts: { db?: Db; includeItems?: boolean } = {},
-): Promise<ShareListPayload | null> {
-  const db = opts.db ?? getDb();
-  const list = await getListByPublicId(publicId, db);
-  if (!list) return null;
-
-  const includeItems = opts.includeItems !== false;
-  const items = includeItems ? await loadListItems(list.id, db) : [];
-  let owner: {
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-  } | null = null;
-  if (list.profileId) {
-    const [profile] = await db
-      .select({
-        username: profiles.username,
-        displayName: profiles.displayName,
-        avatarUrl: profiles.avatarUrl,
-      })
-      .from(profiles)
-      .where(eq(profiles.id, list.profileId))
-      .limit(1);
-    if (profile) {
-      owner = {
-        username: profile.username,
-        displayName: profile.displayName,
-        avatarUrl: profile.avatarUrl,
-      };
-    }
-  }
-
-  return { list, items, owner };
-}
-
 export async function getShareListByUsernameSlug(
   username: string,
   slug: string,
@@ -954,14 +917,13 @@ export async function getListShareTarget(
     if (profile?.username) {
       return {
         path: listSharePath({
-          publicId: list.publicId,
           slug: list.slug,
           username: profile.username,
         }),
       };
     }
   }
-  return { path: listSharePath({ publicId: list.publicId }) };
+  return { path: "/create" };
 }
 
 type ClientDraftItem = {

@@ -218,9 +218,6 @@ export function loadStepFamily(step: string): string {
   if (step.startsWith("/create/goty")) {
     return "/create/goty";
   }
-  if (step.startsWith("/l/") && step.length > "/l/".length) {
-    return "/l/:publicId";
-  }
   if (/^\/u\/[^/]+\/[^/]+$/.test(step)) {
     return "/u/:username/:listSlug";
   }

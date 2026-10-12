@@ -207,7 +207,6 @@ async function runScenario(input: {
               ? `/u/${pickLoadtestUsername(input.fixtures.writerCount)}`
               : item.pickShare
                 ? loadShareListPath(
-                    item.pickShare,
                     pickLoadtestShareList(input.fixtures.lists ?? []),
                   )
                 : item.path;

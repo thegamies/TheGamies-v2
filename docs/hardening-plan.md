@@ -190,7 +190,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Header: session and promoted TGA link load in parallel; profile via the request-cached lookup.
   - Game detail: artworks / screenshots / videos run together, alongside the viewer chain (session → profile → library entry + followed-library count in parallel). Each read keeps its own fallback.
   - Edition page: editions list + edition in parallel, then ballot, site GOTY prefill, award categories and custom categories in parallel.
-  - `/u/[username]`, `/create`, `/create/goty`, `/create/custom`, `/u/[username]/[listSlug]`, `/l/[publicId]`: use `getRequestSessionUser` + `getRequestProfileByAuthUserId`, so the header and page share one session lookup and one profile query per request (previously each page did its own `auth.getSession()` and profile query). `/u/[username]` loads follow counts and the viewer's follow state in parallel.
+  - `/u/[username]`, `/create`, `/create/goty`, `/create/custom`, `/u/[username]/[listSlug]`: use `getRequestSessionUser` + `getRequestProfileByAuthUserId`, so the header and page share one session lookup and one profile query per request (previously each page did its own `auth.getSession()` and profile query). `/u/[username]` loads follow counts and the viewer's follow state in parallel.
   - Skipped: `cache()` on `getPromotedTgaHref` — only the header calls it, once per request, so request memoization saves nothing. Narrower header profile select — the header and pages share the cached full profile row; a narrower header query would add a second profile query on pages that need the full row.
   - No new tests: behavior is unchanged (same reads and fallbacks, reordered); existing unit + integration suites pass.
 

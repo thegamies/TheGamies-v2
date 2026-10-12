@@ -164,12 +164,6 @@ function cacheHints(input: SiteEndpointInput): Pick<
       cacheComplexity: 4,
       cacheNotes: "Not a cache. Dirties home activity (and profile library).",
     },
-    "/l/:publicId": {
-      cacheEase: 4,
-      cacheComplexity: 4,
-      cacheNotes:
-        "Public list HTML is one key. Owner save must purge that publicId.",
-    },
     "/u/:username/:listSlug": {
       cacheEase: 4,
       cacheComplexity: 4,
@@ -431,18 +425,6 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     testPriority: 3,
     loadMix: true,
     notes: "Custom list editor.",
-  }),
-  row({
-    method: "GET",
-    path: "/l/:publicId",
-    kind: "page",
-    group: "lists",
-    audience: "public",
-    usage: 4,
-    dbImpact: 3,
-    testPriority: 3,
-    loadMix: true,
-    notes: "Share link. List plus covers.",
   }),
   row({
     method: "GET",

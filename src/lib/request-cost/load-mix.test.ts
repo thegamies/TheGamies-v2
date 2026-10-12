@@ -80,12 +80,9 @@ describe("buildLoadGets", () => {
       expect(buildLoadGets(scenario, urls).some((item) => item.pickProfile)).toBe(
         true,
       );
-      expect(buildLoadGets(scenario, urls).some((item) => item.pickShare === "l")).toBe(
+      expect(buildLoadGets(scenario, urls).some((item) => item.pickShare)).toBe(
         true,
       );
-      expect(
-        buildLoadGets(scenario, urls).some((item) => item.pickShare === "owned"),
-      ).toBe(true);
       expect(mixUsesShowcaseSlug(buildLoadGets(scenario, urls))).toBe(false);
     }
   });
@@ -151,8 +148,7 @@ describe("share list mix", () => {
 
   it("builds share paths from a planted list", () => {
     const list = urls.lists[0]!;
-    expect(loadShareListPath("l", list)).toBe("/l/share1");
-    expect(loadShareListPath("owned", list)).toBe(
+    expect(loadShareListPath(list)).toBe(
       `/u/${loadtestAccount(1).username}/${LOADTEST_SHARE_LIST_SLUG}`,
     );
   });

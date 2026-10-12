@@ -113,6 +113,8 @@ type ListFormat = "poster" | "list" | "grid";
 
 type ListEditorProps = {
   publicId?: string | null;
+  /** Owned public list URL (`/u/:username/:slug`). */
+  sharePath?: string | null;
   listType: "goty" | "custom";
   initialTitle: string;
   initialYear: number | null;
@@ -172,6 +174,7 @@ function persistSnapshot(input: {
 
 export function ListEditor({
   publicId: initialPublicId = null,
+  sharePath: initialSharePath = null,
   listType: initialListType,
   initialTitle,
   initialYear,
@@ -218,6 +221,9 @@ export function ListEditor({
 
   const [publicId, setPublicId] = useState<string | null>(
     initialPublicId ?? null,
+  );
+  const [sharePath, setSharePath] = useState<string | null>(
+    initialSharePath ?? null,
   );
   const [listType] = useState<"goty" | "custom">(initialListType);
   const [title, setTitle] = useState(initialTitle);
@@ -488,6 +494,7 @@ export function ListEditor({
       }
       if (result.publicId) {
         setPublicId(result.publicId);
+        if (result.sharePath) setSharePath(result.sharePath);
         setSavedSnapshot(currentSnapshot());
         setSaveError(null);
         setSavedFlash(true);
@@ -738,6 +745,7 @@ export function ListEditor({
   async function persistList(): Promise<{
     ok: boolean;
     publicId?: string | null;
+    sharePath?: string | null;
   }> {
     if (!signedIn) {
       setSaveSignInOpen(true);
@@ -766,12 +774,17 @@ export function ListEditor({
     }
     const nextId = result.publicId ?? publicId;
     if (result.publicId) setPublicId(result.publicId);
+    if (result.sharePath) setSharePath(result.sharePath);
     setSavedSnapshot(currentSnapshot());
     setSaveError(null);
     setSaveNotice(null);
     setSavedFlash(true);
     window.setTimeout(() => setSavedFlash(false), 2000);
-    return { ok: true, publicId: nextId };
+    return {
+      ok: true,
+      publicId: nextId,
+      sharePath: result.sharePath ?? sharePath,
+    };
   }
 
   function save() {
@@ -780,8 +793,8 @@ export function ListEditor({
     });
   }
 
-  function viewPath(id: string | null | undefined) {
-    return id ? `/l/${id}` : "/create";
+  function viewPath(path?: string | null) {
+    return path || sharePath || "/create";
   }
 
   function selectEditorView(next: ListShareView) {
@@ -803,7 +816,7 @@ export function ListEditor({
       return;
     }
     allowLeave();
-    router.push(viewPath(publicId));
+    router.push(viewPath());
   }
 
   function openShareMenu() {
@@ -1421,7 +1434,7 @@ export function ListEditor({
                 shareFormRef.current?.requestSubmit();
                 return;
               }
-              router.push(viewPath(result.publicId ?? publicId));
+              router.push(viewPath(result.sharePath));
             });
           }}
           discardLabel={leavePrompt === "done" ? "Leave without saving" : undefined}
@@ -1430,7 +1443,7 @@ export function ListEditor({
               ? () => {
                   setLeavePrompt(null);
                   allowLeave();
-                  router.push(viewPath(publicId));
+                  router.push(viewPath());
                 }
               : undefined
           }

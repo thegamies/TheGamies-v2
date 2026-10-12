@@ -24,7 +24,7 @@ describe("withAuthEntryRel", () => {
 
 describe("safeNextPath", () => {
   it("allows relative paths only", () => {
-    expect(safeNextPath("/l/abc")).toBe("/l/abc");
+    expect(safeNextPath("/u/alex/goty-2026")).toBe("/u/alex/goty-2026");
     expect(safeNextPath("//evil")).toBeNull();
     expect(safeNextPath("https://evil")).toBeNull();
     expect(safeNextPath(null)).toBeNull();

@@ -39,7 +39,7 @@ Hit these in staging traffic mixes and keep an eye on round trips (`docs/request
 | `GET /create/goty` | 4 | 3 | Editor; save is the heavy part. |
 | list save (`saveOwnedListAction`) | 4 | 5 | ~10–13 trips per save. |
 
-Already in the general load mix: `/`, `/games`, search, `/games/:slug`, GOTY, **`/create`**, **`/create/goty`**, **`/create/custom`**, **`/u/:username`**, **`/l/:publicId`**, **`/u/:username/:listSlug`** (one planted custom list per load-test account; readers pick at random), list/library writes.
+Already in the general load mix: `/`, `/games`, search, `/games/:slug`, GOTY, **`/create`**, **`/create/goty`**, **`/create/custom`**, **`/u/:username`**, **`/u/:username/:listSlug`** (one planted custom list per load-test account; readers pick at random), list/library writes.
 
 The routes HTML (`e2e/.cost/endpoints.html`) has a **Covered** column: Load mix, Unit, Playwright, or **Not yet**. Filter by Covered to see gaps. `loadMix` / `unitTests` / `e2eTests` on `SITE_ENDPOINTS` feed that column.
 

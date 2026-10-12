@@ -45,9 +45,6 @@ describe("SITE_ENDPOINTS", () => {
     expect(endpointCoverage(terms).label).toBe("Not yet");
     expect(createGoty.loadMix).toBe(true);
     expect(endpointCoverage(createGoty).label).toContain("Load mix");
-    expect(SITE_ENDPOINTS.find((row) => row.path === "/l/:publicId")!.loadMix).toBe(
-      true,
-    );
     expect(
       SITE_ENDPOINTS.find((row) => row.path === "/u/:username/:listSlug")!.loadMix,
     ).toBe(true);
