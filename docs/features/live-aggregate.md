@@ -115,7 +115,7 @@ Onimusha: Way of the Sword, not Resident Evil Requiem). Other years pick from ea
 list’s ranked GOTY games (top-rank weighted). **Rewrite category votes only**
 keeps existing GOTY lists and replaces those votes.
 
-- Up to **1000** seed indices; UI batches of 50
+- No total seed-index cap; UI batches of 50 (server batch max 100)
 - **Reseed on** → Seed N rewrites voters `1…N`
 - **Reseed off** → Seed N appends N new voters after the current max index (does not re-target `1…N` and skip)
 - **Keep adding until stopped** also continues from max index

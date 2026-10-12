@@ -60,7 +60,7 @@ import {
 
 export const SEED_AUTH_PREFIX = "seed:standings:";
 export const SEED_USERNAME_PREFIX = "seedvoter";
-export const SEED_MAX_INDEX = 1000;
+/** Per-request batch size (no total index cap — client loops to grow). */
 export const SEED_MAX_BATCH = 100;
 /** Neon HTTP inserts stay reliable when category vote batches stay small. */
 export const SEED_INSERT_CHUNK = 200;
@@ -377,7 +377,7 @@ export function selectStandingsSeedWork(opts: {
 
 /**
  * Create/update a batch of synthetic GOTY voters.
- * Use startIndex + count for paging up to SEED_MAX_INDEX; client can loop until stopped.
+ * No total index cap — the client pages with startIndex + count until stopped.
  */
 export async function seedStandingsVoters(
   input: SeedStandingsInput,
@@ -413,11 +413,11 @@ export async function seedStandingsVoters(
       error: `Each batch can create between 1 and ${SEED_MAX_BATCH} voters.`,
     };
   }
-  if (startIndex > SEED_MAX_INDEX) {
-    return { error: `Seed index cannot exceed ${SEED_MAX_INDEX}.` };
+  if (!Number.isFinite(startIndex)) {
+    return { error: "Pick a valid start index." };
   }
 
-  const endIndex = Math.min(SEED_MAX_INDEX, startIndex + count - 1);
+  const endIndex = startIndex + count - 1;
   const indices = Array.from(
     { length: endIndex - startIndex + 1 },
     (_, i) => startIndex + i,
