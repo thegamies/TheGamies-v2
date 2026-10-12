@@ -1,8 +1,8 @@
 import {
   LOADTEST_SCENARIOS,
   LOADTEST_WRITERS_MAX,
-  isLoadtestScenario,
   parseWriterCount,
+  resolveLoadtestScenario,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
 import { isProductionAppHost } from "@/lib/qa/staging-fixtures";
@@ -89,10 +89,11 @@ export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
       }
       i += 1;
       if (arg === "--scenario") {
-        if (!isLoadtestScenario(next)) {
+        const scenario = resolveLoadtestScenario(next);
+        if (!scenario) {
           return { error: `Unknown scenario '${next}'.` };
         }
-        scenarios.push(next);
+        scenarios.push(scenario);
       } else if (arg === "--duration") {
         const parsed = parseDurationMs(next);
         if (typeof parsed !== "number") return parsed;

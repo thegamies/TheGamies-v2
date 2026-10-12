@@ -30,7 +30,7 @@ vi.mock("@/lib/communities/service", () => ({
 }));
 
 import { POST } from "./route";
-import { LOADTEST_TGA_OPEN_YEAR } from "@/lib/qa/loadtest";
+import { LOADTEST_TGA_YEAR } from "@/lib/qa/loadtest";
 
 function req(
   url: string,
@@ -158,7 +158,7 @@ describe("POST /api/qa/loadtest", () => {
       req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
         op: "pickem",
         slug: "gamies_qa_load",
-        year: LOADTEST_TGA_OPEN_YEAR + 1,
+        year: LOADTEST_TGA_YEAR + 1,
         worldPremieresGuess: 1,
         picks: {},
       }),

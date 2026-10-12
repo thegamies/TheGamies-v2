@@ -14,10 +14,10 @@ import {
   LOADTEST_EDITION_FILLING_YEAR,
   LOADTEST_EDITION_RESULTS_YEAR,
   LOADTEST_SHARE_LIST_SLUG,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
   LOADTEST_WRITERS_MAX,
   loadtestAccount,
+  loadtestTgaYearFromFixtures,
   type LoadtestFixturesFile,
   type LoadtestScenario,
   type LoadtestShareList,
@@ -78,6 +78,7 @@ export type LoadMixUrls = Pick<
   | "fillingYear"
   | "resultsYear"
   | "resultsCategoryId"
+  | "tgaYear"
   | "tgaOpenYear"
   | "tgaLockedYear"
   | "game"
@@ -90,8 +91,7 @@ const sampleUrls: LoadMixUrls = {
   fillingYear: LOADTEST_EDITION_FILLING_YEAR,
   resultsYear: LOADTEST_EDITION_RESULTS_YEAR,
   resultsCategoryId: "cat_load",
-  tgaOpenYear: LOADTEST_TGA_OPEN_YEAR,
-  tgaLockedYear: LOADTEST_TGA_LOCKED_YEAR,
+  tgaYear: LOADTEST_TGA_YEAR,
   game: { id: "g1", slug: "sample-game", igdbId: 1 },
   writerCount: 1,
   lists: [
@@ -214,24 +214,60 @@ function shareGets(urls: LoadMixUrls): LoadGetItem[] {
   ];
 }
 
-function pickemGets(year: number): LoadGetItem[] {
+export type LoadPickemPhase = "open" | "locked";
+
+export const LOADTEST_PICKEM_LOCK_FRACTION = 0.5;
+
+export function pickemPhaseAt(
+  elapsedMs: number,
+  durationMs: number,
+  fraction = LOADTEST_PICKEM_LOCK_FRACTION,
+): LoadPickemPhase {
+  if (durationMs <= 0) return "locked";
+  return elapsedMs / durationMs >= fraction ? "locked" : "open";
+}
+
+function pickemGets(year: number, phase: LoadPickemPhase): LoadGetItem[] {
   const base = `/the-game-awards/${year}`;
   const community = `/communities/${LOADTEST_COMMUNITY.slug}/the-game-awards/${year}`;
+  if (phase === "open") {
+    return [
+      { group: "pickem", method: "GET", path: base, weight: 6 },
+      { group: "pickem", method: "GET", path: community, weight: 3 },
+      {
+        group: "pickem",
+        method: "GET",
+        path: tgaYearHref(base, { view: "standings" }),
+        weight: 2,
+      },
+      {
+        group: "pickem",
+        method: "GET",
+        path: tgaYearHref(community, { view: "standings" }),
+        weight: 1,
+      },
+    ];
+  }
   return [
-    { group: "pickem", method: "GET", path: base, weight: 4 },
     {
       group: "pickem",
       method: "GET",
       path: tgaYearHref(base, { view: "standings" }),
-      weight: 4,
+      weight: 6,
     },
-    { group: "pickem", method: "GET", path: community, weight: 2 },
     {
       group: "pickem",
       method: "GET",
       path: tgaYearHref(community, { view: "standings" }),
+      weight: 4,
+    },
+    {
+      group: "pickem",
+      method: "GET",
+      path: tgaYearHref(community, { view: "standings", mode: "voices" }),
       weight: 2,
     },
+    { group: "pickem", method: "GET", path: base, weight: 1 },
   ];
 }
 
@@ -308,12 +344,11 @@ function generalWrites(): LoadWriteItem[] {
 export function buildLoadGets(
   scenario: LoadtestScenario,
   urls: LoadMixUrls = sampleUrls,
+  pickemPhase: LoadPickemPhase = "open",
 ): LoadGetItem[] {
   const items = [...generalGets(urls)];
-  if (scenario === "pickem-open") {
-    items.push(...pickemGets(urls.tgaOpenYear));
-  } else if (scenario === "pickem-locked") {
-    items.push(...pickemGets(urls.tgaLockedYear));
+  if (scenario === "pickem") {
+    items.push(...pickemGets(loadtestTgaYearFromFixtures(urls), pickemPhase));
   } else if (scenario === "editions-filling") {
     items.push(...editionFillingGets(urls));
   } else if (scenario === "editions-results") {
@@ -322,9 +357,12 @@ export function buildLoadGets(
   return items;
 }
 
-export function buildLoadWrites(scenario: LoadtestScenario): LoadWriteItem[] {
+export function buildLoadWrites(
+  scenario: LoadtestScenario,
+  pickemPhase: LoadPickemPhase = "open",
+): LoadWriteItem[] {
   const items = [...generalWrites()];
-  if (scenario === "pickem-open") {
+  if (scenario === "pickem" && pickemPhase === "open") {
     items.push({ group: "write", method: "POST", op: "pickem", weight: 4 });
   }
   if (scenario === "editions-filling") {
@@ -336,8 +374,12 @@ export function buildLoadWrites(scenario: LoadtestScenario): LoadWriteItem[] {
 export function buildLoadMix(
   scenario: LoadtestScenario,
   urls: LoadMixUrls = sampleUrls,
+  pickemPhase: LoadPickemPhase = "open",
 ): LoadMixItem[] {
-  return [...buildLoadGets(scenario, urls), ...buildLoadWrites(scenario)];
+  return [
+    ...buildLoadGets(scenario, urls, pickemPhase),
+    ...buildLoadWrites(scenario, pickemPhase),
+  ];
 }
 
 export function pickWeighted<T extends { weight: number }>(
@@ -360,12 +402,12 @@ export function mixUsesShowcaseSlug(items: LoadMixItem[]): boolean {
   );
 }
 
-export function mixUsesPromotedTgaYear(items: LoadMixItem[]): boolean {
+export function mixUsesUnexpectedTgaYear(items: LoadMixItem[]): boolean {
+  const year = String(LOADTEST_TGA_YEAR);
   return items.some(
     (item) =>
       item.method === "GET" &&
       item.group === "pickem" &&
-      !item.path.includes(String(LOADTEST_TGA_OPEN_YEAR)) &&
-      !item.path.includes(String(LOADTEST_TGA_LOCKED_YEAR)),
+      !item.path.includes(year),
   );
 }

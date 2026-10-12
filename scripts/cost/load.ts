@@ -14,11 +14,13 @@ import {
   buildLoadGets,
   buildLoadWrites,
   isListWriteOp,
+  LOADTEST_PICKEM_LOCK_FRACTION,
   loadShareListPath,
   pickLoadtestGotyCategory,
   pickLoadtestUsername,
   pickWeighted,
   siteGotyCategoryPath,
+  type LoadPickemPhase,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
 import { loadGamesSearchPath } from "@/lib/request-cost/load-search";
@@ -55,9 +57,11 @@ import {
   assertLoadtestFixturesSafe,
   LOADTEST_BALLOT_ITEM_COUNT,
   LOADTEST_EDITION_FILLING_YEAR,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
+  completeLoadtestTgaPicks,
   loadtestBallotGames,
+  loadtestTgaSlateFromFixtures,
+  loadtestTgaYearFromFixtures,
   loadtestWriteGames,
   pickLoadtestGame,
   pickLoadtestGames,
@@ -68,7 +72,9 @@ import {
 import {
   repairLoadtestOpenEdition,
   repairLoadtestTgaYear,
+  restoreLoadtestTgaSchedule,
 } from "@/lib/qa/loadtest-repair";
+import { getTgaYear } from "@/lib/tga-pickem/service";
 import { loadtestSecretFromEnv } from "@/lib/qa/loadtest-guard";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
@@ -93,6 +99,7 @@ async function readJson<T>(file: string): Promise<T> {
 function writeBody(
   op: LoadWriteOp,
   fixtures: LoadtestFixturesFile,
+  writerIndex = 0,
 ): unknown {
   if (isListWriteOp(op)) {
     throw new Error(`List writes use listWriteJsonBody, not writeBody (${op}).`);
@@ -123,9 +130,12 @@ function writeBody(
   return {
     op: "pickem",
     slug: fixtures.communitySlug,
-    year: fixtures.tgaOpenYear,
-    worldPremieresGuess: 3,
-    picks: fixtures.tgaOpenPicks,
+    year: loadtestTgaYearFromFixtures(fixtures),
+    worldPremieresGuess: writerIndex % 21,
+    picks: completeLoadtestTgaPicks(
+      loadtestTgaSlateFromFixtures(fixtures),
+      writerIndex,
+    ),
   };
 }
 
@@ -143,18 +153,6 @@ async function repairPhases(fixtures: LoadtestFixturesFile, databaseUrl: string)
   await repairLoadtestOpenEdition(db, {
     communityId: fixtures.communityId,
     year: LOADTEST_EDITION_FILLING_YEAR,
-  });
-  await repairLoadtestTgaYear(db, {
-    year: LOADTEST_TGA_OPEN_YEAR,
-    phase: "open",
-    communityId: fixtures.communityId,
-    gameId: fixtures.game.id,
-  });
-  await repairLoadtestTgaYear(db, {
-    year: LOADTEST_TGA_LOCKED_YEAR,
-    phase: "locked",
-    communityId: fixtures.communityId,
-    gameId: fixtures.game.id,
   });
 }
 
@@ -180,23 +178,47 @@ async function runScenario(input: {
   cookies: string[];
   secret: string | null;
   tag: string;
+  skipRepair: boolean;
 }): Promise<string> {
-  const gets = buildLoadGets(input.scenario, input.fixtures);
-  const writes = buildLoadWrites(input.scenario);
+  const pickemPhaseRef = { phase: "open" as LoadPickemPhase };
+  const getsOpen = buildLoadGets(input.scenario, input.fixtures, "open");
+  const getsLocked = buildLoadGets(input.scenario, input.fixtures, "locked");
+  const writesOpen = buildLoadWrites(input.scenario, "open");
+  const writesLocked = buildLoadWrites(input.scenario, "locked");
   const pgBefore = await snapshotPgStatStatementsAt(input.databaseUrl);
-  await warmup(input.appUrl, gets[0]!.path);
+  await warmup(input.appUrl, getsOpen[0]!.path);
 
   const samples: LoadSample[] = [];
   const started = new Date();
   const end = started.getTime() + input.durationMs;
   const rampMs = Math.min(Math.max(0, input.rampMs), input.durationMs);
   const journey = `${input.tag}-${input.scenario}`;
+  const lockAt = started.getTime() + input.durationMs * LOADTEST_PICKEM_LOCK_FRACTION;
+
+  let restoreSchedule: { opensAt: Date; showStartsAt: Date } | null = null;
+  if (input.scenario === "pickem" && !input.skipRepair) {
+    const db = createDb(input.databaseUrl);
+    const current = await getTgaYear(LOADTEST_TGA_YEAR, db);
+    if (current?.opensAt && current.showStartsAt) {
+      restoreSchedule = {
+        opensAt: current.opensAt,
+        showStartsAt: current.showStartsAt,
+      };
+    }
+    await repairLoadtestTgaYear(db, {
+      year: LOADTEST_TGA_YEAR,
+      phase: "open",
+      communityId: input.fixtures.communityId,
+    });
+  }
 
   const readers = Array.from({ length: input.vusRead }, async (_, i) => {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
     if (delay > 0) await sleep(delay);
     while (Date.now() < end) {
-      const item = pickWeighted(gets);
+      const item = pickWeighted(
+        pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
+      );
       const path = item.pickSearch
         ? loadGamesSearchPath(item.pickSearch, input.fixtures)
         : item.pickGame
@@ -251,7 +273,7 @@ async function runScenario(input: {
 
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
     const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
-    if (!slot?.cookie || !input.secret || writes.length === 0) return;
+    if (!slot?.cookie || !input.secret || writesOpen.length === 0) return;
     const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
     if (delay > 0) await sleep(delay);
 
@@ -294,7 +316,9 @@ async function runScenario(input: {
     };
 
     while (Date.now() < end) {
-      const item = pickWeighted(writes);
+      const item = pickWeighted(
+        pickemPhaseRef.phase === "locked" ? writesLocked : writesOpen,
+      );
       await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), false);
       const games =
         item.op === "list-create" ||
@@ -315,7 +339,7 @@ async function runScenario(input: {
           ? listDraft
             ? listWriteJsonBody(item.op, listDraft)
             : null
-          : writeBody(item.op, input.fixtures);
+          : writeBody(item.op, input.fixtures, i);
         if (!body) continue;
         const recorded =
           item.op === "list-delete" && listDraft
@@ -350,7 +374,30 @@ async function runScenario(input: {
     }
   });
 
-  await Promise.all([...readers, ...writerLoops]);
+  const lockPickem = (async () => {
+    if (input.scenario !== "pickem") return;
+    const wait = lockAt - Date.now();
+    if (wait > 0) await sleep(wait);
+    pickemPhaseRef.phase = "locked";
+    if (input.skipRepair) return;
+    await repairLoadtestTgaYear(createDb(input.databaseUrl), {
+      year: LOADTEST_TGA_YEAR,
+      phase: "locked",
+      communityId: input.fixtures.communityId,
+    });
+  })();
+
+  try {
+    await Promise.all([...readers, ...writerLoops, lockPickem]);
+  } finally {
+    if (restoreSchedule) {
+      await restoreLoadtestTgaSchedule(
+        createDb(input.databaseUrl),
+        LOADTEST_TGA_YEAR,
+        restoreSchedule,
+      );
+    }
+  }
   const ended = new Date();
   const stats: LoadRunStats = {
     scenario: input.scenario,
@@ -408,7 +455,8 @@ async function main() {
     throw new Error("LOADTEST_SECRET is required when --writers is set.");
   }
 
-  if (process.env.COST_LOAD_SKIP_REPAIR === "1") {
+  const skipRepair = process.env.COST_LOAD_SKIP_REPAIR === "1";
+  if (skipRepair) {
     console.log("cost-load: skipping phase repair");
   } else {
     await repairPhases(fixtures, target.databaseUrl);
@@ -428,6 +476,7 @@ async function main() {
       cookies: cookies.slice(0, args.writers),
       secret,
       tag,
+      skipRepair,
     });
   }
 }

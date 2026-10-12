@@ -10,8 +10,10 @@ export const LOADTEST_COMMUNITY = {
   joinsClosed: false,
 };
 
-export const LOADTEST_TGA_OPEN_YEAR = 2098;
-export const LOADTEST_TGA_LOCKED_YEAR = 2099;
+/** Real TGA slate on staging. The pickem load run opens it, then locks at halfway. */
+export const LOADTEST_TGA_YEAR = 2025;
+/** Leftover synthetic years from the old two-year mix. Purge may delete these. */
+export const LEGACY_LOADTEST_TGA_YEARS = [2098, 2099] as const;
 export const LOADTEST_EDITION_FILLING_YEAR = 2026;
 /** Same calendar year as QA showcase is fine: this is a different community. */
 export const LOADTEST_EDITION_RESULTS_YEAR = 2025;
@@ -22,8 +24,7 @@ export const LOADTEST_EMAIL_DOMAIN = "example.com";
 
 export const LOADTEST_SCENARIOS = [
   "general",
-  "pickem-open",
-  "pickem-locked",
+  "pickem",
   "editions-filling",
   "editions-results",
 ] as const;
@@ -32,6 +33,13 @@ export type LoadtestScenario = (typeof LOADTEST_SCENARIOS)[number];
 
 export function isLoadtestScenario(raw: string): raw is LoadtestScenario {
   return (LOADTEST_SCENARIOS as readonly string[]).includes(raw);
+}
+
+/** Old CLI names map onto the combined 2025 Pick’em run. */
+export function resolveLoadtestScenario(raw: string): LoadtestScenario | null {
+  if (raw === "pickem-open" || raw === "pickem-locked") return "pickem";
+  if (isLoadtestScenario(raw)) return raw;
+  return null;
 }
 
 export function loadtestAccount(index: number): {
@@ -125,6 +133,43 @@ export type LoadtestGame = {
   title?: string;
 };
 
+export type LoadtestTgaSlateCategory = {
+  id: string;
+  nomineeIds: string[];
+};
+
+/** One nominee per category so the sheet is complete. Rotates by writer. */
+export function completeLoadtestTgaPicks(
+  slate: LoadtestTgaSlateCategory[],
+  writerIndex: number,
+): Record<string, string> {
+  const picks: Record<string, string> = {};
+  const index = Math.max(0, Math.floor(writerIndex));
+  for (const category of slate) {
+    if (category.nomineeIds.length === 0) continue;
+    picks[category.id] =
+      category.nomineeIds[index % category.nomineeIds.length]!;
+  }
+  return picks;
+}
+
+export function loadtestTgaYearFromFixtures(
+  fixtures: Pick<LoadtestFixturesFile, "tgaYear" | "tgaOpenYear">,
+): number {
+  return fixtures.tgaYear ?? fixtures.tgaOpenYear ?? LOADTEST_TGA_YEAR;
+}
+
+export function loadtestTgaSlateFromFixtures(
+  fixtures: Pick<LoadtestFixturesFile, "tgaSlate" | "tgaPicks" | "tgaOpenPicks">,
+): LoadtestTgaSlateCategory[] {
+  if (fixtures.tgaSlate && fixtures.tgaSlate.length > 0) return fixtures.tgaSlate;
+  const picks = fixtures.tgaPicks ?? fixtures.tgaOpenPicks ?? {};
+  return Object.entries(picks).map(([id, nomineeId]) => ({
+    id,
+    nomineeIds: [nomineeId],
+  }));
+}
+
 /** Public custom list planted by ensure so readers can hit share URLs. */
 export type LoadtestShareList = {
   username: string;
@@ -141,10 +186,14 @@ export type LoadtestFixturesFile = {
   fillingYear: number;
   resultsYear: number;
   resultsCategoryId: string;
-  tgaOpenYear: number;
-  tgaLockedYear: number;
-  tgaOpenPicks: Record<string, string>;
-  tgaLockedPicks: Record<string, string>;
+  tgaYear: number;
+  tgaSlate: LoadtestTgaSlateCategory[];
+  /** Writer-0 complete sheet. Prefer `tgaSlate` + `completeLoadtestTgaPicks`. */
+  tgaPicks: Record<string, string>;
+  tgaOpenYear?: number;
+  tgaLockedYear?: number;
+  tgaOpenPicks?: Record<string, string>;
+  tgaLockedPicks?: Record<string, string>;
   game: { id: string; slug: string; igdbId: number };
   /** Catalog pool for list/library/GET rotation. Optional on older fixture files. */
   games?: LoadtestGame[];

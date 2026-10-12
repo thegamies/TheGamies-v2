@@ -9,8 +9,7 @@ describe("repairLoadtestTgaYear", () => {
         year: 2026,
         phase: "open",
         communityId: "c1",
-        gameId: "g1",
       }),
-    ).rejects.toThrow(/not a load-test year/);
+    ).rejects.toThrow(/not the load-test year/);
   });
 });

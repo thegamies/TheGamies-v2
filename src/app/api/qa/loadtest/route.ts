@@ -12,7 +12,7 @@ import { saveCommunitySheet } from "@/lib/tga-pickem/sheets";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import {
   LOADTEST_COMMUNITY,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
 } from "@/lib/qa/loadtest";
 import {
   authorizeLoadtestRequest,
@@ -145,9 +145,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  if (body.year !== LOADTEST_TGA_OPEN_YEAR) {
+  if (body.year !== LOADTEST_TGA_YEAR) {
     return NextResponse.json(
-      { error: "Pick’em writes only use the load-test open year." },
+      { error: "Pick’em writes only use the load-test TGA year." },
       { status: 400 },
     );
   }

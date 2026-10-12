@@ -5,8 +5,9 @@ import { slugifyCommunityName } from "@/lib/communities/schema";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import {
   LOADTEST_COMMUNITY,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
+  completeLoadtestTgaPicks,
+  resolveLoadtestScenario,
   LOADTEST_WRITERS_MAX,
   assertLoadtestFixturesSafe,
   isLoadtestEmail,
@@ -71,7 +72,37 @@ describe("loadtest schedules", () => {
     expect(open.showStartsAt.getTime()).toBeGreaterThan(now.getTime());
     const locked = loadtestTgaLockedSchedule(now);
     expect(locked.showStartsAt.getTime()).toBeLessThan(now.getTime());
-    expect(LOADTEST_TGA_OPEN_YEAR).not.toBe(LOADTEST_TGA_LOCKED_YEAR);
+    expect(LOADTEST_TGA_YEAR).toBe(2025);
+  });
+});
+
+describe("completeLoadtestTgaPicks", () => {
+  const slate = [
+    { id: "goty", nomineeIds: ["a", "b", "c"] },
+    { id: "indie", nomineeIds: ["x"] },
+  ];
+
+  it("fills every category and rotates nominees by writer", () => {
+    expect(completeLoadtestTgaPicks(slate, 0)).toEqual({
+      goty: "a",
+      indie: "x",
+    });
+    expect(completeLoadtestTgaPicks(slate, 1)).toEqual({
+      goty: "b",
+      indie: "x",
+    });
+    expect(completeLoadtestTgaPicks(slate, 3)).toEqual({
+      goty: "a",
+      indie: "x",
+    });
+  });
+});
+
+describe("resolveLoadtestScenario", () => {
+  it("maps the old open/locked names onto pickem", () => {
+    expect(resolveLoadtestScenario("pickem-open")).toBe("pickem");
+    expect(resolveLoadtestScenario("pickem-locked")).toBe("pickem");
+    expect(resolveLoadtestScenario("pickem")).toBe("pickem");
   });
 });
 

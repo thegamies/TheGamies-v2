@@ -18,8 +18,7 @@ import {
 } from "@/lib/auth/remove-neon-auth-user";
 import {
   LOADTEST_COMMUNITY,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LEGACY_LOADTEST_TGA_YEARS,
   LOADTEST_USERNAME_PREFIX,
   LOADTEST_WRITERS_MAX,
   loadtestAccount,
@@ -47,7 +46,7 @@ async function main() {
     .from(tgaYears)
     .where(eq(tgaYears.promoted, true))
     .limit(1);
-  const reserved = [LOADTEST_TGA_OPEN_YEAR, LOADTEST_TGA_LOCKED_YEAR].filter(
+  const reserved = LEGACY_LOADTEST_TGA_YEARS.filter(
     (year) => year !== promoted?.year,
   );
   if (reserved.length > 0) {

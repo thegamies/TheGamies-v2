@@ -1,70 +1,77 @@
 import { and, eq } from "drizzle-orm";
-import {
-  communityEditions,
-  tgaYears,
-  type Db,
-} from "@thegamies/db";
+import { communityEditions, type Db } from "@thegamies/db";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
 import { seedEditionCategories } from "@/lib/communities/edition-categories";
 import { computeEditionStatus } from "@/lib/communities/edition-status";
 import {
   createCommunityTgaYear,
-  createTgaCategory,
-  createTgaYear,
-  addGameNominee,
   getTgaYear,
   isCommunityTgaOptedIn,
   listTgaBallot,
   saveTgaSchedule,
   setTgaEnabled,
-  setTgaPromoted,
 } from "@/lib/tga-pickem/service";
 import { computeTgaStatus } from "@/lib/tga-pickem/status";
 import {
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
+  completeLoadtestTgaPicks,
   loadtestEditionOpenSchedule,
   loadtestTgaLockedSchedule,
   loadtestTgaOpenSchedule,
+  type LoadtestTgaSlateCategory,
 } from "@/lib/qa/loadtest";
 
-async function firstBallotPicks(year: number, db: Db): Promise<Record<string, string>> {
-  const ballot = await listTgaBallot(year, db);
-  const picks: Record<string, string> = {};
-  for (const category of ballot) {
-    const nominee = category.nominees[0];
-    if (nominee) picks[category.id] = nominee.id;
+export async function snapshotLoadtestTgaSlate(
+  db: Db,
+  year: number = LOADTEST_TGA_YEAR,
+): Promise<LoadtestTgaSlateCategory[]> {
+  if (year !== LOADTEST_TGA_YEAR) {
+    throw new Error("Refusing to repair a TGA year that is not the load-test year.");
   }
-  return picks;
+  const current = await getTgaYear(year, db);
+  if (!current) {
+    throw new Error(`TGA ${year} is missing; Pick’em load uses the real slate.`);
+  }
+  const ballot = await listTgaBallot(year, db);
+  const slate = ballot.map((category) => ({
+    id: category.id,
+    nomineeIds: category.nominees.map((nominee) => nominee.id),
+  }));
+  if (slate.length === 0 || slate.every((row) => row.nomineeIds.length === 0)) {
+    throw new Error(`TGA ${year} has no nominees to fill.`);
+  }
+  return slate;
 }
 
-async function ensureSlate(
-  year: number,
-  gameId: string,
+export async function attachLoadtestTgaCommunity(
   db: Db,
-): Promise<void> {
-  let current = await getTgaYear(year, db);
-  if (!current) {
-    const created = await createTgaYear(year, db);
-    if ("error" in created) throw new Error(`TGA ${year}: ${created.error}`);
-    current = await getTgaYear(year, db);
+  input: { year: number; communityId: string },
+): Promise<{
+  slate: LoadtestTgaSlateCategory[];
+  picks: Record<string, string>;
+}> {
+  const { year, communityId } = input;
+  const slate = await snapshotLoadtestTgaSlate(db, year);
+  const enabled = await setTgaEnabled(year, true, db);
+  if ("error" in enabled) throw new Error(`TGA ${year}: ${enabled.error}`);
+  const opted = await isCommunityTgaOptedIn(communityId, year, db);
+  if (!opted) {
+    const join = await createCommunityTgaYear(communityId, year, db);
+    if ("error" in join) throw new Error(`TGA ${year}: ${join.error}`);
   }
-  if (!current) throw new Error(`TGA ${year}: missing after create`);
+  return { slate, picks: completeLoadtestTgaPicks(slate, 0) };
+}
 
-  const ballot = await listTgaBallot(year, db);
-  if (ballot.length === 0) {
-    const category = await createTgaCategory(
-      year,
-      { label: "Game of the Year", kind: "game" },
-      db,
-    );
-    if ("error" in category) throw new Error(`TGA ${year}: ${category.error}`);
-    const nominee = await addGameNominee(year, category.id, gameId, db);
-    if ("error" in nominee) throw new Error(`TGA ${year}: ${nominee.error}`);
-  } else if (ballot.every((row) => row.nominees.length === 0)) {
-    const nominee = await addGameNominee(year, ballot[0]!.id, gameId, db);
-    if ("error" in nominee) throw new Error(`TGA ${year}: ${nominee.error}`);
+export async function restoreLoadtestTgaSchedule(
+  db: Db,
+  year: number,
+  schedule: { opensAt: Date; showStartsAt: Date },
+): Promise<void> {
+  if (year !== LOADTEST_TGA_YEAR) {
+    throw new Error("Refusing to repair a TGA year that is not the load-test year.");
   }
+  const saved = await saveTgaSchedule(year, schedule, db);
+  if ("error" in saved) throw new Error(`TGA ${year}: ${saved.error}`);
 }
 
 export async function repairLoadtestTgaYear(
@@ -73,51 +80,25 @@ export async function repairLoadtestTgaYear(
     year: number;
     phase: "open" | "locked";
     communityId: string;
-    gameId: string;
     now?: Date;
   },
-): Promise<Record<string, string>> {
-  const { year, phase, communityId, gameId } = input;
+): Promise<{
+  slate: LoadtestTgaSlateCategory[];
+  picks: Record<string, string>;
+}> {
+  const { year, phase, communityId } = input;
   const now = input.now ?? new Date();
-  if (year !== LOADTEST_TGA_OPEN_YEAR && year !== LOADTEST_TGA_LOCKED_YEAR) {
-    throw new Error("Refusing to repair a TGA year that is not a load-test year.");
-  }
+  const attached = await attachLoadtestTgaCommunity(db, { year, communityId });
 
-  const promoted = await db
-    .select({ year: tgaYears.year, promoted: tgaYears.promoted })
-    .from(tgaYears)
-    .where(eq(tgaYears.promoted, true))
-    .limit(1);
-  if (promoted[0] && promoted[0].year === year) {
-    const demoted = await setTgaPromoted(year, false, db);
-    if ("error" in demoted) throw new Error(`TGA ${year}: ${demoted.error}`);
-  }
-
-  await ensureSlate(year, gameId, db);
-
-  const openSchedule = loadtestTgaOpenSchedule(now);
-  let saved = await saveTgaSchedule(year, openSchedule, db);
+  const schedule =
+    phase === "locked"
+      ? loadtestTgaLockedSchedule(now)
+      : loadtestTgaOpenSchedule(now);
+  const saved = await saveTgaSchedule(year, schedule, db);
   if ("error" in saved) throw new Error(`TGA ${year}: ${saved.error}`);
-
-  const enabled = await setTgaEnabled(year, true, db);
-  if ("error" in enabled) throw new Error(`TGA ${year}: ${enabled.error}`);
-
-  const opted = await isCommunityTgaOptedIn(communityId, year, db);
-  if (!opted) {
-    const join = await createCommunityTgaYear(communityId, year, db);
-    if ("error" in join) throw new Error(`TGA ${year}: ${join.error}`);
-  }
-
-  if (phase === "locked") {
-    saved = await saveTgaSchedule(year, loadtestTgaLockedSchedule(now), db);
-    if ("error" in saved) throw new Error(`TGA ${year}: ${saved.error}`);
-  }
 
   const after = await getTgaYear(year, db);
   if (!after) throw new Error(`TGA ${year}: missing after repair`);
-  if (after.promoted) {
-    throw new Error(`TGA ${year}: load-test year must not be promoted`);
-  }
   const status = computeTgaStatus(after, now);
   if (phase === "open" && status !== "open") {
     throw new Error(`TGA ${year}: expected open, got ${status}`);
@@ -125,7 +106,7 @@ export async function repairLoadtestTgaYear(
   if (phase === "locked" && status !== "locked") {
     throw new Error(`TGA ${year}: expected locked, got ${status}`);
   }
-  return firstBallotPicks(year, db);
+  return attached;
 }
 
 export async function repairLoadtestOpenEdition(

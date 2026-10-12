@@ -1,7 +1,8 @@
 /**
  * Idempotently create load-test accounts, gamies_qa_load, one public custom
- * share list per account, open + published editions, and reserved TGA years.
- * Never touches QA showcase or the promoted TGA year. Refuses production.
+ * share list per account, open + published editions, and opt the load
+ * community into TGA 2025. Does not change the 2025 show schedule (the load
+ * runner does that). Never touches QA showcase. Refuses production.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -35,8 +36,7 @@ import {
   LOADTEST_EDITION_FILLING_YEAR,
   LOADTEST_EDITION_RESULTS_YEAR,
   LOADTEST_POPULAR_POOL,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
   LOADTEST_UNPOPULAR_POOL,
   loadtestAccount,
   loadtestEditionOpenSchedule,
@@ -47,8 +47,8 @@ import {
 } from "@/lib/qa/loadtest";
 import { ensureLoadtestShareList } from "@/lib/qa/loadtest-share-lists";
 import {
+  attachLoadtestTgaCommunity,
   repairLoadtestOpenEdition,
-  repairLoadtestTgaYear,
 } from "@/lib/qa/loadtest-repair";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
@@ -437,19 +437,11 @@ async function main() {
   const [categoryId] = await listEditionEnabledCategoryIds(published.id, db);
   if (!categoryId) throw new Error("Published edition has no categories");
 
-  const tgaOpenPicks = await repairLoadtestTgaYear(db, {
-    year: LOADTEST_TGA_OPEN_YEAR,
-    phase: "open",
+  const tga = await attachLoadtestTgaCommunity(db, {
+    year: LOADTEST_TGA_YEAR,
     communityId,
-    gameId: game.id,
   });
-  const tgaLockedPicks = await repairLoadtestTgaYear(db, {
-    year: LOADTEST_TGA_LOCKED_YEAR,
-    phase: "locked",
-    communityId,
-    gameId: game.id,
-  });
-  log("TGA load years ready");
+  log("TGA 2025 slate attached");
 
   const outDir = path.resolve("e2e/.auth/loadtest");
   await mkdir(outDir, { recursive: true });
@@ -459,10 +451,9 @@ async function main() {
     fillingYear: LOADTEST_EDITION_FILLING_YEAR,
     resultsYear: LOADTEST_EDITION_RESULTS_YEAR,
     resultsCategoryId: categoryId,
-    tgaOpenYear: LOADTEST_TGA_OPEN_YEAR,
-    tgaLockedYear: LOADTEST_TGA_LOCKED_YEAR,
-    tgaOpenPicks,
-    tgaLockedPicks,
+    tgaYear: LOADTEST_TGA_YEAR,
+    tgaSlate: tga.slate,
+    tgaPicks: tga.picks,
     game: { id: game.id, slug: game.slug, igdbId: game.igdbId },
     games: catalogGames.length > 0 ? catalogGames : ballotGames,
     ballotGames,

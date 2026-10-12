@@ -35,12 +35,26 @@ describe("parseLoadArgs", () => {
       writers: 50,
     });
     if ("error" in parsed) throw new Error(parsed.error);
-    expect(parsed.scenarios).toHaveLength(5);
+    expect(parsed.scenarios).toEqual([
+      "general",
+      "pickem",
+      "editions-filling",
+      "editions-results",
+    ]);
   });
 
   it("refuses unknown scenarios and over-cap writers", () => {
     expect(parseLoadArgs(["--scenario", "prod"])).toHaveProperty("error");
     expect(parseLoadArgs(["--writers", "101"])).toHaveProperty("error");
+  });
+
+  it("treats pickem-open and pickem-locked as the combined pickem run", () => {
+    expect(parseLoadArgs(["--scenario", "pickem-open"])).toMatchObject({
+      scenarios: ["pickem"],
+    });
+    expect(parseLoadArgs(["--scenario", "pickem-locked"])).toMatchObject({
+      scenarios: ["pickem"],
+    });
   });
 
   it("parses --ramp 0 for an all-at-once start", () => {

@@ -3,17 +3,17 @@ import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import {
   LOADTEST_COMMUNITY,
   LOADTEST_SHARE_LIST_SLUG,
-  LOADTEST_TGA_LOCKED_YEAR,
-  LOADTEST_TGA_OPEN_YEAR,
+  LOADTEST_TGA_YEAR,
   loadtestAccount,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
 import {
   buildLoadGets,
   buildLoadWrites,
-  mixUsesPromotedTgaYear,
+  mixUsesUnexpectedTgaYear,
   mixUsesShowcaseSlug,
   loadShareListPath,
+  pickemPhaseAt,
   pickLoadtestGotyCategory,
   pickLoadtestUsername,
   pickWeighted,
@@ -25,8 +25,7 @@ const urls = {
   fillingYear: 2026,
   resultsYear: 2025,
   resultsCategoryId: "cat1",
-  tgaOpenYear: LOADTEST_TGA_OPEN_YEAR,
-  tgaLockedYear: LOADTEST_TGA_LOCKED_YEAR,
+  tgaYear: LOADTEST_TGA_YEAR,
   game: { id: "g1", slug: "hades", igdbId: 99 },
   writerCount: 10,
   lists: [
@@ -45,8 +44,7 @@ const urls = {
 
 const scenarios: LoadtestScenario[] = [
   "general",
-  "pickem-open",
-  "pickem-locked",
+  "pickem",
   "editions-filling",
   "editions-results",
 ];
@@ -95,19 +93,32 @@ describe("buildLoadGets", () => {
     expect(browse?.weight).toBeGreaterThan(0);
   });
 
-  it("uses reserved TGA years, not the current show year", () => {
-    const open = buildLoadGets("pickem-open", urls);
-    expect(open.some((item) => item.path.includes(String(LOADTEST_TGA_OPEN_YEAR)))).toBe(
+  it("uses the 2025 Pick’em year for ballot then standings", () => {
+    const open = buildLoadGets("pickem", urls, "open");
+    expect(open.some((item) => item.path.includes(`/the-game-awards/${LOADTEST_TGA_YEAR}`))).toBe(
       true,
     );
-    expect(mixUsesPromotedTgaYear(open)).toBe(false);
-    const locked = buildLoadGets("pickem-locked", urls);
-    expect(
-      locked.some((item) => item.path.includes(String(LOADTEST_TGA_LOCKED_YEAR))),
-    ).toBe(true);
-    expect(locked.some((item) => item.path.includes(String(LOADTEST_TGA_OPEN_YEAR)))).toBe(
-      false,
+    expect(mixUsesUnexpectedTgaYear(open)).toBe(false);
+    const openStandings = open.filter((item) => item.path.includes("view=standings"));
+    const openBallot = open.filter(
+      (item) => item.group === "pickem" && !item.path.includes("view=standings"),
     );
+    const openBallotWeight = openBallot.reduce((sum, item) => sum + item.weight, 0);
+    const openStandingsWeight = openStandings.reduce((sum, item) => sum + item.weight, 0);
+    expect(openBallotWeight).toBeGreaterThan(openStandingsWeight);
+
+    const locked = buildLoadGets("pickem", urls, "locked");
+    const lockedStandings = locked.filter((item) =>
+      item.path.includes("view=standings"),
+    );
+    const lockedStandingsWeight = lockedStandings.reduce(
+      (sum, item) => sum + item.weight,
+      0,
+    );
+    const lockedBallotWeight = locked
+      .filter((item) => item.group === "pickem" && !item.path.includes("view=standings"))
+      .reduce((sum, item) => sum + item.weight, 0);
+    expect(lockedStandingsWeight).toBeGreaterThan(lockedBallotWeight);
   });
 
   it("does not point at the QA showcase community", () => {
@@ -122,8 +133,8 @@ describe("buildLoadGets", () => {
 });
 
 describe("buildLoadWrites", () => {
-  it("omits pickem and ballot writes on locked results", () => {
-    expect(buildLoadWrites("pickem-locked").map((item) => item.op)).toEqual([
+  it("omits pickem writes after lock and ballot writes on results", () => {
+    expect(buildLoadWrites("pickem", "locked").map((item) => item.op)).toEqual([
       "list-create",
       "list-edit",
       "list-reorder",
@@ -137,12 +148,20 @@ describe("buildLoadWrites", () => {
       "list-delete",
       "library",
     ]);
-    expect(buildLoadWrites("pickem-open").some((item) => item.op === "pickem")).toBe(
+    expect(buildLoadWrites("pickem", "open").some((item) => item.op === "pickem")).toBe(
       true,
     );
     expect(
       buildLoadWrites("editions-filling").some((item) => item.op === "ballot"),
     ).toBe(true);
+  });
+});
+
+describe("pickemPhaseAt", () => {
+  it("flips to locked at halfway", () => {
+    expect(pickemPhaseAt(0, 90_000)).toBe("open");
+    expect(pickemPhaseAt(44_999, 90_000)).toBe("open");
+    expect(pickemPhaseAt(45_000, 90_000)).toBe("locked");
   });
 });
 
