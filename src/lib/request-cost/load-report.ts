@@ -79,6 +79,8 @@ export type LoadLatencySummary = {
   wall: LoadMsBand | null;
   db: LoadMsBand | null;
   dbSpan: LoadMsBand | null;
+  /** Mean Postgres exec per successful request (statement mean × trips). */
+  cpuMs: number | null;
 };
 
 /** Share of `totalMs` as a percentage string (`12.4%`). */
@@ -143,9 +145,47 @@ function formatMsBand(band: LoadMsBand): string {
   return `p50 ${band.p50} ms · p90 ${band.p90} ms · p95 ${band.p95} ms · p99 ${band.p99} ms`;
 }
 
+export function sampleEstimatedExecMs(
+  sample: LoadSample,
+  pgRows: PgStatDeltaRow[],
+): number | null {
+  if (pgRows.length === 0 || !sample.trips?.length) return null;
+  let sum = 0;
+  let matched = 0;
+  for (const trip of sample.trips) {
+    const exec = attachPgExecToTripSql(trip.sql, pgRows);
+    if (!exec) continue;
+    matched += 1;
+    sum += exec.meanMs;
+  }
+  if (matched === 0) return null;
+  return sum;
+}
+
+export function meanEstimatedExecMs(
+  samples: LoadSample[],
+  pgRows: PgStatDeltaRow[],
+): number | null {
+  const values: number[] = [];
+  for (const sample of samples) {
+    if (!sample.ok) continue;
+    const execMs = sampleEstimatedExecMs(sample, pgRows);
+    if (execMs == null) continue;
+    values.push(execMs);
+  }
+  if (values.length === 0) return null;
+  return values.reduce((sum, ms) => sum + ms, 0) / values.length;
+}
+
+function formatCpuPerReq(cpuMs: number | null): string {
+  if (cpuMs == null) return "";
+  return ` · cpu ${cpuMs.toFixed(1)} ms/req`;
+}
+
 export function latencySummary(
   samples: LoadSample[],
   label = "all",
+  pgRows: PgStatDeltaRow[] = [],
 ): LoadLatencySummary {
   const latencies = samples.map((s) => s.ms).sort((a, b) => a - b);
   const client = msBand(latencies);
@@ -161,6 +201,7 @@ export function latencySummary(
     wall: optionalMsBand(samples, "wallMs"),
     db: optionalMsBand(samples, "dbMs"),
     dbSpan: optionalMsBand(samples, "dbSpanMs"),
+    cpuMs: meanEstimatedExecMs(samples, pgRows),
   };
 }
 
@@ -236,6 +277,7 @@ export function loadStepFamily(step: string): string {
 export function partitionLoadSamples(
   samples: LoadSample[],
   key: "group" | "step" | "status" | "family",
+  pgRows: PgStatDeltaRow[] = [],
 ): LoadLatencySummary[] {
   const buckets = new Map<string, LoadSample[]>();
   for (const sample of samples) {
@@ -255,29 +297,40 @@ export function partitionLoadSamples(
   } else {
     labels.sort((a, b) => a.localeCompare(b));
   }
-  return labels.map((label) => latencySummary(buckets.get(label) ?? [], label));
+  return labels.map((label) =>
+    latencySummary(buckets.get(label) ?? [], label, pgRows),
+  );
 }
 
 function summaryLines(rows: LoadLatencySummary[], totalMs: number): string {
   return rows
     .map(
       (row) =>
-        `- ${row.label}: ${row.n} · ${formatTimeSharePct(row.sumMs, totalMs)} time · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
+        `- ${row.label}: ${row.n} · ${formatTimeSharePct(row.sumMs, totalMs)} time${formatCpuPerReq(row.cpuMs)} · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
     )
     .join("\n");
 }
 
 export function formatLoadReport(stats: LoadRunStats): string {
   const { samples } = stats;
-  const all = latencySummary(samples);
+  const pgRows = stats.pgExec?.ok ? stats.pgExec.rows : [];
+  const all = latencySummary(samples, "all", pgRows);
   const elapsedSec = Math.max(0.001, stats.durationMs / 1000);
   const rps = samples.length / elapsedSec;
-  const groupLines = summaryLines(partitionLoadSamples(samples, "group"), all.sumMs);
-  const stepLines = summaryLines(partitionLoadSamples(samples, "family"), all.sumMs);
-  const statusLines = summaryLines(partitionLoadSamples(samples, "status"), all.sumMs);
+  const groupLines = summaryLines(
+    partitionLoadSamples(samples, "group", pgRows),
+    all.sumMs,
+  );
+  const stepLines = summaryLines(
+    partitionLoadSamples(samples, "family", pgRows),
+    all.sumMs,
+  );
+  const statusLines = summaryLines(
+    partitionLoadSamples(samples, "status", pgRows),
+    all.sumMs,
+  );
   const tripRows = summarizeLoadTrips(samples);
   const tripTotal = tripRows.reduce((sum, row) => sum + row.sumMs, 0);
-  const pgRows = stats.pgExec?.ok ? stats.pgExec.rows : [];
   const pgTotal = pgRows.reduce((sum, row) => sum + row.totalMs, 0);
   const tripLines = tripRows
     .slice(0, 25)
@@ -337,7 +390,7 @@ Copy the UTC window into Neon CU-hours and Cloudflare Worker CPU for \`thegamies
 - Errors: ${all.errors}
 - RPS: ${rps.toFixed(2)}
 - Client ${formatMsBand(all)} · max ${all.max} ms
-${all.wall ? `- Worker wall ${formatMsBand(all.wall)} · max ${all.wall.max} ms\n` : ""}${all.dbSpan ? `- Neon db clock ${formatMsBand(all.dbSpan)} · max ${all.dbSpan.max} ms (overlap union)\n` : ""}${all.db ? `- Neon db sum ${formatMsBand(all.db)} · max ${all.db.max} ms (work; parallel trips add)\n` : ""}
+${all.wall ? `- Worker wall ${formatMsBand(all.wall)} · max ${all.wall.max} ms\n` : ""}${all.dbSpan ? `- Neon db clock ${formatMsBand(all.dbSpan)} · max ${all.dbSpan.max} ms (overlap union)\n` : ""}${all.db ? `- Neon db sum ${formatMsBand(all.db)} · max ${all.db.max} ms (work; parallel trips add)\n` : ""}${all.cpuMs != null ? `- Neon CPU ${all.cpuMs.toFixed(1)} ms/req (Postgres exec; statement mean × trips on each request)\n` : ""}
 
 ## By group
 

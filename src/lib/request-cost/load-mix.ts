@@ -155,7 +155,7 @@ function generalGets(urls: LoadMixUrls): LoadGetItem[] {
       group: "general",
       method: "GET",
       path: "/api/games/search",
-      weight: 2,
+      weight: 4,
       pickSearch: "api",
     },
     {

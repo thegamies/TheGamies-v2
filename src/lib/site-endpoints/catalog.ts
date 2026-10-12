@@ -103,7 +103,7 @@ function cacheHints(input: SiteEndpointInput): Pick<
       cacheEase: 2,
       cacheComplexity: 3,
       cacheNotes:
-        "SQL title search, LIMIT page+1, no COUNT(*). Do not cache unique q= keys.",
+        "Same cachedBrowseGames helper as typeahead (Workers Cache 5 min, q + filters + page size/offset + catalog count). HTML chrome stays live. Unique q= is still a weak load-mix / R2 target.",
     },
     "/games/:slug": {
       cacheEase: 4,
@@ -115,7 +115,7 @@ function cacheHints(input: SiteEndpointInput): Pick<
       cacheEase: 2,
       cacheComplexity: 3,
       cacheNotes:
-        "Workers Cache 5 min, keyed by q + filters + site_settings.catalog_game_count (colo-local). Unique q= is still a weak load-mix / R2 target.",
+        "cachedBrowseGames: Workers Cache 5 min, keyed by q + filters + limit/offset + site_settings.catalog_game_count (colo-local). Unique q= is still a weak load-mix / R2 target.",
     },
     "/game-of-the-year": {
       cacheEase: 3,

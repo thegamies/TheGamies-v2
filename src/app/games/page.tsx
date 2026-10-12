@@ -26,6 +26,7 @@ import {
   countBrowseGames,
   sliceSearchPage,
 } from "@/lib/catalog";
+import { cachedBrowseGames } from "@/lib/catalog/game-search-cache";
 import { followsAnyone } from "@/lib/follow/service";
 import { paginateProfileItems, parseProfilePage } from "@/lib/profile/profile-page";
 import { SiteAds } from "@/components/ads/AdsLayout";
@@ -270,7 +271,7 @@ async function GamesCatalogGrid({
   try {
     if (searching) {
       page = Math.max(1, Math.floor(pageRaw) || 1);
-      const rows = await browseGames({
+      const rows = await cachedBrowseGames({
         ...filters,
         limit: GAMES_BROWSE_PAGE_SIZE + 1,
         offset: (page - 1) * GAMES_BROWSE_PAGE_SIZE,

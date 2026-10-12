@@ -235,7 +235,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     </div>
     <div class="legend" id="legend"></div>
     <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.35rem">Endpoints</h2>
-    <p class="meta"><strong>% time</strong> is this row’s share of summed client round-trip time in the current filter (adds to 100%). Click a column header to sort.</p>
+    <p class="meta"><strong>% time</strong> is this row’s share of summed client round-trip time in the current filter (adds to 100%). <strong>Neon CPU</strong> is mean Postgres exec per successful request (statement mean × trips on that URL — not Worker wait). Click a column header to sort.</p>
     <div class="table-scroll">
     <table>
       <thead id="slice-head"></thead>
@@ -640,15 +640,6 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
       const rows = filtered();
       const s = summary(rows);
       const rps = (rows.length / Math.max(0.001, DATA.durationMs / 1000)).toFixed(2);
-      document.getElementById("stats").innerHTML =
-        stat("Requests", s.n.toLocaleString()) +
-        stat("Success", s.ok.toLocaleString()) +
-        stat("Errors", s.errors.toLocaleString()) +
-        stat("RPS", rps) +
-        bandStats("client", s.client) +
-        bandStats("wall", s.wall) +
-        bandStats("db clock", s.dbSpan) +
-        bandStats("db sum", s.db);
       const cap = Math.max(s.client.p95 * 1.5, 200);
       const buckets = Array(24).fill(0);
       for (const r of rows) {
@@ -661,6 +652,66 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         .join("");
       document.getElementById("hist-max").textContent = Math.round(cap) + " ms";
       drawTimeline(rows);
+      const pgRows = DATA.pgExec && DATA.pgExec.ok && DATA.pgExec.rows ? DATA.pgExec.rows : [];
+      const pgTotal = pgRows.reduce((acc, row) => acc + (row.totalMs || 0), 0);
+      function attachExec(sql) {
+        let calls = 0;
+        let totalMs = 0;
+        const used = new Set();
+        for (const row of pgRows) {
+          if (used.has(row.queryid)) continue;
+          const fp = row.fingerprint;
+          if (sql === fp || String(sql).split(" | ").indexOf(fp) >= 0) {
+            used.add(row.queryid);
+            calls += row.calls;
+            totalMs += row.totalMs;
+          }
+        }
+        if (calls <= 0) return { execN: 0, execMean: 0, execTotal: 0, execPct: 0 };
+        return {
+          execN: calls,
+          execMean: totalMs / calls,
+          execTotal: totalMs,
+          execPct: timePct(totalMs, pgTotal),
+        };
+      }
+      function requestCpu(r) {
+        if (r[2] >= 400) return null;
+        const trips = r[8] || [];
+        if (!trips.length) return null;
+        let sum = 0;
+        let matched = 0;
+        for (const pair of trips) {
+          const sql = DATA.queries[pair[0]] || "";
+          const exec = attachExec(sql);
+          if (!exec.execN) continue;
+          matched += 1;
+          sum += exec.execMean;
+        }
+        return matched ? sum : null;
+      }
+      function meanCpu(list) {
+        let sum = 0;
+        let n = 0;
+        for (const r of list) {
+          const cpu = requestCpu(r);
+          if (cpu == null) continue;
+          sum += cpu;
+          n += 1;
+        }
+        return n ? sum / n : null;
+      }
+      const cpuMs = meanCpu(rows);
+      document.getElementById("stats").innerHTML =
+        stat("Requests", s.n.toLocaleString()) +
+        stat("Success", s.ok.toLocaleString()) +
+        stat("Errors", s.errors.toLocaleString()) +
+        stat("RPS", rps) +
+        bandStats("client", s.client) +
+        bandStats("wall", s.wall) +
+        bandStats("db clock", s.dbSpan) +
+        bandStats("db sum", s.db) +
+        (cpuMs == null ? "" : stat("Neon CPU / req", cpuMs.toFixed(1) + " ms"));
       const by = new Map();
       for (const r of rows) {
         const k = rowKey(r);
@@ -677,6 +728,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
             label: k,
             n: sl.n,
             timePct: timePct(sumCol(list, 3), clientTotal),
+            cpuMs: meanCpu(list),
             client: sl.client,
             wall: sl.wall,
             dbSpan: sl.dbSpan,
@@ -697,6 +749,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         "<th rowspan=\\"2\\" class=\\"num sort\\" data-table=\\"slice\\" data-key=\\"timePct\\" aria-sort=\\"" +
         ariaSort("slice", "timePct") +
         "\\">% time</th>" +
+        "<th rowspan=\\"2\\" class=\\"num sort\\" data-table=\\"slice\\" data-key=\\"cpuMs\\" aria-sort=\\"" +
+        ariaSort("slice", "cpuMs") +
+        "\\">Neon CPU</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Client</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Wall</th>" +
         "<th class=\\"group\\" colspan=\\"" + pctColspan() + "\\">Db clock</th>" +
@@ -719,6 +774,8 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 sl.n +
                 "</td><td class=\\"num\\">" +
                 formatTimePct(sl.timePct) +
+                "</td><td class=\\"num\\">" +
+                (sl.cpuMs == null ? "—" : sl.cpuMs.toFixed(1) + " ms") +
                 "</td>" +
                 pctCells(sl.client) +
                 pctCells(sl.wall) +
@@ -728,7 +785,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
               );
             })
             .join("")
-        : "<tr><td class=\\"empty\\" colspan=\\"" + (3 + pctColspan() * 4) + "\\">No requests in this filter.</td></tr>";
+        : "<tr><td class=\\"empty\\" colspan=\\"" + (4 + pctColspan() * 4) + "\\">No requests in this filter.</td></tr>";
       const tripMs = new Map();
       let tripTotal = 0;
       for (const r of rows) {
@@ -739,29 +796,6 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
           else tripMs.set(sql, [pair[1]]);
           if (typeof pair[1] === "number" && pair[1] > 0) tripTotal += pair[1];
         }
-      }
-      const pgRows = DATA.pgExec && DATA.pgExec.ok && DATA.pgExec.rows ? DATA.pgExec.rows : [];
-      const pgTotal = pgRows.reduce((acc, row) => acc + (row.totalMs || 0), 0);
-      function attachExec(sql) {
-        let calls = 0;
-        let totalMs = 0;
-        const used = new Set();
-        for (const row of pgRows) {
-          if (used.has(row.queryid)) continue;
-          const fp = row.fingerprint;
-          if (sql === fp || String(sql).split(" | ").indexOf(fp) >= 0) {
-            used.add(row.queryid);
-            calls += row.calls;
-            totalMs += row.totalMs;
-          }
-        }
-        if (calls <= 0) return { execN: 0, execMean: 0, execTotal: 0, execPct: 0 };
-        return {
-          execN: calls,
-          execMean: Math.round(totalMs / calls),
-          execTotal: Math.round(totalMs),
-          execPct: timePct(totalMs, pgTotal),
-        };
       }
       const tripRows = sortRows(
         [...tripMs.keys()].map((sql) => {
@@ -801,7 +835,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 "</td><td class=\\"num\\">" +
                 (t.execN ? t.execN : "—") +
                 "</td><td class=\\"num\\">" +
-                (t.execN ? t.execMean : "—") +
+                (t.execN ? Math.round(t.execMean) : "—") +
                 "</td><td class=\\"num\\">" +
                 (t.execN ? formatTimePct(t.execPct) : "—") +
                 "</td>" +

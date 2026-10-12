@@ -87,6 +87,14 @@ describe("buildLoadGets", () => {
     }
   });
 
+  it("weights hub search and typeahead the same", () => {
+    const gets = buildLoadGets("general", urls);
+    const browse = gets.find((item) => item.pickSearch === "browse");
+    const api = gets.find((item) => item.pickSearch === "api");
+    expect(browse?.weight).toBe(api?.weight);
+    expect(browse?.weight).toBeGreaterThan(0);
+  });
+
   it("uses reserved TGA years, not the current show year", () => {
     const open = buildLoadGets("pickem-open", urls);
     expect(open.some((item) => item.path.includes(String(LOADTEST_TGA_OPEN_YEAR)))).toBe(

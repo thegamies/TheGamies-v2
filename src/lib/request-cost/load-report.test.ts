@@ -125,6 +125,9 @@ describe("formatLoadReport", () => {
     });
     expect(md).toContain("exec 333");
     expect(md).toContain("100.0% exec");
+    expect(md).toContain("cpu ");
+    expect(md).toContain("ms/req");
+    expect(md).toContain("Neon CPU");
     expect(md).toContain("(all exec rows matched a trip fingerprint)");
   });
 

@@ -36,6 +36,7 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain('data-table');
     expect(html).toContain("p99");
     expect(html).toContain("Db clock");
+    expect(html).toContain("Neon CPU");
     expect(html).toContain("select count(*) from games");
     expect(html).toContain('id="trips"');
     expect(html).toContain("% time");
