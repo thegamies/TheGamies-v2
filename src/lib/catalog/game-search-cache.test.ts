@@ -61,7 +61,7 @@ describe("gameSearchCacheRequest", () => {
         {
           q: "Hades",
           year: 2026,
-          sort: "title",
+          sort: "name",
           sortDir: "asc",
           releaseStatus: "released",
           excludeEditions: true,
@@ -75,7 +75,7 @@ describe("gameSearchCacheRequest", () => {
     ).url;
     expect(url).toContain("count=374123");
     expect(url).toContain("year=2026");
-    expect(url).toContain("sort=title");
+    expect(url).toContain("sort=name");
     expect(url).toContain("dir=asc");
     expect(url).toContain("rs=released");
     expect(url).toContain("goty=1");
