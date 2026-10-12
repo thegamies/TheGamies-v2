@@ -115,7 +115,7 @@ function cacheHints(input: SiteEndpointInput): Pick<
       cacheEase: 2,
       cacheComplexity: 3,
       cacheNotes:
-        "Same as browse search: unbounded keys. Typeahead is a poor R2 target.",
+        "Workers Cache 5 min, keyed by q + filters + site_settings.catalog_game_count (colo-local). Unique q= is still a weak load-mix / R2 target.",
     },
     "/game-of-the-year": {
       cacheEase: 3,

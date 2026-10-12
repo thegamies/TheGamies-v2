@@ -1,4 +1,12 @@
+import { createDb, readCatalogGameCount } from "@thegamies/db";
 import { browseGames } from "@/lib/catalog";
+import {
+  GAME_SEARCH_CACHE_LIMIT,
+  matchGameSearchHits,
+  putGameSearchHits,
+  shouldCacheGameSearchQuery,
+  type GameSearchCacheKeyInput,
+} from "@/lib/catalog/game-search-cache";
 import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
 import { browseInputForCategoryEligibility } from "@/lib/live-aggregate/category-eligibility";
 import type {
@@ -6,10 +14,26 @@ import type {
   SearchGamesForListInput,
 } from "@/lib/lists/game-search-hit";
 
-export async function searchGamesForList(
+function searchCacheKeyInput(
   input: SearchGamesForListInput,
+  q: string,
+  catalogGameCount: number | null,
+): GameSearchCacheKeyInput {
+  return {
+    q,
+    year: input.year,
+    gotyMode: input.gotyMode,
+    eligibility: input.eligibility,
+    allowEditions: input.allowEditions,
+    allowDlcAddon: input.allowDlcAddon,
+    catalogGameCount,
+  };
+}
+
+async function searchGamesForListFromDb(
+  input: SearchGamesForListInput,
+  q: string,
 ): Promise<GameSearchHit[]> {
-  const q = input.q.trim();
   const year = input.year;
   const eligibility = parseAwardCategoryEligibility(input.eligibility);
   const allowEditions = input.allowEditions === true;
@@ -34,7 +58,7 @@ export async function searchGamesForList(
     }),
     sort: "popularity",
     sortDir: "desc",
-    limit: 24,
+    limit: GAME_SEARCH_CACHE_LIMIT,
   });
 
   return rows.map((r) => ({
@@ -45,4 +69,22 @@ export async function searchGamesForList(
     year: r.year,
     coverUrl: r.coverUrl,
   }));
+}
+
+export async function searchGamesForList(
+  input: SearchGamesForListInput,
+): Promise<GameSearchHit[]> {
+  const q = input.q.trim();
+  if (!shouldCacheGameSearchQuery(q)) {
+    return searchGamesForListFromDb(input, q);
+  }
+
+  const catalogGameCount = await readCatalogGameCount(createDb());
+  const cacheInput = searchCacheKeyInput(input, q, catalogGameCount);
+  const hit = await matchGameSearchHits(cacheInput);
+  if (hit) return hit;
+
+  const rows = await searchGamesForListFromDb(input, q);
+  await putGameSearchHits(cacheInput, rows);
+  return rows;
 }
