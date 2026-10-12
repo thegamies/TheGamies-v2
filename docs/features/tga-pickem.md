@@ -28,17 +28,21 @@ On but not promoted: URL works (soft launch / archive).
 - **Game:** nominees are catalog games; UI links to `/games/[slug]`.
 - **Other:** custom name + optional uploaded art (R2, same bucket as avatars). Artwork is not required to turn a year On.
 - **Load 2025 categories** seeds official 2025 names, order, and kinds, then attaches nominees (catalog games + text for non-game awards).
-- **Load 2025 nominees** replaces that year’s nominees with the 2025 seed (clears prior nominees, calls, and picks for the year), then reports titles missing from the catalog. Catalog matching is not limited to that release year (ongoing, prior, and unreleased titles can attach). Admin nominee search uses the full catalog the same way. Text awards (Performance, Adaptation, Content Creator, Esports Athlete/Team) upload stored 2025 portraits to the image bucket.
+- **Load 2025 nominees** replaces that year’s nominees with the 2025 seed (clears prior nominees, calls, and ballot masks for the year), then reports titles missing from the catalog. Catalog matching is not limited to that release year (ongoing, prior, and unreleased titles can attach). Admin nominee search uses the full catalog the same way. Text awards (Performance, Adaptation, Content Creator, Esports Athlete/Team) upload stored 2025 portraits to the image bucket.
 - **Load 2025 winners** calls the official 2025 winners on the current slate and scores existing sheets.
-- **Copy categories** copies labels, descriptions, order, and kind only.
+- **Copy categories** copies labels, descriptions, order, kind, and the stable award slot. Replacing a year that already has categories clears that year’s ballot masks.
 
-Picks lock at **show start**. The nominee ballot is hidden while the year is scheduled (coming soon) or still a draft. It appears when picks open, then stays after lock for review and scoring. Admin calls winners in the show room. Each call patches score rows for that category (SQL), then leaderboards page those rows. The public and community ballots mark the winner plus Correct / Incorrect on your pick after picks lock. While picks are open, Standings lists who has a sheet (names only). Places, points, and opening a sheet wait until picks lock. Called winners stay hidden and Standings does not show places or points until then.
+Picks lock at **show start**. The nominee ballot is hidden while the year is scheduled (coming soon) or still a draft. It appears when picks open, then stays after lock for review and scoring. Admin calls winners in the show room. Each call recounts ballot masks into the existing score rows, then leaderboards page those rows. The public and community ballots mark the winner plus Correct / Incorrect on your pick after picks lock. While picks are open, Standings lists who has a sheet (names only). Places, points, and opening a sheet wait until picks lock. Called winners stay hidden and Standings does not show places or points until then.
 
 ## Scoring
 
 1 point per correct **called** category. Uncalled awards do not score. World Premieres (absolute difference) is the competition tie-break. Equal points and equal WP share a place (1–2–2–4). After picks lock, a name on Standings opens that entry.
 
-Saving a ballot writes that person’s score row at 0 points, including the World Premieres delta when the official count is already set. Saving again refreshes the delta and leaves points alone. Winner calls only add or remove one point for that category. They do not scan sheets to create score rows. A migration backfills any sheet that does not yet have one, counting picks that already match called winners, and leaves existing score rows unchanged.
+A ballot is a byte mask on the sheet, plus the World Premieres guess. Each award and each nominee keeps a slot assigned once, when it is created. Display order can change without rewriting masks. Slot 0 in the mask means no pick. Removing an award or nominee retires that slot so later additions do not reuse it.
+
+Saving a ballot writes that mask and that person’s score row at 0 points, including the World Premieres delta when the official count is already set. Saving again refreshes the mask and the delta and leaves points alone. It also adjusts a pick count for each nominee that changed, so a tally does not need one row per pick. There is no public tally screen.
+
+A winner call, or setting the official World Premieres count, recounts that year’s masks in one pass and writes points, the World Premieres delta, and place onto the existing site and community score rows. It does not insert score rows and it does not read the old pick tables. Those tables stay in the database. The app does not read or write them. Standings then read 50 score rows ordered by place. Your ballot reads your one score row. Until the first winner call, place is empty and the ballot still says score and rank appear as awards are called. The Hosts board ranks the snapshot from stored points, because that place is among hosts.
 
 ## Community
 
@@ -50,4 +54,4 @@ Create seeds that year’s Host snapshot (`tga_community_hosts`) from current co
 
 ## Request cost
 
-Normalized pick and score rows. Leaderboards use SQL `LIMIT`. Winner calls `UPDATE` from pick tables for one category — do not load every sheet into the app. Community picks are indexed by year, category, and nominee so that update can seek the matching rows.
+One mask per sheet, plus one score row. Leaderboards use SQL `LIMIT` on stored place. A winner call drops the standings index, recounts masks, writes points and place, then builds the index once. Do not load every sheet into the app.

@@ -5,7 +5,7 @@ import {
   games,
   tgaCategories,
   tgaCategoryNominees,
-  tgaCommunityPicks,
+  tgaCommunityPickCounts,
   tgaCommunityScores,
   tgaCommunitySheets,
   tgaCommunityYears,
@@ -296,15 +296,22 @@ export async function load2025Categories(
   if (existing.length > 0) {
     return { error: "This year already has categories." };
   }
+  const seeded = seedCategoryRows(TGA_2025_CATEGORIES);
   await db.insert(tgaCategories).values(
-    seedCategoryRows(TGA_2025_CATEGORIES).map((row) => ({
+    seeded.map((row) => ({
       year,
       label: row.label,
       description: row.description,
       kind: row.kind,
       sortOrder: row.sortOrder,
+      slot: row.sortOrder,
+      nomineeSlotHigh: 0,
     })),
   );
+  await db
+    .update(tgaYears)
+    .set({ categorySlotHigh: seeded.length, updatedAt: new Date() })
+    .where(eq(tgaYears.year, year));
   return load2025Nominees(year, db);
 }
 
@@ -314,22 +321,7 @@ async function clearYearNominees(year: number, db: Db) {
     using tga_categories c
     where w.category_id = c.id and c.year = ${year}
   `);
-  await db.execute(sql`
-    delete from tga_site_picks where year = ${year}
-  `);
-  await db.execute(sql`
-    delete from tga_community_picks where year = ${year}
-  `);
-  await db.execute(sql`
-    update tga_site_scores
-    set points = 0, updated_at = now()
-    where year = ${year}
-  `);
-  await db.execute(sql`
-    update tga_community_scores
-    set points = 0, updated_at = now()
-    where year = ${year}
-  `);
+  await clearYearBallots(year, db);
   await db.execute(sql`
     delete from tga_category_nominees cn
     using tga_categories c
@@ -521,6 +513,7 @@ export async function copyTgaCategories(
   }
   if (existing.length > 0) {
     await db.delete(tgaCategories).where(eq(tgaCategories.year, toYear));
+    await clearYearBallots(toYear, db);
   }
   const rows = await db
     .select()
@@ -528,6 +521,7 @@ export async function copyTgaCategories(
     .where(eq(tgaCategories.year, fromYear))
     .orderBy(asc(tgaCategories.sortOrder));
   if (rows.length === 0) return { error: "Source year has no categories." };
+  const slotHigh = rows.reduce((max, row) => Math.max(max, row.slot), 0);
   await db.insert(tgaCategories).values(
     rows.map((row) => ({
       year: toYear,
@@ -535,9 +529,40 @@ export async function copyTgaCategories(
       description: row.description,
       kind: row.kind,
       sortOrder: row.sortOrder,
+      slot: row.slot,
+      nomineeSlotHigh: 0,
     })),
   );
+  await db
+    .update(tgaYears)
+    .set({ categorySlotHigh: slotHigh, updatedAt: new Date() })
+    .where(eq(tgaYears.year, toYear));
   return { ok: true };
+}
+
+async function clearYearBallots(year: number, db: Db) {
+  await db.execute(sql`
+    update tga_site_sheets
+    set ballot_mask = null, updated_at = now()
+    where year = ${year}
+  `);
+  await db.execute(sql`
+    update tga_community_sheets
+    set ballot_mask = null, updated_at = now()
+    where year = ${year}
+  `);
+  await db.execute(sql`delete from tga_site_pick_counts where year = ${year}`);
+  await db.execute(sql`delete from tga_community_pick_counts where year = ${year}`);
+  await db.execute(sql`
+    update tga_site_scores
+    set points = 0, place = null, updated_at = now()
+    where year = ${year}
+  `);
+  await db.execute(sql`
+    update tga_community_scores
+    set points = 0, place = null, updated_at = now()
+    where year = ${year}
+  `);
 }
 
 export async function createTgaCategory(
@@ -549,6 +574,24 @@ export async function createTgaCategory(
   if (!label) return { error: "Name the category." };
   if (input.kind !== "game" && input.kind !== "other") {
     return { error: "Choose game or other." };
+  }
+  const assigned = await db.execute(sql`
+    update tga_years
+    set category_slot_high = category_slot_high + 1, updated_at = now()
+    where year = ${year} and category_slot_high < 255
+    returning category_slot_high
+  `);
+  const slot = Number(
+    (assigned.rows[0] as { category_slot_high?: number } | undefined)
+      ?.category_slot_high,
+  );
+  if (!slot) {
+    const [yearRow] = await db
+      .select({ year: tgaYears.year })
+      .from(tgaYears)
+      .where(eq(tgaYears.year, year));
+    if (!yearRow) return { error: "Year not found." };
+    return { error: "This year already has every award slot." };
   }
   const [max] = await db
     .select({ sort: tgaCategories.sortOrder })
@@ -564,6 +607,7 @@ export async function createTgaCategory(
       kind: input.kind,
       description: input.description?.trim() || null,
       sortOrder: (max?.sort ?? 0) + 1,
+      slot,
     })
     .returning({ id: tgaCategories.id });
   return row ?? { error: "Could not add the category." };
@@ -672,18 +716,27 @@ export async function addGameNominee(
     )[0]?.id;
   if (!nomineeId) return { error: "Could not add the nominee." };
 
-  const [max] = await db
-    .select({ sort: tgaCategoryNominees.sortOrder })
+  const [already] = await db
+    .select({ nomineeId: tgaCategoryNominees.nomineeId })
     .from(tgaCategoryNominees)
-    .where(eq(tgaCategoryNominees.categoryId, categoryId))
-    .orderBy(desc(tgaCategoryNominees.sortOrder))
+    .where(
+      and(
+        eq(tgaCategoryNominees.categoryId, categoryId),
+        eq(tgaCategoryNominees.nomineeId, nomineeId),
+      ),
+    )
     .limit(1);
+  if (already) return { id: nomineeId };
+
+  const placed = await placeNominee(categoryId, db);
+  if ("error" in placed) return placed;
   await db
     .insert(tgaCategoryNominees)
     .values({
       categoryId,
       nomineeId,
-      sortOrder: (max?.sort ?? 0) + 1,
+      sortOrder: placed.sortOrder,
+      slot: placed.slot,
     })
     .onConflictDoNothing();
   return { id: nomineeId };
@@ -710,18 +763,39 @@ export async function addOtherNominee(
     .values({ year, displayName: name })
     .returning({ id: tgaNominees.id });
   if (!nominee) return { error: "Could not add the nominee." };
+  const placed = await placeNominee(categoryId, db);
+  if ("error" in placed) return placed;
+  await db.insert(tgaCategoryNominees).values({
+    categoryId,
+    nomineeId: nominee.id,
+    sortOrder: placed.sortOrder,
+    slot: placed.slot,
+  });
+  return { id: nominee.id };
+}
+
+async function placeNominee(
+  categoryId: string,
+  db: Db,
+): Promise<{ sortOrder: number; slot: number } | { error: string }> {
+  const assigned = await db.execute(sql`
+    update tga_categories
+    set nominee_slot_high = nominee_slot_high + 1
+    where id = ${categoryId} and nominee_slot_high < 255
+    returning nominee_slot_high
+  `);
+  const slot = Number(
+    (assigned.rows[0] as { nominee_slot_high?: number } | undefined)
+      ?.nominee_slot_high,
+  );
+  if (!slot) return { error: "This award already has every nominee slot." };
   const [max] = await db
     .select({ sort: tgaCategoryNominees.sortOrder })
     .from(tgaCategoryNominees)
     .where(eq(tgaCategoryNominees.categoryId, categoryId))
     .orderBy(desc(tgaCategoryNominees.sortOrder))
     .limit(1);
-  await db.insert(tgaCategoryNominees).values({
-    categoryId,
-    nomineeId: nominee.id,
-    sortOrder: (max?.sort ?? 0) + 1,
-  });
-  return { id: nominee.id };
+  return { sortOrder: (max?.sort ?? 0) + 1, slot };
 }
 
 export async function setNomineeImageUrl(
@@ -764,6 +838,7 @@ export async function detachNominee(
 
 export type TgaBallotNominee = {
   id: string;
+  slot: number;
   displayName: string;
   gameId: string | null;
   slug: string | null;
@@ -772,6 +847,7 @@ export type TgaBallotNominee = {
 
 export type TgaBallotCategory = {
   id: string;
+  slot: number;
   label: string;
   description: string | null;
   kind: "game" | "other";
@@ -804,6 +880,7 @@ export async function listTgaBallot(
     .select({
       categoryId: tgaCategoryNominees.categoryId,
       sortOrder: tgaCategoryNominees.sortOrder,
+      nomineeSlot: tgaCategoryNominees.slot,
       id: tgaNominees.id,
       displayName: tgaNominees.displayName,
       gameId: tgaNominees.gameId,
@@ -834,6 +911,7 @@ export async function listTgaBallot(
 
   return categories.map((category) => ({
     id: category.id,
+    slot: category.slot,
     label: category.label,
     description: category.description,
     kind: category.kind,
@@ -843,6 +921,7 @@ export async function listTgaBallot(
       .filter((row) => row.categoryId === category.id)
       .map((row) => ({
         id: row.id,
+        slot: row.nomineeSlot,
         displayName: row.displayName,
         gameId: row.gameId,
         slug: row.slug,
@@ -932,11 +1011,14 @@ export async function deleteCommunityTgaYear(
   if (!(await isCommunityTgaOptedIn(communityId, year, db))) {
     return { error: `${TGA_PUBLIC_LABEL} was not found for that year.` };
   }
-  const scope = and(
-    eq(tgaCommunityPicks.communityId, communityId),
-    eq(tgaCommunityPicks.year, year),
-  );
-  await db.delete(tgaCommunityPicks).where(scope);
+  await db
+    .delete(tgaCommunityPickCounts)
+    .where(
+      and(
+        eq(tgaCommunityPickCounts.communityId, communityId),
+        eq(tgaCommunityPickCounts.year, year),
+      ),
+    );
   await db
     .delete(tgaCommunityScores)
     .where(
