@@ -1,5 +1,7 @@
+import { createDb } from "@thegamies/db";
 import { describe, expect, it } from "vitest";
 import {
+  browseGamesSearchQuery,
   isDefaultCatalogCountInput,
   sliceSearchPage,
   upcomingReleaseWindow,
@@ -30,6 +32,27 @@ describe("isDefaultCatalogCountInput", () => {
     expect(isDefaultCatalogCountInput({ excludeEditions: true })).toBe(false);
     expect(isDefaultCatalogCountInput({ gotyEligibleTypes: true })).toBe(false);
     expect(isDefaultCatalogCountInput({ includeAdult: true })).toBe(false);
+  });
+});
+
+describe("browseGamesSearchQuery", () => {
+  const db = createDb("postgresql://user:pass@127.0.0.1/thegamies");
+
+  it("matches before sorting, then joins covers for the page", () => {
+    const { sql } = browseGamesSearchQuery(db, {
+      q: "portal",
+      limit: 49,
+    }).toSQL();
+    const normalized = sql.toLowerCase();
+    const matchOffset = normalized.indexOf("offset 0");
+    const limitAt = normalized.indexOf("limit");
+    const coversAt = normalized.lastIndexOf("covers");
+    expect(matchOffset).toBeGreaterThan(-1);
+    expect(limitAt).toBeGreaterThan(matchOffset);
+    expect(coversAt).toBeGreaterThan(limitAt);
+    expect(normalized).toContain("ilike");
+    expect(normalized).toContain("title");
+    expect(normalized).toContain("slug");
   });
 });
 

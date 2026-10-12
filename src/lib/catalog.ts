@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -208,6 +209,99 @@ export async function countBrowseGames(
   return Number(row?.n ?? 0);
 }
 
+/**
+ * Drizzle omits a numeric offset of 0. A SQL literal stays in the query and
+ * stops Postgres from walking `games_popularity_idx` to satisfy
+ * `ORDER BY popularity LIMIT` — that walk reads the catalog for a word like
+ * "portal", whose matches are not packed at the top.
+ */
+function searchMatchOffset(): number {
+  return sql`0` as unknown as number;
+}
+
+type RankColumn = Parameters<typeof desc>[0];
+
+function browseRank(
+  sort: BrowseSort,
+  sortDir: "asc" | "desc",
+  cols: {
+    title: RankColumn;
+    firstReleaseDate: RankColumn;
+    popularity: RankColumn;
+  },
+) {
+  const column =
+    sort === "name"
+      ? cols.title
+      : sort === "first_release_date"
+        ? cols.firstReleaseDate
+        : cols.popularity;
+  return sortDir === "asc" ? asc(column) : desc(column);
+}
+
+/**
+ * Text search: trigram-match title and slug, sort and limit that set, then
+ * attach covers for the page. Joining covers before the limit looked up a
+ * cover for every hit (a word like "dark").
+ */
+export function browseGamesSearchQuery(db: Db, input: BrowseGamesInput) {
+  const {
+    sort = "popularity",
+    sortDir = "desc",
+    limit = GAMES_BROWSE_PAGE_SIZE,
+    offset = 0,
+  } = input;
+  const where = browseGamesWhere(input);
+
+  const matched = db
+    .select({
+      id: games.id,
+      igdbId: games.igdbId,
+      slug: games.slug,
+      title: games.title,
+      year: games.year,
+      firstReleaseDate: games.firstReleaseDate,
+      popularity: games.popularity,
+      coverIgdbId: games.coverIgdbId,
+    })
+    .from(games)
+    .where(where)
+    .offset(searchMatchOffset())
+    .as("matched");
+
+  const page = db
+    .select({
+      id: matched.id,
+      igdbId: matched.igdbId,
+      slug: matched.slug,
+      title: matched.title,
+      year: matched.year,
+      firstReleaseDate: matched.firstReleaseDate,
+      popularity: matched.popularity,
+      coverIgdbId: matched.coverIgdbId,
+    })
+    .from(matched)
+    .orderBy(browseRank(sort, sortDir, matched), matched.id)
+    .limit(limit)
+    .offset(offset)
+    .as("page");
+
+  return db
+    .select({
+      id: page.id,
+      igdbId: page.igdbId,
+      slug: page.slug,
+      title: page.title,
+      year: page.year,
+      firstReleaseDate: page.firstReleaseDate,
+      popularity: page.popularity,
+      coverImageId: covers.imageId,
+    })
+    .from(page)
+    .leftJoin(covers, eq(covers.igdbId, page.coverIgdbId))
+    .orderBy(browseRank(sort, sortDir, page), page.id);
+}
+
 export async function browseGames(input: BrowseGamesInput = {}) {
   const db = getDb();
   const {
@@ -219,36 +313,25 @@ export async function browseGames(input: BrowseGamesInput = {}) {
 
   const where = browseGamesWhere(input);
 
-  const order =
-    sort === "name"
-      ? sortDir === "asc"
-        ? games.title
-        : desc(games.title)
-      : sort === "first_release_date"
-        ? sortDir === "asc"
-          ? games.firstReleaseDate
-          : desc(games.firstReleaseDate)
-        : sortDir === "asc"
-          ? games.popularity
-          : desc(games.popularity);
-
-  const rows = await db
-    .select({
-      id: games.id,
-      igdbId: games.igdbId,
-      slug: games.slug,
-      title: games.title,
-      year: games.year,
-      firstReleaseDate: games.firstReleaseDate,
-      popularity: games.popularity,
-      coverImageId: covers.imageId,
-    })
-    .from(games)
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
-    .where(where)
-    .orderBy(order, games.id)
-    .limit(limit)
-    .offset(offset);
+  const rows = input.q?.trim()
+    ? await browseGamesSearchQuery(db, input)
+    : await db
+        .select({
+          id: games.id,
+          igdbId: games.igdbId,
+          slug: games.slug,
+          title: games.title,
+          year: games.year,
+          firstReleaseDate: games.firstReleaseDate,
+          popularity: games.popularity,
+          coverImageId: covers.imageId,
+        })
+        .from(games)
+        .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+        .where(where)
+        .orderBy(browseRank(sort, sortDir, games), games.id)
+        .limit(limit)
+        .offset(offset);
 
   return rows.map((r) => ({
     ...r,
