@@ -1239,6 +1239,18 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
   }),
   row({
     method: "GET",
+    path: "/admin/communities/stats",
+    kind: "page",
+    group: "admin",
+    audience: "admin",
+    usage: 1,
+    dbImpact: 3,
+    testPriority: 2,
+    notes:
+      "Paged community roster. Count members/Pick’em/editions only for that page. Search is ILIKE.",
+  }),
+  row({
+    method: "GET",
     path: "/admin/seed",
     kind: "page",
     group: "admin",

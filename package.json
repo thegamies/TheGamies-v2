@@ -19,6 +19,7 @@
     "qa:fixtures": "tsx scripts/qa/ensure-staging-fixtures.ts",
     "qa:loadtest:ensure": "tsx scripts/qa/ensure-loadtest-fixtures.ts",
     "qa:loadtest:purge": "tsx scripts/qa/purge-loadtest-fixtures.ts",
+    "qa:pickem-scale": "tsx scripts/qa/seed-pickem-scale.ts",
     "cost:load": "tsx scripts/cost/load.ts",
     "cost:journeys": "playwright test -c playwright.cost.config.ts",
     "cost:report": "tsx scripts/cost/report.ts",

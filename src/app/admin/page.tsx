@@ -62,6 +62,12 @@ const ADMIN_LINKS = [
       "Feature public communities, close joins, and seed members and ballots.",
   },
   {
+    href: "/admin/communities/stats",
+    title: "Community stats",
+    description:
+      "Members, Pick’em, ballots, and edition entries for each community.",
+  },
+  {
     href: "/admin/the-game-awards/seed",
     title: "Video Game Awards Pick’em seed",
     description:

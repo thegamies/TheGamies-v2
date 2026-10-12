@@ -150,6 +150,11 @@ pnpm qa:loadtest:ensure -- --writers 50
 pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
 # or --all (four scenarios, ~40 minutes)
 # teardown: pnpm qa:loadtest:purge
+
+# Optional: 1000 public scale communities × 1000 is_seed users (no Neon Auth),
+# each user a member with a complete 2025 community Pick’em sheet (~1M sheets).
+# Staging only. Purge with pnpm qa:pickem-scale -- --purge
+pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000
 ```
 
 `--ramp` is k6 `ramping-vus`: VUs start at 0 and reach the target linearly, then hold for the rest of `--duration`. Default **30s**. `--ramp 0` starts every loop at once (the old stampede). Duration includes the ramp (90s with a 30s ramp is 30s climb + 60s hold).
