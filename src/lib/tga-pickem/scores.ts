@@ -21,6 +21,15 @@ function getDb(db?: Db): Db {
 export async function rebuildPickemScores(year: number, db: Db = getDb()): Promise<void> {
   await db.execute(sql`drop index if exists tga_site_scores_board_idx`);
   await db.execute(sql`
+    with called as materialized (
+      select c.slot as category_slot, cn.slot as nominee_slot
+      from tga_winners w
+      inner join tga_categories c on c.id = w.category_id
+      inner join tga_category_nominees cn
+        on cn.category_id = w.category_id
+       and cn.nominee_id = w.nominee_id
+      where c.year = ${year}
+    )
     update tga_site_scores sc
     set
       points = ranked.points,
@@ -38,28 +47,29 @@ export async function rebuildPickemScores(year: number, db: Db = getDb()): Promi
       from (
         select
           s.profile_id,
-          coalesce((
-            select count(*)::int
-            from tga_winners w
-            inner join tga_categories c on c.id = w.category_id
-            inner join tga_category_nominees cn
-              on cn.category_id = w.category_id
-             and cn.nominee_id = w.nominee_id
-            where c.year = s.year
-              and s.ballot_mask is not null
-              and get_byte(s.ballot_mask, c.slot) = cn.slot
-          ), 0) as points,
+          coalesce(hits.points, 0) as points,
           case
             when y.world_premieres_official is null or s.world_premieres_guess is null then null
             else abs(s.world_premieres_guess - y.world_premieres_official)
           end as wp_delta
         from tga_site_sheets s
         inner join tga_years y on y.year = s.year
+        left join lateral (
+          select count(*)::int as points
+          from called
+          where s.ballot_mask is not null
+            and get_byte(s.ballot_mask, called.category_slot) = called.nominee_slot
+        ) hits on true
         where s.year = ${year}
       ) scored
     ) ranked
     where sc.year = ${year}
       and sc.profile_id = ranked.profile_id
+      and (
+        sc.points is distinct from ranked.points
+        or sc.wp_delta is distinct from ranked.wp_delta
+        or sc.place is distinct from ranked.place
+      )
   `);
   await db.execute(sql`
     create index tga_site_scores_board_idx on tga_site_scores (year, place)
@@ -67,6 +77,15 @@ export async function rebuildPickemScores(year: number, db: Db = getDb()): Promi
 
   await db.execute(sql`drop index if exists tga_community_scores_board_idx`);
   await db.execute(sql`
+    with called as materialized (
+      select c.slot as category_slot, cn.slot as nominee_slot
+      from tga_winners w
+      inner join tga_categories c on c.id = w.category_id
+      inner join tga_category_nominees cn
+        on cn.category_id = w.category_id
+       and cn.nominee_id = w.nominee_id
+      where c.year = ${year}
+    )
     update tga_community_scores sc
     set
       points = ranked.points,
@@ -87,29 +106,30 @@ export async function rebuildPickemScores(year: number, db: Db = getDb()): Promi
         select
           s.community_id,
           s.profile_id,
-          coalesce((
-            select count(*)::int
-            from tga_winners w
-            inner join tga_categories c on c.id = w.category_id
-            inner join tga_category_nominees cn
-              on cn.category_id = w.category_id
-             and cn.nominee_id = w.nominee_id
-            where c.year = s.year
-              and s.ballot_mask is not null
-              and get_byte(s.ballot_mask, c.slot) = cn.slot
-          ), 0) as points,
+          coalesce(hits.points, 0) as points,
           case
             when y.world_premieres_official is null or s.world_premieres_guess is null then null
             else abs(s.world_premieres_guess - y.world_premieres_official)
           end as wp_delta
         from tga_community_sheets s
         inner join tga_years y on y.year = s.year
+        left join lateral (
+          select count(*)::int as points
+          from called
+          where s.ballot_mask is not null
+            and get_byte(s.ballot_mask, called.category_slot) = called.nominee_slot
+        ) hits on true
         where s.year = ${year}
       ) scored
     ) ranked
     where sc.year = ${year}
       and sc.community_id = ranked.community_id
       and sc.profile_id = ranked.profile_id
+      and (
+        sc.points is distinct from ranked.points
+        or sc.wp_delta is distinct from ranked.wp_delta
+        or sc.place is distinct from ranked.place
+      )
   `);
   await db.execute(sql`
     create index tga_community_scores_board_idx
@@ -162,18 +182,20 @@ export async function callTgaWinner(
   year: number,
   categoryId: string,
   nomineeId: string | null,
-  db: Db = getDb(),
+  db?: Db,
+  options?: { rebuild?: boolean },
 ): Promise<{ ok: true } | { error: string }> {
-  const [slate] = await db.select().from(tgaYears).where(eq(tgaYears.year, year));
+  const database = getDb(db);
+  const [slate] = await database.select().from(tgaYears).where(eq(tgaYears.year, year));
   if (!slate) return { error: "Year not found." };
 
-  const [existing] = await db
+  const [existing] = await database
     .select()
     .from(tgaWinners)
     .where(eq(tgaWinners.categoryId, categoryId));
 
   if (nomineeId) {
-    await db
+    await database
       .insert(tgaWinners)
       .values({
         categoryId,
@@ -185,26 +207,28 @@ export async function callTgaWinner(
         set: { nomineeId, calledAt: new Date() },
       });
   } else if (existing) {
-    await db.delete(tgaWinners).where(eq(tgaWinners.categoryId, categoryId));
+    await database.delete(tgaWinners).where(eq(tgaWinners.categoryId, categoryId));
   }
 
-  await rebuildPickemScores(year, db);
+  if (options?.rebuild !== false) await rebuildPickemScores(year, database);
   return { ok: true };
 }
 
 export async function setOfficialWorldPremieres(
   year: number,
   count: number | null,
-  db: Db = getDb(),
+  db?: Db,
+  options?: { rebuild?: boolean },
 ): Promise<{ ok: true } | { error: string }> {
   if (count != null && (!Number.isInteger(count) || count < 0 || count > 200)) {
     return { error: "Enter a World Premieres count from 0 to 200." };
   }
-  await db
+  const database = getDb(db);
+  await database
     .update(tgaYears)
     .set({ worldPremieresOfficial: count, updatedAt: new Date() })
     .where(eq(tgaYears.year, year));
-  await rebuildPickemScores(year, db);
+  if (options?.rebuild !== false) await rebuildPickemScores(year, database);
   return { ok: true };
 }
 
