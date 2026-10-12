@@ -38,6 +38,8 @@ Picks lock at **show start**. The nominee ballot is hidden while the year is sch
 
 1 point per correct **called** category. Uncalled awards do not score. World Premieres (absolute difference) is the competition tie-break. Equal points and equal WP share a place (1–2–2–4). After picks lock, a name on Standings opens that entry.
 
+Saving a ballot writes that person’s score row at 0 points, including the World Premieres delta when the official count is already set. Saving again refreshes the delta and leaves points alone. Winner calls still add or remove one point for that category. A sheet from before this still receives its score row on the next winner call.
+
 ## Community
 
 Same official slate and winners. Separate sheets. Import from the global sheet (warns before replacing picks already on the community ballot). After a complete community save, if they have no site sheet yet, prompt to copy that entry to the global game and open it. Opens when the community creates that year and the site year is On with picks open. Closes at the same show start. On **public + joins closed** communities, guests see the same ballot slate (read-only) and Standings; locked sheets stay readable. Regular public and private interiors stay members-only.
@@ -48,4 +50,4 @@ Create seeds that year’s Host snapshot (`tga_community_hosts`) from current co
 
 ## Request cost
 
-Normalized pick and score rows. Leaderboards use SQL `LIMIT`. Winner calls `UPDATE` from pick tables for one category — do not load every sheet into the app.
+Normalized pick and score rows. Leaderboards use SQL `LIMIT`. Winner calls `UPDATE` from pick tables for one category — do not load every sheet into the app. Community picks are indexed by year, category, and nominee so that update can seek the matching rows.

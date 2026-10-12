@@ -14,6 +14,7 @@ import {
   leaderboardPageCount,
 } from "./scoring";
 import { getTgaYear, isCommunityTgaOptedIn, listTgaBallot } from "./service";
+import { upsertCommunityScoreOnSave, upsertSiteScoreOnSave } from "./scores";
 import { picksAreOpen } from "./status";
 
 export const COMMUNITY_TGA_NOT_RUNNING =
@@ -265,8 +266,9 @@ export async function saveSiteSheet(
   input: { worldPremieresGuess: number; picks: Record<string, string> },
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
-  const blocked = assertOpen(await getTgaYear(year, db));
-  if (blocked) return blocked;
+  const slate = await getTgaYear(year, db);
+  const blocked = assertOpen(slate);
+  if (blocked || !slate) return blocked ?? { error: "Year not found." };
   const guess = parseGuess(input.worldPremieresGuess);
   if (typeof guess !== "number") return guess;
   const rows = await allowedPicks(year, input.picks, db);
@@ -302,6 +304,13 @@ export async function saveSiteSheet(
       })),
     );
   }
+  await upsertSiteScoreOnSave(
+    profileId,
+    year,
+    guess,
+    slate.worldPremieresOfficial,
+    db,
+  );
   return { ok: true };
 }
 
@@ -312,8 +321,9 @@ export async function saveCommunitySheet(
   input: { worldPremieresGuess: number; picks: Record<string, string> },
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
-  const blocked = assertOpen(await getTgaYear(year, db));
-  if (blocked) return blocked;
+  const slate = await getTgaYear(year, db);
+  const blocked = assertOpen(slate);
+  if (blocked || !slate) return blocked ?? { error: "Year not found." };
   if (!(await isCommunityTgaOptedIn(communityId, year, db))) {
     return { error: COMMUNITY_TGA_NOT_RUNNING };
   }
@@ -362,6 +372,14 @@ export async function saveCommunitySheet(
       })),
     );
   }
+  await upsertCommunityScoreOnSave(
+    communityId,
+    profileId,
+    year,
+    guess,
+    slate.worldPremieresOfficial,
+    db,
+  );
   return { ok: true };
 }
 

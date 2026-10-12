@@ -113,6 +113,47 @@ async function applyWinnerDelta(
   }
 }
 
+export async function upsertSiteScoreOnSave(
+  profileId: string,
+  year: number,
+  guess: number,
+  officialWp: number | null | undefined,
+  db: Db = getDb(),
+): Promise<void> {
+  const wpDelta = worldPremieresDelta(guess, officialWp);
+  const updatedAt = new Date();
+  await db
+    .insert(tgaSiteScores)
+    .values({ year, profileId, points: 0, wpDelta, updatedAt })
+    .onConflictDoUpdate({
+      target: [tgaSiteScores.year, tgaSiteScores.profileId],
+      set: { wpDelta, updatedAt },
+    });
+}
+
+export async function upsertCommunityScoreOnSave(
+  communityId: string,
+  profileId: string,
+  year: number,
+  guess: number,
+  officialWp: number | null | undefined,
+  db: Db = getDb(),
+): Promise<void> {
+  const wpDelta = worldPremieresDelta(guess, officialWp);
+  const updatedAt = new Date();
+  await db
+    .insert(tgaCommunityScores)
+    .values({ communityId, year, profileId, points: 0, wpDelta, updatedAt })
+    .onConflictDoUpdate({
+      target: [
+        tgaCommunityScores.communityId,
+        tgaCommunityScores.year,
+        tgaCommunityScores.profileId,
+      ],
+      set: { wpDelta, updatedAt },
+    });
+}
+
 export async function callTgaWinner(
   year: number,
   categoryId: string,

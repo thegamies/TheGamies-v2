@@ -428,6 +428,13 @@
       "when": 1790467200000,
       "tag": "0060_catalog_game_count",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790553600000,
+      "tag": "0061_tga_community_picks_nominee_idx",
+      "breakpoints": true
     }
   ]
 }

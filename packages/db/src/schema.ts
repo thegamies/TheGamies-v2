@@ -1601,6 +1601,13 @@ export const tgaCommunityPicks = pgTable(
       t.categoryId,
       t.nomineeId,
     ),
+    index("tga_community_picks_nominee_idx").on(
+      t.year,
+      t.categoryId,
+      t.nomineeId,
+      t.communityId,
+      t.profileId,
+    ),
   ],
 );
 
