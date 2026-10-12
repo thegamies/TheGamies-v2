@@ -40,6 +40,8 @@ describe("formatLoadHtmlReport", () => {
     expect(html).toContain("select count(*) from games");
     expect(html).toContain('id="trips"');
     expect(html).toContain("% time");
+    expect(html).toContain("Postgres exec unmatched");
+    expect(html).toContain("exec n");
     expect(html).toContain("Endpoints");
     expect(html).toContain('id="pcts"');
     expect(html).toContain('id="timeline"');

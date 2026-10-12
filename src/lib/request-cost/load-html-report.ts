@@ -66,6 +66,7 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     endedAt: stats.endedAt,
     queries: compact.queries,
     samples: compact.samples,
+    pgExec: stats.pgExec ?? null,
   };
 
   return `<!DOCTYPE html>
@@ -242,11 +243,27 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
     </table>
     </div>
     <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.5rem">Neon trips</h2>
-    <p class="meta">Same filter as above. One HTTP trip to Neon; a batch is several statements joined with <code>|</code>. <strong>% time</strong> is this fingerprint’s share of summed trip wait in the filter (adds to 100%). Click a column header to sort.</p>
+    <p class="meta">Same filter as above. One HTTP trip to Neon; a batch is several statements joined with <code>|</code>. <strong>% time</strong> is trip wait. <strong>Exec</strong> is Postgres <code>pg_stat_statements</code> for this run when the fingerprint matches (best effort). Click a column header to sort.</p>
     <div class="table-scroll">
     <table>
       <thead id="trip-head"></thead>
       <tbody id="trips"></tbody>
+    </table>
+    </div>
+    <h2 style="font:700 1rem/1.2 Archivo,system-ui,sans-serif;margin:2rem 0 0.5rem">Postgres exec unmatched</h2>
+    <p class="meta">Statement exec in the run window that did not join a trip fingerprint. Whole run, not the filter. Includes other develop traffic in the same minutes.</p>
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="sticky">SQL</th>
+          <th class="num">n</th>
+          <th class="num">mean</th>
+          <th class="num">total</th>
+          <th class="num">% exec</th>
+        </tr>
+      </thead>
+      <tbody id="pg-unmatched"></tbody>
     </table>
     </div>
   </main>
@@ -726,13 +743,36 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
           if (typeof pair[1] === "number" && pair[1] > 0) tripTotal += pair[1];
         }
       }
+      const pgRows = DATA.pgExec && DATA.pgExec.ok && DATA.pgExec.rows ? DATA.pgExec.rows : [];
+      const pgTotal = pgRows.reduce((acc, row) => acc + (row.totalMs || 0), 0);
+      function attachExec(sql) {
+        let calls = 0;
+        let totalMs = 0;
+        const used = new Set();
+        for (const row of pgRows) {
+          if (used.has(row.queryid)) continue;
+          const fp = row.fingerprint;
+          if (sql === fp || String(sql).split(" | ").indexOf(fp) >= 0) {
+            used.add(row.queryid);
+            calls += row.calls;
+            totalMs += row.totalMs;
+          }
+        }
+        if (calls <= 0) return { execN: 0, execMean: 0, execTotal: 0, execPct: 0 };
+        return {
+          execN: calls,
+          execMean: Math.round(totalMs / calls),
+          execTotal: Math.round(totalMs),
+          execPct: timePct(totalMs, pgTotal),
+        };
+      }
       const tripRows = sortRows(
         [...tripMs.keys()].map((sql) => {
           const values = tripMs.get(sql);
           const sorted = values.slice().sort((a, b) => a - b);
           const b = band(sorted);
           const sumMs = values.reduce((acc, ms) => acc + ms, 0);
-          return { sql, n: sorted.length, timePct: timePct(sumMs, tripTotal), ...b };
+          return { sql, n: sorted.length, timePct: timePct(sumMs, tripTotal), ...attachExec(sql), ...b };
         }),
         sorts.trip,
       );
@@ -744,6 +784,9 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
         "\\">SQL</th>" +
         sortTh("trip", "n", "n") +
         sortTh("trip", "timePct", "% time") +
+        sortTh("trip", "execN", "exec n") +
+        sortTh("trip", "execMean", "exec mean") +
+        sortTh("trip", "execPct", "% exec") +
         visiblePcts().map((k) => sortTh("trip", k, k)).join("") +
         "</tr>";
       bindSort(tripHead);
@@ -758,13 +801,50 @@ export function formatLoadHtmlReport(stats: LoadRunStats): string {
                 t.n +
                 "</td><td class=\\"num\\">" +
                 formatTimePct(t.timePct) +
+                "</td><td class=\\"num\\">" +
+                (t.execN ? t.execN : "—") +
+                "</td><td class=\\"num\\">" +
+                (t.execN ? t.execMean : "—") +
+                "</td><td class=\\"num\\">" +
+                (t.execN ? formatTimePct(t.execPct) : "—") +
                 "</td>" +
                 visiblePcts().map((k) => "<td class=\\"num\\">" + t[k] + "</td>").join("") +
                 "</tr>"
               );
             })
             .join("")
-        : "<tr><td class=\\"empty\\" colspan=\\"" + (3 + pctColspan()) + "\\">No trip fingerprints in this filter (deploy staging meter, then re-run).</td></tr>";
+        : "<tr><td class=\\"empty\\" colspan=\\"" + (6 + pctColspan()) + "\\">No trip fingerprints in this filter (deploy staging meter, then re-run).</td></tr>";
+      const unmatchedBody = document.getElementById("pg-unmatched");
+      if (!DATA.pgExec) {
+        unmatchedBody.innerHTML = "<tr><td class=\\"empty\\" colspan=\\"5\\">No pg_stat_statements snapshot for this file.</td></tr>";
+      } else if (!DATA.pgExec.ok) {
+        unmatchedBody.innerHTML = "<tr><td class=\\"empty\\" colspan=\\"5\\">" + String(DATA.pgExec.error).replace(/</g, "&lt;") + "</td></tr>";
+      } else {
+        const usedFp = new Set();
+        for (const sql of tripMs.keys()) {
+          for (const row of pgRows) {
+            if (sql === row.fingerprint || String(sql).split(" | ").indexOf(row.fingerprint) >= 0) usedFp.add(row.queryid);
+          }
+        }
+        const leftover = pgRows.filter((row) => !usedFp.has(row.queryid)).slice(0, 25);
+        unmatchedBody.innerHTML = leftover.length
+          ? leftover.map((row) => {
+              return (
+                "<tr><td class=\\"sticky\\"><code>" +
+                String(row.query).replace(/</g, "&lt;") +
+                "</code></td><td class=\\"num\\">" +
+                row.calls +
+                "</td><td class=\\"num\\">" +
+                Math.round(row.meanMs) +
+                "</td><td class=\\"num\\">" +
+                Math.round(row.totalMs) +
+                "</td><td class=\\"num\\">" +
+                formatTimePct(timePct(row.totalMs, pgTotal)) +
+                "</td></tr>"
+              );
+            }).join("")
+          : "<tr><td class=\\"empty\\" colspan=\\"5\\">All exec rows matched a trip fingerprint.</td></tr>";
+      }
     }
     render();
   </script>

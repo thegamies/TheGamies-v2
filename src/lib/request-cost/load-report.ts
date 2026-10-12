@@ -1,5 +1,10 @@
 import type { LoadtestScenario } from "@/lib/qa/loadtest";
 import { parseMeteredDbTripsHeader } from "@thegamies/db/request-cost";
+import {
+  attachPgExecToTripSql,
+  unmatchedPgExecRows,
+  type PgStatDeltaRow,
+} from "@/lib/request-cost/pg-stat-delta";
 
 export type LoadSample = {
   group: string;
@@ -85,6 +90,10 @@ export function formatTimeSharePct(partMs: number, totalMs: number): string {
   return `${pct.toFixed(1)}%`;
 }
 
+export type PgExecReport =
+  | { ok: true; rows: PgStatDeltaRow[] }
+  | { ok: false; error: string };
+
 export type LoadRunStats = {
   scenario: LoadtestScenario;
   durationMs: number;
@@ -95,6 +104,8 @@ export type LoadRunStats = {
   startedAt: string;
   endedAt: string;
   samples: LoadSample[];
+  /** Postgres exec delta for the run (`pg_stat_statements`). */
+  pgExec?: PgExecReport;
 };
 
 export function percentile(sortedMs: number[], p: number): number {
@@ -269,13 +280,43 @@ export function formatLoadReport(stats: LoadRunStats): string {
   const statusLines = summaryLines(partitionLoadSamples(samples, "status"), all.sumMs);
   const tripRows = summarizeLoadTrips(samples);
   const tripTotal = tripRows.reduce((sum, row) => sum + row.sumMs, 0);
+  const pgRows = stats.pgExec?.ok ? stats.pgExec.rows : [];
+  const pgTotal = pgRows.reduce((sum, row) => sum + row.totalMs, 0);
   const tripLines = tripRows
+    .slice(0, 25)
+    .map((row) => {
+      const exec = attachPgExecToTripSql(row.sql, pgRows);
+      const execBit = exec
+        ? ` · exec ${exec.calls} · ${exec.meanMs.toFixed(1)} ms mean · ${formatTimeSharePct(exec.totalMs, pgTotal)} exec`
+        : "";
+      return `- ${row.sql}: ${row.n} · ${formatTimeSharePct(row.sumMs, tripTotal)} time · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms${execBit}`;
+    })
+    .join("\n");
+  const unmatched = unmatchedPgExecRows(
+    tripRows.map((row) => row.sql),
+    pgRows,
+  )
     .slice(0, 25)
     .map(
       (row) =>
-        `- ${row.sql}: ${row.n} · ${formatTimeSharePct(row.sumMs, tripTotal)} time · p50 ${row.p50} ms · p90 ${row.p90} ms · p95 ${row.p95} ms · p99 ${row.p99} ms · max ${row.max} ms`,
+        `- ${row.query.replace(/\s+/g, " ").trim()}: ${row.calls} · ${row.meanMs.toFixed(1)} ms mean · ${formatTimeSharePct(row.totalMs, pgTotal)} exec`,
     )
     .join("\n");
+  const pgSection = stats.pgExec
+    ? stats.pgExec.ok
+      ? `
+## Postgres exec (unmatched)
+
+Delta from \`pg_stat_statements\` for this window, not Worker wait. Rows already joined onto Neon trips are omitted.
+
+${unmatched || "- (all exec rows matched a trip fingerprint)"}
+`
+      : `
+## Postgres exec
+
+- ${stats.pgExec.error}
+`
+    : "";
 
   return `# Load test ${stats.scenario}
 
@@ -316,5 +357,5 @@ ${statusLines || "- (none)"}
 ## Neon trips (SQL fingerprint)
 
 ${tripLines || "- (none — needs staging meter trip headers)"}
-`;
+${pgSection}`;
 }

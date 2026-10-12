@@ -38,8 +38,15 @@ import { formatLoadHtmlReport } from "@/lib/request-cost/load-html-report";
 import {
   formatLoadReport,
   readLoadCostHeaders,
+  type LoadRunStats,
   type LoadSample,
+  type PgExecReport,
 } from "@/lib/request-cost/load-report";
+import {
+  diffPgStatSnapshots,
+  snapshotPgStatStatementsAt,
+  type PgStatSnapshotRow,
+} from "@/lib/request-cost/pg-stat-delta";
 import {
   ensureLoadSessionCookie,
   type LoadCookieSlot,
@@ -151,9 +158,20 @@ async function repairPhases(fixtures: LoadtestFixturesFile, databaseUrl: string)
   });
 }
 
+async function capturePgExec(
+  databaseUrl: string,
+  before: PgStatSnapshotRow[] | { error: string },
+): Promise<PgExecReport> {
+  if ("error" in before) return { ok: false, error: before.error };
+  const after = await snapshotPgStatStatementsAt(databaseUrl);
+  if ("error" in after) return { ok: false, error: after.error };
+  return { ok: true, rows: diffPgStatSnapshots(before, after) };
+}
+
 async function runScenario(input: {
   scenario: LoadtestScenario;
   appUrl: string;
+  databaseUrl: string;
   durationMs: number;
   rampMs: number;
   vusRead: number;
@@ -165,6 +183,7 @@ async function runScenario(input: {
 }): Promise<string> {
   const gets = buildLoadGets(input.scenario, input.fixtures);
   const writes = buildLoadWrites(input.scenario);
+  const pgBefore = await snapshotPgStatStatementsAt(input.databaseUrl);
   await warmup(input.appUrl, gets[0]!.path);
 
   const samples: LoadSample[] = [];
@@ -334,7 +353,7 @@ async function runScenario(input: {
 
   await Promise.all([...readers, ...writerLoops]);
   const ended = new Date();
-  const stats = {
+  const stats: LoadRunStats = {
     scenario: input.scenario,
     durationMs: ended.getTime() - started.getTime(),
     rampMs,
@@ -343,6 +362,7 @@ async function runScenario(input: {
     startedAt: started.toISOString(),
     endedAt: ended.toISOString(),
     samples,
+    pgExec: await capturePgExec(input.databaseUrl, pgBefore),
   };
   const report = formatLoadReport(stats);
   const html = formatLoadHtmlReport(stats);
@@ -400,6 +420,7 @@ async function main() {
     await runScenario({
       scenario,
       appUrl: target.appUrl,
+      databaseUrl: target.databaseUrl,
       durationMs: args.durationMs,
       rampMs: args.rampMs,
       vusRead: args.vusRead,

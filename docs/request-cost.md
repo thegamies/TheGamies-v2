@@ -85,6 +85,8 @@ DB counting hooks `neonConfig.fetchFunction` (`packages/db/src/request-cost.ts`)
 
 `dbMs` on the Worker is **wait** (HTTP to Neon). Postgres execution time is `pg_stat_statements` (`mean_exec_time` / `total_exec_time`). The Console view reads a system copy. On **develop only**, the same extension is installed in `neondb` (one-off, not a shipped migration) so agents can query it. Production stays without the app-database extension.
 
+The load runner snapshots `pg_stat_statements` before and after each scenario (same `DATABASE_URL` as staging/develop) and writes the delta into the HTML/markdown. **Exec** columns on Neon trips are a best-effort join on the Worker SQL fingerprint; unmatched exec stays in its own table. The window also includes any other develop traffic. Do not `pg_stat_statements_reset()` from the runner.
+
 From Cursor, on develop (`br-royal-hall-ax9tmxqg`, `neondb`):
 
 - Neon MCP `inspect_database` with `check`: `outliers` (highest total time) or `calls` (most frequent)

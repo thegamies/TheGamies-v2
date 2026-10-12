@@ -90,6 +90,44 @@ describe("formatLoadReport", () => {
     expect(md).toContain("select count(*) from games");
   });
 
+  it("joins pg_stat_statements exec onto a matching trip fingerprint", () => {
+    const sql = "select count(*) from games";
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 0,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        {
+          group: "general",
+          step: "/",
+          status: 200,
+          ms: 80,
+          ok: true,
+          trips: [{ ms: 45, sql }],
+        },
+      ],
+      pgExec: {
+        ok: true,
+        rows: [
+          {
+            queryid: "1",
+            query: sql,
+            fingerprint: sql,
+            calls: 333,
+            totalMs: 35_000,
+            meanMs: 35_000 / 333,
+          },
+        ],
+      },
+    });
+    expect(md).toContain("exec 333");
+    expect(md).toContain("100.0% exec");
+    expect(md).toContain("(all exec rows matched a trip fingerprint)");
+  });
+
   it("labels a linear VU ramp", () => {
     const md = formatLoadReport({
       scenario: "general",
