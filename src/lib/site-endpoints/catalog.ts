@@ -302,7 +302,8 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     dbImpact: 5,
     testPriority: 4,
     loadMix: true,
-    notes: "About a dozen sequential catalog and standings trips per game.",
+    notes:
+      "Catalog row, media, GOTY/category ranks. Ads probe is EXISTS one public list only when the title has no rank yet.",
   }),
   row({
     method: "GET",
