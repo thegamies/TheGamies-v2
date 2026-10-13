@@ -7,11 +7,34 @@ import { AsyncLocalStorage } from "node:async_hooks";
  *
  * `cf-connecting-ip` is set by Cloudflare and is not a client-supplied
  * forwarding header.
+ *
+ * Worker bundles each get their own copy of this module, but they share
+ * `globalThis`. A second copy must not wrap `fetch` again, and this wrapper
+ * must call the fetch it captured at install time. Calling the current
+ * `globalThis.fetch` makes the two wrappers recurse until sign-in dies with
+ * "Maximum call stack size exceeded".
  */
-const clientIp = new AsyncLocalStorage<string>();
+export const AUTH_CLIENT_IP_FETCH = Symbol.for("thegamies.authClientIpFetch");
 
-let installed = false;
-let nativeFetch: typeof fetch | null = null;
+type AuthClientIpSlot = {
+  ips: AsyncLocalStorage<string>;
+  /** Fetch captured once, before this module replaced `globalThis.fetch`. */
+  underlying: typeof fetch | null;
+};
+
+function authClientIpSlot(): AuthClientIpSlot {
+  const globalRecord = globalThis as typeof globalThis & {
+    [AUTH_CLIENT_IP_FETCH]?: AuthClientIpSlot;
+  };
+  const existing = globalRecord[AUTH_CLIENT_IP_FETCH];
+  if (existing) return existing;
+  const created: AuthClientIpSlot = {
+    ips: new AsyncLocalStorage<string>(),
+    underlying: null,
+  };
+  globalRecord[AUTH_CLIENT_IP_FETCH] = created;
+  return created;
+}
 
 export function clientIpFromHeaders(headers: {
   get(name: string): string | null;
@@ -73,7 +96,7 @@ export function withClientIpHeader(
 export function withAuthClientIp<T>(ip: string | null, run: () => T): T {
   if (!ip) return run();
   installAuthClientIpFetch();
-  return clientIp.run(ip, run);
+  return authClientIpSlot().ips.run(ip, run);
 }
 
 export function shareInflight<T>(
@@ -92,17 +115,18 @@ export function shareInflight<T>(
 }
 
 function installAuthClientIpFetch(): void {
-  if (installed) return;
-  installed = true;
-  nativeFetch = globalThis.fetch.bind(globalThis);
+  const slot = authClientIpSlot();
+  if (slot.underlying) return;
+  const underlying = globalThis.fetch.bind(globalThis);
+  slot.underlying = underlying;
   const wrapped: typeof fetch = (input, init) => {
-    const ip = clientIp.getStore();
+    const next = slot.underlying ?? underlying;
+    const ip = slot.ips.getStore();
     const base = process.env.NEON_AUTH_BASE_URL?.trim();
-    const target = globalThis.fetch === wrapped ? nativeFetch! : globalThis.fetch;
-    if (!ip || !base) return target(input, init);
+    if (!ip || !base) return next(input, init);
     const forwarded = withClientIpHeader(input, init, ip, base);
-    if (!forwarded) return target(input, init);
-    return target(forwarded.input, forwarded.init);
+    if (!forwarded) return next(input, init);
+    return next(forwarded.input, forwarded.init);
   };
   globalThis.fetch = wrapped;
 }

@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  AUTH_CLIENT_IP_FETCH,
   clientIpFromHeaders,
   isNeonAuthUrl,
   shareInflight,
+  withAuthClientIp,
   withClientIpHeader,
 } from "@/lib/auth/auth-client-ip";
 
@@ -48,6 +50,46 @@ describe("client IP for Auth rate limits", () => {
     expect(
       withClientIpHeader("https://thegamies.gg/games", undefined, "203.0.113.8", authBase),
     ).toBeNull();
+  });
+});
+
+describe("auth fetch wrapper", () => {
+  const nativeFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = nativeFetch;
+    delete (globalThis as typeof globalThis & { [AUTH_CLIENT_IP_FETCH]?: unknown })[
+      AUTH_CLIENT_IP_FETCH
+    ];
+    vi.unstubAllEnvs();
+  });
+
+  it("sends the visitor address and does not call back into a later wrapper", async () => {
+    const calls: string[] = [];
+    const real: typeof fetch = async (_input, init) => {
+      calls.push("real");
+      return new Response(new Headers(init?.headers).get("x-forwarded-for"));
+    };
+    globalThis.fetch = real;
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+
+    const first = await withAuthClientIp("203.0.113.8", () =>
+      globalThis.fetch(`${authBase}/get-session`),
+    );
+    expect(await first.text()).toBe("203.0.113.8");
+
+    const ours = globalThis.fetch;
+    const outer: typeof fetch = (input, init) => {
+      calls.push("outer");
+      return ours(input, init);
+    };
+    globalThis.fetch = outer;
+
+    const second = await withAuthClientIp("198.51.100.4", () =>
+      globalThis.fetch(`${authBase}/sign-in/email`, { method: "POST" }),
+    );
+    expect(await second.text()).toBe("198.51.100.4");
+    expect(calls).toEqual(["real", "outer", "real"]);
   });
 });
 
