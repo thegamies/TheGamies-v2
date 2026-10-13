@@ -263,8 +263,9 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     dbImpact: 4,
     testPriority: 4,
     loadMix: true,
+    unitTests: true,
     notes:
-      "Default land. Standings rails plus a Workers-cached site trending strip. Streamer-link risk.",
+      "Default land. Public covers, standings, and the Pick’em banner share a 60-second Workers cache. Session and list buttons stay live. Streamer-link risk.",
   }),
   row({
     method: "GET",
