@@ -7,6 +7,10 @@ export const PICKEM_SCALE_SLUG_PREFIX = "seed_pem_";
 export const PICKEM_SCALE_MAX = 1000;
 export const PICKEM_SCALE_DEFAULT_YEAR = LOADTEST_TGA_YEAR;
 
+/** One nominee per award. The nominee id is part of the key so voters diverge. */
+export const PICKEM_SCALE_NOMINEE_RANK =
+  "md5(p.id::text || c.id::text || cn.nominee_id::text)";
+
 export function pickemScaleAuthUserId(index: number): string {
   return `${PICKEM_SCALE_AUTH_PREFIX}${String(index).padStart(4, "0")}`;
 }

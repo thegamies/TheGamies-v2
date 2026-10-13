@@ -3,6 +3,7 @@ import { parseOwnedUsername } from "@/lib/profile/username";
 import { slugifyCommunityName } from "@/lib/communities/schema";
 import {
   PICKEM_SCALE_MAX,
+  PICKEM_SCALE_NOMINEE_RANK,
   pickemScaleAuthBounds,
   pickemScaleAuthUserId,
   pickemScaleCommunityName,
@@ -48,6 +49,14 @@ describe("parsePickemScaleCount", () => {
     expect(parsePickemScaleCount(1000, "Users")).toBe(PICKEM_SCALE_MAX);
     expect(parsePickemScaleCount(0, "Users")).toHaveProperty("error");
     expect(parsePickemScaleCount(1001, "Communities")).toHaveProperty("error");
+  });
+});
+
+describe("pickem scale nominee rank", () => {
+  it("ranks nominees with the voter, the award, and the nominee", () => {
+    expect(PICKEM_SCALE_NOMINEE_RANK).toContain("p.id");
+    expect(PICKEM_SCALE_NOMINEE_RANK).toContain("c.id");
+    expect(PICKEM_SCALE_NOMINEE_RANK).toContain("cn.nominee_id");
   });
 });
 
