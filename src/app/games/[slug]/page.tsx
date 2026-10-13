@@ -23,8 +23,6 @@ import { countFollowsLibraryForGame } from "@/lib/activity/query";
 import { getLibraryEntry } from "@/lib/library/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
-import { adsenseAccountMetadata } from "@/lib/ads/adsense";
-
 type Params = Promise<{ slug: string }>;
 
 const COVER_WIDTH = 240;
@@ -46,7 +44,6 @@ export async function generateMetadata({
         path: `/games/${slug}`,
         image: ogImagePath({ kind: "game", slug }),
       }),
-      ...(data.hasPublicSiteValue ? adsenseAccountMetadata() : {}),
     };
   } catch {
     return { title: "Game" };

@@ -118,12 +118,12 @@ describe("adsenseAllowedOnPath", () => {
     expect(adsenseAllowedOnPath("/guidelines")).toBe(false);
   });
 
-  it("blocks catalog pagination and game detail paths", () => {
+  it("blocks catalog pagination and allows game pages", () => {
     expect(adsenseAllowedOnPath("/games", "page=1")).toBe(true);
     expect(adsenseAllowedOnPath("/games", "")).toBe(true);
     expect(adsenseAllowedOnPath("/games", "page=2")).toBe(false);
     expect(adsenseAllowedOnPath("/games?page=2")).toBe(false);
-    expect(adsenseAllowedOnPath("/games/mass-effect")).toBe(false);
+    expect(adsenseAllowedOnPath("/games/mass-effect")).toBe(true);
   });
 });
 
