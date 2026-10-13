@@ -29,6 +29,7 @@ vi.mock("./edition-results", () => ({
 }));
 
 import {
+  editionPageNeedsBallotCategories,
   loadEditionResultsOverview,
   loadEditionYearContext,
   loadPublishedEditionMeta,
@@ -231,5 +232,43 @@ describe("loadEditionResultsOverview", () => {
     releaseEnsure(meta);
     await pending;
     expect(gotyStarted).toBe(true);
+  });
+});
+
+describe("editionPageNeedsBallotCategories", () => {
+  it("skips award lists for an anonymous open event", () => {
+    expect(
+      editionPageNeedsBallotCategories({
+        status: "open",
+        showHostBallotPreview: false,
+        hasProfile: false,
+        isMember: false,
+        voterUsername: "",
+      }),
+    ).toBe(false);
+  });
+
+  it("loads award lists for a member who can edit", () => {
+    expect(
+      editionPageNeedsBallotCategories({
+        status: "open",
+        showHostBallotPreview: false,
+        hasProfile: true,
+        isMember: true,
+        voterUsername: "",
+      }),
+    ).toBe(true);
+  });
+
+  it("loads award lists for a published voter ballot", () => {
+    expect(
+      editionPageNeedsBallotCategories({
+        status: "published",
+        showHostBallotPreview: false,
+        hasProfile: false,
+        isMember: false,
+        voterUsername: "ada",
+      }),
+    ).toBe(true);
   });
 });

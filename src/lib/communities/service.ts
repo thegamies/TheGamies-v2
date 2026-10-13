@@ -454,15 +454,14 @@ async function queryCommunityBySlug(
   if (!community) return null;
 
   const memberWhere = eq(communityMembers.communityId, community.id);
-  const [memberCountRows, hostCountRows, viewerRows] = await Promise.all([
+  const [countRows, viewerRows] = await Promise.all([
     db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({
+        members: sql<number>`count(*)::int`,
+        hosts: sql<number>`count(*) filter (where ${communityMembers.role} = 'admin')::int`,
+      })
       .from(communityMembers)
       .where(memberWhere),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(communityMembers)
-      .where(and(memberWhere, eq(communityMembers.role, "admin"))),
     viewerProfileId
       ? db
           .select({ role: communityMembers.role })
@@ -479,8 +478,8 @@ async function queryCommunityBySlug(
 
   return toCommunityDetail(
     community,
-    Number(memberCountRows[0]?.n ?? 0),
-    Number(hostCountRows[0]?.n ?? 0),
+    Number(countRows[0]?.members ?? 0),
+    Number(countRows[0]?.hosts ?? 0),
     viewerRows[0] ? asRole(viewerRows[0].role) : null,
   );
 }

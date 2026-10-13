@@ -18,6 +18,23 @@ import type { SharedRankMode } from "@/lib/standings/shared-rank";
 
 export { editionForYear };
 
+/** Anonymous visitors on an open event see the sign-in prompt, not the editor. */
+export function editionPageNeedsBallotCategories(input: {
+  status: string;
+  showHostBallotPreview: boolean;
+  hasProfile: boolean;
+  isMember: boolean;
+  voterUsername: string;
+}): boolean {
+  return (
+    input.showHostBallotPreview ||
+    (input.hasProfile &&
+      input.isMember &&
+      input.status !== "scheduled") ||
+    (input.status === "published" && input.voterUsername.length > 0)
+  );
+}
+
 export async function loadEditionYearContext(
   slug: string,
   year: number,

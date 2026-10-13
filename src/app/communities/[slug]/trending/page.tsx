@@ -14,7 +14,7 @@ import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
 import { shouldIndexCommunityBoards } from "@/lib/seo/sitemap-plan";
@@ -106,6 +106,10 @@ export default async function CommunityTrendingPage({
     publicReady: true,
     distinctPeople: 0,
   }));
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -121,9 +125,8 @@ export default async function CommunityTrendingPage({
             : null
         }
         communityId={community.id}
-        tgaEnabled={
-          await communityTgaNavVisible(community.id).catch(() => false)
-        }
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="trending"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

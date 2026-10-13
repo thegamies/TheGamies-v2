@@ -24,11 +24,15 @@ export async function GET(
     }
     const { community, edition, viewerProfileId } = access;
 
-    await ensurePublishedEditionResults(community.id, edition.year);
+    const ensured = await ensurePublishedEditionResults(
+      community.id,
+      edition.year,
+    );
 
     const data = await getEditionComparisonBundle(edition.id, {
       viewerProfileId,
       rankMode: edition.rankMode,
+      skipCustomBackfill: Boolean(ensured && !("error" in ensured)),
     });
 
     return NextResponse.json(data);

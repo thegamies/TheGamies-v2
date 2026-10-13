@@ -35,7 +35,7 @@ import { LiveSettingsForm } from "./LiveSettingsForm";
 import { TgaSettings } from "./TgaSettings";
 import { listCurrentCommunityHosts } from "@/lib/communities/community-hosts";
 import {
-  communityTgaNavVisible,
+  communityTgaNavTarget,
   listCommunityTgaYears,
 } from "@/lib/tga-pickem/service";
 
@@ -136,6 +136,10 @@ export default async function CommunitySettingsPage({
     tab === "tga"
       ? await listCommunityTgaYears(community.id).catch(() => [])
       : [];
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -147,7 +151,8 @@ export default async function CommunitySettingsPage({
         editionStatus={featuredStatus}
         editionYear={featuredStatus && featured ? featured.year : null}
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

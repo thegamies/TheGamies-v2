@@ -1083,16 +1083,19 @@ export async function communityTgaNavVisible(
   communityId: string,
   db: Db = getDb(),
 ): Promise<boolean> {
-  const [row] = await db
-    .select({ year: tgaCommunityYears.year })
-    .from(tgaCommunityYears)
-    .innerJoin(tgaYears, eq(tgaYears.year, tgaCommunityYears.year))
-    .where(
-      and(
-        eq(tgaCommunityYears.communityId, communityId),
-        eq(tgaYears.enabled, true),
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
+  const target = await communityTgaNavTarget(communityId, db);
+  return target.enabled;
+}
+
+/**
+ * Header chip target. Same join as nav visibility, and the year so the chip
+ * does not fall through to the site promoted-year read (that one scans the slate).
+ */
+export async function communityTgaNavTarget(
+  communityId: string,
+  db: Db = getDb(),
+): Promise<{ enabled: boolean; year: number | null }> {
+  const promo = await getCommunityTgaPromoYear(communityId, db);
+  if (!promo) return { enabled: false, year: null };
+  return { enabled: true, year: promo.year };
 }

@@ -1,8 +1,5 @@
 import { redirect } from "next/navigation";
-import {
-  communityTgaNavVisible,
-  resolveTgaLandingYear,
-} from "@/lib/tga-pickem/service";
+import { getCommunityTgaPromoYear } from "@/lib/tga-pickem/service";
 import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
 import {
@@ -35,11 +32,9 @@ export default async function CommunityTgaIndexPage({
   ) {
     redirect(`/communities/${encodeURIComponent(community.slug)}`);
   }
-  const visible = await communityTgaNavVisible(community.id).catch(() => false);
-  if (!visible) redirect(`/communities/${slug}`);
-  const year = await resolveTgaLandingYear().catch(() => null);
-  if (year) {
-    redirect(`/communities/${slug}/the-game-awards/${year}`);
+  const promo = await getCommunityTgaPromoYear(community.id).catch(() => null);
+  if (promo) {
+    redirect(`/communities/${slug}/the-game-awards/${promo.year}`);
   }
   redirect(`/communities/${slug}`);
 }
