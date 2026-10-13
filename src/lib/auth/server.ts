@@ -1,4 +1,6 @@
 import { createNeonAuth } from "@neondatabase/auth/next/server";
+import { guardSessionReads } from "@/lib/auth/guard-session-reads";
+import { SESSION_DATA_TTL_SEC } from "@/lib/auth/session-cache-cookie";
 
 type NeonAuth = ReturnType<typeof createNeonAuth>;
 
@@ -20,14 +22,17 @@ let cached: NeonAuth | null | undefined;
 function createAuthOrNull(): NeonAuth | null {
   const env = readAuthEnv();
   if (!env) return null;
-  return createNeonAuth({
-    baseUrl: env.baseUrl,
-    cookies: {
-      secret: env.secret,
-      // Lax so the OAuth challenge cookie is sent on the Google return hop.
-      sameSite: "lax",
-    },
-  });
+  return guardSessionReads(
+    createNeonAuth({
+      baseUrl: env.baseUrl,
+      cookies: {
+        secret: env.secret,
+        // Lax so the OAuth challenge cookie is sent on the Google return hop.
+        sameSite: "lax",
+        sessionDataTtl: SESSION_DATA_TTL_SEC,
+      },
+    }),
+  );
 }
 
 /** Auth instance when env is set; otherwise null (pages can still render). */

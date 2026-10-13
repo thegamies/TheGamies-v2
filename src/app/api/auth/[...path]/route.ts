@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  clientIpFromHeaders,
+  withAuthClientIp,
+} from "@/lib/auth/auth-client-ip";
 import { getAuthOrNull } from "@/lib/auth/server";
+import { requestWithRefreshedSessionCache } from "@/lib/auth/session-cache-cookie";
 import {
   resetPasswordFormPath,
   tokenFromResetPasswordSegments,
@@ -39,7 +44,13 @@ export async function GET(
   if (resetRedirect) return resetRedirect;
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
-  return auth.handler().GET(request, context);
+  const next =
+    path.length === 1 && path[0] === "get-session"
+      ? requestWithRefreshedSessionCache(request)
+      : request;
+  return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
+    auth.handler().GET(next, context),
+  );
 }
 
 export async function POST(
@@ -48,5 +59,7 @@ export async function POST(
 ) {
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
-  return auth.handler().POST(request, context);
+  return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
+    auth.handler().POST(request, context),
+  );
 }
