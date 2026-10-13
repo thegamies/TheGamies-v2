@@ -99,7 +99,8 @@ describe("EditionResultsOverview comparison", () => {
                   gameId: "g1",
                   slug: "hades-ii",
                   title: "Hades II",
-                  coverUrl: null,
+                  coverUrl:
+                    "https://images.igdb.com/igdb/image/upload/t_cover_big/cohades.jpg",
                 },
               ],
               voices: [],
@@ -118,6 +119,11 @@ describe("EditionResultsOverview comparison", () => {
     expect(screen.getByRole("link", { name: /Hades II/ }).getAttribute("href")).toBe(
       "/games/hades-ii",
     );
+    const cover = document.querySelector("img");
+    expect(cover?.getAttribute("src")).toBe(
+      "https://images.igdb.com/igdb/image/upload/t_cover_big/cohades.jpg",
+    );
+    expect(cover?.getAttribute("srcset") ?? "").not.toContain("w=3840");
     expect(screen.getByText("Community")).toBeTruthy();
   });
 });

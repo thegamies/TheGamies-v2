@@ -17,6 +17,11 @@ type GameCoverProps = {
   dimmed?: boolean;
   /** Inset pick / result chrome painted above artwork. */
   frame?: "accent" | "success" | "miss";
+  /**
+   * One image URL, no srcset. Standings cards are ~200px; the default srcset
+   * lists widths up to 3840 and that list is most of the document.
+   */
+  unoptimized?: boolean;
 };
 
 export function GameCover({
@@ -29,6 +34,7 @@ export function GameCover({
   fluid = false,
   dimmed = false,
   frame,
+  unoptimized = false,
 }: GameCoverProps) {
   const fixed = !fluid && width != null && height != null;
 
@@ -44,6 +50,7 @@ export function GameCover({
           src={imageUrl}
           alt={title}
           fill
+          unoptimized={unoptimized}
           priority={priority}
           draggable={false}
           className={`pointer-events-none object-cover ${dimmed ? "opacity-40" : ""}`}

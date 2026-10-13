@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "@/lib/next-link";
 import {
   useEffect,
   useRef,
@@ -10,7 +9,7 @@ import {
   type CSSProperties,
   type MouseEvent,
 } from "react";
-import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
+import { StandingCardTitle } from "@/components/communities/StandingGameCard";
 
 type TieGame = {
   gameId: string;
@@ -40,6 +39,7 @@ function StackCover({
           src={imageUrl}
           alt={title}
           fill
+          unoptimized
           draggable={false}
           className="pointer-events-none object-cover"
           sizes="(max-width: 1023px) 103px, 206px"
@@ -115,7 +115,6 @@ export function CompactTieStack({
   games,
   className = "w-[103px] lg:w-[206px]",
   titleMaxPx = 18,
-  titleMinPx = 12,
 }: {
   games: TieGame[];
   className?: string;
@@ -254,29 +253,16 @@ export function CompactTieStack({
       </button>
 
       {shown.slug.trim() ? (
-        <Link
-          href={`/games/${shown.slug}`}
-          className="group mt-2 block min-w-0"
-        >
-          <FitDisplayTitle
-            className="w-full group-hover:text-accent"
+        <a href={`/games/${shown.slug}`} className="group mt-2 block min-w-0">
+          <StandingCardTitle
+            title={shown.title}
             maxPx={titleMaxPx}
-            minPx={titleMinPx}
-            lines={2}
-          >
-            {shown.title}
-          </FitDisplayTitle>
-        </Link>
+            className="group-hover:text-accent"
+          />
+        </a>
       ) : (
         <div className="mt-2 min-w-0">
-          <FitDisplayTitle
-            className="w-full"
-            maxPx={titleMaxPx}
-            minPx={titleMinPx}
-            lines={2}
-          >
-            {shown.title}
-          </FitDisplayTitle>
+          <StandingCardTitle title={shown.title} maxPx={titleMaxPx} />
         </div>
       )}
     </div>

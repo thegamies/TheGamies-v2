@@ -293,7 +293,6 @@ function CategoryRankedSections({
                       coverUrl={row.coverUrl}
                       points={row.votes}
                       scoreUnit="votes"
-                      priority={row.rank === 1}
                       pinCover
                     />
                   </li>

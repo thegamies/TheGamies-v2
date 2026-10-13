@@ -1,6 +1,4 @@
-import Link from "@/lib/next-link";
 import type { ReactNode } from "react";
-import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
 import {
@@ -32,9 +30,9 @@ function OptionalGameLink({
   const href = standingGameHref(slug);
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className}>
+    <a href={href} className={className} draggable={false}>
       {children}
-    </Link>
+    </a>
   );
 }
 
@@ -175,8 +173,8 @@ export function StandingGameCard({
           chrome.placeBeforeTitle && placeSize === "lg" ? "pt-1" : ""
         }`}
       >
-        <FitDisplayTitle
-          className="w-full group-hover:text-accent"
+        <StandingCardTitle
+          title={title}
           maxPx={
             placeSize === "lg"
               ? place != null && place <= 3
@@ -184,12 +182,9 @@ export function StandingGameCard({
                 : 16
               : 18
           }
-          minPx={12}
-          lines={2}
           reserve={chrome.reserveTitle}
-        >
-          {title}
-        </FitDisplayTitle>
+          className="group-hover:text-accent"
+        />
         {meta ? (
           <p
             className={`text-xs text-muted ${
@@ -214,9 +209,15 @@ export function StandingGameCard({
         fluid
         width={MATRIX_COVER_WIDE.width}
         height={MATRIX_COVER_WIDE.height}
+        unoptimized
       />
     ) : (
-      <GameCover title={title} imageUrl={coverUrl} priority={priority} />
+      <GameCover
+        title={title}
+        imageUrl={coverUrl}
+        priority={priority}
+        unoptimized
+      />
     );
 
   const pinnedCover = pinCover ? (
@@ -245,9 +246,44 @@ export function StandingGameCard({
     return <div className={linkClass}>{body}</div>;
   }
   return (
-    <Link href={to} className={linkClass} draggable={false}>
+    <a href={to} className={linkClass} draggable={false}>
       {body}
-    </Link>
+    </a>
+  );
+}
+
+const TITLE_LINE_HEIGHT = 1.375;
+
+/** Two-line title. Ordinary HTML so a grid of cards is not copied into the client payload. */
+export function StandingCardTitle({
+  title,
+  maxPx,
+  reserve = true,
+  className = "",
+}: {
+  title: string;
+  maxPx: number;
+  reserve?: boolean;
+  className?: string;
+}) {
+  const reservedPx = Math.ceil(2 * maxPx * TITLE_LINE_HEIGHT);
+  return (
+    <span
+      className="block w-full"
+      style={reserve ? { minHeight: reservedPx } : undefined}
+    >
+      <p
+        title={title}
+        className={`w-full overflow-hidden font-display tracking-wide text-ink line-clamp-2 ${className}`}
+        style={{
+          fontSize: maxPx,
+          lineHeight: TITLE_LINE_HEIGHT,
+          maxHeight: `calc(2 * ${TITLE_LINE_HEIGHT}em)`,
+        }}
+      >
+        {title}
+      </p>
+    </span>
   );
 }
 
