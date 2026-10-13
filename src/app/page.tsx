@@ -1,7 +1,4 @@
-import {
-  HomeBigPictureBanner,
-  type HomeBigPictureGame,
-} from "@/components/home/HomeBigPictureBanner";
+import { HomeBigPictureBanner } from "@/components/home/HomeBigPictureBanner";
 import { HomeCoverStrip } from "@/components/home/HomeCoverStrip";
 import {
   HomeCommunitiesIntro,
@@ -9,26 +6,9 @@ import {
   HomeWhatIs,
 } from "@/components/home/HomePitch";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
-import { listHomeBigPictureGames } from "@/lib/home/big-picture-games";
-import {
-  listHomeTrendingGames,
-  listHomeUpcomingGames,
-  type HomeDiscoverGame,
-} from "@/lib/home/discover-games";
-import { getCategoryHighlightsForYears } from "@/lib/live-aggregate/category-highlights";
-import { orderLandingStandingsBoards } from "@/lib/live-aggregate/landing-order";
-import {
-  filterYearsWithPublicGoty,
-  getGotyThroughRankForYears,
-  TOP_STANDINGS_RANK,
-} from "@/lib/live-aggregate/service";
+import { loadHomePublic } from "@/lib/home/load-home-public";
 import { gotyCreatorCta, type GotyCreatorCta } from "@/lib/lists/existing-goty";
 import { loadGotyCreatorCtas } from "@/lib/lists/load-goty-creator-cta";
-import {
-  getSiteSettings,
-  resolveLandingStandingsYears,
-} from "@/lib/site-settings/service";
-import { DEFAULT_STANDING_FILL_MIN_VISIBLE } from "@/lib/standings/standing-fill";
 import { SiteAds } from "@/components/ads/AdsLayout";
 import { adsenseAccountMetadata } from "@/lib/ads/adsense";
 import { gamesBrowseHref, trendingHref } from "@/lib/activity/paths";
@@ -36,8 +16,6 @@ import { getRequestSessionUser } from "@/lib/auth/session";
 import { publicPageMetadata, SITE_DESCRIPTION, SITE_NAME } from "@/lib/seo/site";
 import { PromoBanner } from "@/components/promo/PromoBanner";
 import { tgaPromoCopy } from "@/lib/tga-pickem/promo";
-import { getPromotedTgaYear } from "@/lib/tga-pickem/service";
-import type { TgaYearSchedule } from "@/lib/tga-pickem/status";
 
 export const metadata = {
   ...publicPageMetadata({
@@ -49,119 +27,25 @@ export const metadata = {
   title: { absolute: SITE_NAME },
 };
 
-type HomeYearSection = {
-  year: number;
-  rows: Array<{
-    place: number;
-    gameId: string;
-    slug: string;
-    title: string;
-    coverUrl: string | null;
-    score: number | null;
-  }>;
-  yearHref: string;
-  categoryWinners?: Array<{
-    categoryId: string;
-    label: string;
-    games: Array<{
-      gameId: string;
-      slug: string;
-      title: string;
-      coverUrl: string | null;
-    }>;
-  }>;
-  creatorCta?: GotyCreatorCta;
-};
-
 export default async function HomePage() {
-  let sections: HomeYearSection[] = [];
-  let minVisible = DEFAULT_STANDING_FILL_MIN_VISIBLE;
-  let bigPictureGames: HomeBigPictureGame[] = [];
-  let trendingGames: HomeDiscoverGame[] = [];
-  let upcomingGames: HomeDiscoverGame[] = [];
-  let tgaBand: (TgaYearSchedule & { year: number }) | null = null;
-  const sessionUser = await getRequestSessionUser();
-  const signedIn = Boolean(sessionUser?.id);
   const listYear = new Date().getUTCFullYear();
-
-  try {
-    const settings = await getSiteSettings();
-    minVisible = settings.standingFillMinVisible;
-    const years = await filterYearsWithPublicGoty(
-      resolveLandingStandingsYears(settings.landingStandingsYears),
-    );
-    const [boards, highlights, popular, creatorCtas, promotedTga, trending, upcoming] =
-      await Promise.all([
-        getGotyThroughRankForYears(years, {
-          maxRank: TOP_STANDINGS_RANK,
-        }),
-        getCategoryHighlightsForYears(years),
-        listHomeBigPictureGames(),
-        loadGotyCreatorCtas([...years, listYear]).catch(
-          () => new Map<number, GotyCreatorCta>(),
-        ),
-        getPromotedTgaYear().catch(() => null),
-        listHomeTrendingGames({
-          minPeople: settings.publicTrendingMinPeople,
-        }),
-        listHomeUpcomingGames(),
-      ]);
-    if (promotedTga) {
-      tgaBand = {
-        year: promotedTga.year,
-        enabled: promotedTga.enabled,
-        opensAt: promotedTga.opensAt,
-        showStartsAt: promotedTga.showStartsAt,
-      };
-    }
-    bigPictureGames = popular;
-    trendingGames = trending;
-    upcomingGames = upcoming;
-    const winnersByYear = new Map(
-      highlights.map((block) => [block.year, block.winners]),
-    );
-    sections = orderLandingStandingsBoards(boards).map((board) => ({
-      year: board.year,
-      yearHref: `/game-of-the-year/${board.year}`,
-      rows: board.rows.map((row) => ({
-        place: row.place,
-        gameId: row.gameId,
-        slug: row.slug,
-        title: row.title,
-        coverUrl: row.coverUrl,
-        score: row.score,
-      })),
-      categoryWinners: winnersByYear.get(board.year) ?? [],
-      creatorCta:
-        creatorCtas.get(board.year) ?? gotyCreatorCta(board.year, null),
-    }));
-  } catch {
-    sections = [];
-    try {
-      const [popular, trending, upcoming] = await Promise.all([
-        listHomeBigPictureGames(),
-        listHomeTrendingGames(),
-        listHomeUpcomingGames(),
-      ]);
-      bigPictureGames = popular;
-      trendingGames = trending;
-      upcomingGames = upcoming;
-    } catch {
-      bigPictureGames = [];
-    }
-  }
-
-  if (!tgaBand) {
-    const promotedTga = await getPromotedTgaYear().catch(() => null);
-    if (promotedTga) {
-      tgaBand = {
-        year: promotedTga.year,
-        enabled: promotedTga.enabled,
-        opensAt: promotedTga.opensAt,
-        showStartsAt: promotedTga.showStartsAt,
-      };
-    }
-  }
+  const [sessionUser, home] = await Promise.all([
+    getRequestSessionUser(),
+    loadHomePublic(),
+  ]);
+  const signedIn = Boolean(sessionUser?.id);
+  const creatorCtas = home.standingsReady
+    ? await loadGotyCreatorCtas([...home.years, listYear]).catch(
+        () => new Map<number, GotyCreatorCta>(),
+      )
+    : new Map<number, GotyCreatorCta>();
+  const sections = home.sections.map((section) => ({
+    ...section,
+    creatorCta:
+      creatorCtas.get(section.year) ?? gotyCreatorCta(section.year, null),
+  }));
+  const { minVisible, bigPictureGames, trendingGames, upcomingGames } = home;
+  const tgaBand = home.tga;
 
   const featuredYear = sections[0] ?? null;
   const laterYears = sections.slice(1);
