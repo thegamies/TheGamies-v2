@@ -50,10 +50,6 @@ import {
   type PgStatSnapshotRow,
 } from "@/lib/request-cost/pg-stat-delta";
 import {
-  ensureLoadSessionCookie,
-  type LoadCookieSlot,
-} from "@/lib/request-cost/load-session";
-import {
   assertLoadtestFixturesSafe,
   LOADTEST_BALLOT_ITEM_COUNT,
   LOADTEST_EDITION_FILLING_YEAR,
@@ -66,6 +62,7 @@ import {
   pickLoadtestGame,
   pickLoadtestGames,
   pickLoadtestShareList,
+  LOADTEST_WRITER_HEADER,
   type LoadtestFixturesFile,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
@@ -78,9 +75,7 @@ import { getTgaYear } from "@/lib/tga-pickem/service";
 import { loadtestSecretFromEnv } from "@/lib/qa/loadtest-guard";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
-type CookieFile = { writers: Array<{ index: number; cookie: string }> };
-
-type WriterSlot = LoadCookieSlot & { list: WriterListState };
+type WriterSlot = { list: WriterListState };
 
 function stampUtc(d: Date): string {
   return d.toISOString().replace(/[:.]/g, "-");
@@ -175,7 +170,6 @@ async function runScenario(input: {
   vusRead: number;
   writers: number;
   fixtures: LoadtestFixturesFile;
-  cookies: string[];
   secret: string | null;
   tag: string;
   skipRepair: boolean;
@@ -264,16 +258,13 @@ async function runScenario(input: {
     }
   });
 
-  const cookieSlots: WriterSlot[] = input.cookies.map((cookie) => ({
-    cookie,
-    refreshedAt: 0,
-    inflight: null,
+  const writerSlots: WriterSlot[] = Array.from({ length: input.writers }, () => ({
     list: emptyWriterListState(),
   }));
 
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
-    const slot = cookieSlots[i % Math.max(cookieSlots.length, 1)];
-    if (!slot?.cookie || !input.secret || writesOpen.length === 0) return;
+    const slot = writerSlots[i];
+    if (!slot || !input.secret || writesOpen.length === 0) return;
     const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
     if (delay > 0) await sleep(delay);
 
@@ -284,7 +275,7 @@ async function runScenario(input: {
           accept: "application/json",
           "content-type": "application/json",
           authorization: `Bearer ${input.secret}`,
-          cookie: slot.cookie,
+          [LOADTEST_WRITER_HEADER]: String(i + 1),
           "x-cost-journey": journey,
           "x-cost-step": step,
         },
@@ -292,13 +283,8 @@ async function runScenario(input: {
       });
 
     const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
-      let res = await postWrite(op, body, step);
-      let text = await res.text().catch(() => "");
-      if (res.status === 401) {
-        await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), true);
-        res = await postWrite(op, body, step);
-        text = await res.text().catch(() => "");
-      }
+      const res = await postWrite(op, body, step);
+      const text = await res.text().catch(() => "");
       return { res, text };
     };
 
@@ -319,7 +305,6 @@ async function runScenario(input: {
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? writesLocked : writesOpen,
       );
-      await ensureLoadSessionCookie(slot, input.appUrl, Date.now(), false);
       const games =
         item.op === "list-create" ||
         item.op === "list-edit" ||
@@ -441,13 +426,9 @@ async function main() {
   const unsafe = assertLoadtestFixturesSafe(fixtures);
   if (unsafe) throw new Error(unsafe);
 
-  const cookieFile = await readJson<CookieFile>(
-    path.join(fixtureDir, "cookies.json"),
-  ).catch(() => ({ writers: [] as CookieFile["writers"] }));
-  const cookies = cookieFile.writers.map((row) => row.cookie);
-  if (args.writers > cookies.length) {
+  if (args.writers > fixtures.writerCount) {
     throw new Error(
-      `Need ${args.writers} writer cookies; run pnpm qa:loadtest:ensure -- --writers ${args.writers}`,
+      `Need ${args.writers} writer profiles; run pnpm qa:loadtest:ensure -- --writers ${args.writers}`,
     );
   }
   const secret = loadtestSecretFromEnv();
@@ -473,7 +454,6 @@ async function main() {
       vusRead: args.vusRead,
       writers: args.writers,
       fixtures,
-      cookies: cookies.slice(0, args.writers),
       secret,
       tag,
       skipRepair,

@@ -1,12 +1,11 @@
 /**
- * Idempotently create load-test accounts, gamies_qa_load, one public custom
+ * Idempotently create load-test profiles (no Neon Auth login), gamies_qa_load, one public custom
  * share list per account, open + published editions, and opt the load
  * community into TGA 2025. Does not change the 2025 show schedule (the load
  * runner does that). Never touches QA showcase. Refuses production.
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { neon } from "@neondatabase/serverless";
 import { and, asc, desc, eq, isNull, lte, notInArray } from "drizzle-orm";
 import {
   communities,
@@ -16,11 +15,6 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
-import {
-  removeNeonAuthDirectoryUser,
-  type NeonSql,
-} from "@/lib/auth/remove-neon-auth-user";
 import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
 import { createCommunityEdition, getEditionByCommunityYear } from "@/lib/communities/editions";
 import {
@@ -40,6 +34,7 @@ import {
   LOADTEST_UNPOPULAR_POOL,
   loadtestAccount,
   loadtestEditionOpenSchedule,
+  loadtestSyntheticAuthUserId,
   mergeLoadtestGameBands,
   parseWriterCount,
   type LoadtestFixturesFile,
@@ -56,152 +51,32 @@ function log(message: string) {
   console.log(`qa-loadtest: ${message}`);
 }
 
-function rowsOf(result: unknown): Array<Record<string, unknown>> {
-  if (Array.isArray(result)) return result;
-  const rows = (result as { rows?: unknown })?.rows;
-  return Array.isArray(rows) ? rows : [];
-}
-
 function parseEnsureWriters(argv: string[]): number | { error: string } {
   const idx = argv.indexOf("--writers");
   if (idx === -1) return 0;
   return parseWriterCount(argv[idx + 1]);
 }
 
-function cookieHeaderFromResponse(res: Response): string {
-  const getSetCookie = (
-    res.headers as Headers & { getSetCookie?: () => string[] }
-  ).getSetCookie;
-  const parts =
-    typeof getSetCookie === "function"
-      ? getSetCookie.call(res.headers)
-      : [res.headers.get("set-cookie") ?? ""];
-  return parts
-    .flatMap((header) => header.split(/,(?=\s*[^;]+=)/))
-    .map((part) => part.split(";")[0]?.trim())
-    .filter(Boolean)
-    .join("; ");
-}
-
-async function authPost(appUrl: string, endpoint: string, body: unknown) {
-  return fetch(`${appUrl}/api/auth/${endpoint}`, {
-    method: "POST",
-    headers: { "content-type": "application/json", origin: appUrl },
-    body: JSON.stringify(body),
-  });
-}
-
-async function authPostRetrying(
-  appUrl: string,
-  endpoint: string,
-  body: unknown,
-  label: string,
-) {
-  let res: Response | null = null;
-  for (let attempt = 0; attempt < 8; attempt++) {
-    res = await authPost(appUrl, endpoint, body);
-    if (res.ok) return res;
-    if (res.status !== 429 || attempt === 7) return res;
-    log(`${label}: HTTP 429, waiting`);
-    await sleep(4000 * (attempt + 1));
-  }
-  return res!;
-}
-
-async function findAuthUserId(query: NeonSql, email: string) {
-  const result =
-    await query`SELECT id FROM neon_auth."user" WHERE lower(email) = lower(${email}) LIMIT 1`;
-  const id = rowsOf(result)[0]?.id;
-  return typeof id === "string" ? id : null;
-}
-
-async function sleep(ms: number) {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function ensureAuthUser(
-  appUrl: string,
-  password: string,
-  query: NeonSql,
-  index: number,
-): Promise<{ authUserId: string; cookie: string }> {
-  const account = loadtestAccount(index);
-  let authUserId = await findAuthUserId(query, account.email);
-  if (!authUserId) {
-    const res = await authPostRetrying(appUrl, "sign-up/email", {
-      email: account.email,
-      password,
-      name: account.displayName,
-    }, account.username);
-    if (!res.ok) {
-      throw new Error(`sign-up ${account.username} failed HTTP ${res.status}`);
-    }
-    await sleep(1500);
-    authUserId = await findAuthUserId(query, account.email);
-    log(`${account.username}: created auth user`);
-  }
-  if (!authUserId) throw new Error(`${account.username}: auth user missing`);
-  await markNeonAuthEmailVerified({ authUserId, query });
-
-  let signIn = await authPostRetrying(appUrl, "sign-in/email", {
-    email: account.email,
-    password,
-  }, account.username);
-  if (!signIn.ok) {
-    log(`${account.username}: sign-in failed HTTP ${signIn.status}, recreating`);
-    await removeNeonAuthDirectoryUser(authUserId, {
-      query,
-      email: account.email,
-    });
-    const res = await authPostRetrying(appUrl, "sign-up/email", {
-      email: account.email,
-      password,
-      name: account.displayName,
-    }, account.username);
-    if (!res.ok) {
-      throw new Error(`re-sign-up ${account.username} failed HTTP ${res.status}`);
-    }
-    authUserId = await findAuthUserId(query, account.email);
-    if (!authUserId) throw new Error(`${account.username}: missing after recreate`);
-    await markNeonAuthEmailVerified({ authUserId, query });
-    signIn = await authPostRetrying(appUrl, "sign-in/email", {
-      email: account.email,
-      password,
-    }, account.username);
-    if (!signIn.ok) {
-      throw new Error(
-        `${account.username}: sign-in still failing HTTP ${signIn.status}`,
-      );
-    }
-  }
-  const cookie = cookieHeaderFromResponse(signIn);
-  if (!cookie) throw new Error(`${account.username}: no session cookie`);
-  return { authUserId, cookie };
-}
-
-async function ensureProfile(db: Db, index: number, authUserId: string) {
+async function ensureProfile(db: Db, index: number) {
   const account = loadtestAccount(index);
   const [byUsername] = await db
-    .select({ id: profiles.id, authUserId: profiles.authUserId })
+    .select({ id: profiles.id })
     .from(profiles)
     .where(eq(profiles.username, account.username))
     .limit(1);
-  if (byUsername && byUsername.authUserId !== authUserId) {
+  if (byUsername) {
     await db
       .update(profiles)
-      .set({ authUserId, updatedAt: new Date() })
+      .set({ visibility: "public" })
       .where(eq(profiles.id, byUsername.id));
+    return byUsername.id;
   }
   const ensured = await ensureProfileForAuthUser({
-    authUserId,
+    authUserId: loadtestSyntheticAuthUserId(index),
     username: account.username,
     displayName: account.displayName,
   });
   if ("error" in ensured) throw new Error(`${account.username}: ${ensured.error}`);
-  await db
-    .update(profiles)
-    .set({ visibility: "public" })
-    .where(eq(profiles.id, ensured.profile.id));
   return ensured.profile.id;
 }
 
@@ -307,28 +182,12 @@ async function main() {
   const accountCount = Math.max(1, writers);
   log(`target ${target.appUrl}, writers ${writers} (accounts ${accountCount})`);
 
-  const query = neon(target.databaseUrl) as unknown as NeonSql;
   const db = createDb(target.databaseUrl);
 
-  const cookies: Array<{ index: number; cookie: string }> = [];
   const profileIds: string[] = [];
   for (let index = 1; index <= accountCount; index++) {
-    const { authUserId, cookie } = await ensureAuthUser(
-      target.appUrl,
-      target.password,
-      query,
-      index,
-    );
-    const profileId = await ensureProfile(db, index, authUserId);
-    profileIds.push(profileId);
-    if (index <= writers || writers === 0) {
-      cookies.push({ index, cookie });
-    }
-    if (index > 1) {
-      await sleep(3000);
-    }
+    profileIds.push(await ensureProfile(db, index));
   }
-  if (writers === 0) cookies.length = 0;
   log("accounts ready");
 
   const hostProfileId = profileIds[0]!;
@@ -465,10 +324,7 @@ async function main() {
     path.join(outDir, "fixtures.json"),
     JSON.stringify(fixtures, null, 2),
   );
-  await writeFile(
-    path.join(outDir, "cookies.json"),
-    JSON.stringify({ writers: cookies }, null, 2),
-  );
+  await rm(path.join(outDir, "cookies.json"), { force: true });
   log(`wrote ${path.relative(process.cwd(), outDir)}`);
 }
 

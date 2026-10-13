@@ -13,6 +13,8 @@ import {
   isLoadtestEmail,
   loadtestAccount,
   loadtestAccountsValidThrough,
+  loadtestSyntheticAuthUserId,
+  parseLoadtestWriterHeader,
   loadtestEditionOpenSchedule,
   loadtestTgaLockedSchedule,
   loadtestTgaOpenSchedule,
@@ -52,6 +54,14 @@ describe("loadtest identities", () => {
     expect(
       assertLoadtestFixturesSafe({ communitySlug: LOADTEST_COMMUNITY.slug }),
     ).toBeNull();
+  });
+
+  it("names a writer from the header and not from a login", () => {
+    expect(parseLoadtestWriterHeader("7")).toBe(7);
+    expect(parseLoadtestWriterHeader("0")).toBeNull();
+    expect(parseLoadtestWriterHeader("101")).toBeNull();
+    expect(parseLoadtestWriterHeader(null)).toBeNull();
+    expect(loadtestSyntheticAuthUserId(1)).toBe("seed:loadtest:gamies_qa_load_001");
   });
 
   it("caps writers at 100", () => {

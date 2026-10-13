@@ -1070,7 +1070,7 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     usage: 1,
     dbImpact: 5,
     testPriority: 2,
-    notes: "Staging write harness for lists, library, ballots, Pick’em. Not production.",
+    notes: "Staging write harness. Secret plus a writer index, not a login. Not production.",
   }),
   row({
     method: "GET",

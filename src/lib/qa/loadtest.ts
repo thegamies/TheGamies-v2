@@ -70,6 +70,20 @@ export function isLoadtestUsername(username: string): boolean {
   );
 }
 
+/** Load-test writes name the writer. They do not sign in. */
+export const LOADTEST_WRITER_HEADER = "x-loadtest-writer";
+
+export function parseLoadtestWriterHeader(raw: string | null): number | null {
+  const parsed = parseWriterCount(raw);
+  if (typeof parsed !== "number" || parsed < 1) return null;
+  return parsed;
+}
+
+export function loadtestSyntheticAuthUserId(index: number): string {
+  const account = loadtestAccount(index);
+  return `seed:loadtest:${account.username}`;
+}
+
 export function parseWriterCount(raw: unknown): number | { error: string } {
   const n = typeof raw === "number" ? raw : Number(String(raw ?? "").trim());
   if (!Number.isInteger(n) || n < 0) {
