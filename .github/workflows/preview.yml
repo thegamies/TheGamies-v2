@@ -131,6 +131,7 @@ jobs:
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
+          LOADTEST_SECRET: ${{ secrets.LOADTEST_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
           R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
@@ -162,6 +163,7 @@ jobs:
             "NEON_AUTH_BASE_URL",
             "NEON_AUTH_COOKIE_SECRET",
             "ADMIN_SYNC_SECRET",
+            "LOADTEST_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
             "R2_ACCOUNT_ID",

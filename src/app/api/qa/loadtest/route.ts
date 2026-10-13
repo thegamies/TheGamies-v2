@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import {
-  getRequestProfileByAuthUserId,
-  getRequestSessionUser,
-} from "@/lib/auth/session";
+import { getProfileByUsername } from "@/lib/profile/service";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveOwnedListFromClientDraft } from "@/lib/lists/service";
 import { setLibraryStatus } from "@/lib/library/service";
@@ -13,6 +10,9 @@ import { getCommunityBySlug } from "@/lib/communities/service";
 import {
   LOADTEST_COMMUNITY,
   LOADTEST_TGA_YEAR,
+  LOADTEST_WRITER_HEADER,
+  loadtestAccount,
+  parseLoadtestWriterHeader,
 } from "@/lib/qa/loadtest";
 import {
   authorizeLoadtestRequest,
@@ -91,11 +91,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   }
 
-  const user = await getRequestSessionUser();
-  if (!user?.id) {
-    return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+  const writerIndex = parseLoadtestWriterHeader(
+    request.headers.get(LOADTEST_WRITER_HEADER),
+  );
+  if (writerIndex == null) {
+    return NextResponse.json({ error: "Writer required." }, { status: 400 });
   }
-  const profile = await getRequestProfileByAuthUserId(user.id).catch(() => null);
+  const account = loadtestAccount(writerIndex);
+  const profile = await getProfileByUsername(account.username).catch(() => null);
   if (!profile) {
     return NextResponse.json({ error: "Profile required." }, { status: 401 });
   }

@@ -1,8 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const session = vi.hoisted(() => ({
-  getRequestSessionUser: vi.fn(),
-  getRequestProfileByAuthUserId: vi.fn(),
+const profiles = vi.hoisted(() => ({
+  getProfileByUsername: vi.fn(),
 }));
 const saves = vi.hoisted(() => ({
   saveOwnedListFromClientDraft: vi.fn(),
@@ -12,7 +11,7 @@ const saves = vi.hoisted(() => ({
   getCommunityBySlug: vi.fn(),
 }));
 
-vi.mock("@/lib/auth/session", () => session);
+vi.mock("@/lib/profile/service", () => profiles);
 vi.mock("@/lib/lists/service", () => ({
   saveOwnedListFromClientDraft: saves.saveOwnedListFromClientDraft,
 }));
@@ -36,13 +35,16 @@ function req(
   url: string,
   body: unknown,
   authorization = "Bearer load-s3cret",
+  writer: string | null = "1",
 ) {
+  const headers = new Headers({
+    authorization,
+    "content-type": "application/json",
+  });
+  if (writer) headers.set("x-loadtest-writer", writer);
   return new Request(url, {
     method: "POST",
-    headers: {
-      authorization,
-      "content-type": "application/json",
-    },
+    headers,
     body: JSON.stringify(body),
   });
 }
@@ -50,8 +52,8 @@ function req(
 describe("POST /api/qa/loadtest", () => {
   beforeEach(() => {
     vi.stubEnv("LOADTEST_SECRET", "load-s3cret");
-    session.getRequestSessionUser.mockReset();
-    session.getRequestProfileByAuthUserId.mockReset();
+    profiles.getProfileByUsername.mockReset();
+    profiles.getProfileByUsername.mockResolvedValue({ id: "p1" });
     for (const fn of Object.values(saves)) fn.mockReset();
   });
 
@@ -78,9 +80,34 @@ describe("POST /api/qa/loadtest", () => {
     expect(res.status).toBe(401);
   });
 
+  it("requires a writer index", async () => {
+    const res = await POST(
+      req(
+        "https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest",
+        { op: "library", gameId: "g", gameSlug: "g", status: "playing" },
+        "Bearer load-s3cret",
+        null,
+      ),
+    );
+    expect(res.status).toBe(400);
+    expect(profiles.getProfileByUsername).not.toHaveBeenCalled();
+  });
+
+  it("401s when the writer profile is missing", async () => {
+    profiles.getProfileByUsername.mockResolvedValue(null);
+    const res = await POST(
+      req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
+        op: "library",
+        gameId: "g",
+        gameSlug: "g",
+        status: "playing",
+      }),
+    );
+    expect(res.status).toBe(401);
+    expect(saves.setLibraryStatus).not.toHaveBeenCalled();
+  });
+
   it("refuses the QA showcase community", async () => {
-    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
-    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
     const res = await POST(
       req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
         op: "ballot",
@@ -94,8 +121,6 @@ describe("POST /api/qa/loadtest", () => {
   });
 
   it("creates a list and returns publicId", async () => {
-    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
-    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
     saves.saveOwnedListFromClientDraft.mockResolvedValue({
       list: { publicId: "lst_load" },
     });
@@ -121,8 +146,6 @@ describe("POST /api/qa/loadtest", () => {
   });
 
   it("rejects the old list op name", async () => {
-    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
-    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
     const res = await POST(
       req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
         op: "list",
@@ -134,8 +157,6 @@ describe("POST /api/qa/loadtest", () => {
   });
 
   it("saves a library row when authorized", async () => {
-    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
-    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
     saves.setLibraryStatus.mockResolvedValue({});
     const res = await POST(
       req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
@@ -149,11 +170,10 @@ describe("POST /api/qa/loadtest", () => {
     expect(saves.setLibraryStatus).toHaveBeenCalledWith("p1", "g1", {
       status: "playing",
     });
+    expect(profiles.getProfileByUsername).toHaveBeenCalledWith("gamies_qa_load_001");
   });
 
   it("rejects pickem writes for a non-open load year", async () => {
-    session.getRequestSessionUser.mockResolvedValue({ id: "u1" });
-    session.getRequestProfileByAuthUserId.mockResolvedValue({ id: "p1" });
     const res = await POST(
       req("https://thegamies-v2-develop.ecdm981.workers.dev/api/qa/loadtest", {
         op: "pickem",
