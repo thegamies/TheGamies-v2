@@ -134,7 +134,7 @@ export function encodeMeteredDbTripsHeader(trips: DbCostTrip[]): string {
     ms: trip.ms,
     sql: trip.sql,
   }));
-  let json = JSON.stringify(compact);
+  const json = JSON.stringify(compact);
   if (json.length <= TRIP_HEADER_MAX) return json;
   return JSON.stringify(
     compact.map((trip) => ({
