@@ -41,7 +41,7 @@ describe("SITE_ENDPOINTS", () => {
     const home = SITE_ENDPOINTS.find((row) => row.path === "/")!;
     const terms = SITE_ENDPOINTS.find((row) => row.path === "/terms")!;
     const createGoty = SITE_ENDPOINTS.find((row) => row.path === "/create/goty")!;
-    expect(endpointCoverage(home).label).toBe("Load mix");
+    expect(endpointCoverage(home).label).toBe("Load mix · Unit");
     expect(endpointCoverage(terms).label).toBe("Not yet");
     expect(createGoty.loadMix).toBe(true);
     expect(endpointCoverage(createGoty).label).toContain("Load mix");
