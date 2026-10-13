@@ -4,6 +4,8 @@ import { parseOwnedUsername } from "@/lib/profile/username";
 import { slugifyCommunityName } from "@/lib/communities/schema";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import {
+  LOADTEST_EDITION_HOSTS,
+  LOADTEST_EDITION_SEED_BALLOTS,
   LOADTEST_COMMUNITY,
   LOADTEST_TGA_YEAR,
   completeLoadtestTgaPicks,
@@ -16,6 +18,7 @@ import {
   loadtestSyntheticAuthUserId,
   parseLoadtestWriterHeader,
   loadtestEditionOpenSchedule,
+  loadtestEditionSeedBatches,
   loadtestTgaLockedSchedule,
   loadtestTgaOpenSchedule,
   parseWriterCount,
@@ -48,6 +51,7 @@ describe("loadtest identities", () => {
       LOADTEST_COMMUNITY.slug,
     );
     expect(LOADTEST_COMMUNITY.slug).not.toBe(QA_COMMUNITIES.showcase.slug);
+    expect(LOADTEST_COMMUNITY.joinsClosed).toBe(true);
     expect(
       assertLoadtestFixturesSafe({ communitySlug: QA_COMMUNITIES.showcase.slug }),
     ).toMatch(/showcase/);
@@ -171,12 +175,28 @@ describe("loadtest share lists", () => {
 describe("loadtest schedules", () => {
   const now = new Date("2026-10-09T17:00:00.000Z");
 
-  it("keeps the filling edition open", () => {
+  it("keeps the 2025 edition open until the load run publishes it", () => {
     const schedule = loadtestEditionOpenSchedule(now);
     expect(schedule.opensAt.getTime()).toBeLessThan(now.getTime());
     expect(schedule.closesAt.getTime()).toBeGreaterThan(now.getTime());
     expect(schedule.publishesAt.getTime()).toBeGreaterThan(
       schedule.closesAt.getTime(),
     );
+  });
+
+  it("splits 1000 ballots into batches of 50, with hosts only in the first", () => {
+    const batches = loadtestEditionSeedBatches();
+    expect(batches).toHaveLength(20);
+    expect(batches[0]).toEqual({ startIndex: 1, count: 50 });
+    expect(batches[19]).toEqual({ startIndex: 951, count: 50 });
+    expect(batches.reduce((sum, batch) => sum + batch.count, 0)).toBe(
+      LOADTEST_EDITION_SEED_BALLOTS,
+    );
+    expect(LOADTEST_EDITION_HOSTS).toBe(3);
+  });
+
+  it("maps the old edition scenario names onto editions", () => {
+    expect(resolveLoadtestScenario("editions-filling")).toBe("editions");
+    expect(resolveLoadtestScenario("editions-results")).toBe("editions");
   });
 });

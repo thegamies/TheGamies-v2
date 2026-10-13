@@ -35,17 +35,21 @@ describe("parseLoadArgs", () => {
       writers: 50,
     });
     if ("error" in parsed) throw new Error(parsed.error);
-    expect(parsed.scenarios).toEqual([
-      "general",
-      "pickem",
-      "editions-filling",
-      "editions-results",
-    ]);
+    expect(parsed.scenarios).toEqual(["general", "pickem", "editions"]);
   });
 
   it("refuses unknown scenarios and over-cap writers", () => {
     expect(parseLoadArgs(["--scenario", "prod"])).toHaveProperty("error");
     expect(parseLoadArgs(["--writers", "101"])).toHaveProperty("error");
+  });
+
+  it("treats the old edition scenario names as the combined editions run", () => {
+    expect(parseLoadArgs(["--scenario", "editions-filling"])).toMatchObject({
+      scenarios: ["editions"],
+    });
+    expect(parseLoadArgs(["--scenario", "editions-results"])).toMatchObject({
+      scenarios: ["editions"],
+    });
   });
 
   it("treats pickem-open and pickem-locked as the combined pickem run", () => {

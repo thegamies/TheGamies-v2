@@ -349,10 +349,12 @@ export function buildLoadGets(
   const items = [...generalGets(urls)];
   if (scenario === "pickem") {
     items.push(...pickemGets(loadtestTgaYearFromFixtures(urls), pickemPhase));
-  } else if (scenario === "editions-filling") {
-    items.push(...editionFillingGets(urls));
-  } else if (scenario === "editions-results") {
-    items.push(...editionResultsGets(urls));
+  } else if (scenario === "editions") {
+    items.push(
+      ...(pickemPhase === "locked"
+        ? editionResultsGets(urls)
+        : editionFillingGets(urls)),
+    );
   }
   return items;
 }
@@ -365,7 +367,7 @@ export function buildLoadWrites(
   if (scenario === "pickem" && pickemPhase === "open") {
     items.push({ group: "write", method: "POST", op: "pickem", weight: 4 });
   }
-  if (scenario === "editions-filling") {
+  if (scenario === "editions" && pickemPhase === "open") {
     items.push({ group: "write", method: "POST", op: "ballot", weight: 4 });
   }
   return items;

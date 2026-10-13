@@ -120,11 +120,6 @@ export async function repairLoadtestOpenEdition(
     db,
   );
   if (!edition) throw new Error(`Open edition ${input.year} is missing`);
-  if (edition.status === "published") {
-    throw new Error(
-      `Open edition ${input.year} is published; pick a different filling year.`,
-    );
-  }
   await seedEditionCategories(edition.id, db);
   const schedule = loadtestEditionOpenSchedule(now);
   await db

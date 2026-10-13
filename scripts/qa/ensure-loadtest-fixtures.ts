@@ -1,8 +1,8 @@
 /**
  * Idempotently create load-test profiles (no Neon Auth login), gamies_qa_load, one public custom
- * share list per account, open + published editions, and opt the load
- * community into TGA 2025. Does not change the 2025 show schedule (the load
- * runner does that). Never touches QA showcase. Refuses production.
+ * share list per account, one open 2025 edition with seeded ballots, and opt
+ * the load community into TGA 2025. Does not change the 2025 show schedule
+ * (the load runner does that). Never touches QA showcase. Refuses production.
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -16,24 +16,22 @@ import {
   type Db,
 } from "@thegamies/db";
 import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
-import { createCommunityEdition, getEditionByCommunityYear } from "@/lib/communities/editions";
-import {
-  publishEditionForSeed,
-  seedCommunityEditionBallots,
-} from "@/lib/communities/seed-community";
+import { getEditionByCommunityYear } from "@/lib/communities/editions";
+import { seedCommunityEditionBallots } from "@/lib/communities/seed-community";
 import { createCommunity } from "@/lib/communities/service";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
 import {
   LOADTEST_BALLOT_POPULAR_POOL,
   LOADTEST_BALLOT_UNPOPULAR_POOL,
   LOADTEST_COMMUNITY,
-  LOADTEST_EDITION_FILLING_YEAR,
-  LOADTEST_EDITION_RESULTS_YEAR,
+  LOADTEST_EDITION_HOSTS,
+  LOADTEST_EDITION_SEED_BALLOTS,
+  LOADTEST_EDITION_YEAR,
   LOADTEST_POPULAR_POOL,
   LOADTEST_TGA_YEAR,
   LOADTEST_UNPOPULAR_POOL,
   loadtestAccount,
-  loadtestEditionOpenSchedule,
+  loadtestEditionSeedBatches,
   loadtestSyntheticAuthUserId,
   mergeLoadtestGameBands,
   parseWriterCount,
@@ -108,6 +106,14 @@ async function ensureCommunity(db: Db, hostProfileId: string): Promise<string> {
     };
     log(`created community ${def.slug}`);
   }
+  await db
+    .update(communities)
+    .set({
+      visibility: def.visibility,
+      joinsClosed: def.joinsClosed,
+      updatedAt: new Date(),
+    })
+    .where(eq(communities.id, row.id));
   await db
     .insert(communityMembers)
     .values({ communityId: row.id, profileId: hostProfileId, role: "admin" })
@@ -207,14 +213,14 @@ async function main() {
     unpopular: LOADTEST_UNPOPULAR_POOL,
   });
   const ballotGames = await pickCatalogPool(db, {
-    year: LOADTEST_EDITION_FILLING_YEAR,
+    year: LOADTEST_EDITION_YEAR,
     popular: LOADTEST_BALLOT_POPULAR_POOL,
     unpopular: LOADTEST_BALLOT_UNPOPULAR_POOL,
   });
   const game = ballotGames[0] ?? catalogGames[0];
   if (!game || ballotGames.length === 0) {
     throw new Error(
-      `Need released catalog games for load-test lists and ${LOADTEST_EDITION_FILLING_YEAR} ballots.`,
+      `Need released catalog games for load-test lists and ${LOADTEST_EDITION_YEAR} ballots.`,
     );
   }
   const ballotItems = ballotGames.slice(0, 3).map((row, i) => ({
@@ -236,65 +242,52 @@ async function main() {
   }
   log(`share lists ${lists.length}`);
 
-  const filling = await getEditionByCommunityYear(
-    communityId,
-    LOADTEST_EDITION_FILLING_YEAR,
-    db,
-  );
-  if (!filling) {
-    const schedule = loadtestEditionOpenSchedule(new Date());
-    const created = await createCommunityEdition(
-      LOADTEST_COMMUNITY.slug,
-      hostProfileId,
-      {
-        year: LOADTEST_EDITION_FILLING_YEAR,
-        opensAt: schedule.opensAt.toISOString(),
-        closesAt: schedule.closesAt.toISOString(),
-        publishesAt: schedule.publishesAt.toISOString(),
-      },
-      db,
-    );
-    if ("error" in created) throw new Error(created.error);
-  }
-  await repairLoadtestOpenEdition(db, {
-    communityId,
-    year: LOADTEST_EDITION_FILLING_YEAR,
-  });
-
-  const results = await getEditionByCommunityYear(
-    communityId,
-    LOADTEST_EDITION_RESULTS_YEAR,
-    db,
-  );
-  if (results?.status !== "published") {
+  let ballots = 0;
+  let hosts = 0;
+  for (const batch of loadtestEditionSeedBatches()) {
     const seeded = await seedCommunityEditionBallots(
       {
         communitySlug: LOADTEST_COMMUNITY.slug,
-        year: LOADTEST_EDITION_RESULTS_YEAR,
-        startIndex: 1,
-        count: 8,
+        year: LOADTEST_EDITION_YEAR,
+        startIndex: batch.startIndex,
+        count: batch.count,
+        voiceCount: batch.startIndex === 1 ? LOADTEST_EDITION_HOSTS : 0,
+        reseed: false,
       },
       db,
     );
     if ("error" in seeded) throw new Error(seeded.error);
-    const published = await publishEditionForSeed(
-      LOADTEST_COMMUNITY.slug,
-      LOADTEST_EDITION_RESULTS_YEAR,
-      db,
+    ballots += seeded.createdBallots + seeded.updatedBallots + seeded.skipped;
+    hosts += seeded.voicesSet;
+    log(
+      `edition ${LOADTEST_EDITION_YEAR} ballots ${batch.startIndex}–${batch.startIndex + batch.count - 1}`,
     );
-    if ("error" in published) throw new Error(published.error);
-    log(`published ${LOADTEST_EDITION_RESULTS_YEAR}`);
   }
-  const published = await getEditionByCommunityYear(
+  if (ballots !== LOADTEST_EDITION_SEED_BALLOTS) {
+    throw new Error(
+      `Expected ${LOADTEST_EDITION_SEED_BALLOTS} seed ballots, counted ${ballots}.`,
+    );
+  }
+  if (hosts !== LOADTEST_EDITION_HOSTS) {
+    throw new Error(`Expected ${LOADTEST_EDITION_HOSTS} hosts, set ${hosts}.`);
+  }
+  await repairLoadtestOpenEdition(db, {
     communityId,
-    LOADTEST_EDITION_RESULTS_YEAR,
+    year: LOADTEST_EDITION_YEAR,
+  });
+  const open = await getEditionByCommunityYear(
+    communityId,
+    LOADTEST_EDITION_YEAR,
     db,
   );
-  if (published?.status !== "published") {
-    throw new Error(`${LOADTEST_EDITION_RESULTS_YEAR} is not published`);
+  if (open?.status !== "open") {
+    throw new Error(`${LOADTEST_EDITION_YEAR} is not open`);
   }
-  const [categoryId] = await listEditionEnabledCategoryIds(published.id, db);
-  if (!categoryId) throw new Error("Published edition has no categories");
+  const [categoryId] = await listEditionEnabledCategoryIds(open.id, db);
+  if (!categoryId) throw new Error("Open edition has no categories");
+  log(
+    `open ${LOADTEST_EDITION_YEAR}: ${ballots} ballots, ${hosts} hosts`,
+  );
 
   const tga = await attachLoadtestTgaCommunity(db, {
     year: LOADTEST_TGA_YEAR,
@@ -307,8 +300,8 @@ async function main() {
   const fixtures: LoadtestFixturesFile = {
     communitySlug: LOADTEST_COMMUNITY.slug,
     communityId,
-    fillingYear: LOADTEST_EDITION_FILLING_YEAR,
-    resultsYear: LOADTEST_EDITION_RESULTS_YEAR,
+    fillingYear: LOADTEST_EDITION_YEAR,
+    resultsYear: LOADTEST_EDITION_YEAR,
     resultsCategoryId: categoryId,
     tgaYear: LOADTEST_TGA_YEAR,
     tgaSlate: tga.slate,

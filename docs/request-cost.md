@@ -138,9 +138,9 @@ Neon bills **CU-hours** (compute size × time the endpoint is awake). Workers bi
 
 Dedicated fixtures (ensure does **not** flip the live Pick’em schedule or QA showcase). The **`pickem`** scenario uses the **2025** slate:
 
-- Community `gamies_qa_load` opted into TGA 2025
+- Community `gamies_qa_load` opted into TGA 2025. Joins stay closed so anonymous readers can open the community boards.
 - First half: 2025 picks are open; writers save a complete sheet (every category). Second half: the runner locks 2025 and readers hit standings. The original 2025 schedule is restored when the run ends.
-- Open edition 2026 (ballots) and published edition 2025 on that community (results)
+- One 2025 edition on that community. Ensure plants 1,000 filled seed ballots and marks the first 3 of those accounts as hosts, then leaves voting open. The `editions` run reads and writes ballots for the first half, publishes and freezes for the results half, then reopens voting when the run ends.
 
 ```bash
 # Doppler: QA_TARGET=staging, QA_STAGING_URL, DATABASE_URL, QA_ACCOUNT_PASSWORD
@@ -148,7 +148,7 @@ Dedicated fixtures (ensure does **not** flip the live Pick’em schedule or QA s
 
 pnpm qa:loadtest:ensure -- --writers 50
 pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
-# or --all (four scenarios, ~40 minutes)
+# or --all (three scenarios)
 # teardown: pnpm qa:loadtest:purge
 
 # Optional: 1000 public scale communities × 1000 is_seed users (no Neon Auth),
@@ -159,13 +159,13 @@ pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000
 
 `--ramp` is k6 `ramping-vus`: VUs start at 0 and reach the target linearly, then hold for the rest of `--duration`. Default **30s**. `--ramp 0` starts every loop at once (the old stampede). Duration includes the ramp (90s with a 30s ramp is 30s climb + 60s hold).
 
-Scenarios (each includes a general mix of home, `/games`, a game, **game search**, `/rankings` explainer, `/game-of-the-year`, **2025** GOTY standings, 2025 categories, rotating category boards, **`/create`**, **`/create/goty`**, **`/create/custom`**, load-test **profiles** `/u/:username`, and planted **share lists** `/u/:username/:listSlug`): `general`, `pickem` (2025 open then locked at halfway), `editions-filling`, `editions-results`. Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only, plus list-editor `GET /api/games/search`. Individual category URLs roll up as `/game-of-the-year/:year/categories?category=:id`. Search queries roll up as `/games?q=:q` and `/api/games/search?q=:q` (equal mix weights). Queries are drawn from the fixture catalog: **full title** most often, some mid-length tokens, and a few **2–3 character** prefixes. Re-run `pnpm qa:loadtest:ensure` so `fixtures.json` includes titles. `pickem-open` / `pickem-locked` still parse as `pickem`.
+Scenarios (each includes a general mix of home, `/games`, a game, **game search**, `/rankings` explainer, `/game-of-the-year`, **2025** GOTY standings, 2025 categories, rotating category boards, **`/create`**, **`/create/goty`**, **`/create/custom`**, load-test **profiles** `/u/:username`, and planted **share lists** `/u/:username/:listSlug`): `general`, `pickem` (2025 open then locked at halfway), `editions` (2025 ballots, then published results at halfway). Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only, plus list-editor `GET /api/games/search`. Individual category URLs roll up as `/game-of-the-year/:year/categories?category=:id`. Search queries roll up as `/games?q=:q` and `/api/games/search?q=:q` (equal mix weights). Queries are drawn from the fixture catalog: **full title** most often, some mid-length tokens, and a few **2–3 character** prefixes. Re-run `pnpm qa:loadtest:ensure` so `fixtures.json` includes titles. `pickem-open` / `pickem-locked` still parse as `pickem`. `editions-filling` / `editions-results` still parse as `editions`.
 
 Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p90/p95/p99 by group and by path/op, errors, UTC window), plus `.json` samples and `.html` with filters for group, kind (`/games/:slug` rolls up game pages; `/u/:username/:listSlug` rolls planted share URLs; Path chips drill into one slug. `list-create/:n`, `list-edit/:n`, and `list-delete/:n` roll up the same way; Path chips are `list-create/1` … `list-create/10`), and status. Endpoint and Neon-trip tables include **% time** (share of summed client time / summed trip wait in the current filter) and **Neon CPU** (mean Postgres exec per successful request: statement mean × trips on that URL). HTML tables use separate percentile columns, a percentile visibility filter, horizontal scroll, and click-to-sort headers. A timeline buckets the run (auto / 1s / 10s / 1m) and counts how many client requests in each bucket were at least as slow as the run’s p50 / p90 / p95 / p99. Client times are the load runner’s HTTP round-trip. After this Worker is on staging, samples store wall, **db clock** (`x-cost-db-span-ms`, overlap union), **db sum** (`x-cost-db-ms`, parallel trips add), and per-trip SQL fingerprints (`x-cost-db-trip-detail`, no bind params). Rebuild HTML from JSON with `pnpm exec tsx scripts/cost/render-load-html.ts e2e/.cost/load-….json`. Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount. `COST_LOAD_SKIP_REPAIR=1` skips edition repair and the 2025 Pick’em open/lock flip (GET-only smoke when fixtures already exist). Previous runs that only wrote markdown cannot be split by path.
 
 Writers do not sign in. Each write sends the load-test secret and a writer index. The harness looks up that load-test profile and saves as them. That avoids Auth sign-in bursts.
 
-Ensure builds a **capped** catalog pool (40 popular + 10 obscure by `popularity`, plus a 2026 ballot pool). List/library/GET game pages rotate across it (~80% popular). Each load-test account also gets one public custom list (`load-share`); readers pick from that group at random. Re-run `pnpm qa:loadtest:ensure` to refresh `fixtures.json`. Pick’em uses the real **2025** nominee slate; each writer fills every category (nominees rotate by writer index).
+Ensure builds a **capped** catalog pool (40 popular + 10 obscure by `popularity`, plus a 2025 ballot pool). List/library/GET game pages rotate across it (~80% popular). Each load-test account also gets one public custom list (`load-share`); readers pick from that group at random. Re-run `pnpm qa:loadtest:ensure` to refresh `fixtures.json` and to plant 1,000 filled 2025 ballots (3 hosts). Pick’em uses the real **2025** nominee slate; each writer fills every category (nominees rotate by writer index).
 
 List writes are four labeled ops. Create, edit, and delete record **how many games** on the step (`list-create/5`, like `/games/hades`): **list-create/:n** (new list of 1–10), **list-edit/:n** (replace with 1–10), **list-delete/:n** (drop that many games). **list-reorder** stays one kind. Kind chips roll the counts; Path chips drill into `1`–`10`. Edit/reorder/delete seed an untimed create if the writer has no list yet (delete seeds at least as many games as it will drop). The API returns `publicId` so later writes reuse the list.
 
