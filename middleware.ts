@@ -3,6 +3,10 @@ import {
   REQUEST_PATHNAME_HEADER,
   REQUEST_SEARCH_HEADER,
 } from "@/lib/ads/adsense";
+import {
+  clientIpFromHeaders,
+  withAuthClientIp,
+} from "@/lib/auth/auth-client-ip";
 import { getAuthOrNull } from "@/lib/auth/server";
 
 function stampPathHeaders(request: NextRequest): Headers {
@@ -33,7 +37,9 @@ export async function middleware(request: NextRequest) {
     return nextWithPath();
   }
   const handler = auth.middleware({ loginUrl: "/auth/sign-in" });
-  return handler(new NextRequest(request, { headers: requestHeaders }));
+  return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
+    handler(new NextRequest(request, { headers: requestHeaders })),
+  );
 }
 
 export const config = {
