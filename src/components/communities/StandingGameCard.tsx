@@ -407,6 +407,7 @@ function PodiumCoverStack({
           imageUrl={entry.coverUrl}
           fluid
           priority={isWinner}
+          unoptimized
           width={isWinner ? PODIUM_COVER.width : RUNNER_MAX.width}
           height={isWinner ? PODIUM_COVER.height : RUNNER_MAX.height}
         />
@@ -430,14 +431,11 @@ function PodiumCaption({
         slug={entry.slug}
         className="group mt-2 block w-full min-w-0 sm:mt-3"
       >
-        <FitDisplayTitle
-          className="group-hover:text-accent"
+        <StandingCardTitle
+          title={entry.title}
           maxPx={titleMax}
-          minPx={12}
-          lines={2}
-        >
-          {entry.title}
-        </FitDisplayTitle>
+          className="group-hover:text-accent"
+        />
       </OptionalGameLink>
       {entry.meta ? (
         <p className="mt-1.5 text-xs text-muted sm:mt-2 sm:text-sm">
