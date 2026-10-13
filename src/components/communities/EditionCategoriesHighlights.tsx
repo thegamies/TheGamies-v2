@@ -1,8 +1,5 @@
-"use client";
-
 import Link from "@/lib/next-link";
 import { type CSSProperties } from "react";
-import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
@@ -330,9 +327,7 @@ export function EditionCategoriesHighlights({
   youBallotHref?: string | null;
   layout?: "ranked" | "comparison";
 }) {
-  const categories = useEditionCategoryPodiums(categoryPodiums);
-
-  if (categories.length === 0 && !categoryComparison.hasGames) {
+  if (categoryPodiums.length === 0 && !categoryComparison.hasGames) {
     return null;
   }
 
@@ -346,7 +341,7 @@ export function EditionCategoriesHighlights({
       {layout === "comparison" ? (
         <CategoryComparisonSections
           matrix={categoryComparison}
-          categoryPodiums={categories}
+          categoryPodiums={categoryPodiums}
           slug={slug}
           year={year}
           mode={mode}
@@ -357,7 +352,7 @@ export function EditionCategoriesHighlights({
           slug={slug}
           year={year}
           mode={mode}
-          categories={categories}
+          categories={categoryPodiums}
         />
       )}
     </section>

@@ -78,4 +78,46 @@ describe("EditionResultsOverview comparison", () => {
     expect(screen.queryByRole("group", { name: "Results board" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Community" })).toBeNull();
   });
+
+  it("writes a Comparison column as page text", () => {
+    render(
+      <EditionResultsOverview
+        slug="eric"
+        year={2026}
+        layout="comparison"
+        topTen={[]}
+        matrix={{
+          showYou: false,
+          hasGames: true,
+          voiceColumns: [],
+          rows: [
+            {
+              rank: 1,
+              you: null,
+              community: [
+                {
+                  gameId: "g1",
+                  slug: "hades-ii",
+                  title: "Hades II",
+                  coverUrl: null,
+                },
+              ],
+              voices: [],
+              voiceGames: {},
+            },
+          ],
+        }}
+        gotyTotal={1}
+        standingsHref="/communities/eric/edition/2026?view=standings"
+        categoryPodiums={[]}
+        categoryComparison={emptyMatrix}
+        youBallotHref={null}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /Hades II/ }).getAttribute("href")).toBe(
+      "/games/hades-ii",
+    );
+    expect(screen.getByText("Community")).toBeTruthy();
+  });
 });
