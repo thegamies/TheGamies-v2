@@ -12,6 +12,7 @@ import { recountCommunityPickCounts } from "@/lib/tga-pickem/sheets";
 import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
 import {
   PICKEM_SCALE_AUTH_PREFIX,
+  PICKEM_SCALE_NOMINEE_RANK,
   PICKEM_SCALE_SLUG_PREFIX,
   pickemScaleAuthBounds,
   pickemScaleAuthUserId,
@@ -202,7 +203,7 @@ export async function seedPickemScale(
             select cn.slot
             from tga_category_nominees cn
             where cn.category_id = c.id
-            order by md5(p.id::text || c.id::text)
+            order by ${sql.raw(PICKEM_SCALE_NOMINEE_RANK)}
             limit 1
           ) n on c.id is not null
         ),
@@ -212,7 +213,10 @@ export async function seedPickemScale(
         and p.deleted_at is null
         and p.auth_user_id >= ${bounds.first}
         and p.auth_user_id <= ${bounds.last}
-      on conflict do nothing
+      on conflict (community_id, profile_id, year) do update
+      set
+        ballot_mask = excluded.ballot_mask,
+        updated_at = now()
     `);
     await db.execute(sql`
       insert into tga_community_scores (
@@ -244,6 +248,7 @@ export async function seedPickemScale(
       set
         points = excluded.points,
         wp_delta = excluded.wp_delta,
+        place = null,
         updated_at = now()
     `);
     done += 1;
