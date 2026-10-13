@@ -26,7 +26,7 @@ If the answer is “load everything, then slice,” the design is wrong.
 
 The client receives **only the rows it paints**. A 50-row page is 50 rows over the wire—not 5,000 with 50 displayed.
 
-Game detail does not list public lists. Ads / site-value on `/games/:slug` use GOTY or a category #1, and only then an `EXISTS` for one public owned list. The sitemap of game URLs is the valued set (GOTY / category #1 / public lists), not the IGDB dump.
+Game detail does not list public lists, and it does not query lists to decide ads. `/games/:slug` shows an ad whenever ads are enabled. The sitemap of game URLs is still the valued set (GOTY / category #1 / public lists), not the IGDB dump.
 
 ## Search is SQL, not a client filter
 

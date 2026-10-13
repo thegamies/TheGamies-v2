@@ -150,11 +150,4 @@ describe("SiteAdBanner", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("opts a ranked game page back in with force", () => {
-    vi.mocked(adsenseAllowedOnPath).mockReturnValue(false);
-    mockAdsbygoogle();
-
-    render(<SiteAdBanner force />);
-    expect(document.querySelector("ins.adsbygoogle")).toBeTruthy();
-  });
 });
