@@ -16,7 +16,7 @@ import {
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
@@ -73,7 +73,14 @@ import {
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
+import { loadEditionCategorySnapshot } from "@/lib/communities/edition-category-snapshot";
 import {
+  editionBoardCacheKey,
+  matchEditionBoard,
+  putEditionBoard,
+} from "@/lib/communities/edition-public-cache";
+import {
+  editionPageNeedsBallotCategories,
   loadEditionResultsOverview,
   loadEditionYearContext,
   loadPublishedEditionMeta,
@@ -225,7 +232,10 @@ export default async function CommunityEditionYearPage({
     voterUsername = "";
   }
 
-  const tgaNavPromise = communityTgaNavVisible(community.id).catch(() => false);
+  const tgaNavPromise = communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null as number | null,
+  }));
 
   const rankMode = edition.rankMode;
   const canManage = canManageCommunity(community.viewerRole);
@@ -240,11 +250,13 @@ export default async function CommunityEditionYearPage({
 
   const editionId = edition.id;
   const editionYear = edition.year;
-  const needsBallotCategories =
-    edition.status === "open" ||
-    showHostBallotPreview ||
-    (profile && isMember && edition.status !== "scheduled") ||
-    (edition.status === "published" && voterUsername.length > 0);
+  const needsBallotCategories = editionPageNeedsBallotCategories({
+    status: edition.status,
+    showHostBallotPreview,
+    hasProfile: Boolean(profile),
+    isMember,
+    voterUsername,
+  });
 
   const ballotPromise = Promise.all([
     profile && isMember
@@ -622,7 +634,7 @@ export default async function CommunityEditionYearPage({
     </div>
   ) : null;
 
-  let resultsBundle: {
+  type EditionYearResultsBundle = {
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyThroughRank>>;
     categoryPodiums: EditionCategoryStandingBlock[];
@@ -669,7 +681,36 @@ export default async function CommunityEditionYearPage({
       customCategories?: CustomCategoryView[];
     } | null;
     standingsPage: Awaited<ReturnType<typeof getEditionGotyPage>> | null;
-  } | null = null;
+  };
+  let resultsBundle: EditionYearResultsBundle | null = null;
+
+  const boardCacheKey =
+    !user &&
+    edition.status === "published" &&
+    !showHostSettings &&
+    view !== "entrance" &&
+    voterUsername.length === 0
+      ? editionBoardCacheKey({
+          editionId,
+          view,
+          mode,
+          rankMode,
+          categoryId,
+          page: categoryPageNum,
+          votersPage: votersPageNum,
+          q: votersQ,
+        })
+      : null;
+  if (boardCacheKey) {
+    const cached = await matchEditionBoard<EditionYearResultsBundle>(
+      boardCacheKey,
+    );
+    if (cached?.meta) {
+      ballotCount = cached.meta.ballotCountCommunity;
+      resultsBundle = cached;
+    }
+  }
+  const servedFromBoardCache = resultsBundle != null;
 
   let entranceFreezeReady = false;
   if (edition.status === "published" && view === "entrance" && !showHostSettings) {
@@ -683,7 +724,12 @@ export default async function CommunityEditionYearPage({
     }
   }
 
-  if (edition.status === "published" && !showHostSettings && view !== "entrance") {
+  if (
+    !servedFromBoardCache &&
+    edition.status === "published" &&
+    !showHostSettings &&
+    view !== "entrance"
+  ) {
     try {
       const emptyVoters = {
         page: 1,
@@ -750,26 +796,35 @@ export default async function CommunityEditionYearPage({
             standingsPage,
           };
         } else if (view === "categories" || view === "category") {
-          const categoryMeta = await listEditionCategoryMeta(edition.id, mode);
+          const categoryIndex =
+            view === "categories"
+              ? await loadEditionCategorySnapshot(
+                  edition.id,
+                  [mode === "voices" ? "voices" : "community"],
+                  { maxRank: CATEGORY_RANKED_TOP, rankMode },
+                )
+              : null;
+          const categoryMeta = categoryIndex
+            ? categoryIndex[mode === "voices" ? "voices" : "community"].meta
+            : await listEditionCategoryMeta(edition.id, mode, undefined, {
+                skipCustomBackfill: true,
+              });
           const categoryPage =
             view === "category" && categoryId
               ? await getEditionCategoryPage(edition.id, mode, categoryId, {
                   page: categoryPageNum,
                   pageSize: CATEGORY_RESULTS_PAGE_SIZE,
                   rankMode,
+                  skipCustomBackfill: true,
                 })
               : null;
           resultsBundle = {
             meta,
             topTen: [],
-            categoryPodiums:
-              view === "categories"
-                ? await getEditionCategoryResults(edition.id, mode, {
-                    maxRank: CATEGORY_RANKED_TOP,
-                    rankMode,
-                    skipCustomBackfill: true,
-                  })
-                : [],
+            categoryPodiums: categoryIndex
+              ? categoryIndex[mode === "voices" ? "voices" : "community"]
+                  .podiums
+              : [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta,
             categoryPage,
@@ -784,6 +839,11 @@ export default async function CommunityEditionYearPage({
             pageSize: STANDINGS_PAGE_SIZE,
             q: votersQ,
             voicesOnly: mode === "voices",
+            knownTotal: votersQ
+              ? undefined
+              : mode === "voices"
+                ? meta.ballotCountVoices
+                : meta.ballotCountCommunity,
           });
           resultsBundle = {
             meta,
@@ -876,6 +936,7 @@ export default async function CommunityEditionYearPage({
             const comparison = await getEditionComparisonBundle(edition.id, {
               viewerProfileId: profile?.id ?? null,
               rankMode,
+              skipCustomBackfill: true,
             });
             resultsBundle = {
               meta,
@@ -919,7 +980,12 @@ export default async function CommunityEditionYearPage({
     } catch {
       resultsBundle = null;
     }
+    if (boardCacheKey && resultsBundle) {
+      await putEditionBoard(boardCacheKey, resultsBundle);
+    }
   }
+
+  const tgaNav = await tgaNavPromise;
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -931,7 +997,8 @@ export default async function CommunityEditionYearPage({
         editionStatus={navStatus}
         editionYear={featured?.year ?? edition.year}
         communityId={community.id}
-        tgaEnabled={await tgaNavPromise}
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="edition"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

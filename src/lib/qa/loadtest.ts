@@ -1,22 +1,34 @@
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import { parseOwnedUsername } from "@/lib/profile/username";
 
-/** Dedicated load-test community. Never the QA showcase slug. */
+/**
+ * Dedicated load-test community. Never the QA showcase slug.
+ * Joins stay closed so anonymous load readers can open Pick’em and the edition.
+ */
 export const LOADTEST_COMMUNITY = {
   name: "Gamies QA Load",
   slug: "gamies_qa_load",
   description: "Automated staging load tests. Not a real community.",
   visibility: "public" as const,
-  joinsClosed: false,
+  joinsClosed: true,
 };
 
 /** Real TGA slate on staging. The pickem load run opens it, then locks at halfway. */
 export const LOADTEST_TGA_YEAR = 2025;
 /** Leftover synthetic years from the old two-year mix. Purge may delete these. */
 export const LEGACY_LOADTEST_TGA_YEARS = [2098, 2099] as const;
-export const LOADTEST_EDITION_FILLING_YEAR = 2026;
+/**
+ * One edition on the load-test community. Ensure leaves it open with seeded
+ * ballots. The editions load run publishes it halfway, then reopens it.
+ */
+export const LOADTEST_EDITION_YEAR = 2025;
+export const LOADTEST_EDITION_FILLING_YEAR = LOADTEST_EDITION_YEAR;
 /** Same calendar year as QA showcase is fine: this is a different community. */
-export const LOADTEST_EDITION_RESULTS_YEAR = 2025;
+export const LOADTEST_EDITION_RESULTS_YEAR = LOADTEST_EDITION_YEAR;
+/** Filled ballots planted by ensure. Seed writes at most 50 per call. */
+export const LOADTEST_EDITION_SEED_BALLOTS = 1000;
+/** First seed accounts in that set, also marked as community hosts. */
+export const LOADTEST_EDITION_HOSTS = 3;
 
 export const LOADTEST_WRITERS_MAX = 100;
 export const LOADTEST_USERNAME_PREFIX = "gamies_qa_load_";
@@ -25,8 +37,7 @@ export const LOADTEST_EMAIL_DOMAIN = "example.com";
 export const LOADTEST_SCENARIOS = [
   "general",
   "pickem",
-  "editions-filling",
-  "editions-results",
+  "editions",
 ] as const;
 
 export type LoadtestScenario = (typeof LOADTEST_SCENARIOS)[number];
@@ -35,11 +46,29 @@ export function isLoadtestScenario(raw: string): raw is LoadtestScenario {
   return (LOADTEST_SCENARIOS as readonly string[]).includes(raw);
 }
 
-/** Old CLI names map onto the combined 2025 Pick’em run. */
+/** Old CLI names map onto the combined 2025 runs. */
 export function resolveLoadtestScenario(raw: string): LoadtestScenario | null {
   if (raw === "pickem-open" || raw === "pickem-locked") return "pickem";
+  if (raw === "editions-filling" || raw === "editions-results") return "editions";
   if (isLoadtestScenario(raw)) return raw;
   return null;
+}
+
+/** Seed accepts 50 ballots per call. 1000 ballots is twenty batches. */
+export function loadtestEditionSeedBatches(
+  total = LOADTEST_EDITION_SEED_BALLOTS,
+  batchSize = 50,
+): Array<{ startIndex: number; count: number }> {
+  const size = Math.max(1, Math.floor(batchSize));
+  const count = Math.max(0, Math.floor(total));
+  const batches: Array<{ startIndex: number; count: number }> = [];
+  for (let start = 1; start <= count; start += size) {
+    batches.push({
+      startIndex: start,
+      count: Math.min(size, count - start + 1),
+    });
+  }
+  return batches;
 }
 
 export function loadtestAccount(index: number): {

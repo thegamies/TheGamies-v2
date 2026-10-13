@@ -19,7 +19,7 @@ import {
   listCommunityMembersPage,
 } from "@/lib/communities/service";
 import { noIndexRobots } from "@/lib/seo/site";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 
 type Params = Promise<{ slug: string }>;
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
@@ -125,6 +125,10 @@ export default async function CommunityMembersPage({
     membersPage.total,
   );
   const showPager = membersPage.total > membersPage.pageSize;
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -136,9 +140,8 @@ export default async function CommunityMembersPage({
         editionStatus={publicEdition?.status ?? null}
         editionYear={publicEdition?.year ?? null}
         communityId={community.id}
-        tgaEnabled={
-          await communityTgaNavVisible(community.id).catch(() => false)
-        }
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="members"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

@@ -41,11 +41,15 @@ export async function GET(
     }
     const { community, edition } = access;
 
-    await ensurePublishedEditionResults(community.id, edition.year);
+    const ensured = await ensurePublishedEditionResults(
+      community.id,
+      edition.year,
+    );
     const data = await getEditionCategoryPage(edition.id, mode, categoryId, {
       page,
       pageSize: CATEGORY_RESULTS_PAGE_SIZE,
       rankMode: edition.rankMode,
+      skipCustomBackfill: Boolean(ensured && !("error" in ensured)),
     });
 
     return NextResponse.json(data);

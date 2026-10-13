@@ -52,7 +52,8 @@ import {
 import {
   assertLoadtestFixturesSafe,
   LOADTEST_BALLOT_ITEM_COUNT,
-  LOADTEST_EDITION_FILLING_YEAR,
+  LOADTEST_COMMUNITY,
+  LOADTEST_EDITION_YEAR,
   LOADTEST_TGA_YEAR,
   completeLoadtestTgaPicks,
   loadtestBallotGames,
@@ -71,6 +72,7 @@ import {
   repairLoadtestTgaYear,
   restoreLoadtestTgaSchedule,
 } from "@/lib/qa/loadtest-repair";
+import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
 import { loadtestSecretFromEnv } from "@/lib/qa/loadtest-guard";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
@@ -147,7 +149,7 @@ async function repairPhases(fixtures: LoadtestFixturesFile, databaseUrl: string)
   const db = createDb(databaseUrl);
   await repairLoadtestOpenEdition(db, {
     communityId: fixtures.communityId,
-    year: LOADTEST_EDITION_FILLING_YEAR,
+    year: LOADTEST_EDITION_YEAR,
   });
 }
 
@@ -359,10 +361,22 @@ async function runScenario(input: {
     }
   });
 
-  const lockPickem = (async () => {
-    if (input.scenario !== "pickem") return;
+  const lockPhase = (async () => {
+    if (input.scenario !== "pickem" && input.scenario !== "editions") return;
     const wait = lockAt - Date.now();
     if (wait > 0) await sleep(wait);
+    if (input.scenario === "editions") {
+      if (!input.skipRepair) {
+        const published = await publishEditionForSeed(
+          LOADTEST_COMMUNITY.slug,
+          LOADTEST_EDITION_YEAR,
+          createDb(input.databaseUrl),
+        );
+        if ("error" in published) throw new Error(published.error);
+      }
+      pickemPhaseRef.phase = "locked";
+      return;
+    }
     pickemPhaseRef.phase = "locked";
     if (input.skipRepair) return;
     await repairLoadtestTgaYear(createDb(input.databaseUrl), {
@@ -373,7 +387,7 @@ async function runScenario(input: {
   })();
 
   try {
-    await Promise.all([...readers, ...writerLoops, lockPickem]);
+    await Promise.all([...readers, ...writerLoops, lockPhase]);
   } finally {
     if (restoreSchedule) {
       await restoreLoadtestTgaSchedule(
@@ -381,6 +395,12 @@ async function runScenario(input: {
         LOADTEST_TGA_YEAR,
         restoreSchedule,
       );
+    }
+    if (input.scenario === "editions" && !input.skipRepair) {
+      await repairLoadtestOpenEdition(createDb(input.databaseUrl), {
+        communityId: input.fixtures.communityId,
+        year: LOADTEST_EDITION_YEAR,
+      });
     }
   }
   const ended = new Date();

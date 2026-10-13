@@ -184,6 +184,7 @@ describe("GET edition comparison viewer", () => {
     expect(mocks.getEditionComparisonBundle).toHaveBeenCalledWith("edition-1", {
       viewerProfileId: MEMBER_PROFILE_ID,
       rankMode: "dense",
+      skipCustomBackfill: false,
     });
   });
 });

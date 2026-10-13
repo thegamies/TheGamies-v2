@@ -42,12 +42,7 @@ const urls = {
   ],
 };
 
-const scenarios: LoadtestScenario[] = [
-  "general",
-  "pickem",
-  "editions-filling",
-  "editions-results",
-];
+const scenarios: LoadtestScenario[] = ["general", "pickem", "editions"];
 
 describe("buildLoadGets", () => {
   it("includes the general mix on every scenario", () => {
@@ -122,7 +117,7 @@ describe("buildLoadGets", () => {
   });
 
   it("does not point at the QA showcase community", () => {
-    const results = buildLoadGets("editions-results", urls);
+    const results = buildLoadGets("editions", urls, "locked");
     expect(results.some((item) => item.path.includes("/edition/2025"))).toBe(true);
     expect(
       results.some((item) =>
@@ -141,7 +136,7 @@ describe("buildLoadWrites", () => {
       "list-delete",
       "library",
     ]);
-    expect(buildLoadWrites("editions-results").map((item) => item.op)).toEqual([
+    expect(buildLoadWrites("editions", "locked").map((item) => item.op)).toEqual([
       "list-create",
       "list-edit",
       "list-reorder",
@@ -152,7 +147,7 @@ describe("buildLoadWrites", () => {
       true,
     );
     expect(
-      buildLoadWrites("editions-filling").some((item) => item.op === "ballot"),
+      buildLoadWrites("editions", "open").some((item) => item.op === "ballot"),
     ).toBe(true);
   });
 });
