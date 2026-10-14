@@ -1,10 +1,12 @@
 import Link from "@/lib/next-link";
 import { type ReactNode } from "react";
-import { RankedStandingPlaceList } from "@/components/communities/RankedStandingPlaceList";
 import {
   StandingGameCard,
   StandingGameCardGrid,
+  standingStripColClass,
+  standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { StandingStrip } from "@/components/communities/StandingStrip";
 import { SupportWatchLink } from "@/components/media/SupportWatchLink";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
@@ -266,19 +268,34 @@ export function EditionCategoryResults({
                   No scores for this award yet.
                 </p>
               ) : (
-                <RankedStandingPlaceList
+                <StandingStrip
+                  className="mt-4"
                   label={`${cat.label} ranked`}
-                  scoreUnit="votes"
-                  rows={cat.rows.map((row) => ({
-                    rank: row.rank,
-                    gameId: row.gameId,
-                    slug: row.slug,
-                    title: row.title,
-                    coverUrl: row.coverUrl,
-                    points: row.votes,
-                    supportLinkUrl: row.supportLinkUrl,
-                  }))}
-                />
+                >
+                  <ul className={standingStripListClass}>
+                    {cat.rows.map((row) => (
+                      <li
+                        key={row.gameId}
+                        className={standingStripColClass(row.rank === 1)}
+                      >
+                        <StandingGameCard
+                          place={row.rank}
+                          placeSize="lg"
+                          slug={row.slug}
+                          title={row.title}
+                          coverUrl={row.coverUrl}
+                          points={row.votes}
+                          scoreUnit="votes"
+                          priority={row.rank === 1}
+                          pinCover
+                        />
+                        {row.supportLinkUrl ? (
+                          <SupportWatchLink url={row.supportLinkUrl} />
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </StandingStrip>
               )}
             </article>
           );

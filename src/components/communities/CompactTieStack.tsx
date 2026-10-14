@@ -60,15 +60,12 @@ function CoverStack({
   games,
   startIndex,
   count,
-  /** SSR keeps a single face so tied cells do not multiply covers in the document. */
-  peekCount,
 }: {
   games: TieGame[];
   startIndex: number;
   count: number;
-  peekCount: number;
 }) {
-  const peek = Math.min(MAX_PEEK, count, Math.max(1, peekCount));
+  const peek = Math.min(MAX_PEEK, count);
   const peekPad = (peek - 1) * PEEK_PX;
 
   return (
@@ -224,12 +221,7 @@ export function CompactTieStack({
             zIndex: top === "a" ? 2 : 1,
           }}
         >
-          <CoverStack
-            games={games}
-            startIndex={layerA.index}
-            count={count}
-            peekCount={mounted ? MAX_PEEK : 1}
-          />
+          <CoverStack games={games} startIndex={layerA.index} count={count} />
         </span>
         {mounted ? (
           <span
@@ -240,12 +232,7 @@ export function CompactTieStack({
               zIndex: top === "b" ? 2 : 1,
             }}
           >
-            <CoverStack
-              games={games}
-              startIndex={layerB.index}
-              count={count}
-              peekCount={MAX_PEEK}
-            />
+            <CoverStack games={games} startIndex={layerB.index} count={count} />
           </span>
         ) : null}
 
