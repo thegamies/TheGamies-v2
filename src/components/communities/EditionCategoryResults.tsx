@@ -1,13 +1,11 @@
 import Link from "@/lib/next-link";
 import { type ReactNode } from "react";
+import { RankedStandingPlaceList } from "@/components/communities/RankedStandingPlaceList";
 import {
   StandingGameCard,
   StandingGameCardGrid,
-  standingStripColClass,
-  standingStripListClass,
 } from "@/components/communities/StandingGameCard";
 import { SupportWatchLink } from "@/components/media/SupportWatchLink";
-import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionCategoryMeta,
@@ -268,34 +266,19 @@ export function EditionCategoryResults({
                   No scores for this award yet.
                 </p>
               ) : (
-                <HorizontalScroll
-                  className="mt-4"
+                <RankedStandingPlaceList
                   label={`${cat.label} ranked`}
-                >
-                  <ul className={standingStripListClass}>
-                    {cat.rows.map((row) => (
-                      <li
-                        key={row.gameId}
-                        className={standingStripColClass(row.rank === 1)}
-                      >
-                        <StandingGameCard
-                          place={row.rank}
-                          placeSize="lg"
-                          slug={row.slug}
-                          title={row.title}
-                          coverUrl={row.coverUrl}
-                          points={row.votes}
-                          scoreUnit="votes"
-                          priority={row.rank === 1}
-                          pinCover
-                        />
-                        {row.supportLinkUrl ? (
-                          <SupportWatchLink url={row.supportLinkUrl} />
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
-                </HorizontalScroll>
+                  scoreUnit="votes"
+                  rows={cat.rows.map((row) => ({
+                    rank: row.rank,
+                    gameId: row.gameId,
+                    slug: row.slug,
+                    title: row.title,
+                    coverUrl: row.coverUrl,
+                    points: row.votes,
+                    supportLinkUrl: row.supportLinkUrl,
+                  }))}
+                />
               )}
             </article>
           );

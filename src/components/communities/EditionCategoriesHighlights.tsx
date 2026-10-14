@@ -3,11 +3,10 @@ import { type CSSProperties } from "react";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
+import { RankedStandingPlaceList } from "@/components/communities/RankedStandingPlaceList";
 import {
   EmptyStandingCard,
   StandingGameCard,
-  standingStripColClass,
-  standingStripListClass,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
@@ -227,7 +226,7 @@ function CategoryComparisonSections({
   );
 }
 
-/** Per-award Top 3 on one line; overflow uses HorizontalScroll. */
+/** Per-award Top 3 places on one line; ties share one stack footprint. */
 function CategoryRankedSections({
   slug,
   year,
@@ -275,30 +274,18 @@ function CategoryRankedSections({
               No scores for this award yet.
             </p>
           ) : (
-            <HorizontalScroll
-              className="mt-4"
+            <RankedStandingPlaceList
               label={`${cat.label} ranked`}
-            >
-              <ul className={standingStripListClass}>
-                {cat.rows.map((row) => (
-                  <li
-                    key={row.gameId}
-                    className={standingStripColClass(row.rank === 1)}
-                  >
-                    <StandingGameCard
-                      place={row.rank}
-                      placeSize="lg"
-                      slug={row.slug}
-                      title={row.title}
-                      coverUrl={row.coverUrl}
-                      points={row.votes}
-                      scoreUnit="votes"
-                      pinCover
-                    />
-                  </li>
-                ))}
-              </ul>
-            </HorizontalScroll>
+              scoreUnit="votes"
+              rows={cat.rows.map((row) => ({
+                rank: row.rank,
+                gameId: row.gameId,
+                slug: row.slug,
+                title: row.title,
+                coverUrl: row.coverUrl,
+                points: row.votes,
+              }))}
+            />
           )}
         </article>
       ))}

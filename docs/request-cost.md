@@ -128,6 +128,10 @@ Staging `qa` always runs that journey. Wrangler tail on CI often captures no `re
 - Warm Worker + Neon: Results document is on the order of **11–13** DB round trips and **~350–500 ms** wall. A cold first hit can look like a regression; always warm (or ignore document 1).
 - Link prefetch was still running destination RSC until imports switched to `@/lib/next-link`. After that, the Results step has **no prefetch RSC**; remaining RSC are real in-app clicks.
 
+### Edition Results document size (2026-10-14)
+
+Ranked Results / Categories were ~1–2 MB uncompressed HTML+Flight on a small showcase fixture: every tied game became its own cover card, and each award strip was a client `HorizontalScroll`. Ranked boards now use **one column per displayed place** (`CompactTieStack` for ties), native overflow strips (no client scroll island), and tie stacks SSR a single cover face. Comparison still uses `HorizontalScroll` for column sync. Reveal ceremony stays a separate client surface.
+
 More journeys (homepage, game covers) and extra Neon HTTP `db.batch` on other boards are **paused**. A Playwright walk measures **one visit**. It does not estimate a traffic bill.
 
 Which URLs to put in a mix first (use × database cost): [endpoints.md](./endpoints.md). Ranked HTML: `e2e/.cost/endpoints.html` after `pnpm exec tsx scripts/cost/render-endpoints-html.ts`.
