@@ -126,6 +126,9 @@ describe("StandingStrip", () => {
     });
     expect(scroller.scrollLeft).toBe(60);
     expect(scroller.dataset.dragging).toBe("true");
+    const strip = scroller.closest("[data-strip]") as HTMLElement;
+    expect(strip.dataset.canLeft).toBe("true");
+    expect(strip.dataset.canRight).toBe("true");
 
     fireEvent.pointerUp(scroller, { pointerId: 1, pointerType: "mouse" });
     expect(scroller.dataset.dragging).toBeUndefined();
@@ -146,5 +149,35 @@ describe("StandingStrip", () => {
       clientX: 20,
     });
     expect(scroller.scrollLeft).toBe(60);
+  });
+
+  it("shows an edge only on the side that still has covers", () => {
+    render(
+      <StandingStrip label="Best Story ranked">
+        <a href="/games/alpha">Alpha</a>
+      </StandingStrip>,
+    );
+    const region = screen.getByLabelText("Best Story ranked");
+    const scroller = region.querySelector("[data-drag-scroll]") as HTMLElement;
+    const strip = region.querySelector("[data-strip]") as HTMLElement;
+    Object.defineProperty(scroller, "scrollWidth", {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(scroller, "clientWidth", {
+      configurable: true,
+      value: 200,
+    });
+
+    fireEvent.scroll(scroller);
+    expect(strip.dataset.canLeft).toBeUndefined();
+    expect(strip.dataset.canRight).toBe("true");
+    expect(region.querySelector("[data-edge='right']")).toBeTruthy();
+    expect(region.querySelector("[data-edge='left']")).toBeTruthy();
+
+    scroller.scrollLeft = 600;
+    fireEvent.scroll(scroller);
+    expect(strip.dataset.canLeft).toBe("true");
+    expect(strip.dataset.canRight).toBeUndefined();
   });
 });
