@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   useEffect,
   useRef,
@@ -9,7 +8,10 @@ import {
   type CSSProperties,
   type MouseEvent,
 } from "react";
-import { StandingCardTitle } from "@/components/communities/StandingGameCard";
+import {
+  StandingCardTitle,
+  StandingCoverArt,
+} from "@/components/communities/StandingGameCard";
 
 type TieGame = {
   gameId: string;
@@ -33,26 +35,12 @@ function StackCover({
   imageUrl: string | null;
 }) {
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-[var(--radius-artwork)] border border-line bg-panel">
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={title}
-          fill
-          unoptimized
-          draggable={false}
-          className="pointer-events-none object-cover"
-          sizes="(max-width: 1023px) 103px, 206px"
-          suppressHydrationWarning
-        />
-      ) : (
-        <div className="flex h-full w-full items-end p-2">
-          <p className="font-display text-sm leading-none tracking-wide text-muted">
-            {title}
-          </p>
-        </div>
-      )}
-    </div>
+    <StandingCoverArt
+      title={title}
+      coverUrl={imageUrl}
+      fill
+      fallback="tie"
+    />
   );
 }
 
@@ -83,7 +71,7 @@ function CoverStack({
         return (
           <span
             key={depth}
-            className="absolute top-0 left-0"
+            className="standing-tie-peek"
             style={style}
             aria-hidden={depth !== 0}
           >
@@ -113,7 +101,7 @@ type Layer = {
  */
 export function CompactTieStack({
   games,
-  className = "w-[103px] lg:w-[206px]",
+  className = "standing-w-sm",
   titleMaxPx = 18,
 }: {
   games: TieGame[];
@@ -210,14 +198,13 @@ export function CompactTieStack({
       <button
         type="button"
         onClick={cycle}
-        className="relative block aspect-[3/4] w-full overflow-hidden rounded-[var(--radius-artwork)] text-left"
+        className="standing-tie"
         aria-label={`Tied games, showing ${shown.title}. Activate to show next.`}
       >
         <span
-          className="absolute inset-0 transition-opacity ease-in-out"
+          className="standing-tie-layer"
           style={{
             opacity: layerA.opacity,
-            transitionDuration: `${CROSSFADE_MS}ms`,
             zIndex: top === "a" ? 2 : 1,
           }}
         >
@@ -225,10 +212,9 @@ export function CompactTieStack({
         </span>
         {mounted ? (
           <span
-            className="absolute inset-0 transition-opacity ease-in-out"
+            className="standing-tie-layer"
             style={{
               opacity: layerB.opacity,
-              transitionDuration: `${CROSSFADE_MS}ms`,
               zIndex: top === "b" ? 2 : 1,
             }}
           >
@@ -253,15 +239,11 @@ export function CompactTieStack({
       </button>
 
       {shown.slug.trim() ? (
-        <a href={`/games/${shown.slug}`} className="group mt-2 block min-w-0">
-          <StandingCardTitle
-            title={shown.title}
-            maxPx={titleMaxPx}
-            className="group-hover:text-accent"
-          />
+        <a href={`/games/${shown.slug}`} className="standing-tie-title">
+          <StandingCardTitle title={shown.title} maxPx={titleMaxPx} />
         </a>
       ) : (
-        <div className="mt-2 min-w-0">
+        <div className="standing-tie-title">
           <StandingCardTitle title={shown.title} maxPx={titleMaxPx} />
         </div>
       )}

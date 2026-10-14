@@ -7,6 +7,7 @@ import { RankedStandingBillboard } from "@/components/communities/RankedStanding
 import {
   EmptyStandingCard,
   StandingGameCard,
+  standingCmpCellRankClass,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll, HorizontalScrollGroup } from "@/components/ui/HorizontalScroll";
 import type {
@@ -16,9 +17,6 @@ import type {
   MatrixVoiceColumn,
 } from "@/lib/communities/edition-results";
 import { editionVoterBallotHref } from "@/lib/communities/edition-results-href";
-
-const LIST_COL =
-  "box-border w-[var(--strip-col)] min-w-[var(--strip-col)] max-w-[var(--strip-col)] px-2 align-top";
 
 const STRIP_TABLE_CLASS =
   "w-max min-w-full border-collapse text-sm [--strip-col:119px] lg:[--strip-col:222px]";
@@ -106,18 +104,18 @@ function GotyComparisonStrip({
         <thead>
           <tr className="border-b border-line text-left">
             {showYou ? (
-              <th scope="col" className={`${LIST_COL} py-2`}>
+              <th scope="col" className={standingCmpCellRankClass}>
                 <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
               </th>
             ) : null}
-            <th scope="col" className={`${LIST_COL} py-2`}>
+            <th scope="col" className={standingCmpCellRankClass}>
               <ComparisonStripHeader>Community</ComparisonStripHeader>
             </th>
-            <th scope="col" className={`${LIST_COL} py-2`}>
+            <th scope="col" className={standingCmpCellRankClass}>
               <ComparisonStripHeader>Hosts</ComparisonStripHeader>
             </th>
             {voiceColumns.map((v) => (
-              <th key={v.profileId} scope="col" className={`${LIST_COL} py-2`}>
+              <th key={v.profileId} scope="col" className={standingCmpCellRankClass}>
                 <ComparisonStripHeader
                   title={`@${v.username}`}
                   href={editionVoterBallotHref(slug, year, v.username)}
@@ -136,18 +134,18 @@ function GotyComparisonStrip({
         <tbody>
           <tr className="align-top">
             {showYou ? (
-              <td className={`${LIST_COL} py-2`}>
+              <td className={standingCmpCellRankClass}>
                 <MatrixCardCell game={row.you} />
               </td>
             ) : null}
-            <td className={`${LIST_COL} py-2`}>
+            <td className={standingCmpCellRankClass}>
               <MatrixStandingCell games={row.community} />
             </td>
-            <td className={`${LIST_COL} py-2`}>
+            <td className={standingCmpCellRankClass}>
               <MatrixStandingCell games={row.voices} />
             </td>
             {voiceColumns.map((v) => (
-              <td key={v.profileId} className={`${LIST_COL} py-2`}>
+              <td key={v.profileId} className={standingCmpCellRankClass}>
                 <MatrixCardCell game={row.voiceGames[v.profileId] ?? null} />
               </td>
             ))}

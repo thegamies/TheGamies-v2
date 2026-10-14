@@ -130,7 +130,7 @@ Staging `qa` always runs that journey. Wrangler tail on CI often captures no `re
 
 ### Edition Results document size (2026-10-14)
 
-Ranked Results / Categories were ~1–2 MB uncompressed HTML+Flight on a small showcase fixture (~600 cover tags across many awards with heavy ties). Each card is small alone; the cost is **count × (HTML + Flight copy)**. Ranked strips stay a server `StandingStrip` instead of a client `HorizontalScroll` per award — same side‑by‑side cards, fewer client islands. Mouse drag is one shared listener, not a scroller island per award. Comparison still uses `HorizontalScroll` for column sync. Collapsing ties into stacks was tried and reverted so the ranked look stays unchanged.
+Ranked Results / Categories were ~1–2 MB uncompressed HTML+Flight on a small showcase fixture (~600 cover tags across many awards with heavy ties). Each card is small alone; the cost is **count × (HTML + Flight copy)**. Ranked strips stay a server `StandingStrip` instead of a client `HorizontalScroll` per award — same side‑by‑side cards, fewer client islands. Mouse drag is one shared listener, not a scroller island per award. Comparison still uses `HorizontalScroll` for column sync. Collapsing ties into stacks was tried and reverted so the ranked look stays unchanged. Standing cards, comparison cells, empty cells, and tie-stack covers use shared classes (native cover `img`, no per-card fill style) so that utility list is not copied into the HTML and the flight.
 
 More journeys (homepage, game covers) and extra Neon HTTP `db.batch` on other boards are **paused**. A Playwright walk measures **one visit**. It does not estimate a traffic bill.
 
