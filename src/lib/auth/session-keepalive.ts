@@ -1,9 +1,10 @@
 /**
- * Neon Auth session cache TTL is 300s. Ping before that so the get-session
- * route can re-mint the signed cache cookie while it is still valid.
+ * Ping the Auth route while a tab is open. A valid session-cache cookie is
+ * answered in the Worker. After it expires, the next ping lets the route
+ * mint a replacement so Set-Cookie reaches the browser.
  */
 export const SESSION_KEEPALIVE_PATH = "/api/auth/get-session";
-export const SESSION_KEEPALIVE_INTERVAL_MS = 4 * 60 * 1000;
+export const SESSION_KEEPALIVE_INTERVAL_MS = 60 * 1000;
 
 export async function refreshSessionCookie(): Promise<boolean> {
   try {

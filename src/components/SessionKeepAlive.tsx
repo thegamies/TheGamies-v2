@@ -14,20 +14,16 @@ function pingIfVisible() {
 }
 
 /**
- * Refresh the Neon Auth session-cache cookie on the official Auth handler
- * so Set-Cookie reaches the browser. RSC and JSON API routes do not.
+ * Ping the Auth route on an interval while the tab is visible. A valid
+ * session-cache cookie stays on the request so Neon is not called. Focusing
+ * the tab does not ping again.
  */
 export function SessionKeepAlive() {
   useEffect(() => {
     pingIfVisible();
     const id = window.setInterval(pingIfVisible, SESSION_KEEPALIVE_INTERVAL_MS);
-    function onVisibility() {
-      if (document.visibilityState === "visible") pingIfVisible();
-    }
-    document.addEventListener("visibilitychange", onVisibility);
     return () => {
       window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 

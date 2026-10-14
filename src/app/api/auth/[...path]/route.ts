@@ -4,7 +4,6 @@ import {
   withAuthClientIp,
 } from "@/lib/auth/auth-client-ip";
 import { getAuthOrNull } from "@/lib/auth/server";
-import { requestWithRefreshedSessionCache } from "@/lib/auth/session-cache-cookie";
 import {
   resetPasswordFormPath,
   tokenFromResetPasswordSegments,
@@ -44,12 +43,8 @@ export async function GET(
   if (resetRedirect) return resetRedirect;
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
-  const next =
-    path.length === 1 && path[0] === "get-session"
-      ? requestWithRefreshedSessionCache(request)
-      : request;
   return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
-    auth.handler().GET(next, context),
+    auth.handler().GET(request, context),
   );
 }
 

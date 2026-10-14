@@ -41,7 +41,32 @@ describe("GET /api/auth/get-session", () => {
     getAuthOrNull.mockReset();
   });
 
-  it("drops a near-expiry session cache before the handler re-mints it", async () => {
+  it("keeps a fresh session cache so the handler does not call Neon", async () => {
+    let seen: string | null = null;
+    getAuthOrNull.mockReturnValue({
+      handler: () => ({
+        GET: async (request: Request) => {
+          seen = request.headers.get("cookie");
+          return new Response(null, { status: 200 });
+        },
+      }),
+    });
+    const exp = Math.floor(Date.now() / 1000) + 200;
+    const cookie = `${SESSION_TOKEN_COOKIE_NAME}=tok; ${SESSION_DATA_COOKIE_NAME}=${jwt(exp)}`;
+    const response = await GET(
+      new Request("https://thegamies.gg/api/auth/get-session", {
+        headers: {
+          cookie,
+          "cf-connecting-ip": "203.0.113.8",
+        },
+      }),
+      { params: Promise.resolve({ path: ["get-session"] }) },
+    );
+    expect(response.status).toBe(200);
+    expect(seen).toBe(cookie);
+  });
+
+  it("leaves a near-expiry session cache in place", async () => {
     let seen: string | null = null;
     getAuthOrNull.mockReturnValue({
       handler: () => ({
@@ -52,16 +77,14 @@ describe("GET /api/auth/get-session", () => {
       }),
     });
     const exp = Math.floor(Date.now() / 1000) + 30;
+    const cookie = `${SESSION_TOKEN_COOKIE_NAME}=tok; ${SESSION_DATA_COOKIE_NAME}=${jwt(exp)}`;
     const response = await GET(
       new Request("https://thegamies.gg/api/auth/get-session", {
-        headers: {
-          cookie: `${SESSION_TOKEN_COOKIE_NAME}=tok; ${SESSION_DATA_COOKIE_NAME}=${jwt(exp)}`,
-          "cf-connecting-ip": "203.0.113.8",
-        },
+        headers: { cookie },
       }),
       { params: Promise.resolve({ path: ["get-session"] }) },
     );
     expect(response.status).toBe(200);
-    expect(seen).toBe(`${SESSION_TOKEN_COOKIE_NAME}=tok`);
+    expect(seen).toBe(cookie);
   });
 });

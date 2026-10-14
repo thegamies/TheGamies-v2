@@ -10,6 +10,10 @@ describe("SessionKeepAlive", () => {
     cleanup();
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => "visible",
+    });
   });
 
   it("pings get-session on mount and on the keepalive interval", async () => {
@@ -42,6 +46,22 @@ describe("SessionKeepAlive", () => {
     });
     await act(async () => {
       await vi.advanceTimersByTimeAsync(SESSION_KEEPALIVE_INTERVAL_MS);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not ping when the tab becomes visible", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.useFakeTimers();
+    render(<SessionKeepAlive />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    document.dispatchEvent(new Event("visibilitychange"));
+    await act(async () => {
+      await Promise.resolve();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
