@@ -9,6 +9,7 @@ import {
   standingStripColClass,
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { StandingStrip } from "@/components/communities/StandingStrip";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
@@ -227,7 +228,7 @@ function CategoryComparisonSections({
   );
 }
 
-/** Per-award Top 3 on one line; overflow uses HorizontalScroll. */
+/** Per-award Top 3 on one line; overflow uses native StandingStrip. */
 function CategoryRankedSections({
   slug,
   year,
@@ -275,10 +276,7 @@ function CategoryRankedSections({
               No scores for this award yet.
             </p>
           ) : (
-            <HorizontalScroll
-              className="mt-4"
-              label={`${cat.label} ranked`}
-            >
+            <StandingStrip className="mt-4" label={`${cat.label} ranked`}>
               <ul className={standingStripListClass}>
                 {cat.rows.map((row) => (
                   <li
@@ -298,7 +296,7 @@ function CategoryRankedSections({
                   </li>
                 ))}
               </ul>
-            </HorizontalScroll>
+            </StandingStrip>
           )}
         </article>
       ))}

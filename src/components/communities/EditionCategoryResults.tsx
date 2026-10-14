@@ -6,8 +6,8 @@ import {
   standingStripColClass,
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { StandingStrip } from "@/components/communities/StandingStrip";
 import { SupportWatchLink } from "@/components/media/SupportWatchLink";
-import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
   EditionCategoryMeta,
@@ -268,7 +268,7 @@ export function EditionCategoryResults({
                   No scores for this award yet.
                 </p>
               ) : (
-                <HorizontalScroll
+                <StandingStrip
                   className="mt-4"
                   label={`${cat.label} ranked`}
                 >
@@ -295,7 +295,7 @@ export function EditionCategoryResults({
                       </li>
                     ))}
                   </ul>
-                </HorizontalScroll>
+                </StandingStrip>
               )}
             </article>
           );
