@@ -3,10 +3,16 @@ import {
   AUTH_CLIENT_IP_FETCH,
   clientIpFromHeaders,
   isNeonAuthUrl,
+  neonAuthFetchTarget,
   shareInflight,
   withAuthClientIp,
   withClientIpHeader,
 } from "@/lib/auth/auth-client-ip";
+import {
+  NEON_AUTH_LOG_TYPE,
+  setNeonAuthMeterSlot,
+  type NeonAuthMeter,
+} from "@/lib/auth/neon-auth-meter";
 
 const authBase = "https://ep-example.neonauth.us-east-2.aws.neon.tech/dbname/auth";
 
@@ -36,6 +42,22 @@ describe("client IP for Auth rate limits", () => {
     );
   });
 
+  it("keeps the Auth path and drops the query string", () => {
+    expect(
+      neonAuthFetchTarget(
+        `${authBase}/get-session?neon_auth_session_verifier=tok`,
+        undefined,
+        authBase,
+      ),
+    ).toEqual({
+      method: "GET",
+      path: "/dbname/auth/get-session",
+    });
+    expect(
+      neonAuthFetchTarget("https://thegamies.gg/api/auth/get-session", undefined, authBase),
+    ).toBeNull();
+  });
+
   it("sets x-forwarded-for on Auth fetches only", () => {
     const forwarded = withClientIpHeader(
       `${authBase}/get-session`,
@@ -61,6 +83,8 @@ describe("auth fetch wrapper", () => {
     delete (globalThis as typeof globalThis & { [AUTH_CLIENT_IP_FETCH]?: unknown })[
       AUTH_CLIENT_IP_FETCH
     ];
+    setNeonAuthMeterSlot(undefined);
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
@@ -90,6 +114,32 @@ describe("auth fetch wrapper", () => {
     );
     expect(await second.text()).toBe("198.51.100.4");
     expect(calls).toEqual(["real", "outer", "real"]);
+  });
+
+  it("counts Auth fetches while a request meter is active", async () => {
+    const meter: NeonAuthMeter = { authRoundTrips: 0, auth429s: 0 };
+    setNeonAuthMeterSlot({ getStore: () => meter });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    globalThis.fetch = async () => new Response("limited", { status: 429 });
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+
+    const response = await withAuthClientIp("203.0.113.8", () =>
+      globalThis.fetch(`${authBase}/get-session?neon_auth_session_verifier=tok`),
+    );
+
+    expect(response.status).toBe(429);
+    expect(meter).toEqual({ authRoundTrips: 1, auth429s: 1 });
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      type: NEON_AUTH_LOG_TYPE,
+      method: "GET",
+      path: "/dbname/auth/get-session",
+      status: 429,
+    });
+    log.mockClear();
+
+    await withAuthClientIp(null, () => globalThis.fetch("https://thegamies.gg/games"));
+    expect(meter.authRoundTrips).toBe(1);
+    expect(log).not.toHaveBeenCalled();
   });
 });
 

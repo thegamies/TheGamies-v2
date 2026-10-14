@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { noteNeonAuthFetch } from "@/lib/auth/neon-auth-meter";
 
 /**
  * Neon Auth rate-limits by the first `x-forwarded-for` address. The Auth SDK
@@ -49,6 +50,34 @@ export function clientIpFromHeaders(headers: {
   return null;
 }
 
+/** Pathname of an Auth URL, with no query string. `null` for any other host. */
+export function neonAuthFetchTarget(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  authBaseUrl: string,
+): { method: string; path: string } | null {
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input.url;
+  if (!isNeonAuthUrl(url, authBaseUrl)) return null;
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    return null;
+  }
+  const method = (
+    init?.method ??
+    (typeof Request !== "undefined" && input instanceof Request
+      ? input.method
+      : "GET")
+  ).toUpperCase();
+  return { method, path };
+}
+
 export function isNeonAuthUrl(url: string, authBaseUrl: string): boolean {
   let target: URL;
   let base: URL;
@@ -94,8 +123,8 @@ export function withClientIpHeader(
 }
 
 export function withAuthClientIp<T>(ip: string | null, run: () => T): T {
-  if (!ip) return run();
   installAuthClientIpFetch();
+  if (!ip) return run();
   return authClientIpSlot().ips.run(ip, run);
 }
 
@@ -119,14 +148,24 @@ function installAuthClientIpFetch(): void {
   if (slot.underlying) return;
   const underlying = globalThis.fetch.bind(globalThis);
   slot.underlying = underlying;
-  const wrapped: typeof fetch = (input, init) => {
+  const wrapped: typeof fetch = async (input, init) => {
     const next = slot.underlying ?? underlying;
     const ip = slot.ips.getStore();
     const base = process.env.NEON_AUTH_BASE_URL?.trim();
-    if (!ip || !base) return next(input, init);
-    const forwarded = withClientIpHeader(input, init, ip, base);
-    if (!forwarded) return next(input, init);
-    return next(forwarded.input, forwarded.init);
+    const target = base ? neonAuthFetchTarget(input, init, base) : null;
+    const forwarded =
+      ip && base ? withClientIpHeader(input, init, ip, base) : null;
+    const callInput = forwarded?.input ?? input;
+    const callInit = forwarded?.init ?? init;
+    if (!target) return next(callInput, callInit);
+    try {
+      const response = await next(callInput, callInit);
+      noteNeonAuthFetch(target.method, target.path, response.status);
+      return response;
+    } catch (error) {
+      noteNeonAuthFetch(target.method, target.path, 0);
+      throw error;
+    }
   };
   globalThis.fetch = wrapped;
 }

@@ -6,6 +6,10 @@ import {
   unionIntervalMs,
   type DbRequestCost,
 } from "@thegamies/db/request-cost";
+import {
+  setNeonAuthMeterSlot,
+  type NeonAuthMeter,
+} from "@/lib/auth/neon-auth-meter";
 
 /** Set on a journey's requests so its log lines can be filtered (`wrangler tail --header`). */
 export const REQUEST_COST_JOURNEY_HEADER = "x-cost-journey";
@@ -31,20 +35,21 @@ export type RequestKind =
   | "api"
   | "other";
 
-export type RequestCostRecord = DbRequestCost & {
-  type: typeof REQUEST_COST_LOG_TYPE;
-  journey: string | null;
-  step: string | null;
-  kind: RequestKind;
-  method: string;
-  path: string;
-  status: number;
-  /** Uncompressed body bytes the Worker sent; Cloudflare compresses after this. */
-  responseBytes: number;
-  wallMs: number;
-  /** Overlap union of Neon trips. */
-  dbSpanMs: number;
-};
+export type RequestCostRecord = DbRequestCost &
+  NeonAuthMeter & {
+    type: typeof REQUEST_COST_LOG_TYPE;
+    journey: string | null;
+    step: string | null;
+    kind: RequestKind;
+    method: string;
+    path: string;
+    status: number;
+    /** Uncompressed body bytes the Worker sent; Cloudflare compresses after this. */
+    responseBytes: number;
+    wallMs: number;
+    /** Overlap union of Neon trips. */
+    dbSpanMs: number;
+  };
 
 type FetchHandler<Env, Ctx> = (
   request: Request,
@@ -52,7 +57,9 @@ type FetchHandler<Env, Ctx> = (
   ctx: Ctx,
 ) => Response | Promise<Response>;
 
-const storage = new AsyncLocalStorage<DbRequestCost>();
+type RequestCostStore = DbRequestCost & NeonAuthMeter;
+
+const storage = new AsyncLocalStorage<RequestCostStore>();
 
 export function requestCostEnabled(env: RequestCostEnv | undefined): boolean {
   return env?.REQUEST_COST_METER === "1";
@@ -102,7 +109,12 @@ export function withRequestCost<Env extends RequestCostEnv, Ctx>(
     if (!requestCostEnabled(env)) return handler(request, env, ctx);
 
     setDbRequestCostSlot(storage);
-    const cost = emptyDbRequestCost();
+    setNeonAuthMeterSlot(storage);
+    const cost: RequestCostStore = {
+      ...emptyDbRequestCost(),
+      authRoundTrips: 0,
+      auth429s: 0,
+    };
     const started = Date.now();
     const url = new URL(request.url);
     const base = {

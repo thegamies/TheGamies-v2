@@ -4,6 +4,11 @@ import {
   meteredNeonFetch,
   setDbRequestCostSlot,
 } from "@thegamies/db/request-cost";
+import { AUTH_CLIENT_IP_FETCH, withAuthClientIp } from "@/lib/auth/auth-client-ip";
+import {
+  NEON_AUTH_LOG_TYPE,
+  setNeonAuthMeterSlot,
+} from "@/lib/auth/neon-auth-meter";
 import {
   classifyRequest,
   REQUEST_COST_JOURNEY_HEADER,
@@ -14,9 +19,17 @@ import {
 
 const ON = { REQUEST_COST_METER: "1" };
 
+const authBase = "https://ep-example.neonauth.us-east-2.aws.neon.tech/dbname/auth";
+
 afterEach(() => {
   setDbRequestCostSlot(undefined);
+  setNeonAuthMeterSlot(undefined);
+  delete (globalThis as typeof globalThis & { [AUTH_CLIENT_IP_FETCH]?: unknown })[
+    AUTH_CLIENT_IP_FETCH
+  ];
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 function parse(line: string): RequestCostRecord {
@@ -168,5 +181,51 @@ describe("withRequestCost", () => {
     );
     expect(byPath).toEqual({ "/?n=1": 1, "/?n=3": 3 });
     expect(currentDbRequestCost()).toBeUndefined();
+  });
+
+  it("logs each Neon Auth call and totals them on the request line", async () => {
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("limited", { status: 429 })),
+    );
+    const authLogs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((line) => {
+      authLogs.push(String(line));
+    });
+    const log = vi.fn();
+    const wrapped = withRequestCost(async () => {
+      await withAuthClientIp("203.0.113.8", () =>
+        globalThis.fetch(`${authBase}/get-session?neon_auth_session_verifier=tok`),
+      );
+      await withAuthClientIp("203.0.113.8", () =>
+        globalThis.fetch(`${authBase}/get-session`),
+      );
+      return new Response(null, { status: 429 });
+    }, log);
+
+    await wrapped(new Request("https://x.test/api/auth/get-session"), ON, {});
+
+    expect(authLogs.map((line) => JSON.parse(line))).toEqual([
+      {
+        type: NEON_AUTH_LOG_TYPE,
+        method: "GET",
+        path: "/dbname/auth/get-session",
+        status: 429,
+      },
+      {
+        type: NEON_AUTH_LOG_TYPE,
+        method: "GET",
+        path: "/dbname/auth/get-session",
+        status: 429,
+      },
+    ]);
+    expect(parse(log.mock.calls[0][0])).toMatchObject({
+      path: "/api/auth/get-session",
+      status: 429,
+      authRoundTrips: 2,
+      auth429s: 2,
+      dbRoundTrips: 0,
+    });
   });
 });
