@@ -1,7 +1,11 @@
 import Link from "@/lib/next-link";
-import { type CSSProperties } from "react";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
+import {
+  comparisonColumnCount,
+  comparisonStripTableClass,
+  comparisonStripTableStyle,
+} from "@/components/communities/comparison-strip";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import {
   EmptyStandingCard,
@@ -24,25 +28,6 @@ import {
   editionVoterBallotHref,
 } from "@/lib/communities/edition-results-href";
 import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
-
-const STRIP_TABLE_CLASS =
-  "w-max min-w-full border-collapse text-sm [--strip-col:119px] lg:[--strip-col:222px]";
-
-function listColumnCount(showYou: boolean, voiceCount: number) {
-  return (showYou ? 1 : 0) + 2 + voiceCount;
-}
-
-function stripTableStyle(
-  showYou: boolean,
-  voiceCount: number,
-): CSSProperties {
-  const cols = listColumnCount(showYou, voiceCount);
-  return {
-    width: `calc(${cols} * var(--strip-col))`,
-    minWidth: `calc(${cols} * var(--strip-col))`,
-    tableLayout: "fixed",
-  };
-}
 
 function MatrixStandingCell({
   games,
@@ -102,11 +87,14 @@ function CategoryComparisonStrip({
   year: number;
   youBallotHref: string | null;
 }) {
-  const style = stripTableStyle(showYou, voiceColumns.length);
+  const columnCount = comparisonColumnCount(showYou, voiceColumns.length);
 
   return (
     <HorizontalScroll className="mt-4" label={`${row.label} comparison`}>
-      <table className={STRIP_TABLE_CLASS} style={style}>
+      <table
+        className={comparisonStripTableClass(columnCount)}
+        style={comparisonStripTableStyle(columnCount)}
+      >
         <thead>
           <tr className="border-b border-line text-left">
             {showYou ? (

@@ -319,7 +319,9 @@ html.has-site-ad {
 
 .standing-card--sm,
 .standing-w-sm {
-  width: 103px;
+  width: 100%;
+  min-width: 0;
+  max-width: 103px;
 }
 
 .standing-card--pin {
@@ -586,14 +588,42 @@ html.has-site-ad {
   line-clamp: 2;
 }
 
+/*
+ * Comparison columns. Five wide-screen columns fill the content width.
+ * 222px × 5 is 6px past the page, which made the row scroll.
+ * A sixth column keeps the editorial width and scrolls.
+ * Narrow screens stay at 119px and scroll when the row is wider than the page.
+ */
+.comparison-strip {
+  --strip-col: 119px;
+  --strip-cols: 1;
+  width: calc(var(--strip-cols) * var(--strip-col));
+  min-width: calc(var(--strip-cols) * var(--strip-col));
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .comparison-strip {
+    --strip-col: 222px;
+  }
+
+  .comparison-strip--fit {
+    width: min(100%, calc(var(--strip-cols) * var(--strip-col)));
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
 .standing-cmp-cell {
   box-sizing: border-box;
-  width: var(--strip-col);
-  min-width: var(--strip-col);
-  max-width: var(--strip-col);
+  min-width: 0;
   padding-left: 0.5rem;
   padding-right: 0.5rem;
   vertical-align: top;
+  overflow-wrap: break-word;
 }
 
 .standing-cmp-cell--rank {
@@ -674,7 +704,7 @@ html.has-site-ad {
 @media (min-width: 1024px) {
   .standing-card--sm,
   .standing-w-sm {
-    width: 206px;
+    max-width: 206px;
   }
 
   .standing-place--sm {
