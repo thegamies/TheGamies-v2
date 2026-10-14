@@ -1,5 +1,8 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { noteNeonAuthFetch } from "@/lib/auth/neon-auth-meter";
+import {
+  neonAuthRetryAfter,
+  noteNeonAuthFetch,
+} from "@/lib/auth/neon-auth-meter";
 
 /**
  * Neon Auth rate-limits by the first `x-forwarded-for` address. The Auth SDK
@@ -160,7 +163,12 @@ function installAuthClientIpFetch(): void {
     if (!target) return next(callInput, callInit);
     try {
       const response = await next(callInput, callInit);
-      noteNeonAuthFetch(target.method, target.path, response.status);
+      noteNeonAuthFetch(
+        target.method,
+        target.path,
+        response.status,
+        neonAuthRetryAfter(response.headers),
+      );
       return response;
     } catch (error) {
       noteNeonAuthFetch(target.method, target.path, 0);

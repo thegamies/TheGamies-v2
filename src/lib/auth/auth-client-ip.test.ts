@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/auth-client-ip";
 import {
   NEON_AUTH_LOG_TYPE,
+  neonAuthRetryAfter,
   setNeonAuthMeterSlot,
   type NeonAuthMeter,
 } from "@/lib/auth/neon-auth-meter";
@@ -140,6 +141,66 @@ describe("auth fetch wrapper", () => {
     await withAuthClientIp(null, () => globalThis.fetch("https://thegamies.gg/games"));
     expect(meter.authRoundTrips).toBe(1);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("records how long Neon asked us to wait on a 429", async () => {
+    const meter: NeonAuthMeter = { authRoundTrips: 0, auth429s: 0 };
+    setNeonAuthMeterSlot({ getStore: () => meter });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    globalThis.fetch = async () =>
+      new Response("limited", {
+        status: 429,
+        headers: { "X-Retry-After": "8" },
+      });
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+
+    await withAuthClientIp("203.0.113.8", () => globalThis.fetch(`${authBase}/get-session`));
+
+    expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toEqual({
+      type: NEON_AUTH_LOG_TYPE,
+      method: "GET",
+      path: "/dbname/auth/get-session",
+      status: 429,
+      retryAfter: "8",
+    });
+  });
+
+  it("prints the wait on a local 429 when the staging meter is off", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    globalThis.fetch = async () =>
+      new Response("limited", {
+        status: 429,
+        headers: { "retry-after": "3" },
+      });
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+    vi.stubEnv("NODE_ENV", "development");
+
+    await withAuthClientIp(null, () => globalThis.fetch(`${authBase}/get-session`));
+
+    expect(JSON.parse(String(log.mock.calls[0]?.[0])).retryAfter).toBe("3");
+  });
+
+  it("stays quiet in production when the meter is off", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    globalThis.fetch = async () =>
+      new Response("limited", {
+        status: 429,
+        headers: { "X-Retry-After": "8" },
+      });
+    vi.stubEnv("NEON_AUTH_BASE_URL", authBase);
+    vi.stubEnv("NODE_ENV", "production");
+
+    await withAuthClientIp(null, () => globalThis.fetch(`${authBase}/get-session`));
+
+    expect(log).not.toHaveBeenCalled();
+  });
+});
+
+describe("neonAuthRetryAfter", () => {
+  it("reads the wait header and ignores a blank value", () => {
+    expect(neonAuthRetryAfter(new Headers({ "X-Retry-After": " 12 " }))).toBe("12");
+    expect(neonAuthRetryAfter(new Headers())).toBeNull();
+    expect(neonAuthRetryAfter(new Headers({ "retry-after": "   " }))).toBeNull();
   });
 });
 
