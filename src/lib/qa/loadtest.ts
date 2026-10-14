@@ -156,6 +156,23 @@ export function loadtestEditionOpenSchedule(now: Date): {
   };
 }
 
+/**
+ * Published, and far enough past `publishesAt` that the 30-day spoiler
+ * entrance is already over. The public URL shows the results board.
+ */
+export function loadtestEditionPublishedSchedule(now: Date): {
+  opensAt: Date;
+  closesAt: Date;
+  publishesAt: Date;
+} {
+  const day = 24 * 60 * 60 * 1000;
+  return {
+    opensAt: new Date(now.getTime() - 45 * day),
+    closesAt: new Date(now.getTime() - 32 * day),
+    publishesAt: new Date(now.getTime() - 31 * day),
+  };
+}
+
 export const LOADTEST_POPULAR_POOL = 40;
 export const LOADTEST_UNPOPULAR_POOL = 10;
 export const LOADTEST_BALLOT_POPULAR_POOL = 20;

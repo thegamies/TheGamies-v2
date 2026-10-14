@@ -69,6 +69,7 @@ import {
 } from "@/lib/qa/loadtest";
 import {
   repairLoadtestOpenEdition,
+  repairLoadtestPublishedEdition,
   repairLoadtestTgaYear,
   restoreLoadtestTgaSchedule,
 } from "@/lib/qa/loadtest-repair";
@@ -397,7 +398,7 @@ async function runScenario(input: {
       );
     }
     if (input.scenario === "editions" && !input.skipRepair) {
-      await repairLoadtestOpenEdition(createDb(input.databaseUrl), {
+      await repairLoadtestPublishedEdition(createDb(input.databaseUrl), {
         communityId: input.fixtures.communityId,
         year: LOADTEST_EDITION_YEAR,
       });

@@ -146,7 +146,7 @@ Dedicated fixtures (ensure does **not** flip the live Pick’em schedule or QA s
 
 - Community `gamies_qa_load` opted into TGA 2025. Joins stay closed so anonymous readers can open the community boards.
 - First half: 2025 picks are open; writers save a complete sheet (every category). Second half: the runner locks 2025 and readers hit standings. The original 2025 schedule is restored when the run ends.
-- One 2025 edition on that community. Ensure plants 1,000 filled seed ballots and marks the first 3 of those accounts as hosts, then leaves voting open. The `editions` run reads and writes ballots for the first half, publishes and freezes for the results half, then reopens voting when the run ends.
+- One 2025 edition on that community. Ensure plants 1,000 filled seed ballots and marks the first 3 of those accounts as hosts, then leaves voting open. The `editions` run reads and writes ballots for the first half, publishes and freezes for the results half, then leaves the public results board up (past the spoiler entrance). The next run opens voting again at the start.
 
 ```bash
 # Doppler: QA_TARGET=staging, QA_STAGING_URL, DATABASE_URL, QA_ACCOUNT_PASSWORD

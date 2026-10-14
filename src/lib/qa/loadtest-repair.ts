@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { communityEditions, type Db } from "@thegamies/db";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
 import { seedEditionCategories } from "@/lib/communities/edition-categories";
+import { isEditionResultsEntranceOpen } from "@/lib/communities/edition-results-entrance";
 import { computeEditionStatus } from "@/lib/communities/edition-status";
 import {
   createCommunityTgaYear,
@@ -16,6 +17,7 @@ import {
   LOADTEST_TGA_YEAR,
   completeLoadtestTgaPicks,
   loadtestEditionOpenSchedule,
+  loadtestEditionPublishedSchedule,
   loadtestTgaLockedSchedule,
   loadtestTgaOpenSchedule,
   type LoadtestTgaSlateCategory,
@@ -146,5 +148,52 @@ export async function repairLoadtestOpenEdition(
     : "missing";
   if (status !== "open") {
     throw new Error(`Open edition ${input.year}: expected open, got ${status}`);
+  }
+}
+
+/** Date-only. Leaves the freeze from the run's publish step in place. */
+export async function repairLoadtestPublishedEdition(
+  db: Db,
+  input: { communityId: string; year: number; now?: Date },
+): Promise<void> {
+  const now = input.now ?? new Date();
+  const edition = await getEditionByCommunityYear(
+    input.communityId,
+    input.year,
+    db,
+  );
+  if (!edition) throw new Error(`Published edition ${input.year} is missing`);
+  const schedule = loadtestEditionPublishedSchedule(now);
+  await db
+    .update(communityEditions)
+    .set({
+      opensAt: schedule.opensAt,
+      closesAt: schedule.closesAt,
+      publishesAt: schedule.publishesAt,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(communityEditions.id, edition.id),
+        eq(communityEditions.communityId, input.communityId),
+      ),
+    );
+  const refreshed = await getEditionByCommunityYear(
+    input.communityId,
+    input.year,
+    db,
+  );
+  const status = refreshed
+    ? computeEditionStatus(refreshed, now)
+    : "missing";
+  if (status !== "published") {
+    throw new Error(
+      `Published edition ${input.year}: expected published, got ${status}`,
+    );
+  }
+  if (isEditionResultsEntranceOpen(refreshed?.publishesAt, now)) {
+    throw new Error(
+      `Published edition ${input.year}: results entrance is still open`,
+    );
   }
 }

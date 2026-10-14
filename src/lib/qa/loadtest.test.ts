@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isUndeliverableEmailAddress } from "@/lib/email/send";
 import { parseOwnedUsername } from "@/lib/profile/username";
+import { isEditionResultsEntranceOpen } from "@/lib/communities/edition-results-entrance";
+import { computeEditionStatus } from "@/lib/communities/edition-status";
 import { slugifyCommunityName } from "@/lib/communities/schema";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 import {
@@ -18,6 +20,7 @@ import {
   loadtestSyntheticAuthUserId,
   parseLoadtestWriterHeader,
   loadtestEditionOpenSchedule,
+  loadtestEditionPublishedSchedule,
   loadtestEditionSeedBatches,
   loadtestTgaLockedSchedule,
   loadtestTgaOpenSchedule,
@@ -181,6 +184,18 @@ describe("loadtest schedules", () => {
     expect(schedule.closesAt.getTime()).toBeGreaterThan(now.getTime());
     expect(schedule.publishesAt.getTime()).toBeGreaterThan(
       schedule.closesAt.getTime(),
+    );
+  });
+
+  it("leaves the edition published with the results board as the public page", () => {
+    const schedule = loadtestEditionPublishedSchedule(now);
+    expect(computeEditionStatus(schedule, now)).toBe("published");
+    expect(isEditionResultsEntranceOpen(schedule.publishesAt, now)).toBe(
+      false,
+    );
+    expect(schedule.opensAt.getTime()).toBeLessThan(schedule.closesAt.getTime());
+    expect(schedule.closesAt.getTime()).toBeLessThanOrEqual(
+      schedule.publishesAt.getTime(),
     );
   });
 
