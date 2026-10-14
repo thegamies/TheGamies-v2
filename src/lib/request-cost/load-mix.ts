@@ -295,6 +295,12 @@ function editionResultsGets(urls: LoadMixUrls): LoadGetItem[] {
     {
       group: "edition",
       method: "GET",
+      path: editionResultsHref(slug, year, { view: "reveal" }),
+      weight: 2,
+    },
+    {
+      group: "edition",
+      method: "GET",
       path: editionResultsHref(slug, year, { view: "standings" }),
       weight: 3,
     },

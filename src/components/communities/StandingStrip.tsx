@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { StandingStripDrag } from "@/components/communities/StandingStripDrag";
 
 type StandingStripProps = {
   children: ReactNode;
@@ -8,8 +9,9 @@ type StandingStripProps = {
 };
 
 /**
- * Ranked horizontal strip with native overflow only — no client island.
- * Comparison boards that need drag sync keep `HorizontalScroll`.
+ * Ranked horizontal strip. Overflow is native; mouse and pen drag share one
+ * listener so each award is not its own client scroller. Comparison boards
+ * that need column sync keep `HorizontalScroll`.
  */
 export function StandingStrip({
   children,
@@ -22,7 +24,11 @@ export function StandingStrip({
       role={label ? "region" : undefined}
       aria-label={label}
     >
-      <div className="scrollbar-none w-full min-w-0 overflow-x-auto overflow-y-hidden [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]">
+      <StandingStripDrag />
+      <div
+        data-drag-scroll
+        className="scrollbar-none w-full min-w-0 overflow-x-auto overflow-y-hidden data-[dragging=true]:cursor-grabbing data-[dragging=true]:select-none [&[data-dragging=true]_*]:cursor-grabbing [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none]"
+      >
         {children}
       </div>
     </div>

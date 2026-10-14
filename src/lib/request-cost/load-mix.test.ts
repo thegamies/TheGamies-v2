@@ -116,6 +116,13 @@ describe("buildLoadGets", () => {
     expect(lockedStandingsWeight).toBeGreaterThan(lockedBallotWeight);
   });
 
+  it("reads Reveal only after the edition is published", () => {
+    const open = buildLoadGets("editions", urls, "open");
+    const locked = buildLoadGets("editions", urls, "locked");
+    expect(open.some((item) => item.path.includes("view=reveal"))).toBe(false);
+    expect(locked.some((item) => item.path.includes("view=reveal"))).toBe(true);
+  });
+
   it("does not point at the QA showcase community", () => {
     const results = buildLoadGets("editions", urls, "locked");
     expect(results.some((item) => item.path.includes("/edition/2025"))).toBe(true);

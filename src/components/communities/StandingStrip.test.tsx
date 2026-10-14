@@ -1,6 +1,6 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   StandingGameCard,
@@ -84,5 +84,67 @@ describe("StandingStrip", () => {
     expect(screen.getByRole("link", { name: /Alpha/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Bravo/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Charlie/ })).toBeTruthy();
+  });
+
+  it("drags an overflowing strip with the mouse and still allows a click", () => {
+    render(
+      <StandingStrip label="Best Story ranked">
+        <a href="/games/alpha">Alpha</a>
+      </StandingStrip>,
+    );
+    const scroller = screen
+      .getByLabelText("Best Story ranked")
+      .querySelector("[data-drag-scroll]") as HTMLElement;
+    Object.defineProperty(scroller, "scrollWidth", {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(scroller, "clientWidth", {
+      configurable: true,
+      value: 200,
+    });
+    scroller.setPointerCapture = () => {};
+    scroller.releasePointerCapture = () => {};
+
+    fireEvent.pointerDown(scroller, {
+      pointerId: 1,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+    });
+    fireEvent.pointerMove(scroller, {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 96,
+    });
+    expect(scroller.scrollLeft).toBe(0);
+
+    fireEvent.pointerMove(scroller, {
+      pointerId: 1,
+      pointerType: "mouse",
+      clientX: 40,
+    });
+    expect(scroller.scrollLeft).toBe(60);
+    expect(scroller.dataset.dragging).toBe("true");
+
+    fireEvent.pointerUp(scroller, { pointerId: 1, pointerType: "mouse" });
+    expect(scroller.dataset.dragging).toBeUndefined();
+
+    const click = new MouseEvent("click", { bubbles: true, cancelable: true });
+    scroller.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+
+    fireEvent.pointerDown(scroller, {
+      pointerId: 2,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+    });
+    fireEvent.pointerMove(scroller, {
+      pointerId: 2,
+      pointerType: "touch",
+      clientX: 20,
+    });
+    expect(scroller.scrollLeft).toBe(60);
   });
 });

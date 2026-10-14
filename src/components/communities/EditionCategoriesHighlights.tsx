@@ -228,7 +228,7 @@ function CategoryComparisonSections({
   );
 }
 
-/** Per-award Top 3 on one line; overflow uses native StandingStrip. */
+/** Per-award Top 3 on one line; overflow uses StandingStrip (native scroll, mouse drag). */
 function CategoryRankedSections({
   slug,
   year,
