@@ -17,8 +17,9 @@ describe("session cache cookie", () => {
     expect(hasSessionTokenCookie("other=1")).toBe(false);
   });
 
-  it("expires before the next keepalive so that ping must mint a cookie", () => {
-    expect(SESSION_DATA_TTL_SEC * 1000).toBeLessThan(
+  it("outlasts the minute keepalive so a ping reuses the cookie", () => {
+    expect(SESSION_DATA_TTL_SEC).toBe(60 * 60);
+    expect(SESSION_DATA_TTL_SEC * 1000).toBeGreaterThan(
       SESSION_KEEPALIVE_INTERVAL_MS,
     );
   });

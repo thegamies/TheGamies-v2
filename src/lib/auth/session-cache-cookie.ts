@@ -6,10 +6,10 @@ export const SESSION_DATA_COOKIE_NAME =
 export const SESSION_TOKEN_COOKIE_NAME = "__Secure-neon-auth.session_token";
 
 /**
- * Signed cache lifetime in seconds. The minute keepalive is longer than this,
- * so each visible-tab ping finds the cookie expired and has to mint a new one.
+ * Signed cache lifetime in seconds. The minute keepalive is shorter than this,
+ * so those pings reuse the cookie. Neon is called about once an hour, when it expires.
  */
-export const SESSION_DATA_TTL_SEC = 30;
+export const SESSION_DATA_TTL_SEC = 60 * 60;
 
 export function readCookie(
   cookieHeader: string | null,
