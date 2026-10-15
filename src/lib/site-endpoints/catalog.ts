@@ -755,6 +755,17 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
     notes: "Host enables a Pick’em year.",
   }),
   row({
+    method: "POST",
+    path: "/api/auth/google-authorize",
+    kind: "api",
+    group: "auth",
+    audience: "public",
+    usage: 3,
+    dbImpact: 2,
+    testPriority: 2,
+    notes: "Asks Google which account to use after Continue with Google.",
+  }),
+  row({
     method: "GET+POST",
     path: "/api/auth/[...path]",
     kind: "api",
