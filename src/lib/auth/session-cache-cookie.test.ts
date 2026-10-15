@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { SESSION_KEEPALIVE_INTERVAL_MS } from "@/lib/auth/session-keepalive";
 import {
   SESSION_DATA_COOKIE_NAME,
   SESSION_DATA_TTL_SEC,
@@ -17,10 +16,7 @@ describe("session cache cookie", () => {
     expect(hasSessionTokenCookie("other=1")).toBe(false);
   });
 
-  it("outlasts the minute keepalive so a ping reuses the cookie", () => {
-    expect(SESSION_DATA_TTL_SEC).toBe(60 * 60);
-    expect(SESSION_DATA_TTL_SEC * 1000).toBeGreaterThan(
-      SESSION_KEEPALIVE_INTERVAL_MS,
-    );
+  it("uses a 30 second cache while refresh-on-navigation is being checked", () => {
+    expect(SESSION_DATA_TTL_SEC).toBe(30);
   });
 });

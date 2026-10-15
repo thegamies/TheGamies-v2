@@ -1,17 +1,9 @@
 import { createNeonAuth } from "@neondatabase/auth/next/server";
+import { readAuthEnv } from "@/lib/auth/auth-env";
 import { guardSessionReads } from "@/lib/auth/guard-session-reads";
 import { SESSION_DATA_TTL_SEC } from "@/lib/auth/session-cache-cookie";
 
 type NeonAuth = ReturnType<typeof createNeonAuth>;
-
-function readAuthEnv(): { baseUrl: string; secret: string } | null {
-  const baseUrl = process.env.NEON_AUTH_BASE_URL?.trim();
-  const secret = process.env.NEON_AUTH_COOKIE_SECRET?.trim();
-  if (!baseUrl || !secret || secret.length < 32) {
-    return null;
-  }
-  return { baseUrl, secret };
-}
 
 export function isAuthConfigured(): boolean {
   return readAuthEnv() !== null;
