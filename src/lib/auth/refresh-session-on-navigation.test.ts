@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   SESSION_DATA_COOKIE_NAME,
+  SESSION_DATA_TTL_SEC,
   SESSION_TOKEN_COOKIE_NAME,
 } from "@/lib/auth/session-cache-cookie";
 
@@ -69,7 +70,7 @@ describe("refreshSessionCacheHeaders", () => {
       request: Request;
     };
     expect(call.path).toBe("get-session");
-    expect(call.sessionDataTtl).toBe(30);
+    expect(call.sessionDataTtl).toBe(SESSION_DATA_TTL_SEC);
     expect(call.sameSite).toBe("lax");
     expect(call.request.method).toBe("GET");
     expect(result.setCookies).toEqual([minted]);

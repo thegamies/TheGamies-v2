@@ -5,12 +5,8 @@ export const SESSION_DATA_COOKIE_NAME =
 /** Primary Neon Auth session cookie. */
 export const SESSION_TOKEN_COOKIE_NAME = "__Secure-neon-auth.session_token";
 
-/**
- * Signed cache lifetime in seconds.
- * 30 seconds so a later navigation can show the refresh. Put this back to an hour
- * after that check.
- */
-export const SESSION_DATA_TTL_SEC = 30;
+/** Signed cache lifetime in seconds. A fresh cookie skips Neon on navigation. */
+export const SESSION_DATA_TTL_SEC = 4 * 60 * 60;
 
 export function readCookie(
   cookieHeader: string | null,

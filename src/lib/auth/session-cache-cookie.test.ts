@@ -16,7 +16,7 @@ describe("session cache cookie", () => {
     expect(hasSessionTokenCookie("other=1")).toBe(false);
   });
 
-  it("uses a 30 second cache while refresh-on-navigation is being checked", () => {
-    expect(SESSION_DATA_TTL_SEC).toBe(30);
+  it("keeps the signed session cache for 4 hours", () => {
+    expect(SESSION_DATA_TTL_SEC).toBe(4 * 60 * 60);
   });
 });
