@@ -1,3 +1,7 @@
+import {
+  SESSION_DATA_COOKIE_NAME,
+  SESSION_TOKEN_COOKIE_NAME,
+} from "@/lib/auth/session-cache-cookie";
 import { envAppOrigin } from "@/lib/seo/origin-env";
 
 /** Neon Auth / Better Auth session cookies we must drop after the user is closed. */
@@ -23,12 +27,28 @@ export function authSessionCookieNamesFromHeader(
   return names;
 }
 
+/**
+ * Auth cookies to drop on sign-out. Includes whatever the browser sent, plus
+ * the login cookie and the signed session cache, so a missing header entry
+ * cannot leave the 4-hour cache in place.
+ */
+export function authCookieNamesToExpire(cookieHeader: string | null): string[] {
+  return [
+    ...new Set([
+      ...authSessionCookieNamesFromHeader(cookieHeader),
+      SESSION_TOKEN_COOKIE_NAME,
+      SESSION_DATA_COOKIE_NAME,
+    ]),
+  ];
+}
+
 /** Options that overwrite Neon Auth cookies so the browser drops them. */
 export function expireAuthCookieOptions(name: string): {
   httpOnly: true;
   sameSite: "lax";
   path: "/";
   maxAge: 0;
+  expires: Date;
   secure: boolean;
 } {
   return {
@@ -36,6 +56,7 @@ export function expireAuthCookieOptions(name: string): {
     sameSite: "lax",
     path: "/",
     maxAge: 0,
+    expires: new Date(0),
     secure:
       name.startsWith("__Secure-") ||
       name.startsWith("__Host-") ||

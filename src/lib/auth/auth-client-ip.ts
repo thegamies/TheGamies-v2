@@ -5,9 +5,11 @@ import {
 } from "@/lib/auth/neon-auth-meter";
 
 /**
- * Neon Auth rate-limits by the first `x-forwarded-for` address. The Auth SDK
- * does not copy the visitor IP, so cache misses were counted on the Worker
- * egress address and one burst throttled the whole site.
+ * The Auth SDK does not copy the visitor IP, so outbound Auth fetches replace
+ * `x-forwarded-for` with one address: Cloudflare's `cf-connecting-ip`.
+ * Current Better Auth trusts that header only when it holds a single address.
+ * Neon has not documented the key its managed limiter uses. A missing address
+ * leaves the header unset.
  *
  * `cf-connecting-ip` is set by Cloudflare and is not a client-supplied
  * forwarding header.

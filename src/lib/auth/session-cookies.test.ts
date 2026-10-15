@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  authCookieNamesToExpire,
   authSessionCookieNamesFromHeader,
   expireAuthCookies,
   isAuthSessionCookieName,
@@ -29,6 +30,27 @@ describe("authSessionCookieNamesFromHeader", () => {
         "tg_list_edit=a.b; better-auth.session_token=abc; other=1",
       ),
     ).toEqual(["better-auth.session_token"]);
+  });
+});
+
+describe("authCookieNamesToExpire", () => {
+  it("always includes the login cookie and the session cache", () => {
+    expect(authCookieNamesToExpire("tg_list_edit=keep")).toEqual([
+      "__Secure-neon-auth.session_token",
+      "__Secure-neon-auth.local.session_data",
+    ]);
+  });
+
+  it("keeps chunked auth cookies from the request", () => {
+    expect(
+      authCookieNamesToExpire(
+        "__Secure-neon-auth.session_token.0=chunk; tg_list_edit=keep",
+      ),
+    ).toEqual([
+      "__Secure-neon-auth.session_token.0",
+      "__Secure-neon-auth.session_token",
+      "__Secure-neon-auth.local.session_data",
+    ]);
   });
 });
 

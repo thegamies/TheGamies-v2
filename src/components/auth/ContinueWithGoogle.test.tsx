@@ -27,9 +27,9 @@ afterEach(() => {
 describe("ContinueWithGoogle", () => {
   it("remembers next and starts Google OAuth", async () => {
     const assign = vi.fn();
-    vi.stubGlobal("location", { assign });
+    vi.stubGlobal("location", { assign, search: "" });
     signInWithGoogle.mockResolvedValueOnce({
-      href: "https://accounts.google.com/o/oauth2",
+      href: "https://auth.example/neondb/auth/sign-in/social/init?token=abc",
     });
     render(
       <ContinueWithGoogle next="/create/goty" intent="save" />,
@@ -42,7 +42,7 @@ describe("ContinueWithGoogle", () => {
     expect(rememberPostAuthNext).toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(assign).toHaveBeenCalledWith(
-        "https://accounts.google.com/o/oauth2",
+        "https://auth.example/neondb/auth/sign-in/social/init?token=abc",
       );
     });
     expect(signInWithGoogle).toHaveBeenCalledWith({

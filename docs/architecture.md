@@ -34,6 +34,23 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 - Local day-to-day: `pnpm dev` (Node). Cloudflare runtime parity: `pnpm preview:cf`.
 - PR previews deploy one Cloudflare Worker and share one Neon branch per PR.
 
+## Auth session
+
+The browser talks only to this origin. Sign-in, sign-up, email confirmation, the Google session claim, and later session reads go to `/api/auth` on `thegamies.gg`. The Worker (`auth.handler()` in `src/app/api/auth/[...path]/route.ts`) calls Neon Auth at `NEON_AUTH_BASE_URL` and writes `Set-Cookie` on the response for this host.
+
+Two cookies matter:
+
+| Cookie | Role |
+|---|---|
+| `__Secure-neon-auth.session_token` | Login session |
+| `__Secure-neon-auth.local.session_data` | Signed cache. A fresh one skips Neon on navigation for up to four hours (`SESSION_DATA_TTL_SEC`) |
+
+They are `HttpOnly`, `Secure`, `Path=/`, and `SameSite=Lax`. The `__Secure-` prefix makes them host-only: no `Domain`, so they belong to the exact host that set them and travel only over HTTPS. On a later visit the browser attaches them as the `Cookie` header. The site does not fetch them.
+
+A 429 is Neon Auth answering that Worker call. This app has no sign-in rate limit of its own. The Auth SDK does not copy the visitor address, so `src/lib/auth/auth-client-ip.ts` replaces `x-forwarded-for` with one value, Cloudflare’s `cf-connecting-ip`, and only on fetches to the Auth base URL. Neon has not documented which key the managed limiter uses. Current Better Auth trusts `x-forwarded-for` when that header holds a single address. A comma-separated list is ignored unless Better Auth is configured with `trustedProxies`. With no resolvable address, Better Auth uses one shared bucket per path. If Neon’s edge appends the Worker’s address before the limiter runs, our single value becomes a list and every visitor can share that bucket. Nothing in this repo can see that hop. The signal is a 429 that lands on more than one visitor at once.
+
+Keep the Auth call on the Worker. Neon’s host cannot store a cookie for `thegamies.gg`: the browser keeps `Set-Cookie` for the host that sent it. Trusted domains only allow redirects and CSRF origins. `cookies.domain` applies when our response sets the cookie, which is what the `/api/auth` proxy is for. A handoff that reads a token from Neon’s JSON and posts it here would put the session token in page JavaScript, and later session checks would still leave from the Worker.
+
 ## Boundaries
 
 - Keep the product as one Next.js app initially.

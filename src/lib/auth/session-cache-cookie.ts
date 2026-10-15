@@ -30,5 +30,6 @@ export function readCookie(
 }
 
 export function hasSessionTokenCookie(cookieHeader: string | null): boolean {
-  return readCookie(cookieHeader, SESSION_TOKEN_COOKIE_NAME) !== null;
+  const value = readCookie(cookieHeader, SESSION_TOKEN_COOKIE_NAME);
+  return value !== null && value.length > 0;
 }

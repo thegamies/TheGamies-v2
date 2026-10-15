@@ -14,6 +14,7 @@ describe("session cache cookie", () => {
       false,
     );
     expect(hasSessionTokenCookie("other=1")).toBe(false);
+    expect(hasSessionTokenCookie(`${SESSION_TOKEN_COOKIE_NAME}=`)).toBe(false);
   });
 
   it("keeps the signed session cache for 4 hours", () => {

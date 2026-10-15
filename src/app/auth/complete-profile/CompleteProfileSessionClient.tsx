@@ -5,7 +5,9 @@ import { useEffect, useRef, useState } from "react";
 import { claimNeonAuthSession } from "@/lib/auth/claim-oauth-session";
 import { GOOGLE_SIGN_IN_FAILED } from "@/lib/auth/google-sign-in-client";
 import { NEON_AUTH_SESSION_VERIFIER_PARAM } from "@/lib/auth/neon-auth-session-verifier";
-import { buildSignInHref, GOOGLE_COMPLETE_PROFILE_PATH } from "@/lib/auth/return-to";
+import { clearPostAuthNext } from "@/lib/auth/post-auth-next";
+import { buildSignInHref } from "@/lib/auth/return-to";
+import { resumeAfterGoogleSignIn } from "./resume-after-google";
 
 export function CompleteProfileSessionClient({ next }: { next: string }) {
   const [error, setError] = useState<string | null>(null);
@@ -18,17 +20,14 @@ export function CompleteProfileSessionClient({ next }: { next: string }) {
       new URLSearchParams(window.location.search).get(
         NEON_AUTH_SESSION_VERIFIER_PARAM,
       ) ?? "",
-    ).then((result) => {
-      if ("ok" in result) {
-        const params = new URLSearchParams();
-        if (next && next !== "/account") params.set("next", next);
-        const qs = params.toString();
-        window.location.assign(
-          qs ? `${GOOGLE_COMPLETE_PROFILE_PATH}?${qs}` : GOOGLE_COMPLETE_PROFILE_PATH,
-        );
+    ).then(async (result) => {
+      if (!("ok" in result)) {
+        setError(result.error);
         return;
       }
-      setError(result.error);
+      const resume = await resumeAfterGoogleSignIn(next);
+      clearPostAuthNext();
+      window.location.replace(resume.href);
     });
   }, [next]);
 

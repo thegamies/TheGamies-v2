@@ -35,7 +35,7 @@ export async function refreshSessionCacheHeaders(
   const headers = new Headers(requestHeaders);
   const cookieHeader = headers.get("cookie") ?? "";
   const token = readCookie(cookieHeader, SESSION_TOKEN_COOKIE_NAME);
-  if (token === null) {
+  if (!token) {
     return { headers, setCookies: [] };
   }
 
