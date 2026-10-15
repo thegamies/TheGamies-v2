@@ -5,8 +5,6 @@ import { GoogleIcon } from "@/components/BrandIcons";
 import { Button } from "@/components/ui/Button";
 import {
   GOOGLE_SIGN_IN_FAILED,
-  launchGoogleSignIn,
-  openGoogleSignInWindow,
   signInWithGoogle,
 } from "@/lib/auth/google-sign-in-client";
 import { rememberPostAuthNext } from "@/lib/auth/post-auth-next";
@@ -28,7 +26,6 @@ export function ContinueWithGoogle({
   const [error, setError] = useState<string | null>(null);
 
   async function onClick() {
-    const popup = openGoogleSignInWindow();
     const params =
       typeof window !== "undefined"
         ? new URLSearchParams(window.location.search)
@@ -44,17 +41,13 @@ export function ContinueWithGoogle({
     try {
       const result = await signInWithGoogle({ errorCallbackPath });
       if ("error" in result) {
-        popup?.close();
         setError(result.error);
         return;
       }
       if ("href" in result) {
-        launchGoogleSignIn(result, popup);
-        return;
+        window.location.assign(result.href);
       }
-      popup?.close();
     } catch {
-      popup?.close();
       setError(GOOGLE_SIGN_IN_FAILED);
     } finally {
       setPending(false);
