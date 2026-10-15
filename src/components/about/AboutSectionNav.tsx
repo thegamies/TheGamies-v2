@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { usePathname } from "next/navigation";
 import { ABOUT_SECTION_LINKS } from "@/lib/about/sections";
 

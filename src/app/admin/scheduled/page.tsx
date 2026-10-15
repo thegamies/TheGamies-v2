@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { loadCloudflareCronSettings } from "@/lib/cloudflare/cron-settings-store";
 import { AdminScheduledClient } from "./AdminScheduledClient";

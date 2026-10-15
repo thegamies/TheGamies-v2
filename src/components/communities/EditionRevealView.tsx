@@ -6,7 +6,7 @@ import {
   standingGameHref,
 } from "@/components/communities/StandingGameCard";
 import { SupportWatchLink } from "@/components/media/SupportWatchLink";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import {
   createContext,
   useContext,

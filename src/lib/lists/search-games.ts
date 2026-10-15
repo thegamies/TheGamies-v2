@@ -1,4 +1,7 @@
-import { browseGames } from "@/lib/catalog";
+import {
+  cachedBrowseGames,
+  GAME_SEARCH_CACHE_LIMIT,
+} from "@/lib/catalog/game-search-cache";
 import { parseAwardCategoryEligibility } from "@/lib/live-aggregate/award-category-defs";
 import { browseInputForCategoryEligibility } from "@/lib/live-aggregate/category-eligibility";
 import type {
@@ -24,7 +27,7 @@ export async function searchGamesForList(
         )
       : null;
 
-  const rows = await browseGames({
+  const rows = await cachedBrowseGames({
     q: q.length >= 2 ? q : undefined,
     ...(categoryBrowse ?? {
       year,
@@ -34,7 +37,7 @@ export async function searchGamesForList(
     }),
     sort: "popularity",
     sortDir: "desc",
-    limit: 24,
+    limit: GAME_SEARCH_CACHE_LIMIT,
   });
 
   return rows.map((r) => ({

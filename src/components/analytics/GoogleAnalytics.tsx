@@ -10,6 +10,9 @@ import { AnalyticsListener } from "./AnalyticsListener";
 export function GoogleAnalytics() {
   const measurementId = getGaMeasurementId();
   if (!measurementId) return null;
+  // The snippets are in the server HTML. A client render of <script> is a
+  // console error and never runs.
+  if (typeof window !== "undefined") return null;
 
   return (
     <>

@@ -3,13 +3,37 @@ import { skipEmailVerification } from "./skip-email-verification";
 
 describe("skipEmailVerification", () => {
   it("is on for local next dev", () => {
-    expect(skipEmailVerification({ NODE_ENV: "development" })).toBe(true);
     expect(
       skipEmailVerification({
         NODE_ENV: "development",
         NEXT_PUBLIC_APP_URL: "http://localhost:3000",
       }),
     ).toBe(true);
+    expect(
+      skipEmailVerification({
+        NODE_ENV: "development",
+        NEXT_PUBLIC_APP_URL: "http://127.0.0.1:3000",
+      }),
+    ).toBe(true);
+  });
+
+  it("stays off when the app URL is missing, malformed, or not loopback", () => {
+    expect(skipEmailVerification({ NODE_ENV: "development" })).toBe(false);
+    expect(
+      skipEmailVerification({ NODE_ENV: "development", NEXT_PUBLIC_APP_URL: " " }),
+    ).toBe(false);
+    expect(
+      skipEmailVerification({
+        NODE_ENV: "development",
+        NEXT_PUBLIC_APP_URL: "not a url",
+      }),
+    ).toBe(false);
+    expect(
+      skipEmailVerification({
+        NODE_ENV: "development",
+        NEXT_PUBLIC_APP_URL: "http://localhost.evil.com",
+      }),
+    ).toBe(false);
   });
 
   it("stays off on pull-request previews and other hosted deploys", () => {

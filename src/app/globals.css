@@ -308,6 +308,410 @@ html.has-site-ad {
   display: none;
 }
 
+/*
+ * Standing cards (Results, Categories, Comparison).
+ * One rule set here so each cover does not repeat the utility list in HTML.
+ * Values match the Tailwind utilities they replace.
+ */
+.standing-card {
+  display: block;
+}
+
+.standing-card--sm,
+.standing-w-sm {
+  width: 100%;
+  min-width: 0;
+  max-width: 103px;
+}
+
+.standing-card--pin {
+  display: contents;
+}
+
+.standing-pin {
+  width: 100%;
+  align-self: flex-end;
+}
+
+.standing-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: var(--radius-artwork);
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.standing-cover--fill {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.standing-cover > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  color: transparent;
+}
+
+.standing-cover-fallback {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: flex-end;
+  padding: 0.5rem;
+}
+
+.standing-cover-fallback p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  line-height: 1;
+  letter-spacing: 0.025em;
+  color: var(--muted);
+}
+
+.standing-tie-fallback {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  align-items: flex-end;
+  padding: 0.5rem;
+}
+
+.standing-tie-fallback p {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  line-height: 1;
+  letter-spacing: 0.025em;
+  color: var(--muted);
+}
+
+.standing-caption {
+  display: flex;
+}
+
+.standing-caption--mt1 {
+  margin-top: 0.25rem;
+}
+
+.standing-caption--mt2 {
+  margin-top: 0.5rem;
+}
+
+.standing-caption--mt05 {
+  margin-top: 0.125rem;
+}
+
+.standing-caption--lg {
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.standing-caption--base {
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.standing-copy {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
+.standing-copy--lg {
+  padding-top: 0.25rem;
+}
+
+.standing-place {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  line-height: 1;
+  letter-spacing: 0.025em;
+  color: var(--accent);
+}
+
+.standing-place--top {
+  font-size: 2rem;
+}
+
+.standing-place--rest {
+  font-size: 1.5rem;
+}
+
+.standing-place--sm {
+  font-size: 14px;
+}
+
+.standing-place--md {
+  font-size: 18px;
+}
+
+.standing-title-slot {
+  display: block;
+  width: 100%;
+}
+
+.standing-title-slot--14 {
+  min-height: 39px;
+}
+
+.standing-title-slot--16 {
+  min-height: 44px;
+}
+
+.standing-title-slot--18 {
+  min-height: 50px;
+}
+
+.standing-title-slot--20 {
+  min-height: 55px;
+}
+
+.standing-title-slot--28 {
+  min-height: 77px;
+}
+
+.standing-title {
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  letter-spacing: 0.025em;
+  color: var(--ink);
+  line-height: 1.375;
+  max-height: calc(2 * 1.375em);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.standing-title--14 {
+  font-size: 14px;
+}
+
+.standing-title--16 {
+  font-size: 16px;
+}
+
+.standing-title--18 {
+  font-size: 18px;
+}
+
+.standing-title--20 {
+  font-size: 20px;
+}
+
+.standing-title--28 {
+  font-size: 28px;
+}
+
+.group:hover .standing-title,
+.standing-card:hover .standing-title,
+.standing-tie-title:hover .standing-title {
+  color: var(--accent);
+}
+
+.standing-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: calc(1 / 0.75);
+}
+
+.standing-meta--votes {
+  margin-top: 0.125rem;
+  line-height: 1;
+  letter-spacing: 0.025em;
+  font-variant-numeric: tabular-nums;
+}
+
+.standing-meta--gap {
+  margin-top: 0.25rem;
+}
+
+.standing-score-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.standing-score-row--mb2 {
+  margin-bottom: 0.5rem;
+}
+
+.standing-score-row--mb05 {
+  margin-bottom: 0.125rem;
+}
+
+.standing-score-row--mt05 {
+  margin-top: 0.125rem;
+}
+
+.standing-score {
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 0.75rem;
+  line-height: calc(1 / 0.75);
+  letter-spacing: 0.025em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.standing-score.standing-score--tight {
+  line-height: 1;
+}
+
+.standing-score--pad {
+  padding-bottom: 0.125rem;
+}
+
+.standing-empty-label {
+  margin: 0.5rem 0 0;
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-size: 14px;
+  line-height: 1.375;
+  letter-spacing: 0.025em;
+  color: var(--muted);
+  min-height: 39px;
+  max-height: calc(2 * 1.375em);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/*
+ * Comparison columns. Five wide-screen columns fill the content width.
+ * 222px × 5 is 6px past the page, which made the row scroll.
+ * A sixth column keeps the editorial width and scrolls.
+ * Narrow screens stay at 119px and scroll when the row is wider than the page.
+ */
+.comparison-strip {
+  --strip-col: 119px;
+  --strip-cols: 1;
+  width: calc(var(--strip-cols) * var(--strip-col));
+  min-width: calc(var(--strip-cols) * var(--strip-col));
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .comparison-strip {
+    --strip-col: 222px;
+  }
+
+  .comparison-strip--fit {
+    width: min(100%, calc(var(--strip-cols) * var(--strip-col)));
+    min-width: 0;
+    max-width: 100%;
+  }
+}
+
+.standing-cmp-cell {
+  box-sizing: border-box;
+  min-width: 0;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  vertical-align: top;
+  overflow-wrap: break-word;
+}
+
+.standing-cmp-cell--rank {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.standing-cmp-cell--award {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.standing-tie {
+  position: relative;
+  display: block;
+  aspect-ratio: 3 / 4;
+  width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-artwork);
+  text-align: left;
+}
+
+.standing-tie-layer {
+  position: absolute;
+  inset: 0;
+  transition: opacity 400ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.standing-tie-peek {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.standing-tie-title {
+  display: block;
+  margin-top: 0.5rem;
+  min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .standing-cover-fallback {
+    padding: 0.75rem;
+  }
+
+  .standing-cover-fallback p {
+    font-size: 1.5rem;
+  }
+
+  .standing-place--top {
+    font-size: 2.5rem;
+  }
+
+  .standing-place--rest {
+    font-size: 1.85rem;
+  }
+
+  .standing-score {
+    font-size: 0.875rem;
+    line-height: calc(1.25 / 0.875);
+  }
+
+  .standing-score.standing-score--tight {
+    line-height: 1;
+  }
+}
+
+@media (min-width: 768px) {
+  .standing-place--top {
+    font-size: 2.75rem;
+  }
+
+  .standing-place--rest {
+    font-size: 2.1rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .standing-card--sm,
+  .standing-w-sm {
+    max-width: 206px;
+  }
+
+  .standing-place--sm {
+    font-size: 18px;
+  }
+}
+
 .reveal-opener-dots {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14'%3E%3Ccircle cx='7' cy='7' r='1' fill='%23ff5a1f' fill-opacity='0.42'/%3E%3C/svg%3E");
   background-repeat: repeat;

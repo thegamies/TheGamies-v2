@@ -1,14 +1,17 @@
-"use client";
-
-import Link from "next/link";
-import { type CSSProperties } from "react";
+import Link from "@/lib/next-link";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
+import {
+  comparisonColumnCount,
+  comparisonStripTableClass,
+  comparisonStripTableStyle,
+} from "@/components/communities/comparison-strip";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import { RankedStandingBillboard } from "@/components/communities/RankedStandingBillboard";
 import {
   EmptyStandingCard,
   StandingGameCard,
+  standingCmpCellRankClass,
 } from "@/components/communities/StandingGameCard";
 import { HorizontalScroll, HorizontalScrollGroup } from "@/components/ui/HorizontalScroll";
 import type {
@@ -18,28 +21,6 @@ import type {
   MatrixVoiceColumn,
 } from "@/lib/communities/edition-results";
 import { editionVoterBallotHref } from "@/lib/communities/edition-results-href";
-
-const LIST_COL =
-  "box-border w-[var(--strip-col)] min-w-[var(--strip-col)] max-w-[var(--strip-col)] px-2 align-top";
-
-const STRIP_TABLE_CLASS =
-  "w-max min-w-full border-collapse text-sm [--strip-col:119px] lg:[--strip-col:222px]";
-
-function listColumnCount(showYou: boolean, voiceCount: number) {
-  return (showYou ? 1 : 0) + 2 + voiceCount;
-}
-
-function stripTableStyle(
-  showYou: boolean,
-  voiceCount: number,
-): CSSProperties {
-  const cols = listColumnCount(showYou, voiceCount);
-  return {
-    width: `calc(${cols} * var(--strip-col))`,
-    minWidth: `calc(${cols} * var(--strip-col))`,
-    tableLayout: "fixed",
-  };
-}
 
 function MatrixCardCell({
   game,
@@ -100,26 +81,29 @@ function GotyComparisonStrip({
   year: number;
   youBallotHref: string | null;
 }) {
-  const style = stripTableStyle(showYou, voiceColumns.length);
+  const columnCount = comparisonColumnCount(showYou, voiceColumns.length);
 
   return (
     <HorizontalScroll className="mt-2" label={`#${row.rank} comparison`}>
-      <table className={STRIP_TABLE_CLASS} style={style}>
+      <table
+        className={comparisonStripTableClass(columnCount)}
+        style={comparisonStripTableStyle(columnCount)}
+      >
         <thead>
           <tr className="border-b border-line text-left">
             {showYou ? (
-              <th scope="col" className={`${LIST_COL} py-2`}>
+              <th scope="col" className={standingCmpCellRankClass}>
                 <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
               </th>
             ) : null}
-            <th scope="col" className={`${LIST_COL} py-2`}>
+            <th scope="col" className={standingCmpCellRankClass}>
               <ComparisonStripHeader>Community</ComparisonStripHeader>
             </th>
-            <th scope="col" className={`${LIST_COL} py-2`}>
+            <th scope="col" className={standingCmpCellRankClass}>
               <ComparisonStripHeader>Hosts</ComparisonStripHeader>
             </th>
             {voiceColumns.map((v) => (
-              <th key={v.profileId} scope="col" className={`${LIST_COL} py-2`}>
+              <th key={v.profileId} scope="col" className={standingCmpCellRankClass}>
                 <ComparisonStripHeader
                   title={`@${v.username}`}
                   href={editionVoterBallotHref(slug, year, v.username)}
@@ -138,18 +122,18 @@ function GotyComparisonStrip({
         <tbody>
           <tr className="align-top">
             {showYou ? (
-              <td className={`${LIST_COL} py-2`}>
+              <td className={standingCmpCellRankClass}>
                 <MatrixCardCell game={row.you} />
               </td>
             ) : null}
-            <td className={`${LIST_COL} py-2`}>
+            <td className={standingCmpCellRankClass}>
               <MatrixStandingCell games={row.community} />
             </td>
-            <td className={`${LIST_COL} py-2`}>
+            <td className={standingCmpCellRankClass}>
               <MatrixStandingCell games={row.voices} />
             </td>
             {voiceColumns.map((v) => (
-              <td key={v.profileId} className={`${LIST_COL} py-2`}>
+              <td key={v.profileId} className={standingCmpCellRankClass}>
                 <MatrixCardCell game={row.voiceGames[v.profileId] ?? null} />
               </td>
             ))}

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 
 export function ProfilePager({
   from,
@@ -12,14 +12,16 @@ export function ProfilePager({
 }: {
   from: number;
   to: number;
-  total: number;
+  total?: number;
   page: number;
-  totalPages: number;
+  totalPages?: number;
   prevHref: string | null;
   nextHref: string | null;
   label: string;
 }) {
-  if (total <= to && page === 1) return null;
+  const knownTotal = total != null && totalPages != null;
+  if (knownTotal && total <= to && page === 1) return null;
+  if (!knownTotal && page === 1 && !nextHref) return null;
 
   return (
     <nav
@@ -27,7 +29,11 @@ export function ProfilePager({
       aria-label={label}
     >
       <p className="text-muted">
-        {from}–{to} of {total} · page {page} of {totalPages}
+        {knownTotal
+          ? `${from}–${to} of ${total} · page ${page} of ${totalPages}`
+          : page > 1
+            ? `${from}–${to} · page ${page}`
+            : `${from}–${to}`}
       </p>
       <div className="flex gap-2">
         {prevHref ? (

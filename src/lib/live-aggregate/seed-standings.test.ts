@@ -3,7 +3,10 @@ import {
   buildSeedCategoryVotes,
   GOTY_SEED_EXCLUDED_TITLES,
   resolveSeedStartIndex,
+  SEED_AUTH_PREFIX,
+  seedAuthUserId,
   seedGotyListEventTime,
+  seedUsername,
   selectStandingsSeedWork,
   weightForRatedGame,
   weightForTopRank,
@@ -131,6 +134,13 @@ describe("selectStandingsSeedWork", () => {
         listProfileIds,
       }).activeProfileIds,
     ).toEqual(["a", "c"]);
+  });
+});
+
+describe("standings seed ids", () => {
+  it("allows indices above 1000", () => {
+    expect(seedAuthUserId(1001)).toBe(`${SEED_AUTH_PREFIX}1001`);
+    expect(seedUsername(2500)).toBe("seedvoter2500");
   });
 });
 

@@ -9,7 +9,7 @@ export const SITE_DESCRIPTION =
 
 export const noIndexRobots = { index: false, follow: false } as const;
 
-/** Thin catalog game pages: stay out of the index, still pass PageRank to lists. */
+/** noindex but still follow links (e.g. private surfaces that should pass PageRank). */
 export const noIndexFollowRobots = { index: false, follow: true } as const;
 
 export function appOrigin(): string {

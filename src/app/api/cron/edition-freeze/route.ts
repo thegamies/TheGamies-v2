@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { timingSafeEqualString } from "@thegamies/igdb";
 import { processEditionFreezeQueue } from "@/lib/communities/edition-freeze";
 
 export const maxDuration = 300;
@@ -7,9 +8,7 @@ function authorize(request: Request): boolean {
   const secret = process.env.CRON_SECRET?.trim();
   if (!secret) return false;
   const header = request.headers.get("authorization") ?? "";
-  if (header === `Bearer ${secret}`) return true;
-  const url = new URL(request.url);
-  return url.searchParams.get("secret") === secret;
+  return timingSafeEqualString(header, `Bearer ${secret}`);
 }
 
 async function handle(request: Request) {

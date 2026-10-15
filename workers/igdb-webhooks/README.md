@@ -82,6 +82,18 @@ pnpm deploy:igdb-webhooks:develop
 pnpm deploy:igdb-webhooks:production
 ```
 
+## Types
+
+`worker-configuration.d.ts` is generated from `wrangler.jsonc` (production env; develop has the same shape) plus the Workers runtime for the compatibility date. Secrets aren't in the config, so they're declared by hand in `secrets.d.ts`. CI runs `pnpm typecheck:igdb-webhooks`, which fails if the generated file is stale or the worker doesn't typecheck.
+
+After changing bindings, vars, the compatibility date/flags, or upgrading wrangler:
+
+```bash
+pnpm --filter @thegamies/igdb-webhooks-worker types
+```
+
+Add new secrets to `secrets.d.ts`.
+
 ## App config
 
 Point each app deploy’s `IGDB_WEBHOOKS_WORKER_URL` at the matching Worker origin (no trailing slash):

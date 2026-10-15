@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { communityCreateEventHref } from "@/lib/communities/community-settings-href";
 import {
   editionHostHostsHref,

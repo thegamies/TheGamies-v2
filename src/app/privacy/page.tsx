@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { SiteInfoLayout } from "@/components/SiteInfoLayout";
 import { PRIVACY_EMAIL, PRIVACY_MAILTO } from "@/lib/site";
 

@@ -140,6 +140,7 @@ type LatestCountingEvent = { lastMs: number; kind: string };
  * real headcount. Adult / missing game_id / weight-zero kinds do not count.
  * One person per game uses their most recent counting event (higher kind
  * weight wins timestamp ties).
+ * Reference rules: `listTrendingBoard` applies them in SQL; change both together.
  */
 export function scoreTrending(
   rows: readonly TrendingEventInput[],

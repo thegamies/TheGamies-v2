@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { editionPromoTitle } from "@/lib/communities/edition-promo";
 import type { PromoBannerCopy, PromoBannerKind } from "@/lib/promo/banner-copy";
 import { tgaPromoTitle } from "@/lib/tga-pickem/promo";

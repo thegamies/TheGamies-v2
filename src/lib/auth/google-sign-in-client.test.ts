@@ -13,6 +13,7 @@ vi.mock("./client", () => ({
 import {
   GOOGLE_ACCOUNT_NOT_LINKED,
   GOOGLE_SIGN_IN_FAILED,
+  googleContinueUrl,
   googleOAuthReturnMessage,
   signInWithGoogle,
 } from "./google-sign-in-client";
@@ -23,20 +24,39 @@ describe("signInWithGoogle", () => {
     signInSocial.mockReset();
   });
 
-  it("starts Google OAuth through the Auth proxy", async () => {
+  it("asks Google for the account list when the URL is already Google's", async () => {
     signInSocial.mockResolvedValueOnce({
       data: { url: "https://accounts.google.com/o/oauth2" },
       error: null,
     });
     await expect(
       signInWithGoogle({ errorCallbackPath: "/auth/sign-up" }),
-    ).resolves.toEqual({ href: "https://accounts.google.com/o/oauth2" });
+    ).resolves.toEqual({
+      href: "https://accounts.google.com/o/oauth2?prompt=select_account",
+    });
     expect(signInSocial).toHaveBeenCalledWith({
       provider: "google",
       callbackURL: GOOGLE_COMPLETE_PROFILE_PATH,
       newUserCallbackURL: GOOGLE_COMPLETE_PROFILE_PATH,
       errorCallbackURL: "/auth/sign-up",
+      disableRedirect: true,
+      additionalParams: { prompt: "select_account" },
     });
+  });
+
+  it("follows Neon's sign-in URL without rewriting it", async () => {
+    const init =
+      "https://auth.example/neondb/auth/sign-in/social/init?token=abc";
+    signInSocial.mockResolvedValueOnce({ data: { url: init }, error: null });
+    await expect(signInWithGoogle({})).resolves.toEqual({ href: init });
+  });
+
+  it("falls back to sign-in for an unsafe error return path", async () => {
+    signInSocial.mockResolvedValueOnce({ data: { url: "https://g" }, error: null });
+    await signInWithGoogle({ errorCallbackPath: "/\\evil.com" });
+    expect(signInSocial).toHaveBeenCalledWith(
+      expect.objectContaining({ errorCallbackURL: "/auth/sign-in" }),
+    );
   });
 
   it("returns product copy when Google OAuth fails", async () => {
@@ -58,6 +78,14 @@ describe("signInWithGoogle", () => {
     await expect(signInWithGoogle({})).resolves.toEqual({
       error: GOOGLE_SIGN_IN_FAILED,
     });
+  });
+});
+
+describe("googleContinueUrl", () => {
+  it("leaves an auth-host URL unchanged", () => {
+    const init =
+      "https://auth.example/neondb/auth/sign-in/social/init?token=abc";
+    expect(googleContinueUrl(init)).toBe(init);
   });
 });
 

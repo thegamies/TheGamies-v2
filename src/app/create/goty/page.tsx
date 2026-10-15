@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { ClearLocalGotyDraft } from "@/components/lists/ClearLocalGotyDraft";
@@ -8,7 +8,10 @@ import { ExistingGotyPreview } from "@/components/lists/ExistingGotyPreview";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { StartGotyForm } from "@/components/lists/StartGotyForm";
 import { Button } from "@/components/ui/Button";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import {
   draftMatchesGoty,
   editorSeedFromDraft,
@@ -20,6 +23,7 @@ import {
   getOwnedGotyForYear,
   getOwnedGotyItemsForYear,
   getEditableList,
+  getListShareTarget,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
@@ -33,8 +37,6 @@ import {
   getCategoryVotesForList,
   listActiveAwardCategories,
 } from "@/lib/live-aggregate/categories";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
-
 export const metadata: Metadata = {
   title: "Create GOTY list",
 };
@@ -48,16 +50,10 @@ function first(value: string | string[] | undefined): string | undefined {
 const currentYear = new Date().getUTCFullYear();
 
 async function sessionProfileId(): Promise<string | null> {
-  const auth = getAuthOrNull();
-  if (!auth) return null;
-  try {
-    const { data: session } = await auth.getSession();
-    if (!session?.user?.id) return null;
-    const profile = await getProfileByAuthUserId(session.user.id);
-    return profile?.id ?? null;
-  } catch {
-    return null;
-  }
+  const user = await getRequestSessionUser();
+  if (!user?.id) return null;
+  const profile = await getRequestProfileByAuthUserId(user.id).catch(() => null);
+  return profile?.id ?? null;
 }
 
 export default async function CreateGotyPage({
@@ -126,6 +122,7 @@ export default async function CreateGotyPage({
 
   let editor: {
     publicId: string | null;
+    sharePath?: string | null;
     title: string;
     year: number | null;
     slotCount: number;
@@ -207,6 +204,10 @@ export default async function CreateGotyPage({
             ? await getCategoryVotesForList(result.list.id).catch(() => [])
             : [],
       };
+      if (signedIn) {
+        const share = await getListShareTarget(result.list);
+        if (share.path !== "/create") editor.sharePath = share.path;
+      }
 
       // Prefer the device draft when it matches — anon edits land in the
       // cookie immediately and may be ahead of the last DB sync.
@@ -394,6 +395,7 @@ export default async function CreateGotyPage({
         ) : null}
         <ListEditor
           publicId={editor.publicId}
+          sharePath={editor.sharePath}
           listType="goty"
           initialTitle={editor.title}
           initialYear={editor.year}

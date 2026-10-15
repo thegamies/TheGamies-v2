@@ -1,15 +1,15 @@
 "use client";
 
-import NextLink from "next/dist/client/app-dir/link";
-import { forwardRef, type ComponentPropsWithoutRef } from "react";
+import NextLink from "next/link";
+import { forwardRef, type ComponentProps } from "react";
 
-export { useLinkStatus } from "next/dist/client/app-dir/link";
+export { useLinkStatus } from "next/link";
 
-type LinkProps = ComponentPropsWithoutRef<typeof NextLink>;
+type LinkProps = ComponentProps<typeof NextLink>;
 
 /**
- * App Router `Link` with prefetch off. `next/link` is aliased here so a
- * viewport of game covers cannot run destination Server Components.
+ * App Router `Link` with prefetch off, so a viewport of game covers cannot
+ * run destination Server Components. Import this, never `next/link`.
  */
 const Link = forwardRef<HTMLAnchorElement, LinkProps>(function Link(
   { prefetch = false, ...props },

@@ -1,8 +1,9 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { EditionBallotReadonly } from "@/components/communities/EditionBallotReadonly";
 import type { EditionBallotCustomCategoryVoteView } from "@/lib/communities/ballots";
 import type { CustomCategoryView } from "@/lib/communities/custom-category-types";
 import { EditionCategoryDebugProvider } from "@/components/communities/EditionCategoryDebug";
+import { isEditionRevealTieDebugEnabled } from "@/lib/communities/edition-reveal-tie-debug";
 import {
   EditionCategoryDetail,
   EditionCategoryResults,
@@ -157,8 +158,7 @@ export function EditionResultsView({
     view === "category" && categoryId
       ? (categoryMeta.find((c) => c.categoryId === categoryId) ?? null)
       : null;
-  return (
-    <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
+  const board = (
     <div className="mt-6 space-y-10">
       <EditionResultsViewNav
         slug={slug}
@@ -312,6 +312,13 @@ export function EditionResultsView({
         />
       )}
     </div>
+  );
+
+  if (!isEditionRevealTieDebugEnabled()) return board;
+
+  return (
+    <EditionCategoryDebugProvider categoryPodiums={categoryPodiums}>
+      {board}
     </EditionCategoryDebugProvider>
   );
 }

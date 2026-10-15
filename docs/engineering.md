@@ -69,7 +69,7 @@ On that personal branch only: delete the extra journal rows whose `created_at` i
 
 ## Request cost (compute · egress · scale)
 
-Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`.
+Every hot read path should be cheap under growth—not only correct for a small fixture. Canonical guide: [request-cost.md](./request-cost.md). Cursor: `.cursor/rules/request-cost.mdc`. Route inventory and load-test order: [endpoints.md](./endpoints.md) (`.cursor/rules/site-endpoints.mdc`).
 
 Before choosing freeze/cache/**search**/list storage, walk the request:
 
@@ -83,6 +83,8 @@ Before choosing freeze/cache/**search**/list storage, walk the request:
 **Never load an unbounded list** on public boards, voter lists, **or** host/admin/settings. “We’ll scroll / search in the UI” still pulls every row—that is a filter, not a search.
 
 Live lock and edition results freeze into **tables**, not one giant payload.
+
+Journeys in [request-cost.md](./request-cost.md) measure **one visit**. Traffic cost (Neon CU-hours, Worker CPU) is a **staging load test** (`pnpm cost:load`, never CI, never production). Extra journeys and HTTP batching are paused.
 
 ## Deployment
 
@@ -125,6 +127,19 @@ Until Postgres **RLS** is adopted (open: Auth JWT → DB role), permission tests
 
 Run against a Neon branch or ephemeral test database — never against production.
 
+- **Files:** `*.int.test.ts` next to the module. `pnpm test` skips them; `pnpm test:integration` runs only them.
+- **Seeding:** `createSeeder(integrationDb())` from `src/test/integration/seed.ts`; call `seed.cleanup()` in `afterAll`. Rows are tagged per seeder, so tests must scope queries to the rows they created (no "count everything" assertions).
+- **Guard:** the run refuses unless the database was marked disposable (`integration.marker`). Never mark staging or production.
+- **CI:** the `integration` job in `ci.yml` creates a throwaway Neon branch from `develop`, empties it, migrates from zero, marks it, runs the tests, and deletes it. It runs only when database-related paths change.
+- **Locally:** against your personal branch (`dev_personal`), mark once, then run:
+
+  ```bash
+  doppler run -c dev_personal -- pnpm test:integration:mark --confirm-test-database
+  doppler run -c dev_personal -- pnpm test:integration
+  ```
+
+  Tests read `INTEGRATION_DATABASE_URL`, falling back to `DATABASE_URL`.
+
 ### Visual / e2e
 
 **Required for** brand-defining UI once those pages exist:
@@ -153,7 +168,7 @@ Use Playwright screenshots compared to approved references under `design-referen
 - `typecheck`
 - `test` (unit — Vitest)
 - `test:watch`
-- `test:integration` (when present)
+- `test:integration` (Neon test branch — see Integration tests)
 - `test:visual` (when present)
 
 CI treats ESLint **errors** as failures (warnings alone do not). Watch for `react-hooks/set-state-in-effect`: do not sync props into state with `useEffect(() => setX(prop))`. Prefer deriving from props, adjusting state during render when the prop identity changes, clearing related state in event handlers, or remounting with a `key`.
@@ -176,7 +191,7 @@ Shared chrome and per-request auth must not create **server waterfalls** with pa
 
 - Render **`NavigationProgress` once in `src/app/layout.tsx`**. Keep the root layout a Server Component — the loader is already a client component.
 - `<Link>` clicks start the accent hairline automatically.
-- `<Link>` prefetch is **off** (`src/lib/next-link.tsx` aliased over `next/link`). Do not set `prefetch={true}` on dense lists (covers, standings). Decorative art is not a `Link`.
+- `<Link>` prefetch is **off**: import from `@/lib/next-link`, never `next/link` (ESLint enforces). Do not set `prefetch={true}` on dense lists (covers, standings). Decorative art is not a `Link`.
 - For `router.push` / `replace`, import `useRouter` from `@/lib/useRouter` (wraps `nextjs-toploader/app`), not `next/navigation`. Otherwise the bar will not start.
 - Keep `usePathname` / `useSearchParams` on `next/navigation`. `router.refresh()` does not need the wrapped hook.
 

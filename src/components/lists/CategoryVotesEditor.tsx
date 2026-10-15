@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { type GameSearchHit } from "@/app/create/search-actions";
 import { BallotChapterHeader } from "@/components/ui/BallotChapterHeader";
 import { Button } from "@/components/ui/Button";
@@ -38,6 +38,7 @@ export type AwardCategoryOption = {
   categoryGroup?: string;
   eligibility?: string;
   allowEditions?: boolean;
+  allowDlcAddon?: boolean;
 };
 
 export type CategoryVoteSelection = {
@@ -100,7 +101,7 @@ export function SiteCategoryBallotBlock({
             year={year}
             eligibility={eligibility}
             allowEditions={category.allowEditions === true}
-            allowDlcAddon={awardAllowsDlcAddon(category.id)}
+            allowDlcAddon={awardAllowsDlcAddon(category)}
             onSelect={onPick}
             aria-label={`Search games for ${category.label}`}
             placeholder={`Search games for ${category.label}`}

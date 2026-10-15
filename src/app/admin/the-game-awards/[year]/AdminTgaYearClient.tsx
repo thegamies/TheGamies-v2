@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { Button } from "@/components/ui/Button";
 import { fieldInputClass } from "@/components/ui/controls";
 import { GameCover } from "@/components/ui/GameCover";

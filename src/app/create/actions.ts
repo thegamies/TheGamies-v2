@@ -18,7 +18,6 @@ import { clientDraftGotyYear } from "@/lib/lists/create-goty-entry";
 import { parseListShareView, withListShareView } from "@/lib/lists/urls";
 import { revalidateSiteGotyYear } from "@/lib/live-aggregate/revalidate-site-goty";
 import {
-  claimList,
   createDraft,
   getEditableList,
   getListShareTarget,
@@ -161,7 +160,12 @@ function parseClientDraftPayload(formData: FormData): unknown {
 export async function saveOwnedListAction(
   _prev: { error?: string; saved?: boolean; publicId?: string } | null,
   formData: FormData,
-): Promise<{ error?: string; saved?: boolean; publicId?: string }> {
+): Promise<{
+  error?: string;
+  saved?: boolean;
+  publicId?: string;
+  sharePath?: string;
+}> {
   const profileId = await currentProfileId();
   if (!profileId) {
     return {
@@ -218,8 +222,7 @@ export async function saveOwnedListAction(
   revalidatePath("/");
   const share = await getListShareTarget(result.list);
   revalidatePath(share.path);
-  revalidatePath(`/l/${result.list.publicId}`);
-  return { saved: true, publicId: result.list.publicId };
+  return { saved: true, publicId: result.list.publicId, sharePath: share.path };
 }
 
 /** Anon (or owner) auto-persist while editing an existing shared list. */
@@ -255,7 +258,6 @@ export async function syncSharedListAction(
 
   const share = await getListShareTarget(result.list);
   revalidatePath(share.path);
-  revalidatePath(`/l/${result.list.publicId}`);
   revalidatePath(`/create/goty`);
   revalidatePath(`/create/custom`);
   return { ok: true, publicId: result.list.publicId };
@@ -317,48 +319,16 @@ export async function resetActiveDraftAction() {
   return discardAnonDraftAction();
 }
 
-export async function claimListAction(formData: FormData) {
-  const publicId = String(formData.get("publicId") ?? "");
-  const auth = getAuthOrNull();
-  const signInNext = `/auth/sign-in?next=${encodeURIComponent(`/l/${publicId}`)}&intent=save`;
-  if (!auth) {
-    redirect(signInNext);
-  }
-  const { data: session } = await auth.getSession();
-  if (!session?.user?.id) {
-    redirect(signInNext);
-  }
-  const profile = await getProfileByAuthUserId(session.user.id);
-  if (!profile) {
-    redirect(`/account?next=${encodeURIComponent(`/l/${publicId}`)}`);
-  }
-
-  const cookie = await readListEditCookie();
-  const editSecret =
-    cookie?.publicId === publicId ? cookie.secret : null;
-
-  const result = await claimList(publicId, {
-    profileId: profile.id,
-    editSecret,
-  });
-  if ("error" in result) {
-    redirect(`/l/${publicId}?error=${encodeURIComponent(result.error)}`);
-  }
-  await clearListEditCookie();
-  await clearListDraftCookie();
-  const share = await getListShareTarget(result.list);
-  revalidatePath(share.path);
-  revalidatePath(`/u/${profile.username}`);
-  redirect(`${share.path}?saved=1`);
-}
-
 export async function loadEditorState(publicId: string) {
   const access = await accessFor(publicId);
   return getEditableList(publicId, access);
 }
 
 export async function hydrateDraftGamesAction(igdbIds: number[]) {
-  return hydrateGamesByIgdbIds(igdbIds);
+  if (!Array.isArray(igdbIds)) return [];
+  return hydrateGamesByIgdbIds(
+    igdbIds.filter((id): id is number => typeof id === "number"),
+  );
 }
 
 /** Drop a local GOTY draft when the account already owns that year. */

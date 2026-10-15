@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useActionState, useEffect } from "react";
 import { ContinueWithGoogle } from "@/components/auth/ContinueWithGoogle";

@@ -19,7 +19,7 @@ The consumer product is largely built. The remaining risk is **production wiring
 
 These v1 loops exist in the app today:
 
-- Games browse (title / year / sort / release status) and game detail (cover, summary, dates, platforms, genres, companies, time-to-beat, site GOTY rank, category #1s, videos / artwork / screenshots)
+- Games browse (title / year / sort / release status) and game detail (cover, summary, dates, platforms, genres, companies, time-to-beat, site GOTY rank, category top 5, videos / artwork / screenshots)
 - GOTY + custom lists, anonymous build, sign-in to save/share, editorial list view, image export
 - Profiles, account settings, username cooldown, password change / forgot, account deletion (tombstone)
 - Site live GOTY + categories, public floor, reveal gate, admin refresh/rebuild
@@ -78,7 +78,7 @@ Empty browse is a launch-killer.
 
 ### 5. Edition freeze cron
 
-**Temporarily off (2026-09-01):** App Worker Cron Trigger is `[]` so the every-minute freeze job is not scheduled. The `scheduled` handler still POSTs `/api/cron/edition-freeze` via `WORKER_SELF_REFERENCE` when a trigger exists. Restore with `["* * * * *"]` in `wrangler.jsonc`. Until then, freeze still kicks from schedule `after()` (and a manual hit). Staging CI injects `CRON_SECRET` onto `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
+**Temporarily off (2026-09-01):** App Worker Cron Trigger is `[]` so the every-minute freeze job is not scheduled. The `scheduled` handler still POSTs `/api/cron/edition-freeze` via `WORKER_SELF_REFERENCE` when a trigger exists. Restore with `["* * * * *"]` in `wrangler.jsonc`. Until then, freeze still kicks from schedule `after()`, or a manual `POST` with `Authorization: Bearer $CRON_SECRET` (the route no longer accepts `?secret=` in the URL). Staging CI injects `CRON_SECRET` onto `thegamies-v2-develop`. Production CI bulk-uploads `CRON_SECRET` onto `thegamies-v2` with the rest of the production app secrets.
 
 Still confirm `CRON_SECRET` exists in GitHub for when the trigger is restored. Without it, Cloudflare’s handler no-ops.
 
@@ -163,7 +163,7 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 - Mailboxes actually receive mail
 - Cookie banner + GA: site property ships gtag; `off` disables. Banner still shows either way.
 - AdSense **European regulations** message published in Privacy & messaging for `thegamies.gg` (Funding Choices; privacy policy `https://thegamies.gg/privacy`; Consent Mode on). The site tag is in the app; the message itself is created in AdSense.
-- After the 2026 “low value content” rejection: do not request another review until Search Console shows `/about`, `/rankings`, `/game-of-the-year/2025`, `/game-of-the-year/2025/categories`, and a ranked game indexed, and thin catalog URLs dropping out. Wait 2–4 weeks. Details: [adsense.md](./adsense.md).
+- After the 2026 “low value content” rejection: do not request another review until Search Console shows `/about`, `/rankings`, `/game-of-the-year/2025`, `/game-of-the-year/2025/categories`, and a ranked game indexed. Wait 2–4 weeks. Catalog game pages are indexable again; deepen desk copy rather than AI filler. Details: [adsense.md](./adsense.md).
 
 ### Hosting plans
 

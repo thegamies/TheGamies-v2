@@ -3,18 +3,33 @@ import {
   createDb,
   profiles,
   tgaCommunityHosts,
-  tgaCommunityPicks,
+  tgaCommunityPickCounts,
   tgaCommunitySheets,
-  tgaSitePicks,
+  tgaSitePickCounts,
   tgaSiteSheets,
   type Db,
 } from "@thegamies/db";
 import {
+  decodeBallotMask,
+  encodeBallotMask,
+  pickCountDeltas,
+  type PickCountDelta,
+} from "./ballot-mask";
+import {
   TGA_LEADERBOARD_PAGE_SIZE,
   leaderboardPageCount,
 } from "./scoring";
-import { getTgaYear, listTgaBallot } from "./service";
+import {
+  getTgaYear,
+  isCommunityTgaOptedIn,
+  listTgaBallot,
+  type TgaBallotCategory,
+} from "./service";
+import { upsertCommunityScoreOnSave, upsertSiteScoreOnSave } from "./scores";
 import { picksAreOpen } from "./status";
+
+export const COMMUNITY_TGA_NOT_RUNNING =
+  "This community isn’t running Pick’em for that year.";
 
 function getDb(db?: Db): Db {
   return db ?? createDb();
@@ -173,15 +188,10 @@ export async function getSiteSheet(
     .where(
       and(eq(tgaSiteSheets.profileId, profileId), eq(tgaSiteSheets.year, year)),
     );
-  const picks = await db
-    .select()
-    .from(tgaSitePicks)
-    .where(
-      and(eq(tgaSitePicks.profileId, profileId), eq(tgaSitePicks.year, year)),
-    );
+  const ballot = await listTgaBallot(year, db);
   return {
     worldPremieresGuess: sheet?.worldPremieresGuess ?? null,
-    picks: Object.fromEntries(picks.map((row) => [row.categoryId, row.nomineeId])),
+    picks: decodeBallotMask(sheet?.ballotMask, ballot),
   };
 }
 
@@ -201,19 +211,10 @@ export async function getCommunitySheet(
         eq(tgaCommunitySheets.year, year),
       ),
     );
-  const picks = await db
-    .select()
-    .from(tgaCommunityPicks)
-    .where(
-      and(
-        eq(tgaCommunityPicks.communityId, communityId),
-        eq(tgaCommunityPicks.profileId, profileId),
-        eq(tgaCommunityPicks.year, year),
-      ),
-    );
+  const ballot = await listTgaBallot(year, db);
   return {
     worldPremieresGuess: sheet?.worldPremieresGuess ?? null,
-    picks: Object.fromEntries(picks.map((row) => [row.categoryId, row.nomineeId])),
+    picks: decodeBallotMask(sheet?.ballotMask, ballot),
   };
 }
 
@@ -233,11 +234,11 @@ function parseGuess(raw: unknown): number | { error: string } {
   return n;
 }
 
-async function allowedPicks(
+async function validatedBallot(
   year: number,
   picks: Record<string, string>,
   db: Db,
-): Promise<Array<{ categoryId: string; nomineeId: string }> | { error: string }> {
+): Promise<{ ballot: TgaBallotCategory[] } | { error: string }> {
   const ballot = await listTgaBallot(year, db);
   const allowed = new Map(
     ballot.map((category) => [
@@ -245,15 +246,114 @@ async function allowedPicks(
       new Set(category.nominees.map((nominee) => nominee.id)),
     ]),
   );
-  const rows: Array<{ categoryId: string; nomineeId: string }> = [];
   for (const [categoryId, nomineeId] of Object.entries(picks)) {
     const set = allowed.get(categoryId);
     if (!set || !set.has(nomineeId)) {
       return { error: "Choose a nominee from the official slate." };
     }
-    rows.push({ categoryId, nomineeId });
   }
-  return rows;
+  return { ballot };
+}
+
+export async function applySitePickCountDeltas(
+  year: number,
+  deltas: PickCountDelta[],
+  db: Db,
+): Promise<void> {
+  for (const delta of deltas) {
+    await db
+      .insert(tgaSitePickCounts)
+      .values({
+        year,
+        categoryId: delta.categoryId,
+        nomineeId: delta.nomineeId,
+        picks: Math.max(delta.delta, 0),
+      })
+      .onConflictDoUpdate({
+        target: [
+          tgaSitePickCounts.year,
+          tgaSitePickCounts.categoryId,
+          tgaSitePickCounts.nomineeId,
+        ],
+        set: {
+          picks: sql`greatest(${tgaSitePickCounts.picks} + ${delta.delta}, 0)`,
+        },
+      });
+  }
+}
+
+export async function applyCommunityPickCountDeltas(
+  communityId: string,
+  year: number,
+  deltas: PickCountDelta[],
+  db: Db,
+): Promise<void> {
+  for (const delta of deltas) {
+    await db
+      .insert(tgaCommunityPickCounts)
+      .values({
+        communityId,
+        year,
+        categoryId: delta.categoryId,
+        nomineeId: delta.nomineeId,
+        picks: Math.max(delta.delta, 0),
+      })
+      .onConflictDoUpdate({
+        target: [
+          tgaCommunityPickCounts.communityId,
+          tgaCommunityPickCounts.year,
+          tgaCommunityPickCounts.categoryId,
+          tgaCommunityPickCounts.nomineeId,
+        ],
+        set: {
+          picks: sql`greatest(${tgaCommunityPickCounts.picks} + ${delta.delta}, 0)`,
+        },
+      });
+  }
+}
+
+export async function recountSitePickCounts(year: number, db: Db): Promise<void> {
+  await db.execute(sql`delete from tga_site_pick_counts where year = ${year}`);
+  await db.execute(sql`
+    insert into tga_site_pick_counts (year, category_id, nominee_id, picks)
+    select s.year, c.id, cn.nominee_id, count(*)::int
+    from tga_site_sheets s
+    inner join tga_categories c on c.year = s.year
+    inner join tga_category_nominees cn on cn.category_id = c.id
+    where s.year = ${year}
+      and s.ballot_mask is not null
+      and get_byte(s.ballot_mask, c.slot) = cn.slot
+    group by s.year, c.id, cn.nominee_id
+  `);
+}
+
+export async function recountCommunityPickCounts(
+  year: number,
+  db: Db,
+  communityId?: string,
+): Promise<void> {
+  if (communityId) {
+    await db.execute(sql`
+      delete from tga_community_pick_counts
+      where year = ${year} and community_id = ${communityId}
+    `);
+  } else {
+    await db.execute(sql`delete from tga_community_pick_counts where year = ${year}`);
+  }
+  await db.execute(sql`
+    insert into tga_community_pick_counts (
+      community_id, year, category_id, nominee_id, picks
+    )
+    select s.community_id, s.year, c.id, cn.nominee_id, count(*)::int
+    from tga_community_sheets s
+    inner join tga_categories c on c.year = s.year
+    inner join tga_category_nominees cn on cn.category_id = c.id
+    where s.year = ${year}
+      and (${communityId ?? null}::uuid is null or s.community_id = ${communityId ?? null}::uuid)
+      and s.ballot_mask is not null
+      and get_byte(s.ballot_mask, c.slot) = cn.slot
+    group by s.community_id, s.year, c.id, cn.nominee_id
+  `);
 }
 
 export async function saveSiteSheet(
@@ -262,12 +362,21 @@ export async function saveSiteSheet(
   input: { worldPremieresGuess: number; picks: Record<string, string> },
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
-  const blocked = assertOpen(await getTgaYear(year, db));
-  if (blocked) return blocked;
+  const slate = await getTgaYear(year, db);
+  const blocked = assertOpen(slate);
+  if (blocked || !slate) return blocked ?? { error: "Year not found." };
   const guess = parseGuess(input.worldPremieresGuess);
   if (typeof guess !== "number") return guess;
-  const rows = await allowedPicks(year, input.picks, db);
-  if ("error" in rows) return rows;
+  const slatePicks = await validatedBallot(year, input.picks, db);
+  if ("error" in slatePicks) return slatePicks;
+  const [current] = await db
+    .select({ ballotMask: tgaSiteSheets.ballotMask })
+    .from(tgaSiteSheets)
+    .where(
+      and(eq(tgaSiteSheets.profileId, profileId), eq(tgaSiteSheets.year, year)),
+    );
+  const previous = decodeBallotMask(current?.ballotMask, slatePicks.ballot);
+  const ballotMask = encodeBallotMask(slatePicks.ballot, input.picks);
 
   await db
     .insert(tgaSiteSheets)
@@ -275,30 +384,29 @@ export async function saveSiteSheet(
       profileId,
       year,
       worldPremieresGuess: guess,
+      ballotMask,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
       target: [tgaSiteSheets.profileId, tgaSiteSheets.year],
       set: {
         worldPremieresGuess: guess,
+        ballotMask,
         updatedAt: new Date(),
       },
     });
-  await db
-    .delete(tgaSitePicks)
-    .where(
-      and(eq(tgaSitePicks.profileId, profileId), eq(tgaSitePicks.year, year)),
-    );
-  if (rows.length > 0) {
-    await db.insert(tgaSitePicks).values(
-      rows.map((row) => ({
-        profileId,
-        year,
-        categoryId: row.categoryId,
-        nomineeId: row.nomineeId,
-      })),
-    );
-  }
+  await applySitePickCountDeltas(
+    year,
+    pickCountDeltas(previous, input.picks),
+    db,
+  );
+  await upsertSiteScoreOnSave(
+    profileId,
+    year,
+    guess,
+    slate.worldPremieresOfficial,
+    db,
+  );
   return { ok: true };
 }
 
@@ -309,12 +417,28 @@ export async function saveCommunitySheet(
   input: { worldPremieresGuess: number; picks: Record<string, string> },
   db: Db = getDb(),
 ): Promise<{ ok: true } | { error: string }> {
-  const blocked = assertOpen(await getTgaYear(year, db));
-  if (blocked) return blocked;
+  const slate = await getTgaYear(year, db);
+  const blocked = assertOpen(slate);
+  if (blocked || !slate) return blocked ?? { error: "Year not found." };
+  if (!(await isCommunityTgaOptedIn(communityId, year, db))) {
+    return { error: COMMUNITY_TGA_NOT_RUNNING };
+  }
   const guess = parseGuess(input.worldPremieresGuess);
   if (typeof guess !== "number") return guess;
-  const rows = await allowedPicks(year, input.picks, db);
-  if ("error" in rows) return rows;
+  const slatePicks = await validatedBallot(year, input.picks, db);
+  if ("error" in slatePicks) return slatePicks;
+  const [current] = await db
+    .select({ ballotMask: tgaCommunitySheets.ballotMask })
+    .from(tgaCommunitySheets)
+    .where(
+      and(
+        eq(tgaCommunitySheets.communityId, communityId),
+        eq(tgaCommunitySheets.profileId, profileId),
+        eq(tgaCommunitySheets.year, year),
+      ),
+    );
+  const previous = decodeBallotMask(current?.ballotMask, slatePicks.ballot);
+  const ballotMask = encodeBallotMask(slatePicks.ballot, input.picks);
 
   await db
     .insert(tgaCommunitySheets)
@@ -323,6 +447,7 @@ export async function saveCommunitySheet(
       profileId,
       year,
       worldPremieresGuess: guess,
+      ballotMask,
       updatedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -333,29 +458,24 @@ export async function saveCommunitySheet(
       ],
       set: {
         worldPremieresGuess: guess,
+        ballotMask,
         updatedAt: new Date(),
       },
     });
-  await db
-    .delete(tgaCommunityPicks)
-    .where(
-      and(
-        eq(tgaCommunityPicks.communityId, communityId),
-        eq(tgaCommunityPicks.profileId, profileId),
-        eq(tgaCommunityPicks.year, year),
-      ),
-    );
-  if (rows.length > 0) {
-    await db.insert(tgaCommunityPicks).values(
-      rows.map((row) => ({
-        communityId,
-        profileId,
-        year,
-        categoryId: row.categoryId,
-        nomineeId: row.nomineeId,
-      })),
-    );
-  }
+  await applyCommunityPickCountDeltas(
+    communityId,
+    year,
+    pickCountDeltas(previous, input.picks),
+    db,
+  );
+  await upsertCommunityScoreOnSave(
+    communityId,
+    profileId,
+    year,
+    guess,
+    slate.worldPremieresOfficial,
+    db,
+  );
   return { ok: true };
 }
 

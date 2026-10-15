@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  clientIpFromHeaders,
+  withAuthClientIp,
+} from "@/lib/auth/auth-client-ip";
 import { getAuthOrNull } from "@/lib/auth/server";
 import {
   resetPasswordFormPath,
@@ -39,7 +43,9 @@ export async function GET(
   if (resetRedirect) return resetRedirect;
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
-  return auth.handler().GET(request, context);
+  return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
+    auth.handler().GET(request, context),
+  );
 }
 
 export async function POST(
@@ -48,5 +54,7 @@ export async function POST(
 ) {
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
-  return auth.handler().POST(request, context);
+  return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
+    auth.handler().POST(request, context),
+  );
 }

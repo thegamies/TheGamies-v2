@@ -13,7 +13,7 @@ import {
   queueAdsenseFill,
 } from "@/lib/ads/queueAdsenseFill";
 
-function SiteAdBannerInner({ force = false }: { force?: boolean }) {
+function SiteAdBannerInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const client = getAdsenseClientId();
@@ -21,9 +21,7 @@ function SiteAdBannerInner({ force = false }: { force?: boolean }) {
   const testAds = adsenseTestAds();
   const insRef = useRef<HTMLModElement>(null);
   const show = Boolean(
-    client &&
-      slot &&
-      (force || adsenseAllowedOnPath(pathname, searchParams.toString())),
+    client && slot && adsenseAllowedOnPath(pathname, searchParams.toString()),
   );
   const [filled, setFilled] = useState(false);
 
@@ -91,10 +89,10 @@ function SiteAdBannerInner({ force = false }: { force?: boolean }) {
   );
 }
 
-export function SiteAdBanner({ force = false }: { force?: boolean }) {
+export function SiteAdBanner() {
   return (
     <Suspense fallback={null}>
-      <SiteAdBannerInner force={force} />
+      <SiteAdBannerInner />
     </Suspense>
   );
 }

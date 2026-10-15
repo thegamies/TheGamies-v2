@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { CopyInviteButton } from "@/components/communities/CopyInviteButton";
 import { ProfileSocialLinks } from "@/components/profile/ProfileSocialLinks";
 import { MastheadBanner } from "@/components/ui/MastheadBanner";

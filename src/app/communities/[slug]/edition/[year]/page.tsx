@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound } from "next/navigation";
 import {
   EditionBallotEditor,
@@ -16,7 +16,7 @@ import {
 } from "@/components/communities/EditionResultsView";
 import { EditionVotersList } from "@/components/communities/EditionVotersList";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { EditionSectionHeader } from "@/components/communities/EditionSectionHeader";
 import { EditionSettingsTabs } from "@/components/communities/EditionSettingsTabs";
@@ -49,7 +49,6 @@ import {
 import {
   CATEGORY_RANKED_TOP,
   CATEGORY_RESULTS_PAGE_SIZE,
-  ensurePublishedEditionResults,
   getEditionCategoryPage,
   getEditionCategoryResults,
   getEditionComparisonBundle,
@@ -71,11 +70,21 @@ import {
   type EditionGotyStandingRow,
 } from "@/lib/communities/edition-results";
 import {
-  getEditionByCommunityYear,
-  listEditionsForCommunity,
   pickFeaturedEdition,
   type CommunityEditionPublic,
 } from "@/lib/communities/editions";
+import { loadEditionCategorySnapshot } from "@/lib/communities/edition-category-snapshot";
+import {
+  editionBoardCacheKey,
+  matchEditionBoard,
+  putEditionBoard,
+} from "@/lib/communities/edition-public-cache";
+import {
+  editionPageNeedsBallotCategories,
+  loadEditionResultsOverview,
+  loadEditionYearContext,
+  loadPublishedEditionMeta,
+} from "@/lib/communities/edition-year-load";
 import { cookies } from "next/headers";
 import {
   ENTRANCE_PREF_COOKIE,
@@ -120,15 +129,20 @@ export async function generateMetadata({
   const { slug, year: yearRaw } = await params;
   const year = Number(yearRaw);
   try {
-    const community = await getCommunityBySlug(slug);
-    if (!community) return { title: "Event", robots: noIndexRobots };
+    const user = await getRequestSessionUser();
+    const profile = user?.id
+      ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
+      : null;
+    const viewerId = profile?.id ?? null;
     if (!Number.isFinite(year)) {
+      const community = await getCommunityBySlug(slug, viewerId);
+      if (!community) return { title: "Event", robots: noIndexRobots };
       return { title: `${community.name} event`, robots: noIndexRobots };
     }
     const y = Math.floor(year);
-    const edition = await getEditionByCommunityYear(community.id, y).catch(
-      () => null,
-    );
+    const ctx = await loadEditionYearContext(slug, y, viewerId);
+    if (!ctx?.community) return { title: "Event", robots: noIndexRobots };
+    const { community, edition } = ctx;
     const index =
       shouldIndexCommunityBoards(community) &&
       Boolean(edition && showEditionNav(edition.status));
@@ -189,10 +203,18 @@ export default async function CommunityEditionYearPage({
     : null;
 
   let community;
+  let edition: CommunityEditionPublic | null = null;
+  let publicEditions: CommunityEditionPublic[] = [];
   try {
-    community = await getCommunityBySlug(slug, profile?.id);
+    const ctx = await loadEditionYearContext(slug, y, profile?.id);
+    community = ctx?.community ?? null;
+    if (ctx) {
+      publicEditions = ctx.editions.filter((e) => showEditionNav(e.status));
+      edition = ctx.edition;
+    }
   } catch {
     community = null;
+    edition = null;
   }
   if (!community) notFound();
   if (
@@ -205,20 +227,15 @@ export default async function CommunityEditionYearPage({
     return <CommunityPrivateView name={community.name} />;
   }
 
-  let edition: CommunityEditionPublic | null = null;
-  let publicEditions: CommunityEditionPublic[] = [];
-  try {
-    const editions = await listEditionsForCommunity(community.id);
-    publicEditions = editions.filter((e) => showEditionNav(e.status));
-    edition = await getEditionByCommunityYear(community.id, y);
-  } catch {
-    edition = null;
-  }
-
   if (!edition || !showEditionNav(edition.status)) notFound();
   if (!editionRevealsVoterBallots(edition.status)) {
     voterUsername = "";
   }
+
+  const tgaNavPromise = communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null as number | null,
+  }));
 
   const rankMode = edition.rankMode;
   const canManage = canManageCommunity(community.viewerRole);
@@ -231,56 +248,49 @@ export default async function CommunityEditionYearPage({
     canManage && editionShowsHostBallotPreview(edition.status);
   const signInHref = `/auth/sign-in?next=/communities/${encodeURIComponent(community.slug)}/edition/${y}`;
 
-  let ballot = null;
-  if (profile && isMember) {
-    try {
-      ballot = await getEditionBallotForProfile(edition.id, profile.id);
-    } catch {
-      ballot = null;
-    }
-  }
+  const editionId = edition.id;
+  const editionYear = edition.year;
+  const needsBallotCategories = editionPageNeedsBallotCategories({
+    status: edition.status,
+    showHostBallotPreview,
+    hasProfile: Boolean(profile),
+    isMember,
+    voterUsername,
+  });
 
-  let siteGotyItems: EditionBallotEditorItem[] | null = null;
-  if (profile && isMember && edition.status === "open") {
-    try {
-      const owned = await getOwnedGotyItemsForYear(profile.id, edition.year, {
-        limit: EDITION_BALLOT_MAX_ITEMS,
-      });
-      siteGotyItems =
-        owned && owned.length > 0
-          ? capEditionBallotItems(
-              owned.map((item) => ({
-                gameId: item.gameId,
-                igdbId: item.igdbId,
-                slug: item.slug,
-                title: item.title,
-                year: item.year,
-                coverUrl: item.coverUrl,
-                rank: item.rank,
-                blurb: item.blurb ?? "",
-              })),
-            )
-          : null;
-    } catch {
-      siteGotyItems = null;
-    }
-  }
-
-  const awardCategories =
-    edition.status === "open" ||
-    showHostBallotPreview ||
-    (profile && isMember && edition.status !== "scheduled") ||
-    (edition.status === "published" && voterUsername.length > 0)
-      ? await listEditionAwardCategories(edition.id).catch(() => [])
-      : [];
-
-  const ballotCustomCategories =
-    edition.status === "open" ||
-    showHostBallotPreview ||
-    (profile && isMember && edition.status !== "scheduled") ||
-    (edition.status === "published" && voterUsername.length > 0)
-      ? await listCustomCategoriesForEdition(edition.id).catch(() => [])
-      : [];
+  const ballotPromise = Promise.all([
+    profile && isMember
+      ? getEditionBallotForProfile(editionId, profile.id).catch(() => null)
+      : null,
+    profile && isMember && edition.status === "open"
+      ? getOwnedGotyItemsForYear(profile.id, editionYear, {
+          limit: EDITION_BALLOT_MAX_ITEMS,
+        })
+          .then((owned): EditionBallotEditorItem[] | null =>
+            owned && owned.length > 0
+              ? capEditionBallotItems(
+                  owned.map((item) => ({
+                    gameId: item.gameId,
+                    igdbId: item.igdbId,
+                    slug: item.slug,
+                    title: item.title,
+                    year: item.year,
+                    coverUrl: item.coverUrl,
+                    rank: item.rank,
+                    blurb: item.blurb ?? "",
+                  })),
+                )
+              : null,
+          )
+          .catch(() => null)
+      : null,
+    needsBallotCategories
+      ? listEditionAwardCategories(editionId).catch(() => [])
+      : [],
+    needsBallotCategories
+      ? listCustomCategoriesForEdition(editionId).catch(() => [])
+      : [],
+  ]);
 
   const requestedViewEarly = parseEditionResultsView(viewParam);
   const resolvedHost = resolveEditionHostSettings(
@@ -367,12 +377,26 @@ export default async function CommunityEditionYearPage({
   const includeSettingsPreviewTab = showLiveVoters;
   const includeRevealShowTab = canManage && edition.status === "closed";
 
+  const publishedResults =
+    edition.status === "published" && !showHostSettings && view !== "entrance";
+  const overviewPromise =
+    publishedResults && (view === "overview" || view === "reveal")
+      ? loadEditionResultsOverview({ edition, mode, rankMode })
+      : null;
+  const publishedMetaPromise =
+    publishedResults && !overviewPromise
+      ? loadPublishedEditionMeta(edition)
+      : edition.status === "published" &&
+          view === "entrance" &&
+          !showHostSettings
+        ? loadPublishedEditionMeta(edition)
+        : null;
+
+  const [ballot, siteGotyItems, awardCategories, ballotCustomCategories] =
+    await ballotPromise;
+
   let ballotCount: number | null = null;
-  if (
-    edition.status === "open" ||
-    edition.status === "closed" ||
-    edition.status === "published"
-  ) {
+  if (edition.status === "open" || edition.status === "closed") {
     try {
       ballotCount = await countEditionSubmittedBallots(edition.id);
     } catch {
@@ -453,6 +477,7 @@ export default async function CommunityEditionYearPage({
         categoryGroup: c.categoryGroup,
         eligibility: c.eligibility,
         allowEditions: c.allowEditions,
+        allowDlcAddon: c.allowDlcAddon,
       }));
       customCategories = customCats;
     } catch {
@@ -609,7 +634,7 @@ export default async function CommunityEditionYearPage({
     </div>
   ) : null;
 
-  let resultsBundle: {
+  type EditionYearResultsBundle = {
     meta: NonNullable<Awaited<ReturnType<typeof getEditionResultsMeta>>>;
     topTen: Awaited<ReturnType<typeof getEditionGotyThroughRank>>;
     categoryPodiums: EditionCategoryStandingBlock[];
@@ -656,52 +681,107 @@ export default async function CommunityEditionYearPage({
       customCategories?: CustomCategoryView[];
     } | null;
     standingsPage: Awaited<ReturnType<typeof getEditionGotyPage>> | null;
-  } | null = null;
+  };
+  let resultsBundle: EditionYearResultsBundle | null = null;
+
+  const boardCacheKey =
+    !user &&
+    edition.status === "published" &&
+    !showHostSettings &&
+    view !== "entrance" &&
+    voterUsername.length === 0
+      ? editionBoardCacheKey({
+          editionId,
+          view,
+          mode,
+          rankMode,
+          categoryId,
+          page: categoryPageNum,
+          votersPage: votersPageNum,
+          q: votersQ,
+        })
+      : null;
+  if (boardCacheKey) {
+    const cached = await matchEditionBoard<EditionYearResultsBundle>(
+      boardCacheKey,
+    );
+    if (cached?.meta) {
+      ballotCount = cached.meta.ballotCountCommunity;
+      resultsBundle = cached;
+    }
+  }
+  const servedFromBoardCache = resultsBundle != null;
 
   let entranceFreezeReady = false;
   if (edition.status === "published" && view === "entrance" && !showHostSettings) {
     try {
-      await ensurePublishedEditionResults(community.id, edition.year);
-      const meta = await getEditionResultsMeta(edition.id);
+      const meta = await (publishedMetaPromise ??
+        loadPublishedEditionMeta(edition));
+      if (meta) ballotCount = meta.ballotCountCommunity;
       entranceFreezeReady = meta != null || edition.freezeStatus === "ready";
     } catch {
       entranceFreezeReady = false;
     }
   }
 
-  if (edition.status === "published" && !showHostSettings && view !== "entrance") {
+  if (
+    !servedFromBoardCache &&
+    edition.status === "published" &&
+    !showHostSettings &&
+    view !== "entrance"
+  ) {
     try {
-      await ensurePublishedEditionResults(community.id, edition.year);
-      const meta = await getEditionResultsMeta(edition.id);
-      if (meta) {
-        const emptyVoters = {
-          page: 1,
-          pageSize: STANDINGS_PAGE_SIZE,
-          total: 0,
-          totalPages: 1,
-          rows: [] as Awaited<
-            ReturnType<typeof getEditionVotersPage>
-          >["rows"],
-          q: "",
-        };
-        const emptyMatrix: EditionBallotMatrix = {
-          showYou: false,
-          hasGames: false,
-          voiceColumns: [],
-          rows: [],
-        };
-        const emptyCategoryComparison: EditionCategoryComparisonMatrix = {
-          showYou: false,
-          hasGames: false,
-          voiceColumns: [],
-          rows: [],
-        };
+      const emptyVoters = {
+        page: 1,
+        pageSize: STANDINGS_PAGE_SIZE,
+        total: 0,
+        totalPages: 1,
+        rows: [] as Awaited<
+          ReturnType<typeof getEditionVotersPage>
+        >["rows"],
+        q: "",
+      };
+      const emptyMatrix: EditionBallotMatrix = {
+        showYou: false,
+        hasGames: false,
+        voiceColumns: [],
+        rows: [],
+      };
+      const emptyCategoryComparison: EditionCategoryComparisonMatrix = {
+        showYou: false,
+        hasGames: false,
+        voiceColumns: [],
+        rows: [],
+      };
 
+      if (overviewPromise) {
+        const overview = await overviewPromise;
+        if (overview) {
+          ballotCount = overview.meta.ballotCountCommunity;
+          resultsBundle = {
+            meta: overview.meta,
+            topTen: overview.topTen,
+            categoryPodiums: overview.categoryPodiums,
+            categoryComparison: emptyCategoryComparison,
+            categoryMeta: [],
+            categoryPage: null,
+            voters: emptyVoters,
+            matrix: emptyMatrix,
+            publicBallot: null,
+            standingsPage: null,
+          };
+        }
+      } else {
+      const meta = await (publishedMetaPromise ??
+        loadPublishedEditionMeta(edition));
+      if (meta) {
+        ballotCount = meta.ballotCountCommunity;
         if (view === "standings") {
           const standingsPage = await getEditionGotyPage(edition.id, mode, {
             page: categoryPageNum,
             pageSize: STANDINGS_PAGE_SIZE,
             rankMode,
+            meta,
           });
           resultsBundle = {
             meta,
@@ -716,25 +796,35 @@ export default async function CommunityEditionYearPage({
             standingsPage,
           };
         } else if (view === "categories" || view === "category") {
-          const categoryMeta = await listEditionCategoryMeta(edition.id, mode);
+          const categoryIndex =
+            view === "categories"
+              ? await loadEditionCategorySnapshot(
+                  edition.id,
+                  [mode === "voices" ? "voices" : "community"],
+                  { maxRank: CATEGORY_RANKED_TOP, rankMode },
+                )
+              : null;
+          const categoryMeta = categoryIndex
+            ? categoryIndex[mode === "voices" ? "voices" : "community"].meta
+            : await listEditionCategoryMeta(edition.id, mode, undefined, {
+                skipCustomBackfill: true,
+              });
           const categoryPage =
             view === "category" && categoryId
               ? await getEditionCategoryPage(edition.id, mode, categoryId, {
                   page: categoryPageNum,
                   pageSize: CATEGORY_RESULTS_PAGE_SIZE,
                   rankMode,
+                  skipCustomBackfill: true,
                 })
               : null;
           resultsBundle = {
             meta,
             topTen: [],
-            categoryPodiums:
-              view === "categories"
-                ? await getEditionCategoryResults(edition.id, mode, {
-                    maxRank: CATEGORY_RANKED_TOP,
-                    rankMode,
-                  })
-                : [],
+            categoryPodiums: categoryIndex
+              ? categoryIndex[mode === "voices" ? "voices" : "community"]
+                  .podiums
+              : [],
             categoryComparison: emptyCategoryComparison,
             categoryMeta,
             categoryPage,
@@ -749,6 +839,11 @@ export default async function CommunityEditionYearPage({
             pageSize: STANDINGS_PAGE_SIZE,
             q: votersQ,
             voicesOnly: mode === "voices",
+            knownTotal: votersQ
+              ? undefined
+              : mode === "voices"
+                ? meta.ballotCountVoices
+                : meta.ballotCountCommunity,
           });
           resultsBundle = {
             meta,
@@ -841,6 +936,7 @@ export default async function CommunityEditionYearPage({
             const comparison = await getEditionComparisonBundle(edition.id, {
               viewerProfileId: profile?.id ?? null,
               rankMode,
+              skipCustomBackfill: true,
             });
             resultsBundle = {
               meta,
@@ -855,35 +951,41 @@ export default async function CommunityEditionYearPage({
               standingsPage: null,
             };
           } else {
-            const [topTen, categoryPodiums] = await Promise.all([
-              getEditionGotyThroughRank(edition.id, mode, {
-                maxRank: 10,
-                rankMode,
-              }),
-              getEditionCategoryResults(edition.id, mode, {
-                maxRank: CATEGORY_RANKED_TOP,
-                rankMode,
-              }),
-            ]);
-            resultsBundle = {
+            const overview = await loadEditionResultsOverview({
+              edition,
+              mode,
+              rankMode,
               meta,
-              topTen,
-              categoryPodiums,
-              categoryComparison: emptyCategoryComparison,
-              categoryMeta: [],
-              categoryPage: null,
-              voters: emptyVoters,
-              matrix: emptyMatrix,
-              publicBallot: null,
-              standingsPage: null,
-            };
+            });
+            if (!overview) {
+              resultsBundle = null;
+            } else {
+              resultsBundle = {
+                meta: overview.meta,
+                topTen: overview.topTen,
+                categoryPodiums: overview.categoryPodiums,
+                categoryComparison: emptyCategoryComparison,
+                categoryMeta: [],
+                categoryPage: null,
+                voters: emptyVoters,
+                matrix: emptyMatrix,
+                publicBallot: null,
+                standingsPage: null,
+              };
+            }
           }
         }
+      }
       }
     } catch {
       resultsBundle = null;
     }
+    if (boardCacheKey && resultsBundle) {
+      await putEditionBoard(boardCacheKey, resultsBundle);
+    }
   }
+
+  const tgaNav = await tgaNavPromise;
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -895,9 +997,8 @@ export default async function CommunityEditionYearPage({
         editionStatus={navStatus}
         editionYear={featured?.year ?? edition.year}
         communityId={community.id}
-        tgaEnabled={
-          await communityTgaNavVisible(community.id).catch(() => false)
-        }
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="edition"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

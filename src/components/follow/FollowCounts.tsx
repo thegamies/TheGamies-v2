@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { profileHref } from "@/lib/profile/profile-page";
 
 export function FollowCounts({

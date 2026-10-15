@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { RankingsInfoControl } from "@/components/standings/RankingsInfoControl";
 import { YearTopFiveSections } from "@/components/standings/YearTopFiveStrip";
 import { YearSelect } from "@/components/ui/YearSelect";

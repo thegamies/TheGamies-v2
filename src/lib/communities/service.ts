@@ -1,7 +1,7 @@
 import { and, asc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { cache } from "react";
 import {
   communities,
-  communityBans,
   communityMembers,
   createDb,
   profiles,
@@ -34,6 +34,7 @@ import {
   type CommunityVisibility,
 } from "./schema";
 import { parseScoresVisibleDateInput } from "./live-reveal";
+import { lockCommunityMembershipSql } from "./membership-lock";
 import {
   clearCommunityLiveLockSnapshots,
   upsertCommunityLiveLockSnapshot,
@@ -440,10 +441,10 @@ export async function listCommunitiesForProfilePage(
   };
 }
 
-export async function getCommunityBySlug(
+async function queryCommunityBySlug(
   slug: string,
-  viewerProfileId?: string | null,
-  db: Db = getDb(),
+  viewerProfileId: string | null,
+  db: Db,
 ): Promise<CommunityDetail | null> {
   const [community] = await db
     .select()
@@ -453,15 +454,14 @@ export async function getCommunityBySlug(
   if (!community) return null;
 
   const memberWhere = eq(communityMembers.communityId, community.id);
-  const [memberCountRows, hostCountRows, viewerRows] = await Promise.all([
+  const [countRows, viewerRows] = await Promise.all([
     db
-      .select({ n: sql<number>`count(*)::int` })
+      .select({
+        members: sql<number>`count(*)::int`,
+        hosts: sql<number>`count(*) filter (where ${communityMembers.role} = 'admin')::int`,
+      })
       .from(communityMembers)
       .where(memberWhere),
-    db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(communityMembers)
-      .where(and(memberWhere, eq(communityMembers.role, "admin"))),
     viewerProfileId
       ? db
           .select({ role: communityMembers.role })
@@ -478,10 +478,26 @@ export async function getCommunityBySlug(
 
   return toCommunityDetail(
     community,
-    Number(memberCountRows[0]?.n ?? 0),
-    Number(hostCountRows[0]?.n ?? 0),
+    Number(countRows[0]?.members ?? 0),
+    Number(countRows[0]?.hosts ?? 0),
     viewerRows[0] ? asRole(viewerRows[0].role) : null,
   );
+}
+
+/** Per React request: metadata + page share one slug lookup. */
+const getCommunityBySlugCached = cache(
+  (slug: string, viewerProfileId: string | null) =>
+    queryCommunityBySlug(slug, viewerProfileId, getDb()),
+);
+
+export async function getCommunityBySlug(
+  slug: string,
+  viewerProfileId?: string | null,
+  db?: Db,
+): Promise<CommunityDetail | null> {
+  const viewer = viewerProfileId ?? null;
+  if (db) return queryCommunityBySlug(slug, viewer, db);
+  return getCommunityBySlugCached(slug, viewer);
 }
 
 export async function listCommunityMembersPage(
@@ -543,34 +559,6 @@ export async function listCommunityMembersPage(
     total,
     totalPages,
   };
-}
-
-export async function listCommunityMemberOptions(
-  communityId: string,
-  db: Db = getDb(),
-): Promise<CommunityMemberPublic[]> {
-  const rows = await db
-    .select({
-      profileId: communityMembers.profileId,
-      role: communityMembers.role,
-      joinedAt: communityMembers.joinedAt,
-      username: profiles.username,
-      displayName: profiles.displayName,
-      avatarUrl: profiles.avatarUrl,
-    })
-    .from(communityMembers)
-    .innerJoin(profiles, eq(profiles.id, communityMembers.profileId))
-    .where(eq(communityMembers.communityId, communityId))
-    .orderBy(asc(profiles.displayName), asc(profiles.username));
-
-  return rows.map((row) => ({
-    profileId: row.profileId,
-    username: row.username,
-    displayName: row.displayName,
-    avatarUrl: row.avatarUrl,
-    role: asRole(row.role),
-    joinedAt: row.joinedAt,
-  }));
 }
 
 export async function createCommunity(
@@ -764,28 +752,38 @@ async function joinCommunityAsMember(
   if (existing) return { ok: true, slug };
   if (joinsClosed) return { error: COMMUNITY_JOINS_CLOSED_MESSAGE };
 
-  const [banned] = await db
-    .select({ profileId: communityBans.profileId })
-    .from(communityBans)
-    .where(
-      and(
-        eq(communityBans.communityId, communityId),
-        eq(communityBans.profileId, profileId),
-      ),
-    )
-    .limit(1);
-  if (banned) return { error: "You can’t join this community." };
-
+  let joined: boolean;
   try {
-    await db.insert(communityMembers).values({
-      communityId,
-      profileId,
-      role: "member",
-    });
+    const [, inserted] = await db.batch([
+      db.execute(lockCommunityMembershipSql(communityId, profileId)),
+      db.execute(sql`
+        INSERT INTO community_members (community_id, profile_id, role)
+        SELECT ${communityId}, ${profileId}, 'member'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM community_bans
+          WHERE community_id = ${communityId} AND profile_id = ${profileId}
+        )
+        ON CONFLICT DO NOTHING
+        RETURNING 1`),
+    ]);
+    joined = inserted.rows.length > 0;
   } catch {
     return { error: "Could not join that community." };
   }
-  return { ok: true, slug };
+  if (joined) return { ok: true, slug };
+
+  // Nothing inserted: a simultaneous join already added them, or they are banned.
+  const [member] = await db
+    .select({ profileId: communityMembers.profileId })
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, communityId),
+        eq(communityMembers.profileId, profileId),
+      ),
+    )
+    .limit(1);
+  return member ? { ok: true, slug } : { error: "You can’t join this community." };
 }
 
 export async function leaveCommunity(

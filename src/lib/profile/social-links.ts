@@ -178,10 +178,18 @@ export function normalizeSocialLinks(value: unknown): SocialLinks {
     const raw = value[key];
     if (typeof raw !== "string") continue;
     const trimmed = raw.trim();
-    if (!trimmed) continue;
+    if (!trimmed || !isHttpsUrl(trimmed)) continue;
     out[key] = trimmed;
   }
   return out;
+}
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 function fieldError(key: SocialLinkKey, err: unknown): never {

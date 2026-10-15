@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import {
   StandingGameCard,
   standingStripColClass,
@@ -15,11 +15,9 @@ export function ProfileListPreviewCard({
   username: string;
   list: ProfileListPreview;
 }) {
-  const href = listSharePath({
-    publicId: list.publicId,
-    slug: list.slug,
-    username,
-  });
+  const href = list.slug
+    ? listSharePath({ slug: list.slug, username })
+    : `/u/${username}`;
   const kind = list.listType === "goty" ? "Game of the Year" : "Custom";
 
   return (

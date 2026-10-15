@@ -120,19 +120,8 @@ export function AdminSeedClient({
         reseed: effectiveReseed,
         maxIndex,
       });
-      if (startIndex > 1000) {
-        setMessage(
-          effectiveReseed
-            ? "Seed index cannot exceed 1000."
-            : "Already at 1000 seed voters. Clear some before adding more, or turn Reseed on to rewrite 1…N.",
-        );
-        return;
-      }
 
-      let remaining = Math.min(
-        1000 - startIndex + 1,
-        Math.min(1000, Math.max(1, Math.floor(count))),
-      );
+      let remaining = Math.max(1, Math.floor(count));
       let createdProfiles = 0;
       let createdLists = 0;
       let updatedLists = 0;
@@ -175,7 +164,6 @@ export function AdminSeedClient({
         setMessage(
           `Progress: seeded through voter ${result.endIndex}… (${createdLists + updatedLists} lists, ${categorySummary(categoryVotes, categoryCount)} so far)`,
         );
-        if (result.nextIndex > 1000) break;
       }
 
       if (wroteAnything && !hadError) {
@@ -210,10 +198,10 @@ export function AdminSeedClient({
     const categoryRerollSeed = crypto.getRandomValues(new Uint32Array(1))[0]!;
 
     try {
-      while (!stopRef.current && startIndex <= 1000) {
+      while (!stopRef.current) {
         const result = await runBatch({
           startIndex,
-          count: Math.min(BATCH_SIZE, 1000 - startIndex + 1),
+          count: BATCH_SIZE,
           rebuild: false,
           categoryRerollSeed,
         });
@@ -237,9 +225,7 @@ export function AdminSeedClient({
       if (wroteAnything && !hadError) {
         await rebuildSeedYearAction({ year });
         setMessage(
-          stopRef.current
-            ? `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categorySummary(categoryVotes, categoryCount)}.`
-            : `Filled through ${Math.min(1000, startIndex - 1)}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categorySummary(categoryVotes, categoryCount)}.`,
+          `Stopped at voter index ${startIndex - 1}. Added ~${totalProfiles} profiles / ${totalLists} list writes / ${categorySummary(categoryVotes, categoryCount)}.`,
         );
       }
       await refreshStats();
@@ -256,7 +242,8 @@ export function AdminSeedClient({
       <p className="text-sm text-muted">
         Synthetic voters and Game of the Year lists for standings QA. They
         cannot sign in. Picks weight the year pool by critic count × rating.
-        Runs in batches of {BATCH_SIZE}; up to 1000 voters.
+        Runs in batches of {BATCH_SIZE}. No total voter cap — uncheck Reseed
+        to append, or keep adding until Stop.
       </p>
 
       {stats ? (
@@ -370,7 +357,6 @@ export function AdminSeedClient({
         <input
           type="number"
           min={1}
-          max={1000}
           className={`${fieldInputClass} mt-2`}
           value={count}
           onChange={(e) => setCount(Number(e.target.value))}

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import {

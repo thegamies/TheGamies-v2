@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useRouter } from "next/navigation";
 import { tgaNomineeGridClass } from "@/components/tga-pickem/tgaNomineeGrid";
 import { Button } from "@/components/ui/Button";

@@ -10,6 +10,9 @@ export function GtagConsentHead() {
   const ads = Boolean(getAdsenseClientId());
   const ga = Boolean(getGaMeasurementId());
   if (!ads && !ga) return null;
+  // The tag is in the server HTML. A client render of <script> is a console
+  // error and never runs, which covers the page after sign-out.
+  if (typeof window !== "undefined") return null;
 
   return (
     <script

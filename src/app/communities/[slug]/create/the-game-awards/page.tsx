@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound, redirect } from "next/navigation";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { CreateTgaForm } from "@/components/tga-pickem/CreateTgaForm";
@@ -26,7 +26,7 @@ import {
   pickCommunityTgaSettingsYear,
 } from "@/lib/tga-pickem/promo";
 import {
-  communityTgaNavVisible,
+  communityTgaNavTarget,
   listCommunityTgaYears,
   listTgaYears,
 } from "@/lib/tga-pickem/service";
@@ -86,6 +86,10 @@ export default async function CreateCommunityTgaPage({
     existing.map((row) => row.year),
   )?.year;
   const emptyReason = communityTgaSettingsEmptyReason(siteYears);
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -96,7 +100,8 @@ export default async function CreateCommunityTgaPage({
         canManage
         editionStatus={featuredStatus}
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

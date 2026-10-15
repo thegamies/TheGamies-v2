@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { CreatePageHeader } from "@/components/lists/CreatePageHeader";
 import { DiscardAnonDraftButton } from "@/components/lists/DiscardAnonDraftButton";
 import { ListEditor } from "@/components/lists/ListEditor";
 import { StartCustomForm } from "@/components/lists/StartCustomForm";
 import { Button } from "@/components/ui/Button";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import {
   draftMatchesCustom,
   editorSeedFromDraft,
@@ -14,12 +17,11 @@ import { readListEditCookie } from "@/lib/lists/cookies";
 import { readListDraftCookie } from "@/lib/lists/draft-cookie";
 import {
   getEditableList,
+  getListShareTarget,
   hydrateGamesByIgdbIds,
 } from "@/lib/lists/service";
 import { parseListAuthIntent } from "@/lib/lists/auth-intent";
 import { parseStoredListFormat, parseStoredRankStyle, parseStoredRankVisibility } from "@/lib/lists/schema";
-import { getProfileByAuthUserId } from "@/lib/profile/service";
-
 export const metadata: Metadata = {
   title: "Create custom list",
 };
@@ -31,16 +33,10 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 async function sessionProfileId(): Promise<string | null> {
-  const auth = getAuthOrNull();
-  if (!auth) return null;
-  try {
-    const { data: session } = await auth.getSession();
-    if (!session?.user?.id) return null;
-    const profile = await getProfileByAuthUserId(session.user.id);
-    return profile?.id ?? null;
-  } catch {
-    return null;
-  }
+  const user = await getRequestSessionUser();
+  if (!user?.id) return null;
+  const profile = await getRequestProfileByAuthUserId(user.id).catch(() => null);
+  return profile?.id ?? null;
 }
 
 export default async function CreateCustomPage({
@@ -60,6 +56,7 @@ export default async function CreateCustomPage({
 
   let editor: {
     publicId: string | null;
+    sharePath?: string | null;
     title: string;
     year: number | null;
     slotCount: number;
@@ -110,6 +107,10 @@ export default async function CreateCustomPage({
           blurb: signedIn ? (item.blurb ?? "") : "",
         })),
       };
+      if (signedIn) {
+        const share = await getListShareTarget(result.list);
+        if (share.path !== "/create") editor.sharePath = share.path;
+      }
 
       if (!signedIn) {
         const draft = await readListDraftCookie();
@@ -260,6 +261,7 @@ export default async function CreateCustomPage({
       <div>
         <ListEditor
           publicId={editor.publicId}
+          sharePath={editor.sharePath}
           listType="custom"
           initialTitle={editor.title}
           initialYear={editor.year}

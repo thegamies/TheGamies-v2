@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { getYearStats } from "@/lib/live-aggregate/service";
 import { getSiteSettings } from "@/lib/site-settings/service";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import {
   ACCOUNT_DELETE_FAILED,
   ACCOUNT_DELETE_NEEDS_PASSWORD,

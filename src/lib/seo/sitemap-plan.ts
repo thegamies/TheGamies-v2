@@ -83,6 +83,7 @@ export function sitemapShardsForCounts(counts: {
   return shards;
 }
 
+/** Games hub page 1 is ad-eligible; later browse pages stay indexable but without ads. */
 export function shouldIndexGamesHub(page: number): boolean {
   return Number.isFinite(page) && page <= 1;
 }

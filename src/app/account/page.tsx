@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import { hasPasswordCredential } from "@/lib/auth/has-password-credential";
 import {
   getRequestProfileByAuthUserId,
   getRequestSessionUser,
 } from "@/lib/auth/session";
+import { toAccountProfileFormProfile } from "./account-profile-dto";
 import { AccountDeleteForm } from "./AccountDeleteForm";
 import { AccountPasswordForm } from "./AccountPasswordForm";
 import { AccountProfileForm } from "./AccountProfileForm";
@@ -47,7 +48,7 @@ export default async function AccountPage() {
           /u/{profile.username}
         </Link>
       </p>
-      <AccountProfileForm profile={profile} />
+      <AccountProfileForm profile={toAccountProfileFormProfile(profile)} />
       <AccountPasswordForm />
       <AccountDeleteForm
         hasPassword={await hasPasswordCredential(user.id)}

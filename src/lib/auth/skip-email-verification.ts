@@ -1,7 +1,4 @@
-function isLoopbackHost(hostname: string): boolean {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
-}
+import { isLoopbackHost } from "./loopback";
 
 function isHostedDeploy(env: Record<string, string | undefined>): boolean {
   if (env.CF_PAGES || env.CF_PAGES_URL) return true;
@@ -31,7 +28,7 @@ export function skipEmailVerification(
   if (env.NODE_ENV !== "development") return false;
   if (isHostedDeploy(env)) return false;
   const appUrl = env.NEXT_PUBLIC_APP_URL?.trim();
-  if (!appUrl) return true;
+  if (!appUrl) return false;
   try {
     return isLoopbackHost(new URL(appUrl).hostname);
   } catch {

@@ -7,10 +7,8 @@ Personal **GOTY** and **custom** ranked lists. Separate from edition ballots and
 | Term | Meaning |
 |---|---|
 | Draft cookie | Anon-only client cookie (`tg_list_draft`) with ordered IGDB ids + meta; auto-updated while building |
-| Edit cookie | httpOnly `tg_list_edit` (`publicId.secret`) for legacy anonymous `/l/` edit access |
-| Owned list | Attached to a profile (`profileId` + `slug`); canonical URL `/u/[username]/[slug]` |
-| Anon share (legacy) | Older DB rows without profile at `/l/[publicId]` until claimed |
-| Claim | Attach a legacy anonymous shared list to a signed-in profile (assigns slug) |
+| Edit cookie | httpOnly `tg_list_edit` (`publicId.secret`) for leftover anonymous edit access (editor `?id=`, not a public URL) |
+| Owned list | Attached to a profile (`profileId` + `slug`); public URL `/u/[username]/[slug]` |
 | Rank visibility | Later than v1: `lists.rank_visibility` = `ranked` \| `games_only` \| `hidden`. Default **ranked**. See below. |
 
 Lists have **no draft/published status**. If a row exists in Postgres, it is shareable **unless** rank visibility is `hidden` (later). Today every owned list URL works even when the profile is private.
@@ -35,12 +33,10 @@ Lists have **no draft/published status**. If a row exists in Postgres, it is sha
      - **Share as image** — everyone; downloadable/shareable JPEG; does not save or rank.
      - **Share with a link** — requires sign-in; dialog prompts to sign in & share, share as image instead, or cancel.
 5. After authentication with `intent=save` or `intent=share`, restore the draft, attach/save the owned list, then stay in the editor (save) or open the owned share URL (share). If the account **already has** a GOTY list for that year, the local draft is discarded (cookie and this-device storage) and the existing owned list opens (`/create/goty?id=…`). The unsigned ranking is not restored or saved onto the account. Header Sign in without intent does the same discard when that year is already owned. Custom lists are unchanged (many per account).
-6. Soft prompt on **legacy** `/l/` pages: sign in to claim; **Don’t prompt again** uses `localStorage`.
-7. **Claim** sets `profileId`, assigns a slug (`goty-{year}` or slugified title), clears the edit secret, redirects to `/u/[username]/[slug]`.
 
 ### Core product rule
 
-Anyone can create and share an image. Signed-in users can save, publish share links, and contribute GOTY lists to rankings. The editor does **not** create new anonymous `/l/` rows.
+Anyone can create and share an image. Signed-in users can save, publish share links, and contribute GOTY lists to rankings. Unsigned builders stay on the draft cookie; there is no public short URL.
 
 ## Builder
 
@@ -72,8 +68,7 @@ Create UI mirrors the Social Gamer Card prototype:
 ## URLs
 
 - Create: `/create`, `/create/goty`, `/create/custom`
-- Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`). GOTY lists use secondary tabs **Game of the Year** (default) and **Categories** (`?view=categories`). Categories loads only that list’s picks (not the full award catalog). **Edit** on Categories opens `/create/goty?id=…&view=categories`. Switching tabs in the GOTY editor updates the same `?view=` query. Custom lists have no tabs.
-- Legacy anon share: `/l/[publicId]` (owned publicId URLs redirect to the slug URL)
+- Owned share (canonical): `/u/[username]/[slug]` (e.g. `/u/alex/goty-2026`). GOTY lists use secondary tabs **Game of the Year** (default) and **Categories** (`?view=categories`). Categories loads only that list’s picks (not the full award catalog). **Edit** on Categories opens `/create/goty?id=…&view=categories`. Switching tabs in the GOTY editor updates the same `?view=` query. Custom lists have no tabs. Editor `?id=` uses `publicId`; that is not a public page.
 - Sign-in to complete Save/Share: `/auth/sign-in?next=...&intent=save|share` (create account uses the same `next` / `intent`). After sign-up, confirm email when Neon requires it (link in the message). The save/share `next` is kept so the user returns to the list. General auth return: after sign-in or sign-up, users go to safe `next` when present (header Sign in passes the current page); otherwise `/account`.
 - Profile lists link to the owned slug URL
 - Profile `/u/[username]`: secondary tabs **Lists** (default) and **Communities** (`?tab=communities`). **Later:** **Library** tab (`?tab=library`) — see [library.md](./library.md). Lists shows every owned list (GOTY and custom) with a SQL-capped top-5 cover strip (12 lists per page, `?page=`). Header **My Lists** / **My Communities** deep-link those tabs. Hidden lists omit the public cover strip for non-owners.

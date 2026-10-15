@@ -535,6 +535,7 @@ export async function upsertEditionBallot(input: {
         id: awardCategories.id,
         eligibility: awardCategories.eligibility,
         allowEditions: awardCategories.allowEditions,
+        allowDlcAddon: awardCategories.allowDlcAddon,
       })
       .from(awardCategories)
       .where(
@@ -573,7 +574,7 @@ export async function upsertEditionBallot(input: {
         game,
         year,
         parseAwardCategoryEligibility(cat.eligibility),
-        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat.id) },
+        { allowEditions: cat.allowEditions, allowDlcAddon: awardAllowsDlcAddon(cat) },
       );
       if (err) return { error: err };
     }

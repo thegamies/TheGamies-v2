@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { Suspense } from "react";
 import {
   getRequestProfileByAuthUserId,
@@ -22,7 +22,10 @@ import {
 import { getPromotedTgaHref } from "@/lib/tga-pickem/service";
 
 export async function SiteHeader() {
-  const user = await getRequestSessionUser();
+  const [user, tgaHref] = await Promise.all([
+    getRequestSessionUser(),
+    getPromotedTgaHref().catch(() => null),
+  ]);
   const profile = user?.id
     ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
     : null;
@@ -32,7 +35,6 @@ export async function SiteHeader() {
     appUrl: process.env.NEXT_PUBLIC_APP_URL,
   });
   const includeAdmin = profile?.isSiteAdmin === true;
-  const tgaHref = await getPromotedTgaHref().catch(() => null);
   const primaryLinks = withSignedInNavLinks(
     buildPrimarySiteNavLinks({ tgaHref }),
     Boolean(user),
@@ -56,7 +58,7 @@ export async function SiteHeader() {
     : { status: "anonymous" };
 
   return (
-    <SiteHeaderChrome signedIn={account.status === "authenticated"}>
+    <SiteHeaderChrome>
       <div className="mx-auto flex max-w-[var(--page-max)] items-center justify-between gap-6 px-[var(--gutter)] py-2">
         <SiteBrand />
         <nav

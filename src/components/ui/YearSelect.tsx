@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   YEAR_SELECT_MENU_MIN_PX,

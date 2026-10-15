@@ -9,7 +9,7 @@ const { pathname } = vi.hoisted(() => ({
   pathname: vi.fn(() => "/"),
 }));
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/next-link", () => ({
   default: ({
     href,
     children,

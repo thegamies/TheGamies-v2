@@ -1,0 +1,234 @@
+import { describe, expect, it } from "vitest";
+import {
+  formatLoadReport,
+  formatTimeSharePct,
+  loadStepFamily,
+  partitionLoadSamples,
+  percentile,
+  readLoadCostHeaders,
+} from "./load-report";
+
+describe("readLoadCostHeaders", () => {
+  it("parses staging meter headers", () => {
+    const headers = new Headers({
+      "x-cost-wall-ms": "120",
+      "x-cost-db-ms": "80",
+      "x-cost-db-span-ms": "40",
+      "x-cost-db-trips": "4",
+      "x-cost-db-trip-detail": JSON.stringify([
+        { ms: 40, sql: "select 1 from games" },
+      ]),
+    });
+    expect(readLoadCostHeaders(headers)).toEqual({
+      wallMs: 120,
+      dbMs: 80,
+      dbSpanMs: 40,
+      dbTrips: 4,
+      trips: [{ ms: 40, sql: "select 1 from games" }],
+    });
+  });
+
+  it("omits missing or invalid values", () => {
+    expect(readLoadCostHeaders(new Headers())).toEqual({});
+    expect(
+      readLoadCostHeaders(new Headers({ "x-cost-wall-ms": "nope" })),
+    ).toEqual({});
+  });
+});
+
+describe("formatTimeSharePct", () => {
+  it("formats a slice of total time", () => {
+    expect(formatTimeSharePct(80, 100)).toBe("80.0%");
+    expect(formatTimeSharePct(0.4, 100)).toBe("0.40%");
+    expect(formatTimeSharePct(0, 100)).toBe("0%");
+    expect(formatTimeSharePct(10, 0)).toBe("—");
+  });
+});
+
+describe("percentile", () => {
+  it("reads from a sorted series", () => {
+    expect(percentile([1, 2, 3, 4, 5], 50)).toBe(3);
+    expect(percentile([10], 95)).toBe(10);
+    expect(percentile([], 50)).toBe(0);
+  });
+});
+
+describe("formatLoadReport", () => {
+  it("includes the UTC window and group counts", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 60_000,
+      vusRead: 20,
+      writers: 10,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:01:00.000Z",
+      samples: [
+        {
+          group: "general",
+          step: "/rankings",
+          status: 200,
+          ms: 80,
+          ok: true,
+          wallMs: 40,
+          dbMs: 90,
+          dbSpanMs: 45,
+          trips: [{ ms: 45, sql: "select count(*) from games" }],
+        },
+        { group: "write", step: "list", status: 401, ms: 20, ok: false },
+      ],
+    });
+    expect(md).toContain("Started (UTC): 2026-10-09T17:00:00.000Z");
+    expect(md).toContain("Ramp: 0s (all VUs at t=0)");
+    expect(md).toContain("Writers: 10");
+    expect(md).toContain("- general: 1 · 80.0% time · p50 80 ms · p90 80 ms · p95 80 ms · p99 80 ms");
+    expect(md).toContain("- /rankings: 1 · 80.0% time · p50 80 ms");
+    expect(md).toContain("select count(*) from games: 1 · 100.0% time");
+    expect(md).toContain("- Errors: 1");
+    expect(md).toContain("Worker wall p50 40 ms · p90 40 ms · p95 40 ms · p99 40 ms");
+    expect(md).toContain("Neon db clock p50 45 ms · p90 45 ms · p95 45 ms · p99 45 ms");
+    expect(md).toContain("Neon db sum p50 90 ms · p90 90 ms · p95 90 ms · p99 90 ms");
+    expect(md).toContain("select count(*) from games");
+  });
+
+  it("joins pg_stat_statements exec onto a matching trip fingerprint", () => {
+    const sql = "select count(*) from games";
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 0,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        {
+          group: "general",
+          step: "/",
+          status: 200,
+          ms: 80,
+          ok: true,
+          trips: [{ ms: 45, sql }],
+        },
+      ],
+      pgExec: {
+        ok: true,
+        rows: [
+          {
+            queryid: "1",
+            query: sql,
+            fingerprint: sql,
+            calls: 333,
+            totalMs: 35_000,
+            meanMs: 35_000 / 333,
+          },
+        ],
+      },
+    });
+    expect(md).toContain("exec 333");
+    expect(md).toContain("100.0% exec");
+    expect(md).toContain("cpu ");
+    expect(md).toContain("ms/req");
+    expect(md).toContain("Neon CPU");
+    expect(md).toContain("(all exec rows matched a trip fingerprint)");
+  });
+
+  it("labels a linear VU ramp", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 90_000,
+      rampMs: 30_000,
+      vusRead: 50,
+      writers: 25,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:01:30.000Z",
+      samples: [
+        { group: "general", step: "/", status: 200, ms: 80, ok: true },
+      ],
+    });
+    expect(md).toContain("Ramp: 30s (linear VU start, then hold)");
+  });
+
+  it("rolls game detail paths into one family", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 0,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        { group: "general", step: "/games/a", status: 200, ms: 10, ok: true },
+        { group: "general", step: "/games/b", status: 200, ms: 20, ok: true },
+      ],
+    });
+    expect(md).toContain("- /games/:slug: 2");
+  });
+
+  it("rolls counted list writes into list-create/:n", () => {
+    const md = formatLoadReport({
+      scenario: "general",
+      durationMs: 1000,
+      vusRead: 1,
+      writers: 1,
+      startedAt: "2026-10-09T17:00:00.000Z",
+      endedAt: "2026-10-09T17:00:01.000Z",
+      samples: [
+        { group: "write", step: "list-create/1", status: 200, ms: 10, ok: true },
+        { group: "write", step: "list-create/10", status: 200, ms: 20, ok: true },
+        { group: "write", step: "list-edit/3", status: 200, ms: 15, ok: true },
+      ],
+    });
+    expect(md).toContain("- list-create/:n: 2");
+    expect(md).toContain("- list-edit/:n: 1");
+  });
+});
+
+describe("loadStepFamily", () => {
+  it("groups game detail paths", () => {
+    expect(loadStepFamily("/games/portal-2")).toBe("/games/:slug");
+    expect(loadStepFamily("/games")).toBe("/games");
+    expect(loadStepFamily("/games?q=Hades")).toBe("/games?q=:q");
+    expect(loadStepFamily("/create/goty?year=2025")).toBe("/create/goty");
+    expect(loadStepFamily("/u/gamies_qa_load_001")).toBe("/u/:username");
+    expect(loadStepFamily("/u/gamies_qa_load_001/goty-2025")).toBe(
+      "/u/:username/:listSlug",
+    );
+    expect(loadStepFamily("/api/games/search?q=ha")).toBe(
+      "/api/games/search?q=:q",
+    );
+    expect(loadStepFamily("list-create/5")).toBe("list-create/:n");
+    expect(loadStepFamily("list-edit/1")).toBe("list-edit/:n");
+    expect(loadStepFamily("list-delete/10")).toBe("list-delete/:n");
+    expect(loadStepFamily("list-reorder")).toBe("list-reorder");
+  });
+
+  it("groups site GOTY category boards", () => {
+    expect(
+      loadStepFamily(
+        "/game-of-the-year/2025/categories?category=best-gameplay",
+      ),
+    ).toBe("/game-of-the-year/:year/categories?category=:id");
+    expect(loadStepFamily("/game-of-the-year/2025/categories")).toBe(
+      "/game-of-the-year/2025/categories",
+    );
+    expect(loadStepFamily("/game-of-the-year/2025")).toBe(
+      "/game-of-the-year/2025",
+    );
+  });
+});
+
+describe("partitionLoadSamples", () => {
+  it("splits p95 by path", () => {
+    const rows = partitionLoadSamples(
+      [
+        { group: "general", step: "/", status: 200, ms: 10, ok: true },
+        { group: "general", step: "/", status: 200, ms: 20, ok: true },
+        { group: "general", step: "/games", status: 200, ms: 500, ok: true },
+      ],
+      "step",
+    );
+    expect(rows).toEqual([
+      expect.objectContaining({ label: "/", n: 2, p95: 20 }),
+      expect.objectContaining({ label: "/games", n: 1, p95: 500 }),
+    ]);
+  });
+});

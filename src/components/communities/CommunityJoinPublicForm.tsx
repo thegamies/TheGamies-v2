@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { joinCommunityPublicAction } from "@/app/communities/actions";
 import { Button } from "@/components/ui/Button";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 
 export function CommunityJoinPublicForm({
   slug,

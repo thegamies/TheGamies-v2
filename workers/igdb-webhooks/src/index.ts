@@ -6,15 +6,18 @@ import {
   listWebhookEvents,
   planAutoQueueDelivery,
   processWebhookBatch,
+  fitsInQueueMessage,
   processWebhookEnvelope,
   registerIgdbWebhookSlot,
   registerMissingIgdbWebhooks,
   reprocessWebhookEvent,
   resolveWebhookRouting,
   testIgdbWebhook,
+  toPublicWebhookRegistration,
   tryExtractWebhookIgdbId,
   truncateWebhookEvents,
   verifyIgdbWebhookSecret,
+  webhookEnvelopeBytes,
   WEBHOOK_ENTITIES,
   WEBHOOK_LOG_CLEANUP_CRON,
   WEBHOOK_METHODS,
@@ -27,6 +30,9 @@ import { createDb } from "@thegamies/db";
 import { bindProcessEnv, json, requireAdmin } from "./http";
 import { readQueueBacklogCount, setQueueDeliveryPaused } from "./queue-delivery";
 import { readDrainSettings, writeDrainSettings } from "./settings";
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isEnvelope(value: unknown): value is IgdbWebhookEnvelope {
   if (!value || typeof value !== "object") return false;
@@ -113,6 +119,8 @@ async function handleIgdbIngress(
     return json({ error: "Invalid secret." }, 401);
   }
 
+  // No size cap: only IGDB holds the secret, and a refused delivery would
+  // leave that record stale in the catalog.
   const rawBody = await request.text();
   let body: unknown;
   let parseError: string | undefined;
@@ -168,6 +176,26 @@ async function handleIgdbIngress(
   const settings = await readDrainSettings(env.IGDB_WEBHOOK_SETTINGS);
   const useLive =
     settings.processingMode === "live" && settings.deliveryMode !== "closed";
+
+  if (!fitsInQueueMessage(envelope)) {
+    console.warn(
+      "igdb-webhooks-oversized",
+      JSON.stringify({
+        bytes: webhookEnvelopeBytes(envelope),
+        entity: envelope.entity,
+        method: envelope.method,
+        igdbId: envelope.igdbId,
+      }),
+    );
+    if (!env.DATABASE_URL) {
+      // Cannot queue or store it here; a 503 makes IGDB retry.
+      return json({ error: "Could not process webhook." }, 503);
+    }
+    bindProcessEnv(env);
+    const db = createDb(env.DATABASE_URL);
+    await processWebhookEnvelope(db, envelope);
+    return json({ ok: true, mode: "live", reason: "too_large_for_queue" });
+  }
 
   if (useLive) {
     if (!env.DATABASE_URL) {
@@ -275,6 +303,9 @@ async function handleAdminEvents(
     parts[3] === "reprocess" &&
     request.method === "POST"
   ) {
+    if (!UUID_RE.test(parts[2]!)) {
+      return json({ error: "Invalid event id." }, 400);
+    }
     const db = createDb(env.DATABASE_URL);
     const result = await reprocessWebhookEvent(db, parts[2]!);
     return json(result);
@@ -352,17 +383,16 @@ async function handleAdminRegister(
       cb,
       baseSecret,
     );
-    return json({ registration });
+    return json({ registration: toPublicWebhookRegistration(registration) });
   }
 
   // DELETE /admin/register/:webhookId
   if (parts.length === 3 && request.method === "DELETE") {
-    const webhookId = Number(parts[2]);
-    if (!Number.isFinite(webhookId)) {
+    if (!/^\d+$/.test(parts[2]!)) {
       return json({ error: "Invalid webhook id." }, 400);
     }
-    const registration = await deleteIgdbWebhook(webhookId);
-    return json({ registration });
+    const registration = await deleteIgdbWebhook(Number(parts[2]));
+    return json({ registration: toPublicWebhookRegistration(registration) });
   }
 
   // POST /admin/register/test  { entity, webhookId, entityId }
@@ -454,6 +484,10 @@ const worker = {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("igdb-webhooks-error", message);
+      // Admin routes are behind the admin secret and keep detail for the operator.
+      if (path === "/igdb") {
+        return json({ error: "Could not process webhook." }, 500);
+      }
       return json({ error: message }, 500);
     }
   },

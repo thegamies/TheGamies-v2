@@ -64,6 +64,7 @@ function siteBlockCategory(
     categoryGroup: hit?.categoryGroup,
     eligibility: hit?.eligibility,
     allowEditions: hit?.allowEditions,
+    allowDlcAddon: hit?.allowDlcAddon,
   };
 }
 

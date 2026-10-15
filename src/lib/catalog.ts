@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   gt,
@@ -24,6 +25,8 @@ import {
   gameTypes,
   genres,
   platforms,
+  readCatalogGameCount,
+  refreshCatalogGameCount,
   type Db,
 } from "@thegamies/db";
 import { coverUrlFromImageId, wideImageUrlFromImageId, youtubePosterUrl } from "@thegamies/igdb";
@@ -163,15 +166,140 @@ function browseGamesWhere(input: BrowseGamesInput) {
   return conditions.length ? and(...conditions) : undefined;
 }
 
+/** Matches the stored `site_settings.catalog_game_count` snapshot. */
+export function isDefaultCatalogCountInput(
+  input: BrowseGamesInput = {},
+): boolean {
+  if (input.q?.trim()) return false;
+  if (input.year != null) return false;
+  if (input.yearAtMost != null) return false;
+  if (input.yearAtLeast != null) return false;
+  if (input.yearKnownAtLeast != null) return false;
+  if (input.releaseStatus != null && input.releaseStatus !== "all") {
+    return false;
+  }
+  if (input.excludeEditions) return false;
+  if (input.gotyEligibleTypes) return false;
+  if (input.includeAdult) return false;
+  return true;
+}
+
+export function sliceSearchPage<T>(
+  rows: T[],
+  pageSize: number,
+): { items: T[]; hasMore: boolean } {
+  const size = Math.max(1, pageSize);
+  const hasMore = rows.length > size;
+  return { items: hasMore ? rows.slice(0, size) : rows, hasMore };
+}
+
 export async function countBrowseGames(
   input: BrowseGamesInput = {},
 ): Promise<number> {
   const db = getDb();
+  if (isDefaultCatalogCountInput(input)) {
+    const stored = await readCatalogGameCount(db);
+    if (stored != null) return stored;
+    return refreshCatalogGameCount(db);
+  }
   const [row] = await db
     .select({ n: sql<number>`count(*)::int` })
     .from(games)
     .where(browseGamesWhere(input));
   return Number(row?.n ?? 0);
+}
+
+/**
+ * Drizzle omits a numeric offset of 0. A SQL literal stays in the query and
+ * stops Postgres from walking `games_popularity_idx` to satisfy
+ * `ORDER BY popularity LIMIT` — that walk reads the catalog for a word like
+ * "portal", whose matches are not packed at the top.
+ */
+function searchMatchOffset(): number {
+  return sql`0` as unknown as number;
+}
+
+type RankColumn = Parameters<typeof desc>[0];
+
+function browseRank(
+  sort: BrowseSort,
+  sortDir: "asc" | "desc",
+  cols: {
+    title: RankColumn;
+    firstReleaseDate: RankColumn;
+    popularity: RankColumn;
+  },
+) {
+  const column =
+    sort === "name"
+      ? cols.title
+      : sort === "first_release_date"
+        ? cols.firstReleaseDate
+        : cols.popularity;
+  return sortDir === "asc" ? asc(column) : desc(column);
+}
+
+/**
+ * Text search: trigram-match title and slug, sort and limit that set, then
+ * attach covers for the page. Joining covers before the limit looked up a
+ * cover for every hit (a word like "dark").
+ */
+export function browseGamesSearchQuery(db: Db, input: BrowseGamesInput) {
+  const {
+    sort = "popularity",
+    sortDir = "desc",
+    limit = GAMES_BROWSE_PAGE_SIZE,
+    offset = 0,
+  } = input;
+  const where = browseGamesWhere(input);
+
+  const matched = db
+    .select({
+      id: games.id,
+      igdbId: games.igdbId,
+      slug: games.slug,
+      title: games.title,
+      year: games.year,
+      firstReleaseDate: games.firstReleaseDate,
+      popularity: games.popularity,
+      coverIgdbId: games.coverIgdbId,
+    })
+    .from(games)
+    .where(where)
+    .offset(searchMatchOffset())
+    .as("matched");
+
+  const page = db
+    .select({
+      id: matched.id,
+      igdbId: matched.igdbId,
+      slug: matched.slug,
+      title: matched.title,
+      year: matched.year,
+      firstReleaseDate: matched.firstReleaseDate,
+      popularity: matched.popularity,
+      coverIgdbId: matched.coverIgdbId,
+    })
+    .from(matched)
+    .orderBy(browseRank(sort, sortDir, matched), matched.id)
+    .limit(limit)
+    .offset(offset)
+    .as("page");
+
+  return db
+    .select({
+      id: page.id,
+      igdbId: page.igdbId,
+      slug: page.slug,
+      title: page.title,
+      year: page.year,
+      firstReleaseDate: page.firstReleaseDate,
+      popularity: page.popularity,
+      coverImageId: covers.imageId,
+    })
+    .from(page)
+    .leftJoin(covers, eq(covers.igdbId, page.coverIgdbId))
+    .orderBy(browseRank(sort, sortDir, page), page.id);
 }
 
 export async function browseGames(input: BrowseGamesInput = {}) {
@@ -185,36 +313,25 @@ export async function browseGames(input: BrowseGamesInput = {}) {
 
   const where = browseGamesWhere(input);
 
-  const order =
-    sort === "name"
-      ? sortDir === "asc"
-        ? games.title
-        : desc(games.title)
-      : sort === "first_release_date"
-        ? sortDir === "asc"
-          ? games.firstReleaseDate
-          : desc(games.firstReleaseDate)
-        : sortDir === "asc"
-          ? games.popularity
-          : desc(games.popularity);
-
-  const rows = await db
-    .select({
-      id: games.id,
-      igdbId: games.igdbId,
-      slug: games.slug,
-      title: games.title,
-      year: games.year,
-      firstReleaseDate: games.firstReleaseDate,
-      popularity: games.popularity,
-      coverImageId: covers.imageId,
-    })
-    .from(games)
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
-    .where(where)
-    .orderBy(order, games.id)
-    .limit(limit)
-    .offset(offset);
+  const rows = input.q?.trim()
+    ? await browseGamesSearchQuery(db, input)
+    : await db
+        .select({
+          id: games.id,
+          igdbId: games.igdbId,
+          slug: games.slug,
+          title: games.title,
+          year: games.year,
+          firstReleaseDate: games.firstReleaseDate,
+          popularity: games.popularity,
+          coverImageId: covers.imageId,
+        })
+        .from(games)
+        .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
+        .where(where)
+        .orderBy(browseRank(sort, sortDir, games), games.id)
+        .limit(limit)
+        .offset(offset);
 
   return rows.map((r) => ({
     ...r,

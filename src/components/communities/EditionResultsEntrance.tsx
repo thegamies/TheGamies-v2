@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { useRouter } from "next/navigation";
 import { useLayoutEffect } from "react";
 import { Button } from "@/components/ui/Button";

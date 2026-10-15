@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound, redirect } from "next/navigation";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { CreateEventForm } from "@/components/communities/CreateEventForm";
@@ -19,7 +19,7 @@ import {
 import type { EditionStatus } from "@/lib/communities/edition-status";
 import { canManageCommunity } from "@/lib/communities/rules";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { listActiveAwardCategories } from "@/lib/live-aggregate/categories";
 
@@ -78,10 +78,15 @@ export default async function CreateCommunityEventPage({
       categoryGroup: c.categoryGroup,
       eligibility: c.eligibility,
       allowEditions: c.allowEditions,
+      allowDlcAddon: c.allowDlcAddon,
     }));
   } catch {
     siteCategoryCatalog = [];
   }
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -92,7 +97,8 @@ export default async function CreateCommunityEventPage({
         canManage
         editionStatus={featuredStatus}
         communityId={community.id}
-        tgaEnabled={await communityTgaNavVisible(community.id).catch(() => false)}
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="settings"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

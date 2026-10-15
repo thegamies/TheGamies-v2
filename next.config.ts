@@ -1,12 +1,7 @@
 import os from "node:os";
-import path from "node:path";
 import type { NextConfig } from "next";
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-
-const nextLinkWithoutPrefetch = path.join(
-  process.cwd(),
-  "src/lib/next-link.tsx",
-);
+import { SECURITY_HEADERS } from "./src/lib/security-headers";
 
 /** Extra hosts for `next dev` when opening via LAN IP / alternate hostname. */
 const extraDevOrigins = (process.env.ALLOWED_DEV_ORIGINS ?? "")
@@ -50,6 +45,9 @@ const nextConfig: NextConfig = {
   // Dev server blocks cross-origin /_next assets unless the browser host is
   // allowlisted (localhost alone is not enough for 127.0.0.1 or LAN IPs).
   allowedDevOrigins: [...lanDevOrigins(), ...extraDevOrigins],
+  async headers() {
+    return [{ source: "/:path*", headers: [...SECURITY_HEADERS] }];
+  },
   // Old thegamies.gg catalog paths still in Google’s index, plus dropped recap URLs.
   async redirects() {
     return [
@@ -69,25 +67,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
-  },
-  // Viewport Link prefetch runs the destination Server Component. Off by default.
-  turbopack: {
-    resolveAlias: {
-      "next/link": "./src/lib/next-link.tsx",
-    },
-  },
-  webpack: (config) => {
-    config.resolve ??= {};
-    const alias = config.resolve.alias;
-    if (Array.isArray(alias)) {
-      alias.push({ name: "next/link", alias: nextLinkWithoutPrefetch });
-    } else {
-      config.resolve.alias = {
-        ...alias,
-        "next/link": nextLinkWithoutPrefetch,
-      };
-    }
-    return config;
   },
   images: {
     remotePatterns: [

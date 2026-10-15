@@ -39,6 +39,12 @@ describe("AWARD_CATEGORY_DEFS", () => {
     expect(awardAllowsDlcAddon("best-expansion-dlc")).toBe(true);
     expect(awardAllowsDlcAddon("best-gameplay")).toBe(false);
     expect(awardAllowsDlcAddon("best-remake-remaster")).toBe(false);
+    expect(
+      awardAllowsDlcAddon({ id: "custom-dlc", allowDlcAddon: true }),
+    ).toBe(true);
+    expect(
+      awardAllowsDlcAddon({ id: "best-expansion-dlc", allowDlcAddon: false }),
+    ).toBe(false);
   });
 
   it("uses three eligibility modes and maps legacy site values", () => {
@@ -76,6 +82,20 @@ describe("AWARD_CATEGORY_DEFS", () => {
     );
     expect(awardOfferedOnListYear("best-ongoing-game", 2024, now)).toBe(false);
     expect(awardOfferedOnListYear("best-story", 2024, now)).toBe(true);
+    expect(
+      awardOfferedOnListYear(
+        { id: "new-ongoing", currentOrPreviousYear: true },
+        2024,
+        now,
+      ),
+    ).toBe(false);
+    expect(
+      awardOfferedOnListYear(
+        { id: "best-ongoing-game", currentOrPreviousYear: false },
+        2024,
+        now,
+      ),
+    ).toBe(true);
     expect(
       filterAwardsOfferedOnListYear(
         [

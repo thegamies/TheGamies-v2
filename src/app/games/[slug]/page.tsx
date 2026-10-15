@@ -1,11 +1,10 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { GameCategoryWins } from "@/components/games/GameCategoryWins";
 import { GameGotyRankings } from "@/components/games/GameGotyRankings";
 import { GameImagesSection } from "@/components/games/GameImagesSection";
 import { GameScreenshotsSection } from "@/components/games/GameScreenshotsSection";
-import { GameSiteContext } from "@/components/games/GameSiteContext";
 import { GameSummary } from "@/components/games/GameSummary";
 import { GameVideosSection } from "@/components/games/GameVideosSection";
 import { GameLibraryControls } from "@/components/library/GameLibraryControls";
@@ -21,12 +20,9 @@ import {
   getRequestSessionUser,
 } from "@/lib/auth/session";
 import { countFollowsLibraryForGame } from "@/lib/activity/query";
-import { listFollowedProfileIds } from "@/lib/follow/service";
 import { getLibraryEntry } from "@/lib/library/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
-import { adsenseAccountMetadata } from "@/lib/ads/adsense";
-
 type Params = Promise<{ slug: string }>;
 
 const COVER_WIDTH = 240;
@@ -47,10 +43,7 @@ export async function generateMetadata({
         description: data.game.summary?.slice(0, 160) ?? undefined,
         path: `/games/${slug}`,
         image: ogImagePath({ kind: "game", slug }),
-        index: data.hasPublicSiteValue,
-        follow: true,
       }),
-      ...(data.hasPublicSiteValue ? adsenseAccountMetadata() : {}),
     };
   } catch {
     return { title: "Game" };
@@ -72,37 +65,35 @@ export default async function GameDetailPage({ params }: { params: Params }) {
   const { slug } = await params;
   const data = await getGamePageData(slug).catch(() => null);
   if (!data) notFound();
-  const { game, rankings, categoryWins, publicLists } = data;
+  const { game, rankings, categoryWins } = data;
 
-  let artworks: Awaited<ReturnType<typeof getGameArtworksForDetail>> = [];
-  let screenshots: Awaited<ReturnType<typeof getGameScreenshotsForDetail>> = [];
-  let videos: Awaited<ReturnType<typeof getGameVideosForDetail>> = [];
-  try {
-    [artworks, screenshots, videos] = await Promise.all([
-      getGameArtworksForDetail(game.id),
-      getGameScreenshotsForDetail(game.id),
-      getGameVideosForDetail(game.id),
-    ]);
-  } catch {
-    artworks = [];
-    screenshots = [];
-    videos = [];
-  }
+  const media = Promise.all([
+    getGameArtworksForDetail(game.id),
+    getGameScreenshotsForDetail(game.id),
+    getGameVideosForDetail(game.id),
+  ]).catch(
+    (): [
+      Awaited<ReturnType<typeof getGameArtworksForDetail>>,
+      Awaited<ReturnType<typeof getGameScreenshotsForDetail>>,
+      Awaited<ReturnType<typeof getGameVideosForDetail>>,
+    ] => [[], [], []],
+  );
 
-  const user = await getRequestSessionUser();
-  const profile = user?.id
-    ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
-    : null;
-  const libraryEntry = profile
-    ? await getLibraryEntry(profile.id, game.id).catch(() => null)
-    : null;
-  const followedIds = profile
-    ? await listFollowedProfileIds(profile.id).catch(() => [] as string[])
-    : [];
-  const followCounts =
-    profile && followedIds.length > 0
-      ? await countFollowsLibraryForGame(game.id, followedIds).catch(() => null)
+  const viewer = (async () => {
+    const user = await getRequestSessionUser();
+    const profile = user?.id
+      ? await getRequestProfileByAuthUserId(user.id).catch(() => null)
       : null;
+    if (!profile) return { profile, libraryEntry: null, followCounts: null };
+    const [libraryEntry, followCounts] = await Promise.all([
+      getLibraryEntry(profile.id, game.id).catch(() => null),
+      countFollowsLibraryForGame(game.id, profile.id).catch(() => null),
+    ]);
+    return { profile, libraryEntry, followCounts };
+  })();
+
+  const [[artworks, screenshots, videos], { profile, libraryEntry, followCounts }] =
+    await Promise.all([media, viewer]);
 
   const developers = game.companies.filter((c) => c.developer);
   const publishers = game.companies.filter((c) => c.publisher);
@@ -144,12 +135,6 @@ export default async function GameDetailPage({ params }: { params: Params }) {
             </h1>
 
             {game.summary ? <GameSummary text={game.summary} /> : null}
-
-            <GameSiteContext
-              title={game.title}
-              rankings={rankings}
-              lists={publicLists}
-            />
 
             <GameGotyRankings
               stats={rankings}

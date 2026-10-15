@@ -1,4 +1,4 @@
-import type { Db } from "@thegamies/db";
+import { refreshCatalogGameCount, type Db } from "@thegamies/db";
 import {
   catalogEntitySpec,
   catalogRunKind,
@@ -142,5 +142,9 @@ export async function runEntityWalk(
       },
     });
     throw error;
+  } finally {
+    if (options.entity === "games") {
+      await refreshCatalogGameCount(db).catch(() => undefined);
+    }
   }
 }

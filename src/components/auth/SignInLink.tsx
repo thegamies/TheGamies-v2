@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { ComponentProps, ReactNode } from "react";
 import {

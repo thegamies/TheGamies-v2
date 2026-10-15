@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import { GameCover } from "@/components/ui/GameCover";
 import { feedCardHeadline, feedGameAction } from "@/lib/activity/feed-copy";

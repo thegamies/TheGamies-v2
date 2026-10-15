@@ -22,6 +22,7 @@
       "@/*": ["./src/*"],
       "@thegamies/db": ["./packages/db/src/index.ts"],
       "@thegamies/db/schema": ["./packages/db/src/schema.ts"],
+      "@thegamies/db/request-cost": ["./packages/db/src/request-cost.ts"],
       "@thegamies/igdb": ["./packages/igdb/src/index.ts"]
     }
   },

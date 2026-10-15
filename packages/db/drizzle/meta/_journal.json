@@ -407,6 +407,48 @@
       "when": 1790121600000,
       "tag": "0057_list_items_game_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790208000000,
+      "tag": "0058_search_trgm_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790380800000,
+      "tag": "0059_award_category_admin_flags",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1790467200000,
+      "tag": "0060_catalog_game_count",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1790553600000,
+      "tag": "0061_tga_community_picks_nominee_idx",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1790640000000,
+      "tag": "0062_tga_score_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1790726400000,
+      "tag": "0063_tga_ballot_mask",
+      "breakpoints": true
     }
   ]
 }

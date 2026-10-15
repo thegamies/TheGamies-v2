@@ -33,6 +33,8 @@ export type AwardCategoryDef = {
   group: AwardCategoryGroup;
   eligibility: AwardCategoryEligibility;
   allowEditions: boolean;
+  allowDlcAddon: boolean;
+  currentOrPreviousYear: boolean;
 };
 
 export const AWARD_CATEGORY_GROUP_LABEL: Record<AwardCategoryGroup, string> = {
@@ -97,35 +99,63 @@ export const CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS = [
 /** DLC add-ons are eligible here; packs, bundles, and other SKU types still are not. */
 export const DLC_ADDON_AWARD_ID = "best-expansion-dlc";
 
-export function awardAllowsDlcAddon(categoryId: string): boolean {
-  return categoryId === DLC_ADDON_AWARD_ID;
+export type AwardDlcFlag = {
+  id: string;
+  allowDlcAddon?: boolean | null;
+};
+
+export type AwardYearWindowFlag = {
+  id: string;
+  currentOrPreviousYear?: boolean | null;
+};
+
+export function awardAllowsDlcAddon(
+  category: string | AwardDlcFlag,
+): boolean {
+  if (typeof category === "string") {
+    return category === DLC_ADDON_AWARD_ID;
+  }
+  if (category.allowDlcAddon != null) return category.allowDlcAddon;
+  return category.id === DLC_ADDON_AWARD_ID;
 }
 
 export function awardOfferedOnListYear(
-  categoryId: string,
+  category: string | AwardYearWindowFlag,
   listYear: number,
   now: Date = new Date(),
 ): boolean {
-  if (
-    !(CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS as readonly string[]).includes(
-      categoryId,
-    )
-  ) {
-    return true;
-  }
+  const id = typeof category === "string" ? category : category.id;
+  const limited =
+    typeof category !== "string" && category.currentOrPreviousYear != null
+      ? category.currentOrPreviousYear
+      : (CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS as readonly string[]).includes(id);
+  if (!limited) return true;
   return listYear >= now.getUTCFullYear() - 1;
 }
 
-export function filterAwardsOfferedOnListYear<T extends { id: string }>(
+export function filterAwardsOfferedOnListYear<
+  T extends { id: string; currentOrPreviousYear?: boolean | null },
+>(
   awards: T[],
   listYear: number,
   opts?: { keepIds?: ReadonlySet<string>; now?: Date },
 ): T[] {
   return awards.filter(
     (award) =>
-      awardOfferedOnListYear(award.id, listYear, opts?.now) ||
+      awardOfferedOnListYear(award, listYear, opts?.now) ||
       opts?.keepIds?.has(award.id),
   );
+}
+
+/** Stable id from the award name. Existing rows keep their id. */
+export function slugifyAwardCategoryId(label: string): string {
+  const base = label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64);
+  return base || "award";
 }
 
 function def(
@@ -145,10 +175,17 @@ function def(
     group,
     eligibility,
     allowEditions,
+    allowDlcAddon: id === DLC_ADDON_AWARD_ID,
+    currentOrPreviousYear: (
+      CURRENT_OR_PREVIOUS_YEAR_AWARD_IDS as readonly string[]
+    ).includes(id),
   };
 }
 
-/** Canonical site award categories (sort order is the published rank, 1–86). */
+/**
+ * Bootstrap catalog for an empty `award_categories` table (new DBs / tests).
+ * Live awards are rows in Postgres, edited at `/admin/awards`.
+ */
 export const AWARD_CATEGORY_DEFS: AwardCategoryDef[] = [
   def(1, "best-gameplay", "Best Gameplay", "premier", "current_year", "The game that felt best to play."),
   def(2, "narrative", "Best Story", "premier", "current_year", "The story you couldn't stop thinking about."),

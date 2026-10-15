@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
@@ -24,8 +24,10 @@ import {
   GAMES_BROWSE_PAGE_SIZE,
   browseGames,
   countBrowseGames,
+  sliceSearchPage,
 } from "@/lib/catalog";
-import { listFollowedProfileIds } from "@/lib/follow/service";
+import { cachedBrowseGames } from "@/lib/catalog/game-search-cache";
+import { followsAnyone } from "@/lib/follow/service";
 import { paginateProfileItems, parseProfilePage } from "@/lib/profile/profile-page";
 import { SiteAds } from "@/components/ads/AdsLayout";
 import { adsenseAccountMetadata } from "@/lib/ads/adsense";
@@ -46,7 +48,6 @@ export async function generateMetadata({
       description:
         "Browse titles on The Gamies and open the ones that appear on Game of the Year lists.",
       path: "/games",
-      index: shouldIndexGamesHub(pageRaw),
     }),
     ...(shouldIndexGamesHub(pageRaw) ? adsenseAccountMetadata() : {}),
   };
@@ -156,10 +157,9 @@ async function GamesTrendingSection({
         )}`,
       );
     }
-    const followedIds = await listFollowedProfileIds(profile.id).catch(() => []);
     const board = await listTrendingBoard({
       windowHours: hours,
-      followedIds,
+      followerProfileId: profile.id,
       applySiteFloor: false,
       page: pageRaw,
     }).catch(() => ({
@@ -171,6 +171,9 @@ async function GamesTrendingSection({
       page: 1,
       totalPages: 1,
     }));
+    const followsNobody =
+      board.rows.length === 0 &&
+      !(await followsAnyone(profile.id).catch(() => true));
 
     return (
       <>
@@ -180,7 +183,7 @@ async function GamesTrendingSection({
           scope="following"
           showFollowingScope={signedIn}
           empty={
-            followedIds.length === 0
+            followsNobody
               ? "Follow people whose lists you already open to see games moving among them."
               : "No games are moving among people you follow in this window."
           }
@@ -259,23 +262,42 @@ async function GamesCatalogGrid({
   };
 
   let games: Awaited<ReturnType<typeof browseGames>> = [];
-  let total = 0;
+  let total: number | null = 0;
   let error: string | null = null;
   let page = 1;
   let totalPages = 1;
+  let hasMore = false;
+  const searching = Boolean(q.trim());
   try {
-    total = await countBrowseGames(filters);
-    if (total === 0) {
-      games = [];
-    } else {
-      const paging = paginateProfileItems(pageRaw, total, GAMES_BROWSE_PAGE_SIZE);
-      page = paging.page;
-      totalPages = paging.totalPages;
-      games = await browseGames({
+    if (searching) {
+      page = Math.max(1, Math.floor(pageRaw) || 1);
+      const rows = await cachedBrowseGames({
         ...filters,
-        limit: GAMES_BROWSE_PAGE_SIZE,
-        offset: paging.offset,
+        limit: GAMES_BROWSE_PAGE_SIZE + 1,
+        offset: (page - 1) * GAMES_BROWSE_PAGE_SIZE,
       });
+      const sliced = sliceSearchPage(rows, GAMES_BROWSE_PAGE_SIZE);
+      games = sliced.items;
+      hasMore = sliced.hasMore;
+      total = null;
+    } else {
+      total = await countBrowseGames(filters);
+      if (total === 0) {
+        games = [];
+      } else {
+        const paging = paginateProfileItems(
+          pageRaw,
+          total,
+          GAMES_BROWSE_PAGE_SIZE,
+        );
+        page = paging.page;
+        totalPages = paging.totalPages;
+        games = await browseGames({
+          ...filters,
+          limit: GAMES_BROWSE_PAGE_SIZE,
+          offset: paging.offset,
+        });
+      }
     }
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
@@ -287,11 +309,17 @@ async function GamesCatalogGrid({
     );
   }
   if (games.length === 0) {
-    return <p className="mt-8 text-muted">No games in the catalog yet.</p>;
+    return (
+      <p className="mt-8 text-muted">
+        {searching
+          ? "No titles match that search."
+          : "No games in the catalog yet."}
+      </p>
+    );
   }
 
   const from = (page - 1) * GAMES_BROWSE_PAGE_SIZE + 1;
-  const to = Math.min(page * GAMES_BROWSE_PAGE_SIZE, total);
+  const to = from + games.length - 1;
 
   return (
     <>
@@ -312,18 +340,22 @@ async function GamesCatalogGrid({
         label="Games pages"
         from={from}
         to={to}
-        total={total}
+        total={total ?? undefined}
         page={page}
-        totalPages={totalPages}
+        totalPages={searching ? undefined : totalPages}
         prevHref={
           page > 1
             ? gamesBrowseHref({ ...filters, page: page - 1 })
             : null
         }
         nextHref={
-          page < totalPages
-            ? gamesBrowseHref({ ...filters, page: page + 1 })
-            : null
+          searching
+            ? hasMore
+              ? gamesBrowseHref({ ...filters, page: page + 1 })
+              : null
+            : page < totalPages
+              ? gamesBrowseHref({ ...filters, page: page + 1 })
+              : null
         }
       />
     </>

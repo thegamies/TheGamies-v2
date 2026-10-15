@@ -6,11 +6,11 @@ import { adsenseAccountMetadata } from "@/lib/ads/adsense";
 export const generateMetadata = adsenseAccountMetadata;
 
 /** Server-rendered AdSense snippet + banner. Used on publication routes only. */
-export function SiteAds({ forceBanner = false }: { forceBanner?: boolean }) {
+export function SiteAds() {
   return (
     <>
       <GoogleAdSense />
-      <SiteAdBanner force={forceBanner} />
+      <SiteAdBanner />
     </>
   );
 }

@@ -1,17 +1,20 @@
-"use client";
-
-import Link from "next/link";
-import { type CSSProperties } from "react";
-import { useEditionCategoryPodiums } from "@/components/communities/EditionCategoryDebug";
+import Link from "@/lib/next-link";
 import { CompactTieStack } from "@/components/communities/CompactTieStack";
 import { ComparisonStripHeader } from "@/components/communities/ComparisonStripHeader";
+import {
+  comparisonColumnCount,
+  comparisonStripTableClass,
+  comparisonStripTableStyle,
+} from "@/components/communities/comparison-strip";
 import { CategoryChapterHeader } from "@/components/communities/EditionCategoryResults";
 import {
   EmptyStandingCard,
   StandingGameCard,
+  standingCmpCellAwardClass,
   standingStripColClass,
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
+import { StandingStrip } from "@/components/communities/StandingStrip";
 import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import { SectionRule } from "@/components/ui/SectionRule";
 import type {
@@ -25,28 +28,6 @@ import {
   editionVoterBallotHref,
 } from "@/lib/communities/edition-results-href";
 import type { EditionResultsPublicMode } from "@/lib/communities/edition-results-scoring";
-
-const LIST_COL =
-  "box-border w-[var(--strip-col)] min-w-[var(--strip-col)] max-w-[var(--strip-col)] px-2 align-top";
-
-const STRIP_TABLE_CLASS =
-  "w-max min-w-full border-collapse text-sm [--strip-col:119px] lg:[--strip-col:222px]";
-
-function listColumnCount(showYou: boolean, voiceCount: number) {
-  return (showYou ? 1 : 0) + 2 + voiceCount;
-}
-
-function stripTableStyle(
-  showYou: boolean,
-  voiceCount: number,
-): CSSProperties {
-  const cols = listColumnCount(showYou, voiceCount);
-  return {
-    width: `calc(${cols} * var(--strip-col))`,
-    minWidth: `calc(${cols} * var(--strip-col))`,
-    tableLayout: "fixed",
-  };
-}
 
 function MatrixStandingCell({
   games,
@@ -106,26 +87,29 @@ function CategoryComparisonStrip({
   year: number;
   youBallotHref: string | null;
 }) {
-  const style = stripTableStyle(showYou, voiceColumns.length);
+  const columnCount = comparisonColumnCount(showYou, voiceColumns.length);
 
   return (
     <HorizontalScroll className="mt-4" label={`${row.label} comparison`}>
-      <table className={STRIP_TABLE_CLASS} style={style}>
+      <table
+        className={comparisonStripTableClass(columnCount)}
+        style={comparisonStripTableStyle(columnCount)}
+      >
         <thead>
           <tr className="border-b border-line text-left">
             {showYou ? (
-              <th scope="col" className={`${LIST_COL} py-3`}>
+              <th scope="col" className={standingCmpCellAwardClass}>
                 <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
               </th>
             ) : null}
-            <th scope="col" className={`${LIST_COL} py-3`}>
+            <th scope="col" className={standingCmpCellAwardClass}>
               <ComparisonStripHeader>Community</ComparisonStripHeader>
             </th>
-            <th scope="col" className={`${LIST_COL} py-3`}>
+            <th scope="col" className={standingCmpCellAwardClass}>
               <ComparisonStripHeader>Hosts</ComparisonStripHeader>
             </th>
             {voiceColumns.map((v) => (
-              <th key={v.profileId} scope="col" className={`${LIST_COL} py-3`}>
+              <th key={v.profileId} scope="col" className={standingCmpCellAwardClass}>
                 <ComparisonStripHeader
                   title={`@${v.username}`}
                   href={editionVoterBallotHref(slug, year, v.username)}
@@ -144,18 +128,18 @@ function CategoryComparisonStrip({
         <tbody>
           <tr className="align-top">
             {showYou ? (
-              <td className={`${LIST_COL} py-3`}>
+              <td className={standingCmpCellAwardClass}>
                 <MatrixCardCell game={row.you} />
               </td>
             ) : null}
-            <td className={`${LIST_COL} py-3`}>
+            <td className={standingCmpCellAwardClass}>
               <MatrixStandingCell games={row.community} />
             </td>
-            <td className={`${LIST_COL} py-3`}>
+            <td className={standingCmpCellAwardClass}>
               <MatrixStandingCell games={row.voices} />
             </td>
             {voiceColumns.map((v) => (
-              <td key={v.profileId} className={`${LIST_COL} py-3`}>
+              <td key={v.profileId} className={standingCmpCellAwardClass}>
                 <MatrixCardCell game={row.voiceGames[v.profileId] ?? null} />
               </td>
             ))}
@@ -230,7 +214,7 @@ function CategoryComparisonSections({
   );
 }
 
-/** Per-award Top 3 on one line; overflow uses HorizontalScroll. */
+/** Per-award Top 3 on one line; overflow uses StandingStrip (native scroll, mouse drag). */
 function CategoryRankedSections({
   slug,
   year,
@@ -278,10 +262,7 @@ function CategoryRankedSections({
               No scores for this award yet.
             </p>
           ) : (
-            <HorizontalScroll
-              className="mt-4"
-              label={`${cat.label} ranked`}
-            >
+            <StandingStrip className="mt-4" label={`${cat.label} ranked`}>
               <ul className={standingStripListClass}>
                 {cat.rows.map((row) => (
                   <li
@@ -296,13 +277,12 @@ function CategoryRankedSections({
                       coverUrl={row.coverUrl}
                       points={row.votes}
                       scoreUnit="votes"
-                      priority={row.rank === 1}
                       pinCover
                     />
                   </li>
                 ))}
               </ul>
-            </HorizontalScroll>
+            </StandingStrip>
           )}
         </article>
       ))}
@@ -330,9 +310,7 @@ export function EditionCategoriesHighlights({
   youBallotHref?: string | null;
   layout?: "ranked" | "comparison";
 }) {
-  const categories = useEditionCategoryPodiums(categoryPodiums);
-
-  if (categories.length === 0 && !categoryComparison.hasGames) {
+  if (categoryPodiums.length === 0 && !categoryComparison.hasGames) {
     return null;
   }
 
@@ -346,7 +324,7 @@ export function EditionCategoriesHighlights({
       {layout === "comparison" ? (
         <CategoryComparisonSections
           matrix={categoryComparison}
-          categoryPodiums={categories}
+          categoryPodiums={categoryPodiums}
           slug={slug}
           year={year}
           mode={mode}
@@ -357,7 +335,7 @@ export function EditionCategoriesHighlights({
           slug={slug}
           year={year}
           mode={mode}
-          categories={categories}
+          categories={categoryPodiums}
         />
       )}
     </section>

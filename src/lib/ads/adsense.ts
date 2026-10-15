@@ -32,8 +32,8 @@ function pageFromSearch(search: string | null | undefined): number {
 }
 
 /**
- * No ads on sign-in / account, legal pages, catalog pagination, or game
- * detail (IGDB replica). Ranked game pages opt back in with `SiteAdBanner force`.
+ * No ads on sign-in / account, legal pages, or catalog pagination.
+ * Game pages follow the same switch as other publication routes.
  * Missing path fails open so a skipped proxy still leaves ads on `/`.
  */
 export function adsenseAllowedOnPath(
@@ -47,7 +47,6 @@ export function adsenseAllowedOnPath(
   if (path === "/account" || path.startsWith("/account/")) return false;
   if (LEGAL_PATHS.has(path)) return false;
   if (path === "/games") return pageFromSearch(query) <= 1;
-  if (path.startsWith("/games/")) return false;
   return true;
 }
 

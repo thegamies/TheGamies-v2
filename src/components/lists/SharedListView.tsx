@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { CopyLinkButton } from "@/components/lists/CopyLinkButton";
 import { ListFormatControl } from "@/components/lists/ListFormatControl";
 import { RefreshOnBfcache } from "@/components/lists/RefreshOnBfcache";
-import { SoftSavePrompt } from "@/components/lists/SoftSavePrompt";
 import { ShareExportButton } from "@/components/list-export/ShareExportButton";
 import { ListExportPoster } from "@/components/list-export/ListExportAwardsLayout";
 import { EXPORT_LAYOUT_DEFAULT } from "@/components/list-export/exportDimensions";
@@ -68,8 +67,6 @@ const POSTER_H = 1350;
 type SharedListViewProps = {
   data: SharedListViewData;
   canEdit: boolean;
-  canClaim: boolean;
-  isSignedIn: boolean;
   alreadyOwned: boolean;
   editHref: string;
   sharePath: string;
@@ -84,8 +81,6 @@ type SharedListViewProps = {
 export function SharedListView({
   data,
   canEdit,
-  canClaim,
-  isSignedIn,
   alreadyOwned,
   editHref,
   sharePath,
@@ -163,13 +158,6 @@ export function SharedListView({
             {error}
           </p>
         ) : null}
-
-        <SoftSavePrompt
-          publicId={data.list.publicId}
-          canClaim={canClaim}
-          isSignedIn={isSignedIn}
-          alreadyOwned={alreadyOwned}
-        />
 
         {isGoty && showCategories ? (
           <ScrollableNav aria-label="List" className="mt-8">

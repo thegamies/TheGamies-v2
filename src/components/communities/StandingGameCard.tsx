@@ -1,12 +1,7 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { FitDisplayTitle } from "@/components/ui/FitDisplayTitle";
 import { GameCover } from "@/components/ui/GameCover";
 import { RankMarker } from "@/components/ui/RankMarker";
-import {
-  MATRIX_COVER_WIDE,
-  PODIUM_COVER,
-} from "@/components/communities/coverSizes";
+import { PODIUM_COVER } from "@/components/communities/coverSizes";
 import {
   DEFAULT_RANK_SCORE_LAYOUT,
   standingCardChrome,
@@ -32,13 +27,103 @@ function OptionalGameLink({
   const href = standingGameHref(slug);
   if (!href) return <div className={className}>{children}</div>;
   return (
-    <Link href={href} className={className}>
+    <a href={href} className={className} draggable={false}>
       {children}
-    </Link>
+    </a>
   );
 }
 
 export type { RankScoreLayout };
+
+const TITLE_SIZES = [14, 16, 18, 20, 28] as const;
+
+function titleSize(maxPx: number): number {
+  return (TITLE_SIZES as readonly number[]).includes(maxPx) ? maxPx : 18;
+}
+
+function captionClass(offset: string, lgAlign: boolean): string {
+  const mt =
+    offset === "mt-1"
+      ? "standing-caption--mt1"
+      : offset === "mt-0.5"
+        ? "standing-caption--mt05"
+        : "standing-caption--mt2";
+  const align = lgAlign ? "standing-caption--lg" : "standing-caption--base";
+  return `standing-caption ${mt} ${align}`;
+}
+
+function placeMarkerClass(
+  placeSize: "md" | "lg",
+  size: "md" | "sm",
+  place: number | null,
+): string {
+  if (placeSize === "lg") {
+    return place != null && place <= 3
+      ? "standing-place standing-place--top"
+      : "standing-place standing-place--rest";
+  }
+  if (size === "sm") return "standing-place standing-place--sm";
+  return "standing-place standing-place--md";
+}
+
+function scoreRowClass(rowGapClass: string): string {
+  const gap =
+    rowGapClass === "mb-2"
+      ? " standing-score-row--mb2"
+      : rowGapClass === "mb-0.5"
+        ? " standing-score-row--mb05"
+        : rowGapClass === "mt-0.5"
+          ? " standing-score-row--mt05"
+          : "";
+  return `standing-score-row${gap}`;
+}
+
+/** Comparison strip cell: column width plus the rank-row or award-row padding. */
+export const standingCmpCellRankClass =
+  "standing-cmp-cell standing-cmp-cell--rank";
+export const standingCmpCellAwardClass =
+  "standing-cmp-cell standing-cmp-cell--award";
+
+export function StandingCoverArt({
+  title,
+  coverUrl,
+  priority = false,
+  fill = false,
+  fallback = "card",
+}: {
+  title: string;
+  coverUrl: string | null;
+  priority?: boolean;
+  /** Fill a parent that already has the 3:4 box (tie stack). */
+  fill?: boolean;
+  fallback?: "card" | "tie";
+}) {
+  const frame = fill ? "standing-cover standing-cover--fill" : "standing-cover";
+  return (
+    <div className={frame}>
+      {coverUrl ? (
+        // Native img: one URL, no Next/Image fill style on every card.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={coverUrl}
+          alt={title}
+          draggable={false}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          fetchPriority={priority ? "high" : undefined}
+        />
+      ) : fallback === "tie" ? (
+        <div className="standing-tie-fallback">
+          <p>{title}</p>
+        </div>
+      ) : (
+        <div className="standing-cover-fallback">
+          <p>{title}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export type StandingGameCardProps = {
   slug: string;
@@ -118,25 +203,13 @@ export function StandingGameCard({
           ? String(year)
           : null;
 
-  const placeClass =
-    placeSize === "lg"
-      ? place != null && place <= 3
-        ? "text-[2rem] sm:text-[2.5rem] md:text-[2.75rem]"
-        : "text-[1.5rem] sm:text-[1.85rem] md:text-[2.1rem]"
-      : size === "sm"
-        ? "text-[14px] lg:text-[18px]"
-        : "text-[18px]";
+  const placeClass = placeMarkerClass(placeSize, size, place);
 
   const rankScoreRow =
     chrome.row && (place != null || scoreLabel) ? (
-      <div
-        className={`${chrome.rowGapClass} flex items-end justify-between gap-2`}
-      >
+      <div className={scoreRowClass(chrome.rowGapClass)}>
         {place != null ? (
-          <span
-            className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
-            aria-label={`Rank ${place}`}
-          >
+          <span className={placeClass} aria-label={`Rank ${place}`}>
             {place}
           </span>
         ) : (
@@ -144,8 +217,8 @@ export function StandingGameCard({
         )}
         {scoreLabel ? (
           <span
-            className={`shrink-0 text-right text-xs tracking-wide text-muted tabular-nums sm:text-sm ${
-              chrome.tightRow ? "leading-none" : "pb-0.5"
+            className={`standing-score ${
+              chrome.tightRow ? "standing-score--tight" : "standing-score--pad"
             }`}
           >
             {scoreLabel}
@@ -156,47 +229,37 @@ export function StandingGameCard({
 
   const titleBlock = (
     <div
-      className={`${chrome.titleOffsetClass} flex ${
-        chrome.placeBeforeTitle && placeSize === "lg"
-          ? "items-start gap-2"
-          : "items-baseline gap-1"
-      }`}
+      className={captionClass(
+        chrome.titleOffsetClass,
+        chrome.placeBeforeTitle && placeSize === "lg",
+      )}
     >
       {chrome.placeBeforeTitle && place != null ? (
-        <span
-          className={`shrink-0 font-display leading-none tracking-wide text-accent ${placeClass}`}
-          aria-label={`Rank ${place}`}
-        >
+        <span className={placeClass} aria-label={`Rank ${place}`}>
           {place}
         </span>
       ) : null}
       <div
-        className={`min-w-0 flex-1 ${
-          chrome.placeBeforeTitle && placeSize === "lg" ? "pt-1" : ""
-        }`}
+        className={
+          chrome.placeBeforeTitle && placeSize === "lg"
+            ? "standing-copy standing-copy--lg"
+            : "standing-copy"
+        }
       >
-        <FitDisplayTitle
-          className="w-full group-hover:text-accent"
+        <StandingCardTitle
+          title={title}
           maxPx={
-            placeSize === "lg"
-              ? place != null && place <= 3
-                ? 20
-                : 16
-              : 18
+            placeSize === "lg" ? (place != null && place <= 3 ? 20 : 16) : 18
           }
-          minPx={12}
-          lines={2}
           reserve={chrome.reserveTitle}
-        >
-          {title}
-        </FitDisplayTitle>
+        />
         {meta ? (
           <p
-            className={`text-xs text-muted ${
+            className={
               chrome.votesUnderTitle
-                ? "mt-0.5 leading-none tracking-wide tabular-nums"
-                : "mt-1"
-            }`}
+                ? "standing-meta standing-meta--votes"
+                : "standing-meta standing-meta--gap"
+            }
           >
             {meta}
           </p>
@@ -205,22 +268,12 @@ export function StandingGameCard({
     </div>
   );
 
-  const cover =
-    size === "sm" ? (
-      <GameCover
-        title={title}
-        imageUrl={coverUrl}
-        priority={priority}
-        fluid
-        width={MATRIX_COVER_WIDE.width}
-        height={MATRIX_COVER_WIDE.height}
-      />
-    ) : (
-      <GameCover title={title} imageUrl={coverUrl} priority={priority} />
-    );
+  const cover = (
+    <StandingCoverArt title={title} coverUrl={coverUrl} priority={priority} />
+  );
 
   const pinnedCover = pinCover ? (
-    <div className="w-full self-end">{cover}</div>
+    <div className="standing-pin">{cover}</div>
   ) : (
     cover
   );
@@ -235,19 +288,45 @@ export function StandingGameCard({
   );
 
   const linkClass = pinCover
-    ? "contents"
+    ? "standing-card standing-card--pin"
     : size === "sm"
-      ? "group block w-[103px] lg:w-[206px]"
-      : "group block";
+      ? "standing-card standing-card--sm"
+      : "standing-card";
 
   const to = href ?? standingGameHref(slug);
   if (!to) {
     return <div className={linkClass}>{body}</div>;
   }
   return (
-    <Link href={to} className={linkClass} draggable={false}>
+    <a href={to} className={linkClass} draggable={false}>
       {body}
-    </Link>
+    </a>
+  );
+}
+
+/** Two-line title. Shared classes so a grid of cards does not repeat the utility list. */
+export function StandingCardTitle({
+  title,
+  maxPx,
+  reserve = true,
+}: {
+  title: string;
+  maxPx: number;
+  reserve?: boolean;
+}) {
+  const px = titleSize(maxPx);
+  return (
+    <span
+      className={
+        reserve
+          ? `standing-title-slot standing-title-slot--${px}`
+          : "standing-title-slot"
+      }
+    >
+      <p title={title} className={`standing-title standing-title--${px}`}>
+        {title}
+      </p>
+    </span>
   );
 }
 
@@ -258,23 +337,9 @@ export function EmptyStandingCard({
   label?: string;
 }) {
   return (
-    <div
-      className="w-[103px] lg:w-[206px]"
-      aria-label={label}
-    >
-      <div
-        className="aspect-[3/4] w-full rounded-[var(--radius-artwork)] border border-line bg-panel"
-        aria-hidden
-      />
-      <p
-        className="mt-2 line-clamp-2 font-display text-[14px] leading-snug tracking-wide text-muted lg:text-[14px]"
-        style={{
-          minHeight: Math.ceil(2 * 14 * 1.375),
-          lineHeight: 1.375,
-        }}
-      >
-        {label}
-      </p>
+    <div className="standing-w-sm" aria-label={label}>
+      <div className="standing-cover" aria-hidden />
+      <p className="standing-empty-label">{label}</p>
     </div>
   );
 }
@@ -371,6 +436,7 @@ function PodiumCoverStack({
           imageUrl={entry.coverUrl}
           fluid
           priority={isWinner}
+          unoptimized
           width={isWinner ? PODIUM_COVER.width : RUNNER_MAX.width}
           height={isWinner ? PODIUM_COVER.height : RUNNER_MAX.height}
         />
@@ -394,14 +460,7 @@ function PodiumCaption({
         slug={entry.slug}
         className="group mt-2 block w-full min-w-0 sm:mt-3"
       >
-        <FitDisplayTitle
-          className="group-hover:text-accent"
-          maxPx={titleMax}
-          minPx={12}
-          lines={2}
-        >
-          {entry.title}
-        </FitDisplayTitle>
+        <StandingCardTitle title={entry.title} maxPx={titleMax} />
       </OptionalGameLink>
       {entry.meta ? (
         <p className="mt-1.5 text-xs text-muted sm:mt-2 sm:text-sm">

@@ -1,4 +1,17 @@
-import { and, desc, eq, gte, inArray, isNull, max, or, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  exists,
+  gte,
+  inArray,
+  isNull,
+  max,
+  or,
+  sql,
+  type AnyColumn,
+  type SQL,
+} from "drizzle-orm";
 import {
   activityEvents,
   communityMembers,
@@ -7,11 +20,13 @@ import {
   games,
   libraryEntries,
   lists,
+  profileFollows,
   profiles,
   type Db,
 } from "@thegamies/db";
 import { coverUrlFromImageId } from "@thegamies/igdb";
 import {
+  ACTIVITY_KINDS,
   emptyLibraryStatusCounts,
   parseActivityKind,
   parseLibraryStatus,
@@ -30,14 +45,20 @@ import {
   DEFAULT_TRENDING_RECENCY_WEIGHTS,
   isPublicTrendingReady,
   parsePublicTrendingMinPeople,
+  parseTrendingKindWeights,
+  parseTrendingRecencyWeights,
   parseTrendingWindowHours,
-  scoreTrending,
   type TrendingKindWeights,
   type TrendingRecencyWeights,
   type TrendingWindowHours,
 } from "@/lib/activity/trending";
 import { getSiteSettings } from "@/lib/site-settings/service";
 import { paginateProfileItems } from "@/lib/profile/profile-page";
+import {
+  canUseSiteTrendingWorkersCache,
+  matchSiteTrendingBoard,
+  putSiteTrendingBoard,
+} from "@/lib/activity/site-trending-cache";
 
 export const FEED_PAGE_SIZE = 40;
 export const TRENDING_PAGE_SIZE = 48;
@@ -176,15 +197,28 @@ function feedDayText(day: unknown): string {
   return String(day).slice(0, 10);
 }
 
+/** Correlated follow check: no follow list is loaded or sent back as `IN (...)`. */
+function followedBy(db: Db, followerProfileId: string, profileId: AnyColumn) {
+  return exists(
+    db
+      .select({ one: sql`1` })
+      .from(profileFollows)
+      .where(
+        and(
+          eq(profileFollows.followerProfileId, followerProfileId),
+          eq(profileFollows.followedProfileId, profileId),
+        ),
+      ),
+  );
+}
+
 export async function listFollowingFeedPage(
-  followedIds: string[],
+  followerProfileId: string,
   pageRaw: number,
   db: Db = getDb(),
 ): Promise<{ cards: FeedCard[]; page: number; hasMore: boolean }> {
   const page = Math.max(1, Math.floor(pageRaw) || 1);
-  if (followedIds.length === 0) {
-    return { cards: [], page, hasMore: false };
-  }
+  const followed = followedBy(db, followerProfileId, activityEvents.profileId);
 
   const offset = (page - 1) * FEED_PAGE_SIZE;
   const dayRows = await db
@@ -203,7 +237,7 @@ export async function listFollowingFeedPage(
         eq(libraryEntries.gameId, activityEvents.gameId),
       ),
     )
-    .where(and(inArray(activityEvents.profileId, followedIds), feedPublicVisible()))
+    .where(and(followed, feedPublicVisible()))
     .groupBy(activityEvents.profileId, utcFeedDay)
     .orderBy(desc(max(activityEvents.createdAt)), desc(activityEvents.profileId))
     .limit(FEED_PAGE_SIZE + 1)
@@ -226,11 +260,7 @@ export async function listFollowingFeedPage(
 
   const rows = await feedEventJoins(db)
     .where(
-      and(
-        inArray(activityEvents.profileId, followedIds),
-        feedPublicVisible(),
-        dayMatch,
-      ),
+      and(followed, feedPublicVisible(), dayMatch),
     )
     .orderBy(desc(activityEvents.createdAt), desc(activityEvents.id))
     .limit(FEED_DAY_EVENT_CAP);
@@ -255,9 +285,49 @@ export type TrendingBoardRow = {
   coverUrl: string | null;
 };
 
-export async function listTrendingBoard(opts: {
+/**
+ * SQL mirror of `recencyWeightForAgeMs` over a `created_at` column. Timestamps
+ * are UTC without zone; truncating to ms matches the JS Date the old path used.
+ */
+function trendingRecencyWeightSql(
+  now: Date,
+  raw: TrendingRecencyWeights,
+): SQL {
+  const weights = parseTrendingRecencyWeights(raw);
+  const ageHours = sql`(extract(epoch FROM (
+    (${now.toISOString()}::timestamptz AT TIME ZONE 'UTC') - date_trunc('milliseconds', created_at)
+  )) / 3600)`;
+  return sql`(CASE
+    WHEN ${ageHours} <= 24 THEN ${weights.hours24}::float8
+    WHEN ${ageHours} <= 72 THEN ${weights.days1to3}::float8
+    WHEN ${ageHours} <= ${24 * 7} THEN ${weights.restOf7d}::float8
+    ELSE ${weights.days7to30}::float8
+  END)`;
+}
+
+/** SQL mirror of `kindWeightForTrending` over a `kind` column. */
+function trendingKindWeightSql(raw: TrendingKindWeights): SQL {
+  const weights = parseTrendingKindWeights(raw);
+  const branches = ACTIVITY_KINDS.map(
+    (kind) => sql`WHEN ${kind} THEN ${weights[kind]}::float8`,
+  );
+  return sql`(CASE kind ${sql.join(branches, sql` `)} ELSE 0::float8 END)`;
+}
+
+export type TrendingBoardResult = {
+  rows: TrendingBoardRow[];
+  windowHours: TrendingWindowHours;
+  publicReady: boolean;
+  distinctPeople: number;
+  total: number;
+  page: number;
+  totalPages: number;
+};
+
+type ListTrendingBoardOpts = {
   windowHours?: TrendingWindowHours;
-  followedIds?: string[] | null;
+  /** Restrict to people this profile follows. */
+  followerProfileId?: string | null;
   communityId?: string | null;
   minPeople?: number;
   applySiteFloor?: boolean;
@@ -266,15 +336,38 @@ export async function listTrendingBoard(opts: {
   now?: Date;
   page?: number;
   db?: Db;
-}): Promise<{
-  rows: TrendingBoardRow[];
-  windowHours: TrendingWindowHours;
-  publicReady: boolean;
-  distinctPeople: number;
-  total: number;
-  page: number;
-  totalPages: number;
-}> {
+};
+
+export async function listTrendingBoard(
+  opts: ListTrendingBoardOpts,
+): Promise<TrendingBoardResult> {
+  const windowHours = parseTrendingWindowHours(opts.windowHours);
+  const minPeople = parsePublicTrendingMinPeople(
+    opts.minPeople ?? DEFAULT_PUBLIC_TRENDING_MIN_PEOPLE,
+  );
+  const page = Number.isFinite(opts.page)
+    ? Math.floor(opts.page as number)
+    : 1;
+  const cacheInput = {
+    windowHours,
+    page,
+    minPeople,
+    applySiteFloor: opts.applySiteFloor === true,
+  };
+  if (canUseSiteTrendingWorkersCache(opts)) {
+    const hit = await matchSiteTrendingBoard(cacheInput);
+    if (hit) return hit;
+  }
+  const result = await listTrendingBoardFromDb(opts);
+  if (canUseSiteTrendingWorkersCache(opts)) {
+    await putSiteTrendingBoard(cacheInput, result);
+  }
+  return result;
+}
+
+async function listTrendingBoardFromDb(
+  opts: ListTrendingBoardOpts,
+): Promise<TrendingBoardResult> {
   const db = opts.db ?? getDb();
   const now = opts.now ?? new Date();
   const windowHours = parseTrendingWindowHours(opts.windowHours);
@@ -297,10 +390,7 @@ export async function listTrendingBoard(opts: {
   }
   const countingKinds = countingKindsFromWeights(kindWeights);
 
-  if (
-    countingKinds.length === 0 ||
-    (opts.followedIds && opts.followedIds.length === 0)
-  ) {
+  if (countingKinds.length === 0) {
     return {
       rows: [],
       windowHours,
@@ -328,33 +418,20 @@ export async function listTrendingBoard(opts: {
     )`,
   ];
 
-  if (opts.followedIds) {
-    filters.push(inArray(activityEvents.profileId, opts.followedIds));
+  if (opts.followerProfileId) {
+    filters.push(followedBy(db, opts.followerProfileId, activityEvents.profileId));
   }
 
-  const grouped = {
-    gameId: activityEvents.gameId,
-    profileId: activityEvents.profileId,
-    lastAt: max(activityEvents.createdAt),
-    kind: sql<string>`(array_agg(${activityEvents.kind} ORDER BY ${activityEvents.createdAt} DESC, ${activityEvents.id} DESC))[1]`,
-    slug: games.slug,
-    title: games.title,
-    coverImageId: covers.imageId,
-  };
-  const groupBy = [
-    activityEvents.gameId,
-    activityEvents.profileId,
-    games.slug,
-    games.title,
-    covers.imageId,
-  ];
-
-  const base = db
-    .select(grouped)
+  const latestBase = db
+    .selectDistinctOn([activityEvents.gameId, activityEvents.profileId], {
+      gameId: activityEvents.gameId,
+      profileId: activityEvents.profileId,
+      kind: activityEvents.kind,
+      createdAt: activityEvents.createdAt,
+    })
     .from(activityEvents)
     .innerJoin(profiles, eq(profiles.id, activityEvents.profileId))
     .innerJoin(games, eq(games.id, activityEvents.gameId))
-    .leftJoin(covers, eq(covers.igdbId, games.coverIgdbId))
     .leftJoin(lists, eq(lists.id, activityEvents.listId))
     .leftJoin(
       libraryEntries,
@@ -363,55 +440,79 @@ export async function listTrendingBoard(opts: {
         eq(libraryEntries.gameId, activityEvents.gameId),
       ),
     );
-
-  const raw = opts.communityId
-    ? await base
-        .innerJoin(
+  // One row per (game, person): their most recent counting event in the window.
+  const latest = (
+    opts.communityId
+      ? latestBase.innerJoin(
           communityMembers,
           and(
             eq(communityMembers.profileId, activityEvents.profileId),
             eq(communityMembers.communityId, opts.communityId),
           ),
         )
-        .where(and(...filters))
-        .groupBy(...groupBy)
-    : await base.where(and(...filters)).groupBy(...groupBy);
+      : latestBase
+  )
+    .where(and(...filters))
+    .orderBy(
+      activityEvents.gameId,
+      activityEvents.profileId,
+      desc(activityEvents.createdAt),
+      desc(activityEvents.id),
+    );
 
-  const meta = new Map<
-    string,
-    { slug: string; title: string; coverImageId: string | null }
-  >();
-  const allPeople = new Set<string>();
-  const events: Array<{
-    profileId: string;
-    gameId: string;
-    kind: string;
-    createdAt?: Date;
-  }> = [];
-  for (const row of raw) {
-    if (!row.gameId) continue;
-    allPeople.add(row.profileId);
-    events.push({
-      profileId: row.profileId,
-      gameId: row.gameId,
-      kind: row.kind ?? "library_backlog",
-      createdAt: row.lastAt ?? undefined,
-    });
-    if (!meta.has(row.gameId)) {
-      meta.set(row.gameId, {
-        slug: row.slug,
-        title: row.title,
-        coverImageId: row.coverImageId,
-      });
-    }
-  }
+  const requestedPage = Number.isFinite(opts.page)
+    ? Math.floor(opts.page as number)
+    : 1;
+  const result = await db.execute(sql`
+    WITH latest AS (${latest}),
+    scored AS (
+      SELECT
+        game_id,
+        count(*)::int AS people,
+        sum(${trendingRecencyWeightSql(now, recencyWeights)} * ${trendingKindWeightSql(kindWeights)}) AS score
+      FROM latest
+      GROUP BY game_id
+    ),
+    paging AS (
+      SELECT
+        t.total,
+        t.distinct_people,
+        least(greatest(1, ceil(t.total / ${TRENDING_PAGE_SIZE}::numeric))::int, greatest(1, ${requestedPage}::int)) AS page
+      FROM (
+        SELECT
+          (SELECT count(*) FROM scored)::int AS total,
+          (SELECT count(DISTINCT profile_id) FROM latest)::int AS distinct_people
+      ) t
+    )
+    SELECT paging.total, paging.distinct_people, paging.page,
+      r.game_id, r.slug, r.title, r.cover_image_id
+    FROM paging
+    LEFT JOIN LATERAL (
+      SELECT s.game_id, g.slug, g.title, c.image_id AS cover_image_id,
+        row_number() OVER (ORDER BY s.score DESC, s.people DESC, s.game_id) AS position
+      FROM scored s
+      JOIN games g ON g.id = s.game_id
+      LEFT JOIN covers c ON c.igdb_id = g.cover_igdb_id
+      ORDER BY s.score DESC, s.people DESC, s.game_id
+      LIMIT ${TRENDING_PAGE_SIZE}
+      OFFSET (paging.page - 1) * ${TRENDING_PAGE_SIZE}
+    ) r ON true
+    ORDER BY r.position
+  `);
 
-  const ranked = scoreTrending(events, {
-    now,
-    weights: recencyWeights,
-    kindWeights,
-  });
-  const distinctPeople = allPeople.size;
+  type TrendingPageRow = {
+    total: number;
+    distinct_people: number;
+    page: number;
+    game_id: string | null;
+    slug: string | null;
+    title: string | null;
+    cover_image_id: string | null;
+  };
+  const pageRows = result.rows as TrendingPageRow[];
+  const head = pageRows[0];
+  const total = Number(head?.total ?? 0);
+  const distinctPeople = Number(head?.distinct_people ?? 0);
   const publicReady = opts.applySiteFloor
     ? isPublicTrendingReady(distinctPeople, minPeople)
     : true;
@@ -428,23 +529,21 @@ export async function listTrendingBoard(opts: {
     };
   }
 
-  const total = ranked.length;
   const paging = paginateProfileItems(
-    opts.page ?? 1,
+    Number(head?.page ?? 1),
     total,
     TRENDING_PAGE_SIZE,
   );
 
   return {
-    rows: ranked.slice(paging.offset, paging.offset + TRENDING_PAGE_SIZE).map((row) => {
-      const info = meta.get(row.gameId)!;
-      return {
-        gameId: row.gameId,
-        slug: info.slug,
-        title: info.title,
-        coverUrl: coverUrlFromImageId(info.coverImageId),
-      };
-    }),
+    rows: pageRows
+      .filter((row) => row.game_id)
+      .map((row) => ({
+        gameId: row.game_id as string,
+        slug: row.slug ?? "",
+        title: row.title ?? "",
+        coverUrl: coverUrlFromImageId(row.cover_image_id),
+      })),
     windowHours,
     publicReady: true,
     distinctPeople,
@@ -456,11 +555,10 @@ export async function listTrendingBoard(opts: {
 
 export async function countFollowsLibraryForGame(
   gameId: string,
-  followedIds: string[],
+  followerProfileId: string,
   db: Db = getDb(),
 ): Promise<Record<LibraryStatus, number>> {
   const empty = emptyLibraryStatusCounts();
-  if (followedIds.length === 0) return empty;
   const rows = await db
     .select({
       status: libraryEntries.status,
@@ -474,7 +572,7 @@ export async function countFollowsLibraryForGame(
         eq(libraryEntries.visibility, "public"),
         eq(profiles.visibility, "public"),
         isNull(profiles.deletedAt),
-        inArray(libraryEntries.profileId, followedIds),
+        followedBy(db, followerProfileId, libraryEntries.profileId),
       ),
     )
     .groupBy(libraryEntries.status);

@@ -30,6 +30,7 @@ export type EditionBallotSiteCategory = {
   categoryGroup: string;
   eligibility: string;
   allowEditions: boolean;
+  allowDlcAddon: boolean;
 };
 
 export type EditionBallotCustomCategory = {
@@ -55,6 +56,7 @@ export function mergeEditionBallotCategories(input: {
     categoryGroup: string;
     eligibility: string;
     allowEditions: boolean;
+    allowDlcAddon?: boolean;
   }>;
   custom: CustomCategoryView[];
 }): EditionBallotCategoryItem[] {
@@ -69,6 +71,7 @@ export function mergeEditionBallotCategories(input: {
         categoryGroup: c.categoryGroup,
         eligibility: c.eligibility,
         allowEditions: c.allowEditions,
+        allowDlcAddon: c.allowDlcAddon === true,
       }),
     ),
     ...input.custom.map(

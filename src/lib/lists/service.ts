@@ -17,6 +17,7 @@ import { shareLinkPublishError } from "@/lib/lists/auth-intent";
 import {
   clientDraftUpsertSchema,
   createDraftSchema,
+  LIST_MAX_ITEMS,
   replaceItemsSchema,
   updateListMetaSchema,
 } from "@/lib/lists/schema";
@@ -336,7 +337,9 @@ export async function hydrateGamesByIgdbIds(
   igdbIds: number[],
   db: Db = getDb(),
 ): Promise<HydratedDraftGame[]> {
-  const unique = [...new Set(igdbIds.filter((id) => Number.isFinite(id) && id > 0))];
+  const unique = [
+    ...new Set(igdbIds.filter((id) => Number.isInteger(id) && id > 0)),
+  ].slice(0, LIST_MAX_ITEMS);
   if (unique.length === 0) return [];
 
   const rows = await db
@@ -729,43 +732,6 @@ export async function getShareListCategoryPicks(
   }));
 }
 
-export async function getShareListByPublicId(
-  publicId: string,
-  opts: { db?: Db; includeItems?: boolean } = {},
-): Promise<ShareListPayload | null> {
-  const db = opts.db ?? getDb();
-  const list = await getListByPublicId(publicId, db);
-  if (!list) return null;
-
-  const includeItems = opts.includeItems !== false;
-  const items = includeItems ? await loadListItems(list.id, db) : [];
-  let owner: {
-    username: string;
-    displayName: string;
-    avatarUrl: string | null;
-  } | null = null;
-  if (list.profileId) {
-    const [profile] = await db
-      .select({
-        username: profiles.username,
-        displayName: profiles.displayName,
-        avatarUrl: profiles.avatarUrl,
-      })
-      .from(profiles)
-      .where(eq(profiles.id, list.profileId))
-      .limit(1);
-    if (profile) {
-      owner = {
-        username: profile.username,
-        displayName: profile.displayName,
-        avatarUrl: profile.avatarUrl,
-      };
-    }
-  }
-
-  return { list, items, owner };
-}
-
 export async function getShareListByUsernameSlug(
   username: string,
   slug: string,
@@ -797,24 +763,6 @@ export async function getShareListByUsernameSlug(
       avatarUrl: row.avatarUrl,
     },
   };
-}
-
-export async function listOwnedForProfile(
-  profileId: string,
-  db: Db = getDb(),
-) {
-  return db
-    .select({
-      publicId: lists.publicId,
-      title: lists.title,
-      year: lists.year,
-      listType: lists.listType,
-      slug: lists.slug,
-      publishedAt: lists.publishedAt,
-    })
-    .from(lists)
-    .where(eq(lists.profileId, profileId))
-    .orderBy(asc(lists.year), asc(lists.title));
 }
 
 /** Paged owned lists plus SQL-capped top-N covers per list (`rank <= 5`). */
@@ -969,14 +917,13 @@ export async function getListShareTarget(
     if (profile?.username) {
       return {
         path: listSharePath({
-          publicId: list.publicId,
           slug: list.slug,
           username: profile.username,
         }),
       };
     }
   }
-  return { path: listSharePath({ publicId: list.publicId }) };
+  return { path: "/create" };
 }
 
 type ClientDraftItem = {

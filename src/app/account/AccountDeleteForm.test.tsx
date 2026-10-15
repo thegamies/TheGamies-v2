@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccountDeleteForm } from "./AccountDeleteForm";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/next-link", () => ({
   default: ({
     href,
     children,

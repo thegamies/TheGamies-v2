@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { requireSiteAdminPage } from "@/lib/admin-auth";
 import { countCommunitySeeds } from "@/lib/communities/seed-community";
 import { listFeaturedCommunitiesForAdmin } from "@/lib/communities/service";
@@ -49,7 +49,11 @@ export default async function AdminCommunitiesPage() {
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
         Feature a public demo community, close joins, then seed members and
-        ballots for ceremony QA.
+        ballots for ceremony QA.{" "}
+        <Link href="/admin/communities/stats" className="text-ink hover:text-accent">
+          Roster and Pick’em counts
+        </Link>
+        .
       </p>
       <h2 className="mt-12 font-display text-3xl tracking-wide text-ink">
         Directory

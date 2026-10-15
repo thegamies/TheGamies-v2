@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { LibraryStatusIcon } from "@/components/library/LibraryStatusIcon";
 import { GameCover } from "@/components/ui/GameCover";
 import { LIBRARY_STATUS_LABELS } from "@/lib/activity/kinds";

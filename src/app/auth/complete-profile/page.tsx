@@ -46,10 +46,6 @@ export default async function CompleteProfilePage({
   if (neonAuthSessionVerifierFromSearch(params.neon_auth_session_verifier)) {
     return (
       <main className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-[var(--gutter)] py-12">
-        <p className="text-xs uppercase tracking-[0.2em] text-muted">Account</p>
-        <h1 className="mt-2 font-display text-5xl tracking-wide text-ink">
-          Choose how you appear
-        </h1>
         <CompleteProfileSessionClient next={next} />
       </main>
     );

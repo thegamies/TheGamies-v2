@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { AdPrivacyOptions } from "@/components/ads/AdPrivacyOptions";
 import { SITE_SOCIAL_ICONS } from "@/components/BrandIcons";
 import { IGDB_URL, SITE_INFO_LINKS, SITE_SOCIAL_LINKS } from "@/lib/site";

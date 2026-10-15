@@ -15,8 +15,8 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const url = new URL(request.url);
   const webhookId = url.searchParams.get("webhookId");
-  if (!webhookId) {
-    return Response.json({ error: "Missing webhook id." }, { status: 400 });
+  if (!webhookId || !/^\d+$/.test(webhookId)) {
+    return Response.json({ error: "Invalid webhook id." }, { status: 400 });
   }
   return proxyWebhooksWorker(request, `/admin/register/${webhookId}`, {
     method: "DELETE",

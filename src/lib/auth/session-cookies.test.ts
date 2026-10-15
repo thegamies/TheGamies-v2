@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  authCookieNamesToExpire,
   authSessionCookieNamesFromHeader,
   expireAuthCookies,
   isAuthSessionCookieName,
@@ -29,6 +30,27 @@ describe("authSessionCookieNamesFromHeader", () => {
         "tg_list_edit=a.b; better-auth.session_token=abc; other=1",
       ),
     ).toEqual(["better-auth.session_token"]);
+  });
+});
+
+describe("authCookieNamesToExpire", () => {
+  it("always includes the login cookie and the session cache", () => {
+    expect(authCookieNamesToExpire("tg_list_edit=keep")).toEqual([
+      "__Secure-neon-auth.session_token",
+      "__Secure-neon-auth.local.session_data",
+    ]);
+  });
+
+  it("keeps chunked auth cookies from the request", () => {
+    expect(
+      authCookieNamesToExpire(
+        "__Secure-neon-auth.session_token.0=chunk; tg_list_edit=keep",
+      ),
+    ).toEqual([
+      "__Secure-neon-auth.session_token.0",
+      "__Secure-neon-auth.session_token",
+      "__Secure-neon-auth.local.session_data",
+    ]);
   });
 });
 
@@ -71,6 +93,47 @@ describe("originMatchesRequestHost", () => {
         new Request("https://thegamies.gg/api/account/delete", {
           headers: { origin: "https://evil.example" },
         }),
+        "https://thegamies.gg",
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores a forged X-Forwarded-Host", () => {
+    expect(
+      originMatchesRequestHost(
+        new Request("https://thegamies.gg/api/account/delete", {
+          headers: {
+            origin: "https://evil.example",
+            host: "thegamies.gg",
+            "x-forwarded-host": "evil.example",
+          },
+        }),
+        "https://thegamies.gg",
+      ),
+    ).toBe(false);
+  });
+
+  it("allows the configured app origin", () => {
+    expect(
+      originMatchesRequestHost(
+        new Request("https://thegamies-v2.example.workers.dev/api/account/delete", {
+          headers: {
+            origin: "https://thegamies.gg",
+            host: "thegamies-v2.example.workers.dev",
+          },
+        }),
+        "https://thegamies.gg",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects a missing or malformed origin", () => {
+    const url = "https://thegamies.gg/api/account/delete";
+    expect(originMatchesRequestHost(new Request(url), "https://thegamies.gg")).toBe(false);
+    expect(
+      originMatchesRequestHost(
+        new Request(url, { headers: { origin: "null", host: "thegamies.gg" } }),
+        "https://thegamies.gg",
       ),
     ).toBe(false);
   });

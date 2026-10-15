@@ -14,7 +14,7 @@ import { canManageCommunity } from "@/lib/communities/rules";
 import { canBrowseCommunityBoards } from "@/lib/communities/schema";
 import { communityHeaderInvitePath } from "@/lib/communities/invite-code";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { communityTgaNavVisible } from "@/lib/tga-pickem/service";
+import { communityTgaNavTarget } from "@/lib/tga-pickem/service";
 import { noIndexRobots } from "@/lib/seo/site";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 import {
@@ -150,6 +150,11 @@ export default async function CommunityLiveYearPage({
     };
   }
 
+  const tgaNav = await communityTgaNavTarget(community.id).catch(() => ({
+    enabled: false,
+    year: null,
+  }));
+
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
       <CommunityHeader
@@ -164,9 +169,8 @@ export default async function CommunityLiveYearPage({
             : null
         }
         communityId={community.id}
-        tgaEnabled={
-          await communityTgaNavVisible(community.id).catch(() => false)
-        }
+        tgaEnabled={tgaNav.enabled}
+        tgaYear={tgaNav.year}
         active="live"
         invitePath={communityHeaderInvitePath(community.viewerInviteCode)}
         avatarUrl={community.avatarUrl}

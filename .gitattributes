@@ -1,0 +1,2 @@
+# `wrangler types --check` compares bytes; keep the generated file LF on every OS.
+workers/*/worker-configuration.d.ts text eol=lf

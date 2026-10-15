@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { notFound } from "next/navigation";
 import {
   getRequestProfileByAuthUserId,
@@ -45,10 +45,13 @@ export async function generateMetadata({
     const community = await getCommunityBySlug(slug);
     if (!community) return { title: "Community" };
     const publicCommunity = isCommunityPublic(community.visibility);
+    const fallbackDescription = `${community.name} on The Gamies`;
     return publicPageMetadata({
       title: community.name,
-      description:
-        community.description || `${community.name} on The Gamies`,
+      // Private pages show outsiders the name only; previews must not add more.
+      description: publicCommunity
+        ? community.description || fallbackDescription
+        : fallbackDescription,
       path: `/communities/${community.slug}`,
       index: publicCommunity,
       image: publicCommunity

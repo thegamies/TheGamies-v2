@@ -4,8 +4,7 @@ import {
   getEditionGotyPage,
   parseEditionResultMode,
 } from "@/lib/communities/edition-results";
-import { getEditionByCommunityYear } from "@/lib/communities/editions";
-import { getCommunityBySlug } from "@/lib/communities/service";
+import { loadBrowsablePublishedEdition } from "@/lib/communities/edition-api-access";
 import { STANDINGS_PAGE_SIZE } from "@/lib/live-aggregate/service";
 
 type Params = Promise<{ slug: string; year: string }>;
@@ -30,17 +29,11 @@ export async function GET(
     Number.isFinite(afterRaw) && afterRaw >= 0 ? Math.floor(afterRaw) : 0;
 
   try {
-    const community = await getCommunityBySlug(slug);
-    if (!community) {
+    const access = await loadBrowsablePublishedEdition(slug, Math.floor(year));
+    if (!access) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
-    const edition = await getEditionByCommunityYear(
-      community.id,
-      Math.floor(year),
-    );
-    if (!edition || edition.status !== "published") {
-      return NextResponse.json({ error: "Not found." }, { status: 404 });
-    }
+    const { community, edition } = access;
 
     await ensurePublishedEditionResults(community.id, edition.year);
     const data = await getEditionGotyPage(edition.id, mode, {

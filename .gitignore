@@ -45,3 +45,6 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/playwright-report-staging/
+/e2e/.auth/
+/e2e/.cost/

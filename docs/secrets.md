@@ -74,6 +74,7 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |
 | `CRON_SECRET` | same | Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
+| `LOADTEST_SECRET` | same | Staging only. Bearer for `/api/qa/loadtest`. Staging CI injects when the GitHub secret is set. **Never** production |
 | `IGDB_CLIENT_ID` | same | staging + PR previews |
 | `IGDB_CLIENT_SECRET` | same | staging + PR previews |
 | `IGDB_WEBHOOK_SECRET` | same | Staging webhook slot base (`{base}:{entity}:{method}`) — develop Worker `secret bulk` + local register. Never production |

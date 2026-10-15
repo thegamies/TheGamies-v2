@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { isAdminAuthorized } from "@/lib/admin-auth";
 import { ClaimFirstAdminForm } from "./ClaimFirstAdminForm";
 
@@ -40,6 +40,11 @@ const ADMIN_LINKS = [
     description: "Reveal scores, refresh dirty keys, or rebuild a year.",
   },
   {
+    href: "/admin/awards",
+    title: "Site awards",
+    description: "Add and edit Game of the Year award categories.",
+  },
+  {
     href: "/admin/the-game-awards",
     title: "Video Game Awards Pick’em",
     description: "Set up the year, nominees, and call winners during the show.",
@@ -55,6 +60,12 @@ const ADMIN_LINKS = [
     title: "Communities",
     description:
       "Feature public communities, close joins, and seed members and ballots.",
+  },
+  {
+    href: "/admin/communities/stats",
+    title: "Community stats",
+    description:
+      "Members, Pick’em, ballots, and edition entries for each community.",
   },
   {
     href: "/admin/the-game-awards/seed",

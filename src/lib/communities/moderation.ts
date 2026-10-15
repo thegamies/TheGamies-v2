@@ -21,6 +21,7 @@ import {
   unbanCommunityMemberBlockedReason,
 } from "./rules";
 import type { CommunityRole } from "./schema";
+import { lockCommunityMembershipSql } from "./membership-lock";
 import { getCommunityBySlug } from "./service";
 
 function getDb(): Db {
@@ -188,19 +189,25 @@ export async function banCommunityMember(
     targetProfileId,
     db,
   );
-  await db
-    .delete(communityMembers)
-    .where(
-      and(
-        eq(communityMembers.communityId, detail.id),
-        eq(communityMembers.profileId, targetProfileId),
+  await db.batch([
+    db.execute(lockCommunityMembershipSql(detail.id, targetProfileId)),
+    db
+      .insert(communityBans)
+      .values({
+        communityId: detail.id,
+        profileId: targetProfileId,
+        bannedByProfileId: actorProfileId,
+      })
+      .onConflictDoNothing(),
+    db
+      .delete(communityMembers)
+      .where(
+        and(
+          eq(communityMembers.communityId, detail.id),
+          eq(communityMembers.profileId, targetProfileId),
+        ),
       ),
-    );
-  await db.insert(communityBans).values({
-    communityId: detail.id,
-    profileId: targetProfileId,
-    bannedByProfileId: actorProfileId,
-  });
+  ]);
   return { ok: true };
 }
 

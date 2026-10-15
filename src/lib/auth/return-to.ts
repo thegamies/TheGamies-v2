@@ -3,6 +3,7 @@ import {
   withListAuthIntent,
   type ListAuthIntent,
 } from "@/lib/lists/auth-intent";
+import { isLoopbackHost } from "@/lib/auth/loopback";
 import { safeNextPath } from "@/lib/auth/safe-next";
 
 export type { ListAuthIntent };
@@ -48,12 +49,17 @@ export function buildVerifyEmailHref(opts: {
 
 /** Absolute in-app URL for Auth callbacks (verification / post-sign-up). */
 export function buildAbsoluteAppUrl(origin: string, path: string): string | null {
-  const base = origin.trim().replace(/\/$/, "");
-  if (!base.startsWith("https://") && !base.startsWith("http://localhost")) {
+  let url: URL;
+  try {
+    url = new URL(origin.trim());
+  } catch {
     return null;
   }
-  const safePath = path.startsWith("/") && !path.startsWith("//") ? path : "/account";
-  return `${base}${safePath}`;
+  const allowed =
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && isLoopbackHost(url.hostname));
+  if (!allowed) return null;
+  return `${url.origin}${safeNextPath(path) ?? "/account"}`;
 }
 
 /** In-app path Neon should trust for password reset (relative = valid redirect). */

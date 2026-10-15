@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SharedListView } from "@/components/lists/SharedListView";
-import { getAuthOrNull } from "@/lib/auth/server";
+import {
+  getRequestProfileByAuthUserId,
+  getRequestSessionUser,
+} from "@/lib/auth/session";
 import { readListEditCookie } from "@/lib/lists/cookies";
 import { canEditList } from "@/lib/lists/ownership";
 import {
@@ -17,7 +20,7 @@ import {
   viewerSeesListCategories,
   viewerSeesListRanks,
 } from "@/lib/lists/rank-visibility";
-import { getProfileByAuthUserId, getProfileByUsername } from "@/lib/profile/service";
+import { getProfileByUsername } from "@/lib/profile/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { shouldIndexProfile } from "@/lib/seo/sitemap-plan";
 import { noIndexRobots, publicPageMetadata } from "@/lib/seo/site";
@@ -43,9 +46,8 @@ export async function generateMetadata({
   ]);
   if (!data) return { title: "List", robots: noIndexRobots };
   const path = listSharePath({
-    publicId: data.list.publicId,
-    slug: data.list.slug,
-    username: data.owner?.username,
+    slug: data.list.slug ?? listSlug,
+    username: data.owner?.username ?? username,
   });
   const index =
     Boolean(profile && shouldIndexProfile(profile)) &&
@@ -98,21 +100,11 @@ export default async function OwnedListBySlugPage({
       : [];
 
   const cookie = await readListEditCookie();
-  let profileId: string | null = null;
-  let isSignedIn = false;
-  const auth = getAuthOrNull();
-  if (auth) {
-    try {
-      const { data: session } = await auth.getSession();
-      if (session?.user?.id) {
-        isSignedIn = true;
-        const profile = await getProfileByAuthUserId(session.user.id);
-        profileId = profile?.id ?? null;
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const sessionUser = await getRequestSessionUser();
+  const viewerProfile = sessionUser?.id
+    ? await getRequestProfileByAuthUserId(sessionUser.id).catch(() => null)
+    : null;
+  const profileId = viewerProfile?.id ?? null;
 
   const publicId = data.list.publicId;
   const editSecret =
@@ -138,9 +130,8 @@ export default async function OwnedListBySlugPage({
       ? `/create/goty?id=${publicId}`
       : `/create/custom?id=${publicId}`;
   const sharePath = listSharePath({
-    publicId,
-    slug: data.list.slug,
-    username: data.owner?.username,
+    slug: data.list.slug ?? listSlug,
+    username: data.owner?.username ?? username,
   });
 
   return (
@@ -148,8 +139,6 @@ export default async function OwnedListBySlugPage({
       <SharedListView
         data={data}
         canEdit={canEdit}
-        canClaim={false}
-        isSignedIn={isSignedIn}
         alreadyOwned={alreadyOwned}
         editHref={editHref}
         sharePath={sharePath}

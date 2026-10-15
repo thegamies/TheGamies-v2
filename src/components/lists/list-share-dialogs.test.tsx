@@ -7,7 +7,7 @@ import { SaveSignInDialog } from "./SaveSignInDialog";
 import { ShareLinkSignInDialog } from "./ShareLinkSignInDialog";
 import { ShareMenuDialog } from "./ShareMenuDialog";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/next-link", () => ({
   default: ({
     href,
     children,

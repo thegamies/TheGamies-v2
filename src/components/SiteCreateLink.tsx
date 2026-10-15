@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/next-link";
 import { SITE_CREATE_HREF, siteCreateLinkClass } from "@/lib/site-nav";
 
 export function SiteCreateLink({
