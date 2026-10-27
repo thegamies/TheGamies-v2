@@ -12,21 +12,25 @@ type SessionClient = {
 };
 
 /**
- * Exchange Neon’s OAuth return token for a session cookie on this origin.
- * Full-page redirects drop Set-Cookie; same as confirm-email.
+ * Ensure a session cookie exists after Google returns to this origin.
+ *
+ * Self-hosted Better Auth sets the cookie on `/api/auth/callback/google`
+ * before landing on complete-profile (no verifier). Neon Managed Auth
+ * returns `neon_auth_session_verifier` and needs an XHR claim so Set-Cookie
+ * sticks (full-page redirects drop it).
  */
 export async function claimNeonAuthSession(
   verifier: string,
 ): Promise<{ ok: true } | { error: string }> {
-  const token = verifier.trim();
-  if (!token) return { error: GOOGLE_SIGN_IN_FAILED };
-
   try {
     const { data } = await (authClient as SessionClient).getSession();
     if (data?.user?.id) return { ok: true };
   } catch {
-    // Fall through to the explicit get-session fetch.
+    // Fall through to the Neon verifier fetch when present.
   }
+
+  const token = verifier.trim();
+  if (!token) return { error: GOOGLE_SIGN_IN_FAILED };
 
   try {
     const response = await fetch(

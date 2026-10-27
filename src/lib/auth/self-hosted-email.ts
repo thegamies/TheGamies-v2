@@ -1,8 +1,11 @@
+import { PASSWORD_RESET_PATH } from "@/lib/auth/return-to";
 import { safeNextPath } from "@/lib/auth/safe-next";
 import { AUTH_EMAIL_SUBJECTS } from "@/lib/email/copy";
 import {
   confirmationText,
+  recoveryText,
   renderConfirmationEmail,
+  renderRecoveryEmail,
 } from "@/lib/email/templates";
 import {
   isSafeEmailHref,
@@ -22,6 +25,15 @@ export function confirmationPageHrefFromToken(input: {
   const appOrigin = input.appOrigin.replace(/\/$/, "");
   const next = nextFromCallback(input.callbackURL, appOrigin);
   return `${appOrigin}/auth/confirmed?token=${encodeURIComponent(input.token)}&next=${encodeURIComponent(next)}`;
+}
+
+/** Leave the reset token unused for the in-app form (same as Neon rewrite). */
+export function resetPasswordPageHrefFromToken(input: {
+  appOrigin: string;
+  token: string;
+}): string {
+  const appOrigin = input.appOrigin.replace(/\/$/, "");
+  return `${appOrigin}${PASSWORD_RESET_PATH}?token=${encodeURIComponent(input.token)}`;
 }
 
 function nextFromCallback(
@@ -69,5 +81,26 @@ export async function sendSelfHostedVerificationEmail(input: {
     subject: AUTH_EMAIL_SUBJECTS.confirmation,
     html: renderConfirmationEmail({ href }),
     text: confirmationText({ href }),
+  });
+}
+
+export async function sendSelfHostedResetPasswordEmail(input: {
+  email: string;
+  token: string;
+  appOrigin: string;
+}): Promise<void> {
+  if (isUndeliverableEmailAddress(input.email)) return;
+
+  const href = resetPasswordPageHrefFromToken({
+    appOrigin: input.appOrigin,
+    token: input.token,
+  });
+  if (!isSafeEmailHref(href)) return;
+
+  await sendAuthEmail({
+    to: input.email,
+    subject: AUTH_EMAIL_SUBJECTS.recovery,
+    html: renderRecoveryEmail({ href }),
+    text: recoveryText({ href }),
   });
 }

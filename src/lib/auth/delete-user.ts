@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { getAuth } from "@/lib/auth/server";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 import { SIGN_IN_CLOSE_FAILED } from "./account-delete-copy";
 import { deleteNeonAuthUserViaApi } from "./neon-auth-directory";
 import { removeNeonAuthDirectoryUser } from "./remove-neon-auth-user";
+import { removeSelfHostedAuthUser } from "./remove-self-hosted-auth-user";
 
 type DeleteUserResult = {
   error?: { message?: string } | null;
@@ -17,6 +19,16 @@ function passwordError(message: string): boolean {
 }
 
 function authSignInUrl(): URL | null {
+  if (isSelfHostedAuthEnabled()) {
+    const base =
+      process.env.BETTER_AUTH_URL?.trim() ||
+      process.env.NEXT_PUBLIC_APP_URL?.trim();
+    if (!base) return null;
+    return new URL(
+      "/api/auth/sign-in/email",
+      base.endsWith("/") ? base : `${base}/`,
+    );
+  }
   const baseUrl = process.env.NEON_AUTH_BASE_URL?.trim();
   if (!baseUrl) return null;
   return new URL(
@@ -30,6 +42,7 @@ async function requestOrigin(): Promise<string> {
   return (
     headerStore.get("origin") ||
     headerStore.get("referer")?.split("/").slice(0, 3).join("/") ||
+    process.env.BETTER_AUTH_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     ""
   );
@@ -72,14 +85,10 @@ export async function verifyAccountPassword(input: {
 }
 
 /**
- * Close the Neon Auth user so the email can be reused.
+ * Close the Auth user so the email can be reused.
  *
- * Neon documents three ways:
- * 1. SDK `auth.deleteUser()` (often a no-op while deleteUser is disabled)
- * 2. Console / API DELETE …/auth/users/{id} (what Auth → Users lists)
- * 3. SQL against `neon_auth` (database is the source of truth)
- *
- * We try all three and only succeed when the directory row is gone.
+ * Self-hosted: SDK deleteUser + SQL against `auth_*`.
+ * Neon Managed: SDK + Users API + `neon_auth` SQL.
  */
 export async function deleteAuthenticatedUser(input: {
   password: string;
@@ -100,6 +109,14 @@ export async function deleteAuthenticatedUser(input: {
     if (passwordError(message)) {
       return { error: "That password is incorrect." };
     }
+  }
+
+  if (isSelfHostedAuthEnabled()) {
+    const viaSql = await removeSelfHostedAuthUser(input.authUserId, {
+      email: input.email,
+    }).catch(() => false);
+    if (viaSql) return { ok: true };
+    return { error: SIGN_IN_CLOSE_FAILED };
   }
 
   const viaApi = await deleteNeonAuthUserViaApi(input.authUserId).catch(

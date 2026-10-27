@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { confirmationPageHrefFromToken } from "./self-hosted-email";
+import {
+  confirmationPageHrefFromToken,
+  resetPasswordPageHrefFromToken,
+} from "./self-hosted-email";
 
 describe("confirmationPageHrefFromToken", () => {
   it("builds the in-app confirm URL with token and next", () => {
@@ -25,3 +28,15 @@ describe("confirmationPageHrefFromToken", () => {
     );
   });
 });
+
+describe("resetPasswordPageHrefFromToken", () => {
+  it("lands on the unused-token form", () => {
+    expect(
+      resetPasswordPageHrefFromToken({
+        appOrigin: "https://preview.example",
+        token: "reset-1",
+      }),
+    ).toBe("https://preview.example/auth/reset-password?token=reset-1");
+  });
+});
+

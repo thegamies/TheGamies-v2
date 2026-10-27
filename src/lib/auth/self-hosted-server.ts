@@ -11,9 +11,17 @@ import {
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { readSelfHostedAuthEnv } from "@/lib/auth/self-hosted-env";
-import { sendSelfHostedVerificationEmail } from "@/lib/auth/self-hosted-email";
+import {
+  sendSelfHostedResetPasswordEmail,
+  sendSelfHostedVerificationEmail,
+} from "@/lib/auth/self-hosted-email";
 
-type AuthResult<T> = { data: T; error: null } | { data: null; error: { message: string; status?: number; code?: string } };
+type AuthResult<T> =
+  | { data: T; error: null }
+  | {
+      data: null;
+      error: { message: string; status?: number; code?: string };
+    };
 
 function errorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === "object") {
@@ -37,9 +45,16 @@ function errorStatus(err: unknown): number | undefined {
   return undefined;
 }
 
+function readGoogleOAuthEnv(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return null;
+  return { clientId, clientSecret };
+}
+
 /**
  * Neon Auth–shaped wrapper around Better Auth so existing call sites keep
- * `getSession` / `signUp.email` / `handler()` / `middleware()`.
+ * `getSession` / `signUp.email` / `handler()` / `middleware()` / `deleteUser`.
  */
 export function createSelfHostedAuth() {
   const env = readSelfHostedAuthEnv();
@@ -49,6 +64,7 @@ export function createSelfHostedAuth() {
     );
   }
 
+  const google = readGoogleOAuthEnv();
   const db = createDb(env.databaseUrl);
   const ba = betterAuth({
     appName: "The Gamies",
@@ -72,6 +88,19 @@ export function createSelfHostedAuth() {
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,
+      // Match product copy (~15 minutes).
+      resetPasswordTokenExpiresIn: 60 * 15,
+      sendResetPassword: async ({ user, token }) => {
+        try {
+          await sendSelfHostedResetPasswordEmail({
+            email: user.email,
+            token,
+            appOrigin: env.baseURL,
+          });
+        } catch (err) {
+          console.error("[auth] reset password email failed", err);
+        }
+      },
     },
     emailVerification: {
       sendOnSignUp: true,
@@ -88,6 +117,20 @@ export function createSelfHostedAuth() {
         } catch (err) {
           console.error("[auth] verification email failed", err);
         }
+      },
+    },
+    socialProviders: google
+      ? {
+          google: {
+            clientId: google.clientId,
+            clientSecret: google.clientSecret,
+            prompt: "select_account",
+          },
+        }
+      : undefined,
+    user: {
+      deleteUser: {
+        enabled: true,
       },
     },
     advanced: {
@@ -108,7 +151,18 @@ export function createSelfHostedAuth() {
   const routeHandlers = toNextJsHandler(ba);
 
   return {
-    getSession: async (): Promise<AuthResult<{ user: { id: string; email?: string | null; name?: string | null; emailVerified?: boolean; image?: string | null }; session: unknown } | null>> => {
+    getSession: async (): Promise<
+      AuthResult<{
+        user: {
+          id: string;
+          email?: string | null;
+          name?: string | null;
+          emailVerified?: boolean;
+          image?: string | null;
+        };
+        session: unknown;
+      } | null>
+    > => {
       try {
         const session = await ba.api.getSession({
           headers: await headers(),
@@ -117,7 +171,10 @@ export function createSelfHostedAuth() {
       } catch (err) {
         return {
           data: null,
-          error: { message: errorMessage(err, "Could not read session."), status: errorStatus(err) },
+          error: {
+            message: errorMessage(err, "Could not read session."),
+            status: errorStatus(err),
+          },
         };
       }
     },
@@ -129,7 +186,10 @@ export function createSelfHostedAuth() {
       } catch (err) {
         return {
           data: null,
-          error: { message: errorMessage(err, "Could not sign out."), status: errorStatus(err) },
+          error: {
+            message: errorMessage(err, "Could not sign out."),
+            status: errorStatus(err),
+          },
         };
       }
     },
@@ -175,6 +235,24 @@ export function createSelfHostedAuth() {
       },
     },
 
+    deleteUser: async (input?: {
+      password?: string;
+    }): Promise<{ error?: { message?: string } | null }> => {
+      try {
+        await ba.api.deleteUser({
+          body: { password: input?.password },
+          headers: await headers(),
+        });
+        return { error: null };
+      } catch (err) {
+        return {
+          error: {
+            message: errorMessage(err, "Could not delete account."),
+          },
+        };
+      }
+    },
+
     handler: () => ({
       GET: (request: Request) => routeHandlers.GET(request),
       POST: (request: Request) => routeHandlers.POST(request),
@@ -201,7 +279,7 @@ export function createSelfHostedAuth() {
       };
     },
 
-    /** Expose raw Better Auth for advanced call sites (delete, etc.). */
+    /** Expose raw Better Auth for advanced call sites. */
     $ba: ba,
   };
 }

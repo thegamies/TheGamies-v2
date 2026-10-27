@@ -132,6 +132,8 @@ jobs:
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
           # Spike: reuse cookie secret as Better Auth secret so previews prefer self-hosted.
           BETTER_AUTH_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           LOADTEST_SECRET: ${{ secrets.LOADTEST_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -165,6 +167,8 @@ jobs:
             "NEON_AUTH_BASE_URL",
             "NEON_AUTH_COOKIE_SECRET",
             "BETTER_AUTH_SECRET",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
             "ADMIN_SYNC_SECRET",
             "LOADTEST_SECRET",
             "IGDB_CLIENT_ID",
