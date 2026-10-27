@@ -11,7 +11,7 @@ import {
 
 async function notConfigured() {
   return NextResponse.json(
-    { error: "Neon Auth is not configured" },
+    { error: "Auth is not configured" },
     { status: 503 },
   );
 }

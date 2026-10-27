@@ -15,6 +15,10 @@ describe("session cache cookie", () => {
     );
     expect(hasSessionTokenCookie("other=1")).toBe(false);
     expect(hasSessionTokenCookie(`${SESSION_TOKEN_COOKIE_NAME}=`)).toBe(false);
+    expect(
+      hasSessionTokenCookie("__Secure-better-auth.session_token=tok"),
+    ).toBe(true);
+    expect(hasSessionTokenCookie("better-auth.session_token=tok")).toBe(true);
   });
 
   it("keeps the signed session cache for 4 hours", () => {

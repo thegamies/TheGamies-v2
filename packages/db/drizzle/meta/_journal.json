@@ -449,6 +449,13 @@
       "when": 1790726400000,
       "tag": "0063_tga_ballot_mask",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1790812800000,
+      "tag": "0064_better_auth",
+      "breakpoints": true
     }
   ]
 }

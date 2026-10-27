@@ -54,10 +54,18 @@ describe("claimNeonAuthSession", () => {
     );
   });
 
-  it("rejects a blank verifier", async () => {
+  it("succeeds with a blank verifier when a session cookie already exists", async () => {
+    getSession.mockResolvedValueOnce({
+      data: { user: { id: "user-1" } },
+    });
+    await expect(claimNeonAuthSession("")).resolves.toEqual({ ok: true });
+  });
+
+  it("rejects a blank verifier when there is no session", async () => {
+    getSession.mockResolvedValueOnce({ data: null });
     await expect(claimNeonAuthSession("")).resolves.toEqual({
       error: GOOGLE_SIGN_IN_FAILED,
     });
-    expect(getSession).not.toHaveBeenCalled();
   });
 });
+

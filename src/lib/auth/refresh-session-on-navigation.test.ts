@@ -27,6 +27,19 @@ describe("refreshSessionCacheHeaders", () => {
     handleAuthProxyRequest.mockReset();
     vi.stubEnv("NEON_AUTH_BASE_URL", "https://auth.example/neondb/auth");
     vi.stubEnv("NEON_AUTH_COOKIE_SECRET", secret);
+    vi.stubEnv("BETTER_AUTH_SECRET", "");
+    vi.stubEnv("DATABASE_URL", "");
+  });
+
+  it("skips Neon mint when self-hosted Better Auth is on", async () => {
+    vi.stubEnv("BETTER_AUTH_SECRET", secret);
+    vi.stubEnv("DATABASE_URL", "postgres://example");
+    const result = await refreshSessionCacheHeaders(
+      headersWith(`${SESSION_TOKEN_COOKIE_NAME}=tok`),
+      "https://thegamies.gg/",
+    );
+    expect(result.setCookies).toEqual([]);
+    expect(handleAuthProxyRequest).not.toHaveBeenCalled();
   });
 
   it("does not call Neon when there is no login cookie", async () => {

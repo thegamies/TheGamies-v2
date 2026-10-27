@@ -130,6 +130,10 @@ jobs:
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
           NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          # Spike: reuse cookie secret as Better Auth secret so previews prefer self-hosted.
+          BETTER_AUTH_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           LOADTEST_SECRET: ${{ secrets.LOADTEST_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -162,6 +166,9 @@ jobs:
             "DATABASE_URL",
             "NEON_AUTH_BASE_URL",
             "NEON_AUTH_COOKIE_SECRET",
+            "BETTER_AUTH_SECRET",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
             "ADMIN_SYNC_SECRET",
             "LOADTEST_SECRET",
             "IGDB_CLIENT_ID",
@@ -182,12 +189,21 @@ jobs:
             secrets[key] = val;
             lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
           }
+          // Client + server must agree: only enable the Better Auth client when the secret is present.
+          if ((process.env.BETTER_AUTH_SECRET || "").trim().length >= 32) {
+            secrets.NEXT_PUBLIC_SELF_HOSTED_AUTH = "1";
+            lines.push("NEXT_PUBLIC_SELF_HOSTED_AUTH=1");
+          }
           fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
           fs.writeFileSync(
             process.env.RUNNER_TEMP + "/wrangler-secrets.json",
             JSON.stringify(secrets),
           );
           NODE
+          # Bake the client flag into the OpenNext build (same-step export; GITHUB_ENV is next-step only).
+          if [ "${#BETTER_AUTH_SECRET}" -ge 32 ]; then
+            export NEXT_PUBLIC_SELF_HOSTED_AUTH=1
+          fi
           pnpm exec opennextjs-cloudflare build
           DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
           if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
@@ -196,6 +212,17 @@ jobs:
           URL=$(echo "$DEPLOY_LOG" | grep -oE 'https://[a-zA-Z0-9._-]+\.workers\.dev' | head -n1)
           if [ -z "$URL" ]; then
             URL="(see wrangler deploy logs for ${WORKER})"
+          fi
+          # Runtime origin for Better Auth email links / CSRF (not available at build).
+          if [ -n "$URL" ] && [[ "$URL" == https://* ]] && [ -n "${BETTER_AUTH_SECRET:-}" ]; then
+            PREVIEW_URL="$URL" node -e '
+              const fs = require("fs");
+              fs.writeFileSync(
+                process.env.RUNNER_TEMP + "/better-auth-url.json",
+                JSON.stringify({ BETTER_AUTH_URL: process.env.PREVIEW_URL }),
+              );
+            '
+            pnpm exec wrangler secret bulk "$RUNNER_TEMP/better-auth-url.json" --name "$WORKER"
           fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Cloudflare preview: $URL"
@@ -266,7 +293,7 @@ jobs:
               `| Migrate | ${migrateSkipped ? 'skipped' : 'applied'} | catalog schema |`,
               `| Cloudflare | ${cfSkipped ? 'skipped (secrets)' : 'deployed'} | ${cfUrl} |`,
               '',
-              'Neon Auth: each preview DB branch gets its own Auth URL (`NEON_AUTH_BASE_URL`). CI registers the Cloudflare origin as a trusted domain on that branch, and points Auth email webhooks at the Cloudflare Worker so branded reset mail stays on that preview.',
+              'Self-hosted Better Auth spike: previews set `BETTER_AUTH_SECRET` + `NEXT_PUBLIC_SELF_HOSTED_AUTH=1` and migrate `auth_*` tables on the Neon branch. Email verification uses Worker EMAIL (no Neon Auth webhook required for that path). Neon Auth domain/webhook registration still runs for fallback.',
               '',
               '_Configure secrets listed in `docs/deployment.md` to enable deploys._',
             ].join('\n');

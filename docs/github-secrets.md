@@ -26,14 +26,18 @@ Without these, host jobs skip:
 
 Also needed on preview deploys if you want those features to work: `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, staging R2 bucket/base (`STAGING_R2_AVATAR_BUCKET`, `STAGING_AVATAR_PUBLIC_BASE_URL`) plus shared R2 account/keys. Preview `DATABASE_URL` / Auth URL come from the Neon branch CI creates — do not put production DB URLs here.
 
+**Self-hosted Better Auth:** CI reuses `NEON_AUTH_COOKIE_SECRET` as `BETTER_AUTH_SECRET`, sets `NEXT_PUBLIC_SELF_HOSTED_AUTH=1`, and sets `BETTER_AUTH_URL` from the deploy origin. Optional shared Google secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (redirect `{origin}/api/auth/callback/google` in Google Cloud for each origin you use).
+
 ## Staging (`develop`)
 
 | Secret | Becomes on the host | Notes |
 |---|---|---|
 | `STAGING_DATABASE_URL` | `DATABASE_URL` | Required. Staging migrate + app Worker + IGDB webhooks develop |
 | `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Alias: `NEON_AUTH_BASE_URL` if the staging name is unset |
-| `NEON_AUTH_COOKIE_SECRET` | same | 32+ chars. Staging + previews |
-| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging public origin |
+| `NEON_AUTH_COOKIE_SECRET` | same (+ CI → `BETTER_AUTH_SECRET`) | 32+ chars. Staging + previews; also enables self-hosted Better Auth |
+| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare staging public origin |
+| `GOOGLE_CLIENT_ID` | same | Optional. Shared with previews/production for self-hosted Google |
+| `GOOGLE_CLIENT_SECRET` | same | Optional. Shared with previews/production |
 | `CRON_SECRET` | same | Edition freeze Cron (Cloudflare Worker). Shared with production |
 | `LOADTEST_SECRET` | same | Optional. Staging-only Bearer for `/api/qa/loadtest` writes. **Never** set on production |
 | `ADMIN_SYNC_SECRET` | same | Site-operator claim + IGDB Worker proxy |
@@ -58,8 +62,10 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 |---|---|---|
 | `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Required. Production migrate + CF `secret bulk` (app + webhooks Worker). Never the develop Neon URL |
 | `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Neon Auth URL |
-| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Optional. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
-| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production public origin |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` (+ CI → `BETTER_AUTH_SECRET`) | Optional. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare production public origin |
+| `GOOGLE_CLIENT_ID` | same | Optional. Shared; add production redirect in Google Cloud |
+| `GOOGLE_CLIENT_SECRET` | same | Optional. Shared |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
 | `PRODUCTION_IGDB_WEBHOOK_SECRET` | `IGDB_WEBHOOK_SECRET` | Production webhook slot base. Never the staging `IGDB_WEBHOOK_SECRET` |
 | `CRON_SECRET` | same | Same secret as staging unless you choose to rotate later |

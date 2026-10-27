@@ -8,6 +8,7 @@ import {
   withAuthClientIp,
 } from "@/lib/auth/auth-client-ip";
 import { getAuthRuntimeConfig } from "@/lib/auth/auth-env";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 import {
   readCookie,
   SESSION_DATA_COOKIE_NAME,
@@ -27,12 +28,17 @@ const mintInflight = new Map<string, Promise<string[]>>();
  * `Set-Cookie` alone is not visible to `auth.getSession()` in that same request.
  * Neon signs the cookie. A valid cache does not call Neon.
  * Parallel requests for the same login cookie share one mint.
+ *
+ * Self-hosted Better Auth skips this path (no Neon session-data cookie).
  */
 export async function refreshSessionCacheHeaders(
   requestHeaders: Headers,
   requestUrl: string,
 ): Promise<{ headers: Headers; setCookies: string[] }> {
   const headers = new Headers(requestHeaders);
+  if (isSelfHostedAuthEnabled()) {
+    return { headers, setCookies: [] };
+  }
   const cookieHeader = headers.get("cookie") ?? "";
   const token = readCookie(cookieHeader, SESSION_TOKEN_COOKIE_NAME);
   if (!token) {

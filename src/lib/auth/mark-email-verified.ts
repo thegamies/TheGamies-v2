@@ -1,5 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { NeonSql } from "./remove-neon-auth-user";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -34,9 +35,41 @@ async function optional(run: () => Promise<unknown>): Promise<unknown> {
   }
 }
 
+async function markSelfHostedVerified(input: {
+  authUserId?: string;
+  email?: string;
+  query: NeonSql;
+}): Promise<boolean> {
+  const authUserId = input.authUserId?.trim();
+  const email = input.email?.trim();
+  if (authUserId) {
+    await optional(
+      () =>
+        input.query`UPDATE auth_user SET "emailVerified" = true WHERE id = ${authUserId}`,
+    );
+    const user = await optional(
+      () =>
+        input.query`SELECT id FROM auth_user WHERE id = ${authUserId} AND "emailVerified" = true`,
+    );
+    return hasRow(user);
+  }
+  if (email) {
+    await optional(
+      () =>
+        input.query`UPDATE auth_user SET "emailVerified" = true WHERE lower(email) = lower(${email})`,
+    );
+    const user = await optional(
+      () =>
+        input.query`SELECT id FROM auth_user WHERE lower(email) = lower(${email}) AND "emailVerified" = true`,
+    );
+    return hasRow(user);
+  }
+  return false;
+}
+
 /**
- * Mark a Neon Auth user verified in `neon_auth` so local sign-up can skip mail.
- * Database is the source of truth for Managed Better Auth.
+ * Mark a user verified so local sign-up can skip mail.
+ * Self-hosted: `auth_user`. Managed Neon Auth: `neon_auth."user"`.
  */
 export async function markNeonAuthEmailVerified(input: {
   authUserId?: string;
@@ -48,6 +81,10 @@ export async function markNeonAuthEmailVerified(input: {
   if (!authUserId && !email) return false;
 
   const query = input.query ?? defaultQuery();
+
+  if (isSelfHostedAuthEnabled()) {
+    return markSelfHostedVerified({ authUserId, email, query });
+  }
 
   if (authUserId) {
     await optional(
