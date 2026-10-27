@@ -76,6 +76,11 @@ jobs:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
           NEON_AUTH_BASE_URL: ${{ secrets.PRODUCTION_NEON_AUTH_BASE_URL }}
           NEON_AUTH_COOKIE_SECRET: ${{ secrets.PRODUCTION_NEON_AUTH_COOKIE_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          # Same pattern as PR/staging: reuse cookie secret for self-hosted Better Auth.
+          BETTER_AUTH_SECRET: ${{ secrets.PRODUCTION_NEON_AUTH_COOKIE_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          BETTER_AUTH_URL: ${{ secrets.PRODUCTION_CF_APP_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -130,6 +135,10 @@ jobs:
             "DATABASE_URL",
             "NEON_AUTH_BASE_URL",
             "NEON_AUTH_COOKIE_SECRET",
+            "BETTER_AUTH_SECRET",
+            "BETTER_AUTH_URL",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
             "ADMIN_SYNC_SECRET",
             "CRON_SECRET",
             "IGDB_CLIENT_ID",
@@ -152,6 +161,10 @@ jobs:
             secrets[key] = val;
             lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
           }
+          if ((process.env.BETTER_AUTH_SECRET || "").trim().length >= 32) {
+            secrets.NEXT_PUBLIC_SELF_HOSTED_AUTH = "1";
+            lines.push("NEXT_PUBLIC_SELF_HOSTED_AUTH=1");
+          }
           fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
           fs.writeFileSync(
             process.env.RUNNER_TEMP + "/wrangler-secrets.json",
@@ -165,6 +178,9 @@ jobs:
           );
           NODE
 
+          if [ "${#BETTER_AUTH_SECRET}" -ge 32 ]; then
+            export NEXT_PUBLIC_SELF_HOSTED_AUTH=1
+          fi
           pnpm deploy:cf
 
           if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
