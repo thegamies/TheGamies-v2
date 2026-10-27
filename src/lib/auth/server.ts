@@ -6,19 +6,19 @@ import {
   createSelfHostedAuth,
   type SelfHostedAuth,
 } from "@/lib/auth/self-hosted-server";
-import { useSelfHostedAuth } from "@/lib/auth/self-hosted-env";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 
 type NeonAuth = ReturnType<typeof createNeonAuth>;
 export type AppAuth = NeonAuth | SelfHostedAuth;
 
 export function isAuthConfigured(): boolean {
-  return useSelfHostedAuth() || readAuthEnv() !== null;
+  return isSelfHostedAuthEnabled() || readAuthEnv() !== null;
 }
 
 let cached: AppAuth | null | undefined;
 
 function createAuthOrNull(): AppAuth | null {
-  if (useSelfHostedAuth()) {
+  if (isSelfHostedAuthEnabled()) {
     return createSelfHostedAuth();
   }
   const env = readAuthEnv();
@@ -53,7 +53,7 @@ export function getAuth(): AppAuth {
   const instance = getAuthOrNull();
   if (!instance) {
     throw new Error(
-      useSelfHostedAuth()
+      isSelfHostedAuthEnabled()
         ? "Self-hosted Better Auth is not configured. Set BETTER_AUTH_SECRET (32+ chars) and DATABASE_URL."
         : "Neon Auth is not configured. Set NEON_AUTH_BASE_URL and NEON_AUTH_COOKIE_SECRET (32+ chars) in Doppler, then restart the server.",
     );

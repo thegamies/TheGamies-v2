@@ -176,9 +176,8 @@ export function createSelfHostedAuth() {
     },
 
     handler: () => ({
-      GET: (request: Request, _context?: unknown) => routeHandlers.GET(request),
-      POST: (request: Request, _context?: unknown) =>
-        routeHandlers.POST(request),
+      GET: (request: Request) => routeHandlers.GET(request),
+      POST: (request: Request) => routeHandlers.POST(request),
     }),
 
     middleware: ({ loginUrl }: { loginUrl: string }) => {

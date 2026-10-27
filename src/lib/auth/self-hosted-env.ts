@@ -19,11 +19,11 @@ export function readSelfHostedAuthEnv(): {
   return { secret, baseURL, databaseUrl };
 }
 
-export function useSelfHostedAuth(): boolean {
+export function isSelfHostedAuthEnabled(): boolean {
   return readSelfHostedAuthEnv() !== null;
 }
 
 /** Build-time / client flag. Set `NEXT_PUBLIC_SELF_HOSTED_AUTH=1` with the secret. */
-export function useSelfHostedAuthClient(): boolean {
+export function isSelfHostedAuthClientEnabled(): boolean {
   return process.env.NEXT_PUBLIC_SELF_HOSTED_AUTH === "1";
 }

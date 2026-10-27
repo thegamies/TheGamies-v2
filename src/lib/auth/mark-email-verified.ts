@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import type { NeonSql } from "./remove-neon-auth-user";
-import { useSelfHostedAuth } from "@/lib/auth/self-hosted-env";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -82,7 +82,7 @@ export async function markNeonAuthEmailVerified(input: {
 
   const query = input.query ?? defaultQuery();
 
-  if (useSelfHostedAuth()) {
+  if (isSelfHostedAuthEnabled()) {
     return markSelfHostedVerified({ authUserId, email, query });
   }
 

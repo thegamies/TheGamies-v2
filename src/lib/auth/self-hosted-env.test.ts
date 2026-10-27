@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { readSelfHostedAuthEnv, useSelfHostedAuth } from "./self-hosted-env";
+import {
+  isSelfHostedAuthEnabled,
+  readSelfHostedAuthEnv,
+} from "./self-hosted-env";
 
 describe("self-hosted auth env", () => {
   afterEach(() => {
@@ -9,7 +12,7 @@ describe("self-hosted auth env", () => {
   it("is off without a long secret", () => {
     vi.stubEnv("BETTER_AUTH_SECRET", "short");
     vi.stubEnv("DATABASE_URL", "postgres://example");
-    expect(useSelfHostedAuth()).toBe(false);
+    expect(isSelfHostedAuthEnabled()).toBe(false);
     expect(readSelfHostedAuthEnv()).toBeNull();
   });
 
@@ -17,7 +20,7 @@ describe("self-hosted auth env", () => {
     vi.stubEnv("BETTER_AUTH_SECRET", "x".repeat(32));
     vi.stubEnv("DATABASE_URL", "postgres://example");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://preview.example");
-    expect(useSelfHostedAuth()).toBe(true);
+    expect(isSelfHostedAuthEnabled()).toBe(true);
     expect(readSelfHostedAuthEnv()).toEqual({
       secret: "x".repeat(32),
       baseURL: "https://preview.example",

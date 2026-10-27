@@ -8,7 +8,7 @@ import {
   withAuthClientIp,
 } from "@/lib/auth/auth-client-ip";
 import { getAuthRuntimeConfig } from "@/lib/auth/auth-env";
-import { useSelfHostedAuth } from "@/lib/auth/self-hosted-env";
+import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
 import {
   readCookie,
   SESSION_DATA_COOKIE_NAME,
@@ -36,7 +36,7 @@ export async function refreshSessionCacheHeaders(
   requestUrl: string,
 ): Promise<{ headers: Headers; setCookies: string[] }> {
   const headers = new Headers(requestHeaders);
-  if (useSelfHostedAuth()) {
+  if (isSelfHostedAuthEnabled()) {
     return { headers, setCookies: [] };
   }
   const cookieHeader = headers.get("cookie") ?? "";
