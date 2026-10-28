@@ -59,7 +59,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       # db_url cannot be a job output — GitHub strips secret-bearing outputs.
-      auth_url: ${{ steps.branch.outputs.auth_url }}
       branch_id: ${{ steps.branch.outputs.branch_id }}
       skipped: ${{ steps.guard.outputs.skipped }}
     steps:
@@ -80,7 +79,6 @@ jobs:
           parent_branch: develop
           api_key: ${{ secrets.NEON_API_KEY }}
           role: neondb_owner
-          get_auth_url: true
 
   migrate:
     if: inputs.action == 'deploy'
@@ -176,8 +174,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
-          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
           IGDB_CLIENT_SECRET: ${{ secrets.IGDB_CLIENT_SECRET }}
@@ -206,8 +205,9 @@ jobs:
           const fs = require("fs");
           const keys = [
             "DATABASE_URL",
-            "NEON_AUTH_BASE_URL",
-            "NEON_AUTH_COOKIE_SECRET",
+            "BETTER_AUTH_SECRET",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
             "ADMIN_SYNC_SECRET",
             "IGDB_CLIENT_ID",
             "IGDB_CLIENT_SECRET",
@@ -242,54 +242,22 @@ jobs:
           if [ -z "$URL" ]; then
             URL="(see wrangler deploy logs for ${WORKER})"
           fi
+          if [ -n "$URL" ] && [[ "$URL" == https://* ]] && [ -n "${BETTER_AUTH_SECRET:-}" ]; then
+            PREVIEW_URL="$URL" node -e '
+              const fs = require("fs");
+              fs.writeFileSync(
+                process.env.RUNNER_TEMP + "/better-auth-url.json",
+                JSON.stringify({ BETTER_AUTH_URL: process.env.PREVIEW_URL }),
+              );
+            '
+            pnpm exec wrangler secret bulk "$RUNNER_TEMP/better-auth-url.json" --name "$WORKER"
+          fi
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Cloudflare manual preview: $URL"
 
-  auth_domains:
-    if: inputs.action == 'deploy'
-    needs: [prepare, neon, cloudflare]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Register Neon Auth trusted domains
-        if: needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-          CF_URL: ${{ needs.cloudflare.outputs.url }}
-        run: |
-          chmod +x scripts/ci/register-neon-auth-domains.sh
-          ARGS=("$BRANCH_ID")
-          case "$CF_URL" in
-            https://*|http://*) ARGS+=("$CF_URL") ;;
-          esac
-          if [ "${#ARGS[@]}" -gt 1 ]; then
-            scripts/ci/register-neon-auth-domains.sh "${ARGS[@]}"
-          else
-            echo "No deploy URLs to register."
-          fi
-      - name: Register Neon Auth email webhook on Cloudflare
-        if: needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-          CF_URL: ${{ needs.cloudflare.outputs.url }}
-        run: |
-          chmod +x scripts/ci/register-neon-auth-email-webhook.sh
-          case "$CF_URL" in
-            https://*)
-              scripts/ci/register-neon-auth-email-webhook.sh "$BRANCH_ID" "$CF_URL"
-              ;;
-            *)
-              echo "No Cloudflare https URL; skipping Auth email webhook."
-              ;;
-          esac
-
   summary:
     if: inputs.action == 'deploy'
-    needs: [prepare, neon, migrate, cloudflare, auth_domains]
+    needs: [prepare, neon, migrate, cloudflare]
     runs-on: ubuntu-latest
     steps:
       - name: Write job summary

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const skipEmailVerification = vi.fn(() => false);
-const markNeonAuthEmailVerified = vi.fn();
+const markAuthEmailVerified = vi.fn();
 const cookieSet = vi.fn();
 
 vi.mock("next/headers", () => ({
@@ -19,8 +19,7 @@ vi.mock("@/lib/auth/skip-email-verification", () => ({
 }));
 
 vi.mock("@/lib/auth/mark-email-verified", () => ({
-  markNeonAuthEmailVerified: (...args: unknown[]) =>
-    markNeonAuthEmailVerified(...args),
+  markAuthEmailVerified: (...args: unknown[]) => markAuthEmailVerified(...args),
 }));
 
 import {
@@ -46,23 +45,23 @@ describe("markVerifiedForLocalDev", () => {
   beforeEach(() => {
     skipEmailVerification.mockReset();
     skipEmailVerification.mockReturnValue(false);
-    markNeonAuthEmailVerified.mockReset();
+    markAuthEmailVerified.mockReset();
   });
 
   it("is a no-op on hosted deploys", async () => {
     await expect(markVerifiedForLocalDev("ada@example.com")).resolves.toBe(
       false,
     );
-    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
+    expect(markAuthEmailVerified).not.toHaveBeenCalled();
   });
 
   it("marks the address verified locally", async () => {
     skipEmailVerification.mockReturnValue(true);
-    markNeonAuthEmailVerified.mockResolvedValueOnce(true);
+    markAuthEmailVerified.mockResolvedValueOnce(true);
     await expect(markVerifiedForLocalDev("ada@example.com")).resolves.toBe(
       true,
     );
-    expect(markNeonAuthEmailVerified).toHaveBeenCalledWith({
+    expect(markAuthEmailVerified).toHaveBeenCalledWith({
       email: "ada@example.com",
     });
   });

@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
+import { markAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import { skipEmailVerification } from "@/lib/auth/skip-email-verification";
 import {
   authSessionCookieNamesFromHeader,
@@ -23,5 +23,5 @@ export async function clearStaleAuthCookies(): Promise<void> {
 /** Local `next dev` only — hosted deploys still require confirm-email. */
 export async function markVerifiedForLocalDev(email: string): Promise<boolean> {
   if (!skipEmailVerification()) return false;
-  return markNeonAuthEmailVerified({ email }).catch(() => false);
+  return markAuthEmailVerified({ email }).catch(() => false);
 }

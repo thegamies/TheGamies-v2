@@ -21,22 +21,21 @@ Without these, host jobs skip:
 
 | Secret | Used by |
 |---|---|
-| `NEON_API_KEY` | Create/delete PR Neon branches; Auth domain registration |
+| `NEON_API_KEY` | Create/delete PR Neon database branches |
 | `NEON_PROJECT_ID` | Same |
 
-Also needed on preview deploys if you want those features to work: `NEON_AUTH_COOKIE_SECRET`, `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, staging R2 bucket/base (`STAGING_R2_AVATAR_BUCKET`, `STAGING_AVATAR_PUBLIC_BASE_URL`) plus shared R2 account/keys. Preview `DATABASE_URL` / Auth URL come from the Neon branch CI creates — do not put production DB URLs here.
+Also needed on preview deploys if you want those features to work: `NEON_AUTH_COOKIE_SECRET` (→ `BETTER_AUTH_SECRET`), `ADMIN_SYNC_SECRET`, `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET`, staging R2 bucket/base (`STAGING_R2_AVATAR_BUCKET`, `STAGING_AVATAR_PUBLIC_BASE_URL`) plus shared R2 account/keys. Preview `DATABASE_URL` comes from the Neon branch CI creates — do not put production DB URLs here.
 
-**Self-hosted Better Auth:** CI reuses `NEON_AUTH_COOKIE_SECRET` as `BETTER_AUTH_SECRET`, sets `NEXT_PUBLIC_SELF_HOSTED_AUTH=1`, and sets `BETTER_AUTH_URL` from the deploy origin. Optional shared Google secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (redirect `{origin}/api/auth/callback/google` in Google Cloud for each origin you use).
+**Better Auth:** CI maps GitHub `NEON_AUTH_COOKIE_SECRET` (legacy name until renamed to `BETTER_AUTH_SECRET`) onto the Worker as `BETTER_AUTH_SECRET`, and sets `BETTER_AUTH_URL` from the deploy origin. Optional shared Google secrets: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (redirect `{origin}/api/auth/callback/google` in Google Cloud for each origin you use). Detail: [self-hosted-better-auth-spike.md](./self-hosted-better-auth-spike.md).
 
 ## Staging (`develop`)
 
 | Secret | Becomes on the host | Notes |
 |---|---|---|
 | `STAGING_DATABASE_URL` | `DATABASE_URL` | Required. Staging migrate + app Worker + IGDB webhooks develop |
-| `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Alias: `NEON_AUTH_BASE_URL` if the staging name is unset |
-| `NEON_AUTH_COOKIE_SECRET` | same (+ CI → `BETTER_AUTH_SECRET`) | 32+ chars. Staging + previews; also enables self-hosted Better Auth |
+| `NEON_AUTH_COOKIE_SECRET` | `BETTER_AUTH_SECRET` | Legacy GitHub name (32+ chars). Staging + previews |
 | `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare staging public origin |
-| `GOOGLE_CLIENT_ID` | same | Optional. Shared with previews/production for self-hosted Google |
+| `GOOGLE_CLIENT_ID` | same | Optional. Shared with previews/production for Google sign-in |
 | `GOOGLE_CLIENT_SECRET` | same | Optional. Shared with previews/production |
 | `CRON_SECRET` | same | Edition freeze Cron (Cloudflare Worker). Shared with production |
 | `LOADTEST_SECRET` | same | Optional. Staging-only Bearer for `/api/qa/loadtest` writes. **Never** set on production |
@@ -61,8 +60,7 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | Secret | Becomes on the host | Notes |
 |---|---|---|
 | `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Required. Production migrate + CF `secret bulk` (app + webhooks Worker). Never the develop Neon URL |
-| `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Neon Auth URL |
-| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` (+ CI → `BETTER_AUTH_SECRET`) | Optional. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `BETTER_AUTH_SECRET` | Optional legacy name. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
 | `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare production public origin |
 | `GOOGLE_CLIENT_ID` | same | Optional. Shared; add production redirect in Google Cloud |
 | `GOOGLE_CLIENT_SECRET` | same | Optional. Shared |
@@ -86,9 +84,8 @@ Also needed on preview deploys if you want those features to work: `NEON_AUTH_CO
 | On the host | Staging GitHub secret | Production GitHub secret |
 |---|---|---|
 | `DATABASE_URL` | `STAGING_DATABASE_URL` | `PRODUCTION_DATABASE_URL` |
-| `NEON_AUTH_BASE_URL` | `STAGING_NEON_AUTH_BASE_URL` (or `NEON_AUTH_BASE_URL`) | `PRODUCTION_NEON_AUTH_BASE_URL` |
-| `NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` (or `NEON_AUTH_COOKIE_SECRET`) |
-| `NEXT_PUBLIC_APP_URL` | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
+| `BETTER_AUTH_SECRET` | `NEON_AUTH_COOKIE_SECRET` (legacy name) | `PRODUCTION_NEON_AUTH_COOKIE_SECRET` (or `NEON_AUTH_COOKIE_SECRET`) |
+| `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` | `STAGING_CF_APP_URL` | `PRODUCTION_CF_APP_URL` |
 | `IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` |
 | `IGDB_WEBHOOK_SECRET` | `IGDB_WEBHOOK_SECRET` | `PRODUCTION_IGDB_WEBHOOK_SECRET` |
 | `R2_AVATAR_BUCKET` | `STAGING_R2_AVATAR_BUCKET` (or `R2_AVATAR_BUCKET`) | `PRODUCTION_R2_AVATAR_BUCKET` |

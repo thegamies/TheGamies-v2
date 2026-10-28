@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { removeSelfHostedAuthUser } from "./remove-self-hosted-auth-user";
-import type { NeonSql } from "./remove-neon-auth-user";
+import type { NeonSql } from "./neon-sql";
 
 describe("removeSelfHostedAuthUser", () => {
   it("deletes auth_* rows and reports the user gone", async () => {

@@ -13,7 +13,7 @@ vi.mock("next/headers", () => ({
   headers: async () =>
     new Headers({
       cookie:
-        "__Secure-neon-auth.session_token=tok; __Secure-neon-auth.local.session_data=cache; tg_list_edit=keep",
+        "__Secure-better-auth.session_token=tok; tg_list_edit=keep",
     }),
   cookies: async () => ({
     set: (...args: unknown[]) => cookieSet(...args),
@@ -39,10 +39,9 @@ describe("signOutAction", () => {
     await expect(signOutAction()).rejects.toThrow("NEXT_REDIRECT");
     expect(signOut).toHaveBeenCalledOnce();
     const names = cookieSet.mock.calls.map((call) => call[0]);
-    expect(names).toEqual([
-      "__Secure-neon-auth.session_token",
-      "__Secure-neon-auth.local.session_data",
-    ]);
+    expect(names).toContain("__Secure-better-auth.session_token");
+    expect(names).toContain("better-auth.session_token");
+    expect(names).toContain("__Secure-neon-auth.session_token");
     expect(cookieSet.mock.calls.every((call) => call[2]?.maxAge === 0)).toBe(
       true,
     );

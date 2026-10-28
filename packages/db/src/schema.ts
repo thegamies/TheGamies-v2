@@ -322,7 +322,7 @@ export const igdbWebhookEvents = pgTable(
   ],
 );
 
-/** App profile linked to Neon Auth user id. Access is app-layer (session + ownership), not RLS. */
+/** App profile linked to Better Auth user id (`auth_user.id`). Access is app-layer (session + ownership), not RLS. */
 export const profiles = pgTable("profiles", {
   id: uuid("id").defaultRandom().primaryKey(),
   authUserId: text("auth_user_id").notNull().unique(),
@@ -1694,9 +1694,8 @@ export const tgaCommunityPickCounts = pgTable(
 );
 
 /**
- * Self-hosted Better Auth tables (spike). CamelCase columns match Better Auth
- * field names. Prefer these over Neon Managed `neon_auth.*` when
- * `BETTER_AUTH_SECRET` is set.
+ * Better Auth tables (self-hosted in the OpenNext Worker). CamelCase columns
+ * match Better Auth field names.
  */
 export const authUser = pgTable("auth_user", {
   id: text("id").primaryKey(),

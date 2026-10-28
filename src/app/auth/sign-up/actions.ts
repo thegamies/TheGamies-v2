@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth/server";
-import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
+import { markAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import {
   emailConfirmedCallbackPath,
   resolvePostAuthRedirect,
@@ -90,7 +90,7 @@ export async function signUpWithEmail(
       redirect(next);
     }
     if (skipEmailVerification()) {
-      const marked = await markNeonAuthEmailVerified({
+      const marked = await markAuthEmailVerified({
         authUserId: userId,
         email,
       }).catch(() => false);

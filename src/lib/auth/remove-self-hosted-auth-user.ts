@@ -1,5 +1,7 @@
 import { neon } from "@neondatabase/serverless";
-import type { NeonSql } from "./remove-neon-auth-user";
+import type { NeonSql } from "./neon-sql";
+
+export type { NeonSql };
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -41,8 +43,7 @@ function defaultQuery(): NeonSql {
 }
 
 /**
- * Remove a self-hosted Better Auth user from `auth_*` tables so the email
- * can be used again.
+ * Remove a Better Auth user from `auth_*` tables so the email can be used again.
  */
 export async function removeSelfHostedAuthUser(
   authUserId: string,

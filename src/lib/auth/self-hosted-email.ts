@@ -27,7 +27,7 @@ export function confirmationPageHrefFromToken(input: {
   return `${appOrigin}/auth/confirmed?token=${encodeURIComponent(input.token)}&next=${encodeURIComponent(next)}`;
 }
 
-/** Leave the reset token unused for the in-app form (same as Neon rewrite). */
+/** Leave the reset token unused for the in-app form. */
 export function resetPasswordPageHrefFromToken(input: {
   appOrigin: string;
   token: string;

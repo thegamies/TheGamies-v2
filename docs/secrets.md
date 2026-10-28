@@ -64,13 +64,11 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | GitHub secret | Becomes | Used by |
 |---|---|---|
 | `STAGING_DATABASE_URL` | `DATABASE_URL` | develop staging |
-| `STAGING_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | develop staging (alias: GitHub `NEON_AUTH_BASE_URL` also accepted) |
-| `NEON_AUTH_COOKIE_SECRET` | same | staging + PR previews (32+ chars) |
-| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare staging |
+| `NEON_AUTH_COOKIE_SECRET` | `BETTER_AUTH_SECRET` | Legacy GitHub name until renamed to `BETTER_AUTH_SECRET`. 32+ chars. Staging + PR previews |
+| `STAGING_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare staging |
 | `PRODUCTION_DATABASE_URL` | `DATABASE_URL` | Production migrate on `main` + Cloudflare app Worker + IGDB webhooks Worker. Never `STAGING_DATABASE_URL` / develop Neon |
-| `PRODUCTION_NEON_AUTH_BASE_URL` | `NEON_AUTH_BASE_URL` | Production Cloudflare app Worker (production Neon Auth URL) |
-| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `NEON_AUTH_COOKIE_SECRET` | Production Cloudflare (alias: GitHub `NEON_AUTH_COOKIE_SECRET`) |
-| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` | Cloudflare production |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | `BETTER_AUTH_SECRET` | Optional legacy name. Else CI uses `NEON_AUTH_COOKIE_SECRET` |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` (+ CI → `BETTER_AUTH_URL`) | Cloudflare production |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | `IGDB_WEBHOOKS_WORKER_URL` | Production app → production webhook Worker. Never the develop URL |
 | `ADMIN_SYNC_SECRET` | same | staging + PR previews |
 | `CRON_SECRET` | same | Cloudflare Worker Cron (`scheduled` → `/api/cron/edition-freeze`, Bearer). Staging and production CI inject onto the matching OpenNext Worker |
@@ -96,9 +94,10 @@ CI reads repo secrets and injects them on staging / preview / production Cloudfl
 | `NEXT_PUBLIC_ADSENSE_BANNER_SLOT` | same | Optional. Unset = site Display unit `2718908461`. `off` hides the banner |
 | `NEXT_PUBLIC_ADSENSE_TEST` | same | Optional. `on` / `off`. Unset = test ads in `next dev` only |
 | `AUTH_EMAIL_FROM` | same | Optional. Cloudflare Auth mail From address (default `The Gamies <noreply@thegamies.gg>`) |
-| `NEON_API_KEY`, `NEON_PROJECT_ID` | same | Optional on the app: close Auth directory users (Console → Auth → Users). Also used in CI for PR branches. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | same | Optional. Google sign-in for Better Auth (redirect `{origin}/api/auth/callback/google`) |
+| `NEON_API_KEY`, `NEON_PROJECT_ID` | same | CI for PR Neon database branches (not Auth user delete) |
 
-PR previews: Neon branch URL from CI overrides `DATABASE_URL` / auth; static keys above still come from GitHub.
+PR previews: Neon branch URL from CI overrides `DATABASE_URL`; static keys above still come from GitHub. Better Auth runs in the Worker against that branch’s `auth_*` tables.
 
 **Cloudflare:** Staging CI runs `wrangler secret bulk` on `thegamies-v2-develop` and, when paths match, on the IGDB webhooks Worker. Production CI migrates with `PRODUCTION_DATABASE_URL` (required), writes `.dev.vars`, deploys `thegamies-v2`, then `secret bulk` from **production** GitHub secrets only (never `STAGING_*`). Empty optional keys are skipped; existing Worker secrets for those keys are left as-is. Empty `PRODUCTION_DATABASE_URL` fails the workflow.
 

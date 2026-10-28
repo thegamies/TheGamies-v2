@@ -17,11 +17,11 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
-import { markNeonAuthEmailVerified } from "@/lib/auth/mark-email-verified";
+import { markAuthEmailVerified } from "@/lib/auth/mark-email-verified";
 import {
-  removeNeonAuthDirectoryUser,
+  removeSelfHostedAuthUser,
   type NeonSql,
-} from "@/lib/auth/remove-neon-auth-user";
+} from "@/lib/auth/remove-self-hosted-auth-user";
 import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
 import {
@@ -65,7 +65,7 @@ async function authPost(target: QaTarget, endpoint: string, body: unknown) {
 
 async function findAuthUserId(query: NeonSql, email: string) {
   const result =
-    await query`SELECT id FROM neon_auth."user" WHERE lower(email) = lower(${email}) LIMIT 1`;
+    await query`SELECT id FROM auth_user WHERE lower(email) = lower(${email}) LIMIT 1`;
   const id = rowsOf(result)[0]?.id;
   return typeof id === "string" ? id : null;
 }
@@ -105,17 +105,17 @@ async function ensureAuthUser(
     log(`${key}: created auth user`);
   }
   if (!authUserId) throw new Error(`${key}: auth user missing after sign-up`);
-  await markNeonAuthEmailVerified({ authUserId, query });
+  await markAuthEmailVerified({ authUserId, query });
 
   if (await signInWorks(target, key)) return authUserId;
 
   // Password secret rotated (or a half-made user): start the auth user over.
   log(`${key}: sign-in failed, recreating auth user`);
-  await removeNeonAuthDirectoryUser(authUserId, { query, email });
+  await removeSelfHostedAuthUser(authUserId, { query, email });
   await signUp(target, key);
   authUserId = await findAuthUserId(query, email);
   if (!authUserId) throw new Error(`${key}: auth user missing after recreate`);
-  await markNeonAuthEmailVerified({ authUserId, query });
+  await markAuthEmailVerified({ authUserId, query });
   if (!(await signInWorks(target, key))) {
     throw new Error(`${key}: sign-in still failing after recreate`);
   }

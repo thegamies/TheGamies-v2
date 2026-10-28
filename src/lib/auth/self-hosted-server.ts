@@ -53,7 +53,7 @@ function readGoogleOAuthEnv(): { clientId: string; clientSecret: string } | null
 }
 
 /**
- * Neon Auth–shaped wrapper around Better Auth so existing call sites keep
+ * App Auth wrapper around Better Auth so call sites keep
  * `getSession` / `signUp.email` / `handler()` / `middleware()` / `deleteUser`.
  */
 export function createSelfHostedAuth() {
