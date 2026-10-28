@@ -75,7 +75,7 @@ import {
   pickLoadtestGame,
   pickLoadtestGames,
   pickLoadtestShareList,
-  LOADTEST_WRITER_HEADER,
+  LOADTEST_SIGNED_IN_READ_FRACTION,
   type LoadtestFixturesFile,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
@@ -87,7 +87,6 @@ import {
 } from "@/lib/qa/loadtest-repair";
 import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
-import { loadtestSecretFromEnv } from "@/lib/qa/loadtest-guard";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
 type WriterSlot = { list: WriterListState };
@@ -400,7 +399,6 @@ async function runScenario(input: {
   vusRead: number;
   writers: number;
   fixtures: LoadtestFixturesFile;
-  secret: string | null;
   tag: string;
   skipRepair: boolean;
 }): Promise<string> {
@@ -450,9 +448,39 @@ async function runScenario(input: {
     });
   }
 
+  const signedInReaders = Math.min(
+    input.vusRead,
+    Math.floor(input.vusRead * LOADTEST_SIGNED_IN_READ_FRACTION),
+  );
+  const authTarget = { appUrl: input.appUrl };
+
   const readers = Array.from({ length: input.vusRead }, async (_, i) => {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
     if (delay > 0) await sleep(delay);
+
+    let cookie = "";
+    if (i < signedInReaders && input.fixtures.writerCount > 0) {
+      const account = loadtestAccount(
+        (i % input.fixtures.writerCount) + 1,
+      );
+      const signed = await signInEmailCookie(authTarget, {
+        email: account.email,
+        password: input.password,
+      });
+      if (signed.ok) {
+        cookie = signed.cookie;
+      } else {
+        samples.push({
+          group: "read",
+          step: "auth-signin",
+          status: signed.status,
+          ms: 0,
+          ok: false,
+          at: Date.now(),
+        });
+      }
+    }
+
     while (Date.now() < end) {
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
@@ -472,13 +500,14 @@ async function runScenario(input: {
                 : item.path;
       const t0 = Date.now();
       try {
-        const res = await fetch(`${input.appUrl}${path}`, {
-          headers: {
-            accept: item.pickSearch === "api" ? "application/json" : "text/html",
-            "x-cost-journey": journey,
-            "x-cost-step": path,
-          },
-        });
+        const headers: Record<string, string> = {
+          accept: item.pickSearch === "api" ? "application/json" : "text/html",
+          "x-cost-journey": journey,
+          "x-cost-step": path,
+        };
+        if (cookie) headers.cookie = cookie;
+        const res = await fetch(`${input.appUrl}${path}`, { headers });
+        if (cookie) cookie = mergeAuthCookies(cookie, res);
         await res.arrayBuffer().catch(() => null);
         samples.push({
           group: item.group,
@@ -508,9 +537,27 @@ async function runScenario(input: {
 
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
     const slot = writerSlots[i];
-    if (!slot || !input.secret || writesOpen.length === 0) return;
+    if (!slot || writesOpen.length === 0) return;
     const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
     if (delay > 0) await sleep(delay);
+
+    const account = loadtestAccount(i + 1);
+    const signed = await signInEmailCookie(authTarget, {
+      email: account.email,
+      password: input.password,
+    });
+    if (!signed.ok) {
+      samples.push({
+        group: "write",
+        step: "auth-signin",
+        status: signed.status,
+        ms: 0,
+        ok: false,
+        at: Date.now(),
+      });
+      return;
+    }
+    let cookie = signed.cookie;
 
     const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
@@ -518,8 +565,7 @@ async function runScenario(input: {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          authorization: `Bearer ${input.secret}`,
-          [LOADTEST_WRITER_HEADER]: String(i + 1),
+          cookie,
           "x-cost-journey": journey,
           "x-cost-step": step,
         },
@@ -528,6 +574,7 @@ async function runScenario(input: {
 
     const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
       const res = await postWrite(op, body, step);
+      cookie = mergeAuthCookies(cookie, res);
       const text = await res.text().catch(() => "");
       return { res, text };
     };
@@ -694,13 +741,12 @@ async function main() {
     );
   }
   const needsTrafficWriters = args.scenarios.some((s) => s !== "auth");
-  const secret = loadtestSecretFromEnv();
-  if (needsTrafficWriters && args.writers > 0 && !secret) {
-    throw new Error("LOADTEST_SECRET is required when --writers is set.");
-  }
-  if (args.scenarios.includes("auth") && fixtures.writerCount < 1) {
+  if (
+    (needsTrafficWriters && args.writers > 0 && fixtures.writerCount < 1) ||
+    (args.scenarios.includes("auth") && fixtures.writerCount < 1)
+  ) {
     throw new Error(
-      "Auth scenario needs ensured writer accounts; run pnpm qa:loadtest:ensure -- --writers N",
+      "Need ensured writer accounts; run pnpm qa:loadtest:ensure -- --writers N",
     );
   }
 
@@ -723,7 +769,6 @@ async function main() {
       vusRead: args.vusRead,
       writers: args.writers,
       fixtures,
-      secret,
       tag,
       skipRepair,
     });

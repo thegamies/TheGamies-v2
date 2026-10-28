@@ -108,10 +108,13 @@ export function isLoadtestUsername(username: string): boolean {
 }
 
 /**
- * Staging-only write harness header. Prefer real Auth session cookies;
- * kept for escape-hatch writers until Phase 3 removes it.
+ * Staging-only write harness header for the Bearer `LOADTEST_SECRET` escape
+ * hatch. Prefer real Auth session cookies on `/api/qa/loadtest`.
  */
 export const LOADTEST_WRITER_HEADER = "x-loadtest-writer";
+
+/** Share of traffic-scenario reader VUs that sign in before GETs. */
+export const LOADTEST_SIGNED_IN_READ_FRACTION = 0.25;
 
 export function parseLoadtestWriterHeader(raw: string | null): number | null {
   const parsed = parseWriterCount(raw);

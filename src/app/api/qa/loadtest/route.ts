@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getProfileByUsername } from "@/lib/profile/service";
 import { upsertEditionBallot } from "@/lib/communities/ballots";
 import { saveOwnedListFromClientDraft } from "@/lib/lists/service";
 import { setLibraryStatus } from "@/lib/library/service";
 import { parseLibraryStatus } from "@/lib/activity/kinds";
 import { saveCommunitySheet } from "@/lib/tga-pickem/sheets";
 import { getCommunityBySlug } from "@/lib/communities/service";
+import { LOADTEST_COMMUNITY, LOADTEST_TGA_YEAR } from "@/lib/qa/loadtest";
 import {
-  LOADTEST_COMMUNITY,
-  LOADTEST_TGA_YEAR,
-  LOADTEST_WRITER_HEADER,
-  loadtestAccount,
-  parseLoadtestWriterHeader,
-} from "@/lib/qa/loadtest";
-import {
-  authorizeLoadtestRequest,
   loadtestBodyTooLarge,
+  resolveLoadtestWriteActor,
 } from "@/lib/qa/loadtest-guard";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 
@@ -77,9 +70,9 @@ function refuseSlug(slug: string): string | null {
 }
 
 export async function POST(request: Request) {
-  const gate = authorizeLoadtestRequest(request);
-  if (!("ok" in gate)) {
-    return NextResponse.json({ error: gate.error }, { status: gate.status });
+  const actor = await resolveLoadtestWriteActor(request);
+  if (!("ok" in actor)) {
+    return NextResponse.json({ error: actor.error }, { status: actor.status });
   }
   if (loadtestBodyTooLarge(request.headers.get("content-length"))) {
     return NextResponse.json({ error: "Payload too large." }, { status: 413 });
@@ -91,18 +84,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid body." }, { status: 400 });
   }
 
-  const writerIndex = parseLoadtestWriterHeader(
-    request.headers.get(LOADTEST_WRITER_HEADER),
-  );
-  if (writerIndex == null) {
-    return NextResponse.json({ error: "Writer required." }, { status: 400 });
-  }
-  const account = loadtestAccount(writerIndex);
-  const profile = await getProfileByUsername(account.username).catch(() => null);
-  if (!profile) {
-    return NextResponse.json({ error: "Profile required." }, { status: 401 });
-  }
-
+  const profileId = actor.profileId;
   const body = parsed.data;
   if (
     body.op === "list-create" ||
@@ -111,7 +93,7 @@ export async function POST(request: Request) {
     body.op === "list-delete"
   ) {
     const result = await saveOwnedListFromClientDraft(body.draft, {
-      profileId: profile.id,
+      profileId,
     });
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
@@ -124,7 +106,7 @@ export async function POST(request: Request) {
     if (!status) {
       return NextResponse.json({ error: "Choose a library status." }, { status: 400 });
     }
-    await setLibraryStatus(profile.id, body.gameId, { status });
+    await setLibraryStatus(profileId, body.gameId, { status });
     return NextResponse.json({ ok: true });
   }
 
@@ -137,7 +119,7 @@ export async function POST(request: Request) {
     const result = await upsertEditionBallot({
       slug: body.slug,
       year: body.year,
-      profileId: profile.id,
+      profileId,
       items: body.items,
       categoryVotes: body.categoryVotes ?? [],
       customCategoryVotes: body.customCategoryVotes ?? [],
@@ -154,11 +136,11 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const community = await getCommunityBySlug(body.slug, profile.id);
+  const community = await getCommunityBySlug(body.slug, profileId);
   if (!community) {
     return NextResponse.json({ error: "Community not found." }, { status: 404 });
   }
-  const result = await saveCommunitySheet(community.id, profile.id, body.year, {
+  const result = await saveCommunitySheet(community.id, profileId, body.year, {
     worldPremieresGuess: body.worldPremieresGuess,
     picks: body.picks,
   });
