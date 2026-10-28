@@ -91,6 +91,19 @@ async function main() {
       await removeSelfHostedAuthUser(id, { query, email: account.email });
     }
   }
+
+  // Auth stress one-off sign-ups (`thegamies-qa-load-su-…@example.com`).
+  const signupUsers =
+    await query`SELECT id, email FROM auth_user WHERE email ILIKE 'thegamies-qa-load-su-%@example.com'`;
+  for (const row of rowsOf(signupUsers)) {
+    const id = row.id;
+    const email = row.email;
+    if (typeof id !== "string") continue;
+    await removeSelfHostedAuthUser(id, {
+      query,
+      email: typeof email === "string" ? email : undefined,
+    });
+  }
   log("removed load-test accounts");
 
   await rm(path.resolve("e2e/.auth/loadtest"), { recursive: true, force: true });

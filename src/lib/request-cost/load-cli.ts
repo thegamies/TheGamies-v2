@@ -1,5 +1,5 @@
 import {
-  LOADTEST_SCENARIOS,
+  LOADTEST_TRAFFIC_SCENARIOS,
   LOADTEST_WRITERS_MAX,
   parseWriterCount,
   resolveLoadtestScenario,
@@ -121,7 +121,7 @@ export function parseLoadArgs(argv: string[]): LoadCliArgs | { error: string } {
   }
 
   const resolved = all
-    ? [...LOADTEST_SCENARIOS]
+    ? [...LOADTEST_TRAFFIC_SCENARIOS]
     : scenarios.length > 0
       ? scenarios
       : (["general"] as LoadtestScenario[]);
