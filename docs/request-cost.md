@@ -75,8 +75,7 @@ Staging deploys with `REQUEST_COST_METER=1` (`--var` in `.github/workflows/stagi
 | Field | Meaning |
 |---|---|
 | `kind` | `document`, `rsc` (in-app navigation), `action` (Server Function), `image` (`/_next/image` transform), `api`, `other` |
-| `dbRoundTrips` / `dbStatements` | Neon HTTP requests / SQL statements (a `db.batch` is one trip, several statements) |
-| `authRoundTrips` / `auth429s` | Outbound calls from this Worker request to Neon Auth, and how many returned 429. A session-cache hit is 0. Each call also logs `{ "type": "neon_auth", "method", "path", "status" }` with the path only (no query string). A 429 shared across visitors means Neon is still counting one bucket; see [Auth session](./architecture.md#auth-session). |
+| `dbRoundTrips` / `dbStatements` | Neon HTTP requests / SQL statements (a `db.batch` is one trip, several statements). Auth sessions live in `auth_*` on the same Postgres — counted here, not as a separate Managed Auth meter. |
 | `dbBytes` | Decoded Neon response bytes: an upper bound on billed transfer |
 | `responseBytes` | Uncompressed bytes the Worker sent |
 | `journey` / `step` | From the `x-cost-journey` / `x-cost-step` request headers |
@@ -158,7 +157,7 @@ pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
 # or --all (three scenarios)
 # teardown: pnpm qa:loadtest:purge
 
-# Optional: 1000 public scale communities × 1000 is_seed users (no Neon Auth),
+# Optional: 1000 public scale communities × 1000 is_seed users (no Auth accounts),
 # each user a member with a complete 2025 community Pick’em sheet (~1M sheets).
 # Staging only. Purge with pnpm qa:pickem-scale -- --purge
 pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000

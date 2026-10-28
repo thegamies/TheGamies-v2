@@ -1,6 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import { isSelfHostedAuthEnabled } from "@/lib/auth/self-hosted-env";
-import type { NeonSql } from "./remove-neon-auth-user";
+import type { NeonSql } from "./neon-sql";
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -29,9 +28,9 @@ function defaultQuery(): NeonSql {
 }
 
 /**
- * True when Auth has an email/password credential for this user.
+ * True when Better Auth has an email/password credential for this user.
  * Google-only accounts have no password until they use Forgot password.
- * Missing account table fails open so password deletes still work.
+ * Missing `auth_account` fails open so password deletes still work.
  */
 export async function hasPasswordCredential(
   authUserId: string,
@@ -39,26 +38,14 @@ export async function hasPasswordCredential(
 ): Promise<boolean> {
   if (!authUserId.trim()) return false;
   const query = options?.query ?? defaultQuery();
-  const table = isSelfHostedAuthEnabled()
-    ? "auth_account"
-    : 'neon_auth.account';
   try {
-    const result =
-      table === "auth_account"
-        ? await query`
-            SELECT 1
-            FROM auth_account
-            WHERE "userId" = ${authUserId}
-              AND "providerId" = 'credential'
-            LIMIT 1
-          `
-        : await query`
-            SELECT 1
-            FROM neon_auth.account
-            WHERE "userId" = ${authUserId}
-              AND "providerId" = 'credential'
-            LIMIT 1
-          `;
+    const result = await query`
+      SELECT 1
+      FROM auth_account
+      WHERE "userId" = ${authUserId}
+        AND "providerId" = 'credential'
+      LIMIT 1
+    `;
     return rowsOf(result).length > 0;
   } catch (err) {
     if (isUndefinedRelation(err)) return true;

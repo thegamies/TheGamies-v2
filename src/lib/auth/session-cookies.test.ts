@@ -8,7 +8,7 @@ import {
 } from "./session-cookies";
 
 describe("isAuthSessionCookieName", () => {
-  it("matches Neon / Better Auth session cookies", () => {
+  it("matches Better Auth session cookies and legacy Neon names", () => {
     expect(isAuthSessionCookieName("better-auth.session_token")).toBe(true);
     expect(
       isAuthSessionCookieName("__Secure-better-auth.session_token"),
@@ -34,22 +34,28 @@ describe("authSessionCookieNamesFromHeader", () => {
 });
 
 describe("authCookieNamesToExpire", () => {
-  it("always includes the login cookie and the session cache", () => {
+  it("always includes Better Auth and legacy Neon cookie names", () => {
     expect(authCookieNamesToExpire("tg_list_edit=keep")).toEqual([
+      "__Secure-better-auth.session_token",
+      "better-auth.session_token",
       "__Secure-neon-auth.session_token",
       "__Secure-neon-auth.local.session_data",
+      "neon-auth.session_token",
     ]);
   });
 
   it("keeps chunked auth cookies from the request", () => {
     expect(
       authCookieNamesToExpire(
-        "__Secure-neon-auth.session_token.0=chunk; tg_list_edit=keep",
+        "__Secure-better-auth.session_token.0=chunk; tg_list_edit=keep",
       ),
     ).toEqual([
-      "__Secure-neon-auth.session_token.0",
+      "__Secure-better-auth.session_token.0",
+      "__Secure-better-auth.session_token",
+      "better-auth.session_token",
       "__Secure-neon-auth.session_token",
       "__Secure-neon-auth.local.session_data",
+      "neon-auth.session_token",
     ]);
   });
 });
@@ -129,7 +135,9 @@ describe("originMatchesRequestHost", () => {
 
   it("rejects a missing or malformed origin", () => {
     const url = "https://thegamies.gg/api/account/delete";
-    expect(originMatchesRequestHost(new Request(url), "https://thegamies.gg")).toBe(false);
+    expect(originMatchesRequestHost(new Request(url), "https://thegamies.gg")).toBe(
+      false,
+    );
     expect(
       originMatchesRequestHost(
         new Request(url, { headers: { origin: "null", host: "thegamies.gg" } }),

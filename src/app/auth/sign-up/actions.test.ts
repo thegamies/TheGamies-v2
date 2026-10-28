@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const signUpEmail = vi.fn();
 const ensureProfileForAuthUser = vi.fn();
 const skipEmailVerification = vi.fn(() => false);
-const markNeonAuthEmailVerified = vi.fn();
+const markAuthEmailVerified = vi.fn();
 const redirect = vi.fn((url: string) => {
   throw new Error(`REDIRECT:${url}`);
 });
@@ -33,8 +33,8 @@ vi.mock("@/lib/auth/skip-email-verification", () => ({
 }));
 
 vi.mock("@/lib/auth/mark-email-verified", () => ({
-  markNeonAuthEmailVerified: (...args: unknown[]) =>
-    markNeonAuthEmailVerified(...args),
+  markAuthEmailVerified: (...args: unknown[]) =>
+    markAuthEmailVerified(...args),
 }));
 
 import { signUpWithEmail } from "./actions";
@@ -63,7 +63,7 @@ describe("signUpWithEmail", () => {
     ensureProfileForAuthUser.mockReset();
     skipEmailVerification.mockReset();
     skipEmailVerification.mockReturnValue(false);
-    markNeonAuthEmailVerified.mockReset();
+    markAuthEmailVerified.mockReset();
     redirect.mockClear();
     ensureProfileForAuthUser.mockResolvedValue({
       profile: { id: "p1", username: "ada" },
@@ -114,7 +114,7 @@ describe("signUpWithEmail", () => {
     await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
       /REDIRECT:\/account/,
     );
-    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
+    expect(markAuthEmailVerified).not.toHaveBeenCalled();
     expect(getSession).not.toHaveBeenCalled();
   });
 
@@ -130,7 +130,7 @@ describe("signUpWithEmail", () => {
     await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
       /REDIRECT:\/account/,
     );
-    expect(markNeonAuthEmailVerified).not.toHaveBeenCalled();
+    expect(markAuthEmailVerified).not.toHaveBeenCalled();
   });
 
   it("skips confirm-email in local development", async () => {
@@ -139,12 +139,12 @@ describe("signUpWithEmail", () => {
       data: { user: { id: "user-1", emailVerified: false } },
       error: null,
     });
-    markNeonAuthEmailVerified.mockResolvedValue(true);
+    markAuthEmailVerified.mockResolvedValue(true);
 
     await expect(signUpWithEmail(null, form(fields))).rejects.toThrow(
       /REDIRECT:\/account/,
     );
-    expect(markNeonAuthEmailVerified).toHaveBeenCalledWith({
+    expect(markAuthEmailVerified).toHaveBeenCalledWith({
       authUserId: "user-1",
       email: "ada@example.com",
     });

@@ -201,7 +201,7 @@ Use React `cache()` helpers in `src/lib/auth/session.ts`:
 
 | Helper | Role |
 |---|---|
-| `getRequestSessionUser` | Neon Auth session user (once per request) |
+| `getRequestSessionUser` | Better Auth session user (once per request) |
 | `getRequestProfileByAuthUserId` | Profile row for that auth id (once per request) |
 
 `SiteHeader` and any page that needs the same session/profile (e.g. `/account`) should call these helpers so layout + page share one auth/profile round-trip.

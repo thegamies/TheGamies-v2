@@ -1053,17 +1053,6 @@ export const SITE_ENDPOINTS: SiteEndpoint[] = [
   }),
   row({
     method: "POST",
-    path: "/api/webhooks/neon-auth-email",
-    kind: "webhook",
-    group: "system",
-    audience: "system",
-    usage: 3,
-    dbImpact: 1,
-    testPriority: 2,
-    notes: "Auth mail. Not a public browse path.",
-  }),
-  row({
-    method: "POST",
     path: "/api/qa/loadtest",
     kind: "api",
     group: "system",

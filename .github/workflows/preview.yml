@@ -15,7 +15,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       # db_url cannot be a job output — GitHub strips secret-bearing outputs.
-      auth_url: ${{ steps.branch.outputs.auth_url }}
       branch_id: ${{ steps.branch.outputs.branch_id }}
       skipped: ${{ steps.guard.outputs.skipped }}
     steps:
@@ -36,7 +35,6 @@ jobs:
           parent_branch: develop
           api_key: ${{ secrets.NEON_API_KEY }}
           role: neondb_owner
-          get_auth_url: true
 
   migrate:
     if: github.event.action != 'closed'
@@ -128,10 +126,8 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ steps.db.outputs.database_url }}
-          NEON_AUTH_BASE_URL: ${{ needs.neon.outputs.auth_url }}
-          NEON_AUTH_COOKIE_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
-          # Spike: reuse cookie secret as Better Auth secret so previews prefer self-hosted.
-          BETTER_AUTH_SECRET: ${{ secrets.NEON_AUTH_COOKIE_SECRET }}
+          # Legacy GitHub secret name until renamed to BETTER_AUTH_SECRET.
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
@@ -164,8 +160,6 @@ jobs:
           const fs = require("fs");
           const keys = [
             "DATABASE_URL",
-            "NEON_AUTH_BASE_URL",
-            "NEON_AUTH_COOKIE_SECRET",
             "BETTER_AUTH_SECRET",
             "GOOGLE_CLIENT_ID",
             "GOOGLE_CLIENT_SECRET",
@@ -189,21 +183,12 @@ jobs:
             secrets[key] = val;
             lines.push(`${key}=${val.replace(/\n/g, "\\n")}`);
           }
-          // Client + server must agree: only enable the Better Auth client when the secret is present.
-          if ((process.env.BETTER_AUTH_SECRET || "").trim().length >= 32) {
-            secrets.NEXT_PUBLIC_SELF_HOSTED_AUTH = "1";
-            lines.push("NEXT_PUBLIC_SELF_HOSTED_AUTH=1");
-          }
           fs.writeFileSync(".dev.vars", lines.join("\n") + "\n");
           fs.writeFileSync(
             process.env.RUNNER_TEMP + "/wrangler-secrets.json",
             JSON.stringify(secrets),
           );
           NODE
-          # Bake the client flag into the OpenNext build (same-step export; GITHUB_ENV is next-step only).
-          if [ "${#BETTER_AUTH_SECRET}" -ge 32 ]; then
-            export NEXT_PUBLIC_SELF_HOSTED_AUTH=1
-          fi
           pnpm exec opennextjs-cloudflare build
           DEPLOY_LOG=$(pnpm exec wrangler deploy 2>&1 | tee /dev/stderr)
           if [ -s "$RUNNER_TEMP/wrangler-secrets.json" ] && [ "$(cat "$RUNNER_TEMP/wrangler-secrets.json")" != "{}" ]; then
@@ -227,51 +212,9 @@ jobs:
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           echo "Cloudflare preview: $URL"
 
-  auth_domains:
-    if: github.event.action != 'closed'
-    needs: [neon, cloudflare]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Register Neon Auth trusted domains
-        if: needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-          CF_URL: ${{ needs.cloudflare.outputs.url }}
-        run: |
-          chmod +x scripts/ci/register-neon-auth-domains.sh
-          ARGS=("$BRANCH_ID")
-          case "$CF_URL" in
-            https://*|http://*) ARGS+=("$CF_URL") ;;
-          esac
-          if [ "${#ARGS[@]}" -gt 1 ]; then
-            scripts/ci/register-neon-auth-domains.sh "${ARGS[@]}"
-          else
-            echo "No deploy URLs to register."
-          fi
-      - name: Register Neon Auth email webhook on Cloudflare
-        if: needs.neon.outputs.skipped != 'true' && needs.neon.outputs.branch_id != ''
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          BRANCH_ID: ${{ needs.neon.outputs.branch_id }}
-          CF_URL: ${{ needs.cloudflare.outputs.url }}
-        run: |
-          chmod +x scripts/ci/register-neon-auth-email-webhook.sh
-          case "$CF_URL" in
-            https://*)
-              scripts/ci/register-neon-auth-email-webhook.sh "$BRANCH_ID" "$CF_URL"
-              ;;
-            *)
-              echo "No Cloudflare https URL; skipping Auth email webhook."
-              ;;
-          esac
-
   comment:
     if: github.event.action != 'closed'
-    needs: [neon, migrate, cloudflare, auth_domains]
+    needs: [neon, migrate, cloudflare]
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
@@ -293,7 +236,7 @@ jobs:
               `| Migrate | ${migrateSkipped ? 'skipped' : 'applied'} | catalog schema |`,
               `| Cloudflare | ${cfSkipped ? 'skipped (secrets)' : 'deployed'} | ${cfUrl} |`,
               '',
-              'Self-hosted Better Auth spike: previews set `BETTER_AUTH_SECRET` + `NEXT_PUBLIC_SELF_HOSTED_AUTH=1` and migrate `auth_*` tables on the Neon branch. Email verification uses Worker EMAIL (no Neon Auth webhook required for that path). Neon Auth domain/webhook registration still runs for fallback.',
+              'Auth: self-hosted Better Auth (`BETTER_AUTH_SECRET` + `auth_*` on the Neon branch). Verification mail uses Worker EMAIL. Google redirect: `{preview}/api/auth/callback/google`.',
               '',
               '_Configure secrets listed in `docs/deployment.md` to enable deploys._',
             ].join('\n');

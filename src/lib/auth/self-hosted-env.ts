@@ -1,6 +1,6 @@
 /**
- * Self-hosted Better Auth is on when `BETTER_AUTH_SECRET` is set (32+ chars)
- * and `DATABASE_URL` is present. Prefers this over Neon Managed Auth.
+ * Better Auth is configured when `BETTER_AUTH_SECRET` is set (32+ chars)
+ * and `DATABASE_URL` is present.
  */
 export function readSelfHostedAuthEnv(): {
   secret: string;
@@ -21,9 +21,4 @@ export function readSelfHostedAuthEnv(): {
 
 export function isSelfHostedAuthEnabled(): boolean {
   return readSelfHostedAuthEnv() !== null;
-}
-
-/** Build-time / client flag. Set `NEXT_PUBLIC_SELF_HOSTED_AUTH=1` with the secret. */
-export function isSelfHostedAuthClientEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_SELF_HOSTED_AUTH === "1";
 }

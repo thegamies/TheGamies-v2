@@ -39,20 +39,17 @@ Production deploy is not a copy of staging. Closing these is the launch itself.
 
 ### 1. Production pipeline parity
 
-`.github/workflows/production.yml` runs `pnpm db:migrate` against `PRODUCTION_DATABASE_URL` (required — deploy fails if missing), then Cloudflare (`pnpm deploy:cf` + production `secret bulk`). Compared with [staging.yml](../.github/workflows/staging.yml) it still does **not**:
+`.github/workflows/production.yml` runs `pnpm db:migrate` against `PRODUCTION_DATABASE_URL` (required — deploy fails if missing), then Cloudflare (`pnpm deploy:cf` + production `secret bulk`).
 
-- Point Neon Auth email webhooks at the production Worker
-- Inject `NEON_API_KEY` / `NEON_PROJECT_ID` onto the app (account close)
-
-**Shipped:** migrate on `main` + production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_NEON_AUTH_BASE_URL`, `PRODUCTION_CF_APP_URL`, `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_IGDB_WEBHOOK_SECRET`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*`, staging `IGDB_WEBHOOK_SECRET`, or the staging upload bucket.
+**Shipped:** migrate on `main` + production Cloudflare `secret bulk` uses `PRODUCTION_DATABASE_URL`, `PRODUCTION_CF_APP_URL` (→ `BETTER_AUTH_URL`), `BETTER_AUTH_SECRET` (from `PRODUCTION_NEON_AUTH_COOKIE_SECRET` or `NEON_AUTH_COOKIE_SECRET`), `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL`, `PRODUCTION_IGDB_WEBHOOK_SECRET`, `PRODUCTION_R2_AVATAR_BUCKET`, `PRODUCTION_AVATAR_PUBLIC_BASE_URL`, and shared keys (`CRON_SECRET`, R2 account/keys, IGDB client, `ADMIN_SYNC_SECRET`). It never reads `STAGING_*`, staging `IGDB_WEBHOOK_SECRET`, or the staging upload bucket.
 
 ### 2. Canonical public origin
 
 Decide the live hostname (`thegamies.gg`) on Cloudflare. Then:
 
 - DNS + TLS
-- Neon Auth **trusted domains** for that origin (and www if used)
-- `NEXT_PUBLIC_APP_URL` on the production Worker
+- `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` on the production Worker
+- Google OAuth redirect `{origin}/api/auth/callback/google` for that origin (if Google is enabled)
 - Redirect `workers.dev` so cookies, Auth, and share links do not split
 
 Email and OG URLs will be wrong until this is one origin.
@@ -60,8 +57,7 @@ Email and OG URLs will be wrong until this is one origin.
 ### 3. Production Neon + Auth mail
 
 - Production Neon branch, backups, and `DATABASE_URL` only on production
-- Neon Auth on that branch: application name **The Gamies**, sign-up, verification **link** (not leftover OTP), password reset to `/auth/reset-password`
-- Webhook `send.magic_link` / `send.otp` → production Worker `/api/webhooks/neon-auth-email` (once; do not leave it on staging)
+- Better Auth in the production Worker (`BETTER_AUTH_SECRET`, `auth_*` tables); password reset to `/auth/reset-password`; verification via Worker `EMAIL` hooks (no Neon Auth webhook)
 - Cloudflare **Email Sending** for `noreply@thegamies.gg` (SPF / DKIM / DMARC)
 - Inbound routing for `hello@`, `privacy@`, `support@` — those addresses are already in the UI
 
@@ -136,7 +132,7 @@ Confirm these exist on **production** (and staging, where still missing):
 
 ### Safety and abuse
 
-- No app-level rate limit or Turnstile on sign-up, list save, or search. Neon Auth may throttle some Auth routes; ranking spam is still “create accounts.” Terms already forbid it; there is **no in-product report / ballot invalidate** (open decision). Minimum: working support inbox + a host-side way to pull a bad ballot (even if that is ops/rebuild, document it).
+- No app-level rate limit or Turnstile on sign-up, list save, or search. Ranking spam is still “create accounts.” Terms already forbid it; there is **no in-product report / ballot invalidate** (open decision). Minimum: working support inbox + a host-side way to pull a bad ballot (even if that is ops/rebuild, document it).
 - App-layer session checks only (RLS deferred). Acceptable for v1 if those checks stay on every write. Do not treat RLS as a launch blocker.
 - Seed voters on a production database would pollute public GOTY. Disable or hard-gate `/admin/seed` in production.
 
@@ -198,8 +194,8 @@ Terms and Privacy exist (13+, cookies, public lists). Before a public URL:
 
 ## Suggested order
 
-1. **Production workflow** — Auth webhook + confirm `PRODUCTION_DATABASE_URL` is the production Neon branch (migrate already runs on `main`)
-2. **Domain + Auth + mail** — one origin, trusted domains, sending + inboxes  
+1. **Production workflow** — confirm `PRODUCTION_DATABASE_URL` is the production Neon branch and `BETTER_AUTH_SECRET` / app URL are on the Worker (migrate already runs on `main`)
+2. **Domain + Auth + mail** — one origin, Better Auth + Email Sending + inboxes  
 3. **Catalog** — backfill production, webhooks Worker live  
 4. Confirm `CRON_SECRET` is in GitHub so freeze Cron authorizes on the Worker  
 5. **Chrome cleanup** — design-system `noindex` / production 404; seed off production. Site operators are shipped.  
