@@ -3,7 +3,10 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 import { createDb } from "@thegamies/db";
+import { markAuthEmailVerified } from "@/lib/auth/mark-email-verified";
+import type { NeonSql } from "@/lib/auth/neon-sql";
 import { costWarmupHits } from "@/lib/request-cost/warmup";
 import {
   loadVuStartOffsetMs,
@@ -50,13 +53,22 @@ import {
   type PgStatSnapshotRow,
 } from "@/lib/request-cost/pg-stat-delta";
 import {
+  authGetSession,
+  authPost,
+  findAuthUserIdByEmail,
+  mergeAuthCookies,
+  signInEmailCookie,
+} from "@/lib/qa/auth-http";
+import {
   assertLoadtestFixturesSafe,
   LOADTEST_BALLOT_ITEM_COUNT,
   LOADTEST_COMMUNITY,
   LOADTEST_EDITION_YEAR,
   LOADTEST_TGA_YEAR,
   completeLoadtestTgaPicks,
+  loadtestAccount,
   loadtestBallotGames,
+  loadtestSignUpEmail,
   loadtestTgaSlateFromFixtures,
   loadtestTgaYearFromFixtures,
   loadtestWriteGames,
@@ -164,10 +176,225 @@ async function capturePgExec(
   return { ok: true, rows: diffPgStatSnapshots(before, after) };
 }
 
+type AuthOp =
+  | "auth-signup"
+  | "auth-signin"
+  | "auth-get-session"
+  | "auth-read";
+
+const AUTH_OPS: Array<{ op: AuthOp; weight: number }> = [
+  { op: "auth-signup", weight: 2 },
+  { op: "auth-signin", weight: 3 },
+  { op: "auth-get-session", weight: 3 },
+  { op: "auth-read", weight: 2 },
+];
+
+function authReadPath(fixtures: LoadtestFixturesFile): string {
+  const roll = Math.random();
+  if (roll < 0.35) return "/account";
+  if (roll < 0.55) return "/create";
+  if (roll < 0.7) return "/create/goty";
+  if (roll < 0.85) {
+    return `/u/${pickLoadtestUsername(fixtures.writerCount)}`;
+  }
+  const list = pickLoadtestShareList(fixtures.lists ?? []);
+  return list ? loadShareListPath(list) : "/account";
+}
+
+async function runAuthScenario(input: {
+  appUrl: string;
+  databaseUrl: string;
+  password: string;
+  durationMs: number;
+  rampMs: number;
+  vusRead: number;
+  poolSize: number;
+  fixtures: LoadtestFixturesFile;
+  tag: string;
+}): Promise<string> {
+  const target = { appUrl: input.appUrl };
+  const query = neon(input.databaseUrl) as unknown as NeonSql;
+  const pgBefore = await snapshotPgStatStatementsAt(input.databaseUrl);
+  await warmup(input.appUrl, "/auth/sign-in");
+
+  const samples: LoadSample[] = [];
+  const started = new Date();
+  const end = started.getTime() + input.durationMs;
+  const rampMs = Math.min(Math.max(0, input.rampMs), input.durationMs);
+  const journey = `${input.tag}-auth`;
+  const runId = stampUtc(started).slice(0, 20);
+  const poolSize = Math.max(1, Math.min(input.poolSize, input.fixtures.writerCount));
+
+  const vus = Array.from({ length: Math.max(1, input.vusRead) }, async (_, vu) => {
+    const delay = loadVuStartOffsetMs(vu, Math.max(1, input.vusRead), rampMs);
+    if (delay > 0) await sleep(delay);
+
+    let cookie = "";
+    let signupSeq = 0;
+    const poolIndex = (vu % poolSize) + 1;
+
+    // Seed the jar once so get-session / signed-in reads have a session.
+    {
+      const account = loadtestAccount(poolIndex);
+      const signed = await signInEmailCookie(target, {
+        email: account.email,
+        password: input.password,
+      });
+      if (signed.ok) cookie = signed.cookie;
+    }
+
+    while (Date.now() < end) {
+      const item = pickWeighted(AUTH_OPS);
+      const t0 = Date.now();
+      try {
+        if (item.op === "auth-signup") {
+          signupSeq += 1;
+          const email = loadtestSignUpEmail({
+            runId,
+            vu,
+            seq: signupSeq,
+          });
+          const res = await authPost(target, "sign-up/email", {
+            email,
+            password: input.password,
+            name: `Load SU ${vu}-${signupSeq}`,
+          });
+          // @example.com skips Worker EMAIL; SQL verify so a follow-up sign-in works.
+          if (res.ok) {
+            const authUserId = await findAuthUserIdByEmail(query, email);
+            if (authUserId) {
+              await markAuthEmailVerified({ authUserId, query });
+            }
+            cookie = mergeAuthCookies(cookie, res);
+          }
+          samples.push({
+            group: "general",
+            step: item.op,
+            status: res.status,
+            ms: Date.now() - t0,
+            ok: res.ok,
+            at: Date.now(),
+            ...readLoadCostHeaders(res.headers),
+          });
+          continue;
+        }
+
+        if (item.op === "auth-signin") {
+          const account = loadtestAccount((vu + signupSeq) % poolSize + 1);
+          const res = await authPost(target, "sign-in/email", {
+            email: account.email,
+            password: input.password,
+          });
+          if (res.ok) cookie = mergeAuthCookies("", res);
+          samples.push({
+            group: "general",
+            step: item.op,
+            status: res.status,
+            ms: Date.now() - t0,
+            ok: res.ok,
+            at: Date.now(),
+            ...readLoadCostHeaders(res.headers),
+          });
+          continue;
+        }
+
+        if (item.op === "auth-get-session") {
+          if (!cookie) {
+            const account = loadtestAccount(poolIndex);
+            const signed = await signInEmailCookie(target, {
+              email: account.email,
+              password: input.password,
+            });
+            if (signed.ok) cookie = signed.cookie;
+          }
+          const res = await authGetSession(target, cookie || "x=1");
+          if (res.ok) cookie = mergeAuthCookies(cookie, res);
+          samples.push({
+            group: "general",
+            step: item.op,
+            status: res.status,
+            ms: Date.now() - t0,
+            ok: res.ok,
+            at: Date.now(),
+            ...readLoadCostHeaders(res.headers),
+          });
+          continue;
+        }
+
+        // auth-read
+        if (!cookie) {
+          const account = loadtestAccount(poolIndex);
+          const signed = await signInEmailCookie(target, {
+            email: account.email,
+            password: input.password,
+          });
+          if (signed.ok) cookie = signed.cookie;
+        }
+        const pathName = authReadPath(input.fixtures);
+        const res = await fetch(`${input.appUrl}${pathName}`, {
+          headers: {
+            accept: "text/html",
+            cookie: cookie || "",
+            "x-cost-journey": journey,
+            "x-cost-step": pathName,
+          },
+        });
+        await res.arrayBuffer().catch(() => null);
+        samples.push({
+          group: "general",
+          step: `auth-read:${pathName}`,
+          status: res.status,
+          ms: Date.now() - t0,
+          ok: res.ok,
+          at: Date.now(),
+          ...readLoadCostHeaders(res.headers),
+        });
+      } catch {
+        samples.push({
+          group: "general",
+          step: item.op,
+          status: 0,
+          ms: Date.now() - t0,
+          ok: false,
+          at: Date.now(),
+        });
+      }
+    }
+  });
+
+  await Promise.all(vus);
+  const ended = new Date();
+  const stats: LoadRunStats = {
+    scenario: "auth",
+    durationMs: ended.getTime() - started.getTime(),
+    rampMs,
+    vusRead: input.vusRead,
+    writers: 0,
+    startedAt: started.toISOString(),
+    endedAt: ended.toISOString(),
+    samples,
+    pgExec: await capturePgExec(input.databaseUrl, pgBefore),
+  };
+  const report = formatLoadReport(stats);
+  const html = formatLoadHtmlReport(stats);
+  const dir = path.resolve("e2e/.cost");
+  await mkdir(dir, { recursive: true });
+  const stem = `load-auth-${stampUtc(started)}`;
+  const file = path.join(dir, `${stem}.md`);
+  await writeFile(file, report);
+  await writeFile(path.join(dir, `${stem}.json`), JSON.stringify(stats));
+  await writeFile(path.join(dir, `${stem}.html`), html);
+  console.log(report);
+  console.log(`wrote ${path.relative(process.cwd(), file)}`);
+  console.log(`wrote ${path.relative(process.cwd(), path.join(dir, `${stem}.html`))}`);
+  return file;
+}
+
 async function runScenario(input: {
   scenario: LoadtestScenario;
   appUrl: string;
   databaseUrl: string;
+  password: string;
   durationMs: number;
   rampMs: number;
   vusRead: number;
@@ -177,6 +404,20 @@ async function runScenario(input: {
   tag: string;
   skipRepair: boolean;
 }): Promise<string> {
+  if (input.scenario === "auth") {
+    return runAuthScenario({
+      appUrl: input.appUrl,
+      databaseUrl: input.databaseUrl,
+      password: input.password,
+      durationMs: input.durationMs,
+      rampMs: input.rampMs,
+      vusRead: input.vusRead,
+      poolSize: Math.max(1, input.writers || input.fixtures.writerCount),
+      fixtures: input.fixtures,
+      tag: input.tag,
+    });
+  }
+
   const pickemPhaseRef = { phase: "open" as LoadPickemPhase };
   const getsOpen = buildLoadGets(input.scenario, input.fixtures, "open");
   const getsLocked = buildLoadGets(input.scenario, input.fixtures, "locked");
@@ -452,15 +693,21 @@ async function main() {
       `Need ${args.writers} writer profiles; run pnpm qa:loadtest:ensure -- --writers ${args.writers}`,
     );
   }
+  const needsTrafficWriters = args.scenarios.some((s) => s !== "auth");
   const secret = loadtestSecretFromEnv();
-  if (args.writers > 0 && !secret) {
+  if (needsTrafficWriters && args.writers > 0 && !secret) {
     throw new Error("LOADTEST_SECRET is required when --writers is set.");
+  }
+  if (args.scenarios.includes("auth") && fixtures.writerCount < 1) {
+    throw new Error(
+      "Auth scenario needs ensured writer accounts; run pnpm qa:loadtest:ensure -- --writers N",
+    );
   }
 
   const skipRepair = process.env.COST_LOAD_SKIP_REPAIR === "1";
   if (skipRepair) {
     console.log("cost-load: skipping phase repair");
-  } else {
+  } else if (args.scenarios.some((s) => s !== "auth")) {
     await repairPhases(fixtures, target.databaseUrl);
   }
   const tag = process.env.COST_RUN_TAG?.trim() || `load-${Date.now()}`;
@@ -470,6 +717,7 @@ async function main() {
       scenario,
       appUrl: target.appUrl,
       databaseUrl: target.databaseUrl,
+      password: target.password,
       durationMs: args.durationMs,
       rampMs: args.rampMs,
       vusRead: args.vusRead,

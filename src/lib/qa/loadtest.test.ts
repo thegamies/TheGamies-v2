@@ -15,8 +15,10 @@ import {
   LOADTEST_WRITERS_MAX,
   assertLoadtestFixturesSafe,
   isLoadtestEmail,
+  isLoadtestSignUpEmail,
   loadtestAccount,
   loadtestAccountsValidThrough,
+  loadtestSignUpEmail,
   loadtestSyntheticAuthUserId,
   parseLoadtestWriterHeader,
   loadtestEditionOpenSchedule,
@@ -69,6 +71,13 @@ describe("loadtest identities", () => {
     expect(parseLoadtestWriterHeader("101")).toBeNull();
     expect(parseLoadtestWriterHeader(null)).toBeNull();
     expect(loadtestSyntheticAuthUserId(1)).toBe("seed:loadtest:gamies_qa_load_001");
+  });
+
+  it("builds undeliverable Auth stress sign-up emails", () => {
+    const email = loadtestSignUpEmail({ runId: "run-1", vu: 2, seq: 7 });
+    expect(email).toBe("thegamies-qa-load-su-run-1-002-00007@example.com");
+    expect(isLoadtestSignUpEmail(email)).toBe(true);
+    expect(isLoadtestSignUpEmail("ada@gmail.com")).toBe(false);
   });
 
   it("caps writers at 100", () => {

@@ -150,11 +150,13 @@ Dedicated fixtures (ensure does **not** flip the live Pick’em schedule or QA s
 
 ```bash
 # Doppler: QA_TARGET=staging, QA_STAGING_URL, DATABASE_URL, QA_ACCOUNT_PASSWORD
-# Writers also need LOADTEST_SECRET (GitHub → staging Worker; local Doppler)
+# Traffic writers also need LOADTEST_SECRET (GitHub → staging Worker; local Doppler)
 
 pnpm qa:loadtest:ensure -- --writers 50
 pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
-# or --all (three scenarios)
+# or --all (general + pickem + editions; Auth is separate)
+# Auth stress (real Better Auth; no Worker EMAIL — @example.com + SQL verify):
+pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=50
 # teardown: pnpm qa:loadtest:purge
 
 # Optional: 1000 public scale communities × 1000 is_seed users (no Auth accounts),
@@ -165,11 +167,18 @@ pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000
 
 `--ramp` is k6 `ramping-vus`: VUs start at 0 and reach the target linearly, then hold for the rest of `--duration`. Default **30s**. `--ramp 0` starts every loop at once (the old stampede). Duration includes the ramp (90s with a 30s ramp is 30s climb + 60s hold).
 
-Scenarios (each includes a general mix of home, `/games`, a game, **game search**, `/rankings` explainer, `/game-of-the-year`, **2025** GOTY standings, 2025 categories, rotating category boards, **`/create`**, **`/create/goty`**, **`/create/custom`**, load-test **profiles** `/u/:username`, and planted **share lists** `/u/:username/:listSlug`): `general`, `pickem` (2025 open then locked at halfway), `editions` (2025 ballots, then published results at halfway, including Reveal). Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only, plus list-editor `GET /api/games/search`. Individual category URLs roll up as `/game-of-the-year/:year/categories?category=:id`. Search queries roll up as `/games?q=:q` and `/api/games/search?q=:q` (equal mix weights). Queries are drawn from the fixture catalog: **full title** most often, some mid-length tokens, and a few **2–3 character** prefixes. Re-run `pnpm qa:loadtest:ensure` so `fixtures.json` includes titles. `pickem-open` / `pickem-locked` still parse as `pickem`. `editions-filling` / `editions-results` still parse as `editions`.
+**Ensure** creates real Better Auth users (`POST /api/auth/sign-up/email`) for `thegamies-qa-load-NNN@example.com`, marks them verified in SQL (so sign-in works without confirm mail), and wires profiles. `@example.com` is undeliverable — Worker `EMAIL` never sends. Use the same `QA_ACCOUNT_PASSWORD` as staging QA.
+
+Scenarios:
+
+- **Traffic** (`general`, `pickem`, `editions`): each includes a general mix of home, `/games`, a game, **game search**, `/rankings` explainer, `/game-of-the-year`, **2025** GOTY standings, 2025 categories, rotating category boards, **`/create`**, **`/create/goty`**, **`/create/custom`**, load-test **profiles** `/u/:username`, and planted **share lists** `/u/:username/:listSlug`. `pickem` (2025 open then locked at halfway), `editions` (2025 ballots, then published results at halfway, including Reveal). Default duration **10m**, `--vus-read=20`, `--writers=0`. HTML documents only, plus list-editor `GET /api/games/search`. `--all` runs these three only.
+- **`auth`**: real Auth stress — sign-up (unique `thegamies-qa-load-su-…@example.com` + SQL verify), sign-in against the ensured pool, `GET /api/auth/get-session` (cookie refresh / cache), and signed-in HTML reads (`/account`, `/create`, profiles, share lists). `--writers` sizes the sign-in pool (must be ≤ ensured count). No `LOADTEST_SECRET`. Not in `--all`.
+
+Individual category URLs roll up as `/game-of-the-year/:year/categories?category=:id`. Search queries roll up as `/games?q=:q` and `/api/games/search?q=:q` (equal mix weights). Queries are drawn from the fixture catalog: **full title** most often, some mid-length tokens, and a few **2–3 character** prefixes. Re-run `pnpm qa:loadtest:ensure` so `fixtures.json` includes titles. `pickem-open` / `pickem-locked` still parse as `pickem`. `editions-filling` / `editions-results` still parse as `editions`.
 
 Each run writes `e2e/.cost/load-{scenario}-{timestamp}.md` (counts, p50/p90/p95/p99 by group and by path/op, errors, UTC window), plus `.json` samples and `.html` with filters for group, kind (`/games/:slug` rolls up game pages; `/u/:username/:listSlug` rolls planted share URLs; Path chips drill into one slug. `list-create/:n`, `list-edit/:n`, and `list-delete/:n` roll up the same way; Path chips are `list-create/1` … `list-create/10`), and status. Endpoint and Neon-trip tables include **% time** (share of summed client time / summed trip wait in the current filter) and **Neon CPU** (mean Postgres exec per successful request: statement mean × trips on that URL). HTML tables use separate percentile columns, a percentile visibility filter, horizontal scroll, and click-to-sort headers. A timeline buckets the run (auto / 1s / 10s / 1m) and counts how many client requests in each bucket were at least as slow as the run’s p50 / p90 / p95 / p99. Client times are the load runner’s HTTP round-trip. After this Worker is on staging, samples store wall, **db clock** (`x-cost-db-span-ms`, overlap union), **db sum** (`x-cost-db-ms`, parallel trips add), and per-trip SQL fingerprints (`x-cost-db-trip-detail`, no bind params). Rebuild HTML from JSON with `pnpm exec tsx scripts/cost/render-load-html.ts e2e/.cost/load-….json`. Copy that window into Neon CU-hours and Cloudflare Worker CPU for `thegamies-v2-develop`. The report is not a dollar amount. `COST_LOAD_SKIP_REPAIR=1` skips edition repair and the 2025 Pick’em open/lock flip (GET-only smoke when fixtures already exist). Previous runs that only wrote markdown cannot be split by path.
 
-Writers do not sign in. Each write sends the load-test secret and a writer index. The harness looks up that load-test profile and saves as them. That avoids Auth sign-in bursts.
+Traffic writers do not sign in yet (Phase 3). Each write sends the load-test secret and a writer index. The harness looks up that load-test profile and saves as them. The **`auth`** scenario exercises real sign-in and session cookies separately.
 
 Ensure builds a **capped** catalog pool (40 popular + 10 obscure by `popularity`, plus a 2025 ballot pool). List/library/GET game pages rotate across it (~80% popular). Each load-test account also gets one public custom list (`load-share`); readers pick from that group at random. Re-run `pnpm qa:loadtest:ensure` to refresh `fixtures.json` and to plant 1,000 filled 2025 ballots (3 hosts). Pick’em uses the real **2025** nominee slate; each writer fills every category (nominees rotate by writer index).
 

@@ -38,6 +38,14 @@ export const LOADTEST_SCENARIOS = [
   "general",
   "pickem",
   "editions",
+  "auth",
+] as const;
+
+/** Traffic-cost scenarios for `--all` (excludes Auth stress). */
+export const LOADTEST_TRAFFIC_SCENARIOS = [
+  "general",
+  "pickem",
+  "editions",
 ] as const;
 
 export type LoadtestScenario = (typeof LOADTEST_SCENARIOS)[number];
@@ -99,7 +107,10 @@ export function isLoadtestUsername(username: string): boolean {
   );
 }
 
-/** Load-test writes name the writer. They do not sign in. */
+/**
+ * Staging-only write harness header. Prefer real Auth session cookies;
+ * kept for escape-hatch writers until Phase 3 removes it.
+ */
 export const LOADTEST_WRITER_HEADER = "x-loadtest-writer";
 
 export function parseLoadtestWriterHeader(raw: string | null): number | null {
@@ -108,9 +119,31 @@ export function parseLoadtestWriterHeader(raw: string | null): number | null {
   return parsed;
 }
 
+/**
+ * @deprecated Prefer real Better Auth users from `qa:loadtest:ensure`.
+ * Kept for older planted profiles until purge + re-ensure.
+ */
 export function loadtestSyntheticAuthUserId(index: number): string {
   const account = loadtestAccount(index);
   return `seed:loadtest:${account.username}`;
+}
+
+/** One-off Auth stress sign-ups (purged after runs / by purge script). */
+export function loadtestSignUpEmail(input: {
+  runId: string;
+  vu: number;
+  seq: number;
+}): string {
+  const run = input.runId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24) || "run";
+  const vu = String(Math.max(0, Math.floor(input.vu))).padStart(3, "0");
+  const seq = String(Math.max(0, Math.floor(input.seq))).padStart(5, "0");
+  return `thegamies-qa-load-su-${run}-${vu}-${seq}@${LOADTEST_EMAIL_DOMAIN}`;
+}
+
+export function isLoadtestSignUpEmail(email: string): boolean {
+  return /^thegamies-qa-load-su-[a-zA-Z0-9_-]+-\d{3}-\d{5}@example\.com$/i.test(
+    email.trim(),
+  );
 }
 
 export function parseWriterCount(raw: unknown): number | { error: string } {
