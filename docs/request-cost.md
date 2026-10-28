@@ -155,7 +155,7 @@ Dedicated fixtures (ensure does **not** flip the live Pick’em schedule or QA s
 pnpm qa:loadtest:ensure -- --writers 50
 pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
 # or --all (general + pickem + editions; Auth is separate)
-# Auth stress (real Better Auth; no Worker EMAIL — @example.com + SQL verify):
+# Auth stress — see checklist below
 pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=50
 # teardown: pnpm qa:loadtest:purge
 
@@ -165,9 +165,55 @@ pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=50
 pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000
 ```
 
+#### Auth stress — home run checklist
+
+Staging only. **No Worker EMAIL spend:** load emails are `@example.com` (undeliverable); ensure / the runner mark `emailVerified` in SQL.
+
+1. **Branch** — merge or check out the PR that adds `--scenario=auth` (then `pnpm install` if needed). Staging Worker must already be on self-hosted Better Auth (`develop` after that cutover).
+2. **Doppler / env** (same as staging QA — no `LOADTEST_SECRET` for Auth-only):
+
+   | Var | Role |
+   |---|---|
+   | `QA_TARGET=staging` | Refuse anything else |
+   | `QA_STAGING_URL` | HTTPS staging origin (not production / not `thegamies.gg`) |
+   | `DATABASE_URL` | Staging Neon (SQL verify + purge) |
+   | `QA_ACCOUNT_PASSWORD` | Password for ensured load accounts (8+ chars, letter + number) |
+
+   Example: `doppler run -- pnpm qa:loadtest:ensure -- --writers 20`
+
+3. **Ensure pool** (real Better Auth sign-up + SQL verify + profiles / share lists / edition seed):
+
+   ```bash
+   doppler run -- pnpm qa:loadtest:ensure -- --writers 20
+   ```
+
+   First run with many writers is slower (sign-up × N). Re-runs are mostly idempotent.
+
+4. **Short smoke** (optional, ~90s):
+
+   ```bash
+   doppler run -- pnpm cost:load -- --scenario=auth --duration=90s --vus-read=5 --writers=20 --ramp=0
+   ```
+
+5. **Full Auth stress**:
+
+   ```bash
+   doppler run -- pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=20
+   ```
+
+   `--writers` = sign-in **pool size** (must be ≤ ensured count). `--vus-read` = concurrent Auth VUs. Mix: sign-up / sign-in / `GET /api/auth/get-session` / signed-in HTML (`/account`, `/create`, profiles, share lists).
+
+6. **Reports** — `e2e/.cost/load-auth-*.md` (+ `.json` / `.html`). Check error rate and p95 on `auth-signin` / `auth-get-session` / `auth-signup`. Compare the UTC window to Neon CU-hours and Worker CPU for `thegamies-v2-develop`.
+
+7. **Teardown** (fixed pool + one-off `thegamies-qa-load-su-…@example.com` users):
+
+   ```bash
+   doppler run -- pnpm qa:loadtest:purge
+   ```
+
 `--ramp` is k6 `ramping-vus`: VUs start at 0 and reach the target linearly, then hold for the rest of `--duration`. Default **30s**. `--ramp 0` starts every loop at once (the old stampede). Duration includes the ramp (90s with a 30s ramp is 30s climb + 60s hold).
 
-**Ensure** creates real Better Auth users (`POST /api/auth/sign-up/email`) for `thegamies-qa-load-NNN@example.com`, marks them verified in SQL (so sign-in works without confirm mail), and wires profiles. `@example.com` is undeliverable — Worker `EMAIL` never sends. Use the same `QA_ACCOUNT_PASSWORD` as staging QA.
+**Ensure** creates real Better Auth users (`POST /api/auth/sign-up/email`) for `thegamies-qa-load-NNN@example.com`, marks them verified in SQL (so sign-in works without confirm mail), and wires profiles. Use the same `QA_ACCOUNT_PASSWORD` as staging QA.
 
 Scenarios:
 
