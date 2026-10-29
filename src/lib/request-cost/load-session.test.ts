@@ -3,7 +3,9 @@ import {
   SESSION_KEEPALIVE_INTERVAL_MS,
   SESSION_KEEPALIVE_PATH,
   applySetCookieHeaders,
+  emptyLoadCookieSlot,
   ensureLoadSessionCookie,
+  maintainLoadSessionCookie,
   refreshLoadSessionCookie,
   type LoadCookieSlot,
 } from "./load-session";
@@ -63,22 +65,36 @@ describe("refreshLoadSessionCookie", () => {
   });
 });
 
-describe("ensureLoadSessionCookie", () => {
+describe("maintainLoadSessionCookie", () => {
   it("skips refresh inside the keepalive window", async () => {
     const fetchImpl = vi.fn();
-    const slot: LoadCookieSlot = {
-      cookie: "a=1",
-      refreshedAt: Date.now(),
-      inflight: null,
-    };
-    await ensureLoadSessionCookie(
+    const slot = emptyLoadCookieSlot("a=1");
+    const result = await maintainLoadSessionCookie(
       slot,
       "https://staging.example",
       slot.refreshedAt + SESSION_KEEPALIVE_INTERVAL_MS - 1_000,
       false,
       fetchImpl,
     );
+    expect(result).toEqual({ action: "skip" });
     expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("reports refresh-failed when get-session rejects", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: false,
+      headers: { getSetCookie: () => [] },
+    });
+    const slot = emptyLoadCookieSlot("session_token=old");
+    slot.refreshedAt = 0;
+    const result = await maintainLoadSessionCookie(
+      slot,
+      "https://staging.example",
+      Date.now(),
+      true,
+      fetchImpl,
+    );
+    expect(result.action).toBe("refresh-failed");
   });
 
   it("refreshes when forced after a 401", async () => {

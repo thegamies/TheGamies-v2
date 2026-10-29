@@ -84,7 +84,7 @@ Before choosing freeze/cache/**search**/list storage, walk the request:
 
 Live lock and edition results freeze into **tables**, not one giant payload.
 
-Journeys in [request-cost.md](./request-cost.md) measure **one visit**. Traffic cost (Neon CU-hours, Worker CPU) is a **staging load test** (`pnpm cost:load`, never CI, never production). Auth stress is `--scenario=auth` (real Better Auth, `@example.com` + SQL verify — no Worker EMAIL); copy-paste checklist in [request-cost.md](./request-cost.md#auth-stress--home-run-checklist). Extra journeys and HTTP batching are paused.
+Journeys in [request-cost.md](./request-cost.md) measure **one visit**. Traffic cost (Neon CU-hours, Worker CPU) is a **staging load test** (`pnpm cost:load`, never CI, never production). Traffic writers (and ~25% of readers) use real Better Auth session cookies; Auth stress is `--scenario=auth` (`@example.com` + SQL verify — no Worker EMAIL). Checklist: [request-cost.md](./request-cost.md#auth-stress--home-run-checklist). Extra journeys and HTTP batching are paused.
 
 ## Deployment
 

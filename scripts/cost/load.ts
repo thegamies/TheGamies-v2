@@ -75,7 +75,7 @@ import {
   pickLoadtestGame,
   pickLoadtestGames,
   pickLoadtestShareList,
-  LOADTEST_WRITER_HEADER,
+  LOADTEST_SIGNED_IN_READ_FRACTION,
   type LoadtestFixturesFile,
   type LoadtestScenario,
 } from "@/lib/qa/loadtest";
@@ -87,10 +87,33 @@ import {
 } from "@/lib/qa/loadtest-repair";
 import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
-import { loadtestSecretFromEnv } from "@/lib/qa/loadtest-guard";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
 
 type WriterSlot = { list: WriterListState };
+
+/** Sign in once; server refreshes cookies on later traffic responses. */
+async function signInTrafficCookie(input: {
+  appUrl: string;
+  email: string;
+  password: string;
+  samples: LoadSample[];
+  group: string;
+}): Promise<string | null> {
+  const t0 = Date.now();
+  const signed = await signInEmailCookie(
+    { appUrl: input.appUrl },
+    { email: input.email, password: input.password },
+  );
+  input.samples.push({
+    group: input.group,
+    step: "auth-signin",
+    status: signed.ok ? 200 : signed.status,
+    ms: Date.now() - t0,
+    ok: signed.ok,
+    at: Date.now(),
+  });
+  return signed.ok ? signed.cookie : null;
+}
 
 function stampUtc(d: Date): string {
   return d.toISOString().replace(/[:.]/g, "-");
@@ -400,7 +423,6 @@ async function runScenario(input: {
   vusRead: number;
   writers: number;
   fixtures: LoadtestFixturesFile;
-  secret: string | null;
   tag: string;
   skipRepair: boolean;
 }): Promise<string> {
@@ -450,9 +472,28 @@ async function runScenario(input: {
     });
   }
 
+  const signedInReaders = Math.min(
+    input.vusRead,
+    Math.floor(input.vusRead * LOADTEST_SIGNED_IN_READ_FRACTION),
+  );
+
   const readers = Array.from({ length: input.vusRead }, async (_, i) => {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
     if (delay > 0) await sleep(delay);
+
+    let cookie = "";
+    if (i < signedInReaders && input.fixtures.writerCount > 0) {
+      const account = loadtestAccount((i % input.fixtures.writerCount) + 1);
+      cookie =
+        (await signInTrafficCookie({
+          appUrl: input.appUrl,
+          email: account.email,
+          password: input.password,
+          samples,
+          group: "read",
+        })) ?? "";
+    }
+
     while (Date.now() < end) {
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
@@ -472,13 +513,15 @@ async function runScenario(input: {
                 : item.path;
       const t0 = Date.now();
       try {
-        const res = await fetch(`${input.appUrl}${path}`, {
-          headers: {
-            accept: item.pickSearch === "api" ? "application/json" : "text/html",
-            "x-cost-journey": journey,
-            "x-cost-step": path,
-          },
-        });
+        const headers: Record<string, string> = {
+          accept: item.pickSearch === "api" ? "application/json" : "text/html",
+          "x-cost-journey": journey,
+          "x-cost-step": path,
+        };
+        if (cookie) headers.cookie = cookie;
+        const res = await fetch(`${input.appUrl}${path}`, { headers });
+        // Absorb server-refreshed session cookies from the real response.
+        if (cookie) cookie = mergeAuthCookies(cookie, res);
         await res.arrayBuffer().catch(() => null);
         samples.push({
           group: item.group,
@@ -508,9 +551,20 @@ async function runScenario(input: {
 
   const writerLoops = Array.from({ length: input.writers }, async (_, i) => {
     const slot = writerSlots[i];
-    if (!slot || !input.secret || writesOpen.length === 0) return;
+    if (!slot || writesOpen.length === 0) return;
     const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
     if (delay > 0) await sleep(delay);
+
+    const account = loadtestAccount(i + 1);
+    let cookie =
+      (await signInTrafficCookie({
+        appUrl: input.appUrl,
+        email: account.email,
+        password: input.password,
+        samples,
+        group: "write",
+      })) ?? "";
+    if (!cookie) return;
 
     const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
@@ -518,8 +572,7 @@ async function runScenario(input: {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          authorization: `Bearer ${input.secret}`,
-          [LOADTEST_WRITER_HEADER]: String(i + 1),
+          cookie,
           "x-cost-journey": journey,
           "x-cost-step": step,
         },
@@ -527,7 +580,25 @@ async function runScenario(input: {
       });
 
     const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
-      const res = await postWrite(op, body, step);
+      let res = await postWrite(op, body, step);
+      // Dead session only — not a keepalive ping. Server refresh is Set-Cookie
+      // on successful getSession inside the loadtest route / page render.
+      if (res.status === 401) {
+        const next = await signInTrafficCookie({
+          appUrl: input.appUrl,
+          email: account.email,
+          password: input.password,
+          samples,
+          group: "write",
+        });
+        if (!next) {
+          const text = await res.text().catch(() => "");
+          return { res, text };
+        }
+        cookie = next;
+        res = await postWrite(op, body, step);
+      }
+      cookie = mergeAuthCookies(cookie, res);
       const text = await res.text().catch(() => "");
       return { res, text };
     };
@@ -694,13 +765,12 @@ async function main() {
     );
   }
   const needsTrafficWriters = args.scenarios.some((s) => s !== "auth");
-  const secret = loadtestSecretFromEnv();
-  if (needsTrafficWriters && args.writers > 0 && !secret) {
-    throw new Error("LOADTEST_SECRET is required when --writers is set.");
-  }
-  if (args.scenarios.includes("auth") && fixtures.writerCount < 1) {
+  if (
+    (needsTrafficWriters && args.writers > 0 && fixtures.writerCount < 1) ||
+    (args.scenarios.includes("auth") && fixtures.writerCount < 1)
+  ) {
     throw new Error(
-      "Auth scenario needs ensured writer accounts; run pnpm qa:loadtest:ensure -- --writers N",
+      "Need ensured writer accounts; run pnpm qa:loadtest:ensure -- --writers N",
     );
   }
 
@@ -723,7 +793,6 @@ async function main() {
       vusRead: args.vusRead,
       writers: args.writers,
       fixtures,
-      secret,
       tag,
       skipRepair,
     });
