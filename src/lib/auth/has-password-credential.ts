@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import type { NeonSql } from "./remove-neon-auth-user";
+import type { NeonSql } from "./neon-sql";
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -28,9 +28,9 @@ function defaultQuery(): NeonSql {
 }
 
 /**
- * True when Neon Auth has an email/password credential for this user.
+ * True when Better Auth has an email/password credential for this user.
  * Google-only accounts have no password until they use Forgot password.
- * Missing `neon_auth.account` fails open so password deletes still work.
+ * Missing `auth_account` fails open so password deletes still work.
  */
 export async function hasPasswordCredential(
   authUserId: string,
@@ -41,7 +41,7 @@ export async function hasPasswordCredential(
   try {
     const result = await query`
       SELECT 1
-      FROM neon_auth.account
+      FROM auth_account
       WHERE "userId" = ${authUserId}
         AND "providerId" = 'credential'
       LIMIT 1

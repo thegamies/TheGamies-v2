@@ -1,11 +1,13 @@
 /**
- * Idempotently create load-test profiles (no Neon Auth login), gamies_qa_load, one public custom
- * share list per account, one open 2025 edition with seeded ballots, and opt
- * the load community into TGA 2025. Does not change the 2025 show schedule
- * (the load runner does that). Never touches QA showcase. Refuses production.
+ * Idempotently create load-test Better Auth users (verified via SQL — no mail),
+ * profiles, gamies_qa_load, one public custom share list per account, one open
+ * 2025 edition with seeded ballots, and opt the load community into TGA 2025.
+ * Does not change the 2025 show schedule (the load runner does that). Never
+ * touches QA showcase. Refuses production.
  */
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 import { and, asc, desc, eq, isNull, lte, notInArray } from "drizzle-orm";
 import {
   communities,
@@ -15,11 +17,13 @@ import {
   profiles,
   type Db,
 } from "@thegamies/db";
+import type { NeonSql } from "@/lib/auth/neon-sql";
 import { listEditionEnabledCategoryIds } from "@/lib/communities/edition-categories";
 import { getEditionByCommunityYear } from "@/lib/communities/editions";
 import { seedCommunityEditionBallots } from "@/lib/communities/seed-community";
 import { createCommunity } from "@/lib/communities/service";
 import { ensureProfileForAuthUser } from "@/lib/profile/service";
+import { ensureVerifiedAuthUser } from "@/lib/qa/auth-http";
 import {
   LOADTEST_BALLOT_POPULAR_POOL,
   LOADTEST_BALLOT_UNPOPULAR_POOL,
@@ -32,7 +36,6 @@ import {
   LOADTEST_UNPOPULAR_POOL,
   loadtestAccount,
   loadtestEditionSeedBatches,
-  loadtestSyntheticAuthUserId,
   mergeLoadtestGameBands,
   parseWriterCount,
   type LoadtestFixturesFile,
@@ -55,13 +58,29 @@ function parseEnsureWriters(argv: string[]): number | { error: string } {
   return parseWriterCount(argv[idx + 1]);
 }
 
-async function ensureProfile(db: Db, index: number) {
+async function ensureProfile(
+  db: Db,
+  index: number,
+  authUserId: string,
+): Promise<string> {
   const account = loadtestAccount(index);
   const [byUsername] = await db
-    .select({ id: profiles.id })
+    .select({ id: profiles.id, authUserId: profiles.authUserId })
     .from(profiles)
     .where(eq(profiles.username, account.username))
     .limit(1);
+
+  if (byUsername && byUsername.authUserId !== authUserId) {
+    await db
+      .update(profiles)
+      .set({
+        authUserId,
+        visibility: "public",
+        updatedAt: new Date(),
+      })
+      .where(eq(profiles.id, byUsername.id));
+    return byUsername.id;
+  }
   if (byUsername) {
     await db
       .update(profiles)
@@ -69,12 +88,17 @@ async function ensureProfile(db: Db, index: number) {
       .where(eq(profiles.id, byUsername.id));
     return byUsername.id;
   }
+
   const ensured = await ensureProfileForAuthUser({
-    authUserId: loadtestSyntheticAuthUserId(index),
+    authUserId,
     username: account.username,
     displayName: account.displayName,
   });
   if ("error" in ensured) throw new Error(`${account.username}: ${ensured.error}`);
+  await db
+    .update(profiles)
+    .set({ visibility: "public" })
+    .where(eq(profiles.id, ensured.profile.id));
   return ensured.profile.id;
 }
 
@@ -189,12 +213,22 @@ async function main() {
   log(`target ${target.appUrl}, writers ${writers} (accounts ${accountCount})`);
 
   const db = createDb(target.databaseUrl);
+  const query = neon(target.databaseUrl) as unknown as NeonSql;
 
   const profileIds: string[] = [];
   for (let index = 1; index <= accountCount; index++) {
-    profileIds.push(await ensureProfile(db, index));
+    const account = loadtestAccount(index);
+    const authUserId = await ensureVerifiedAuthUser({
+      target,
+      query,
+      email: account.email,
+      password: target.password,
+      name: account.displayName,
+      log,
+    });
+    profileIds.push(await ensureProfile(db, index, authUserId));
   }
-  log("accounts ready");
+  log("accounts ready (Better Auth + verified)");
 
   const hostProfileId = profileIds[0]!;
   const communityId = await ensureCommunity(db, hostProfileId);

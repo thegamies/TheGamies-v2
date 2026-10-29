@@ -74,8 +74,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-          NEON_AUTH_BASE_URL: ${{ secrets.PRODUCTION_NEON_AUTH_BASE_URL }}
-          NEON_AUTH_COOKIE_SECRET: ${{ secrets.PRODUCTION_NEON_AUTH_COOKIE_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          # Prefer PRODUCTION_BETTER_AUTH_SECRET; fall back to legacy cookie secret names.
+          BETTER_AUTH_SECRET: ${{ secrets.PRODUCTION_BETTER_AUTH_SECRET || secrets.BETTER_AUTH_SECRET || secrets.PRODUCTION_NEON_AUTH_COOKIE_SECRET || secrets.NEON_AUTH_COOKIE_SECRET }}
+          BETTER_AUTH_URL: ${{ secrets.PRODUCTION_CF_APP_URL }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ADMIN_SYNC_SECRET: ${{ secrets.ADMIN_SYNC_SECRET }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           IGDB_CLIENT_ID: ${{ secrets.IGDB_CLIENT_ID }}
@@ -95,11 +98,8 @@ jobs:
             echo "::error::PRODUCTION_DATABASE_URL empty — Worker will not get a production DATABASE_URL from this deploy."
             exit 1
           fi
-          if [ -z "$NEON_AUTH_BASE_URL" ]; then
-            echo "::warning::PRODUCTION_NEON_AUTH_BASE_URL empty — set GitHub secret PRODUCTION_NEON_AUTH_BASE_URL"
-          fi
-          if [ -z "$NEON_AUTH_COOKIE_SECRET" ]; then
-            echo "::warning::NEON_AUTH_COOKIE_SECRET empty — set PRODUCTION_NEON_AUTH_COOKIE_SECRET (or NEON_AUTH_COOKIE_SECRET)"
+          if [ -z "$BETTER_AUTH_SECRET" ] || [ "${#BETTER_AUTH_SECRET}" -lt 32 ]; then
+            echo "::warning::BETTER_AUTH_SECRET empty/short — set PRODUCTION_BETTER_AUTH_SECRET (or BETTER_AUTH_SECRET / legacy cookie secret)"
           fi
           if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
             echo "::error::PRODUCTION_CF_APP_URL empty — set GitHub secret PRODUCTION_CF_APP_URL (https://… origin). OpenNext build needs it for metadataBase."
@@ -128,8 +128,10 @@ jobs:
           const fs = require("fs");
           const keys = [
             "DATABASE_URL",
-            "NEON_AUTH_BASE_URL",
-            "NEON_AUTH_COOKIE_SECRET",
+            "BETTER_AUTH_SECRET",
+            "BETTER_AUTH_URL",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
             "ADMIN_SYNC_SECRET",
             "CRON_SECRET",
             "IGDB_CLIENT_ID",

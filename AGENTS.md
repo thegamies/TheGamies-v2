@@ -17,7 +17,7 @@ Visual system: **Editorial Standings** with editorial minimalism and soft brutal
 - Next.js App Router + TypeScript
 - Tailwind CSS + project-owned design tokens
 - Hosting: Cloudflare Workers (OpenNext)
-- Database + Auth: Neon (Postgres + Neon Auth)
+- Database + Auth: Neon Postgres + self-hosted Better Auth (in-Worker, `auth_*` tables)
 - Game catalog: IGDB via a separate ingestion worker
 - Validation: Zod
 - Client data: TanStack Query only where it clearly helps

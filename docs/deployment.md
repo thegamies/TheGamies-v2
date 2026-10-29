@@ -48,9 +48,8 @@ pnpm deploy:cf        # OpenNext build + deploy to Cloudflare
 ### Neon
 
 1. Create a Neon project for The Gamies v2.
-2. Enable Neon Auth when ready (not required for static scaffold).
-3. Create API key; note **project id**.
-4. Production branch = default; previews create ephemeral branches in CI.
+2. Create API key; note **project id** (CI PR database branches). Auth is self-hosted Better Auth in the app Worker — do not enable Neon Managed Auth.
+3. Production branch = default; previews create ephemeral branches in CI.
 
 ### Cloudflare
 
@@ -72,13 +71,11 @@ Configure on the repo:
 | `CLOUDFLARE_API_TOKEN` | Workers deploy |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare account |
 | `STAGING_DATABASE_URL` | Neon URL for `develop` staging (`DATABASE_URL`) |
-| `STAGING_NEON_AUTH_BASE_URL` | Auth URL for develop staging |
-| `NEON_AUTH_COOKIE_SECRET` | Neon Auth cookie signing (32+ chars; staging + previews) |
-| `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
+| `NEON_AUTH_COOKIE_SECRET` | Legacy GitHub name → Worker `BETTER_AUTH_SECRET` (32+ chars; staging + previews) |
+| `STAGING_CF_APP_URL` | Optional `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` for Cloudflare staging (e.g. `https://thegamies-v2-develop.<account>.workers.dev`) |
 | `PRODUCTION_DATABASE_URL` | Production Neon URL (`DATABASE_URL` on `thegamies-v2` and IGDB webhooks production). Never `STAGING_DATABASE_URL` |
-| `PRODUCTION_NEON_AUTH_BASE_URL` | Production Neon Auth URL |
-| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | Optional. Production cookie secret (else `NEON_AUTH_COOKIE_SECRET`) |
-| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` for Cloudflare production |
+| `PRODUCTION_NEON_AUTH_COOKIE_SECRET` | Optional legacy name → `BETTER_AUTH_SECRET` (else `NEON_AUTH_COOKIE_SECRET`) |
+| `PRODUCTION_CF_APP_URL` | `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` for Cloudflare production |
 | `PRODUCTION_IGDB_WEBHOOKS_WORKER_URL` | Production app → production IGDB webhook Worker origin |
 | `PRODUCTION_IGDB_WEBHOOK_SECRET` | Production webhook slot base (host `IGDB_WEBHOOK_SECRET`). Never the staging secret |
 | `CRON_SECRET` | Edition freeze cron (Cloudflare `scheduled` handler) |
@@ -123,10 +120,10 @@ Cloudflare staging URL is stable across deploys (`thegamies-v2-develop.*.workers
 ```text
 PR opened/updated
   → ci: lint + typecheck + build
-  → neon: create branch preview/pr-<n> from Neon `develop` (unique Auth URL via get_auth_url)
+  → neon: create branch preview/pr-<n> from Neon `develop`
   → migrate / cloudflare: each job re-fetches DATABASE_URL via Neon API + branch_id
        (create-branch-action’s db_url cannot cross jobs — GitHub strips secret-bearing outputs)
-  → register the Cloudflare origin as a Neon Auth trusted domain on that branch
+  → deploy Worker with that branch’s DATABASE_URL + BETTER_AUTH_SECRET / BETTER_AUTH_URL
   → comment the Worker URL on the PR
   → on PR close: delete Neon branch + optional CF preview worker
 ```
@@ -159,28 +156,21 @@ Resources:
 
 Destroy removes the Neon branch and CF worker.
 
-## Neon Auth URLs and domains
+## Preview Auth (Better Auth)
 
-Two different “URLs” matter:
-
-1. **Auth API URL (`NEON_AUTH_BASE_URL`)** — each Neon **database branch** gets its own Auth endpoint when Auth is enabled. CI reads it from `create-branch-action` (`get_auth_url: true`) and injects it into the Worker. Tokens from one branch are not valid on another.
-2. **App origins (trusted domains)** — the hosts where the Next app runs (`*.workers.dev`, staging, production). Neon Auth will only redirect / accept CSRF origins that are allowlisted **on that Auth branch**.
+Auth is **self-hosted Better Auth** in each Worker. There is no Neon Managed Auth URL, trusted-domain list, or Auth email webhook.
 
 What CI does for previews and manual deploys:
 
-- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → gets `auth_url` + `branch_id`
+- Creates (or reuses) a Neon branch **parented from Neon `develop`** (not production) → `branch_id`
 - Downstream jobs resolve `DATABASE_URL` with `scripts/ci/neon-database-url.sh` (job outputs cannot carry the masked `db_url`)
-- Deploys the Cloudflare Worker with that branch’s `DATABASE_URL` / `NEON_AUTH_BASE_URL`
-- POSTs the deploy origin to Neon’s branch Auth domains API (`scripts/ci/register-neon-auth-domains.sh`)
-- PUTs Auth **email webhooks** on that branch to the **Cloudflare** origin `/api/webhooks/neon-auth-email` (`scripts/ci/register-neon-auth-email-webhook.sh`). Staging does the same for Neon branch `develop` → worker `thegamies-v2-develop`.
-
-Each Neon Auth branch has its own webhook URL. A preview Worker never receives production reset mail, and production never sends through a PR worker. Local personal branches: run the same script (or set the webhook in Console) against your Worker/`wrangler` preview URL.
+- Migrates `auth_*` (and the rest of the schema) on that branch
+- Deploys the Cloudflare Worker with that branch’s `DATABASE_URL`, `BETTER_AUTH_SECRET` (from GitHub `NEON_AUTH_COOKIE_SECRET` until renamed), and `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` set to the deploy origin
+- Auth mail goes through Worker `EMAIL` from Better Auth hooks on that same Worker
 
 The Neon branch name must be exactly `develop` (same branch `STAGING_DATABASE_URL` should point at). Rename in Neon or change `parent_branch` in the workflows if yours differs.
 
-Staging CI also POSTs `STAGING_CF_APP_URL` as a trusted domain on Neon branch `develop`. Production App URLs still go in Neon Console → Auth → Configuration → Domains (exact origins), or a wildcard such as `https://*.workers.dev` if you want a broader preview allowlist. `localhost` ports are pre-approved; LAN IPs for phone testing are not — add those for local device testing.
-
-You do **not** need one Neon Auth project per preview host. One Neon project, many branches; each branch carries its Auth URL + its own trusted-domain list.
+Google OAuth (optional): add each preview/staging/production origin’s `/api/auth/callback/google` on the Google Cloud Web client. Detail: [self-hosted-better-auth-spike.md](./self-hosted-better-auth-spike.md).
 
 ## Production flow (`main`)
 
@@ -194,7 +184,7 @@ Push / merge to main  —or—  Actions → Production Cloudflare deploy → Run
         secret bulk only if sync_igdb_webhook_secrets)
 ```
 
-1. Promote `develop` → `main` via PR — or re-run production from Actions on `main` after changing GitHub secrets (e.g. Auth URL).
+1. Promote `develop` → `main` via PR — or re-run production from Actions on `main` after changing GitHub secrets (e.g. `BETTER_AUTH_SECRET` / app URL).
 2. CI migrates production Neon, then deploys `thegamies-v2`. Empty `PRODUCTION_DATABASE_URL` fails the workflow (no silent skip).
 3. IGDB webhooks Worker `thegamies-igdb-webhooks` deploys when webhook-related paths change (after migrate), or when manual run enables force deploy.
 4. Neon production branch only — never point `PRODUCTION_DATABASE_URL` at the develop branch.
@@ -206,8 +196,8 @@ App secrets are managed in **GitHub Actions** for deploys and **Doppler** for lo
 Runtime keys (also listed in `.env.example`):
 
 - `DATABASE_URL`
-- `NEON_AUTH_BASE_URL` (when Auth is enabled)
-- `NEXT_PUBLIC_APP_URL` (per deployment)
+- `BETTER_AUTH_SECRET` (32+; CI may source from GitHub `NEON_AUTH_COOKIE_SECRET`)
+- `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` (per deployment)
 
 Do not commit `.env` or `.dev.vars`.
 

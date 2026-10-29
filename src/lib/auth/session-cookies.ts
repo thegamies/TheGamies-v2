@@ -1,10 +1,11 @@
 import {
-  SESSION_DATA_COOKIE_NAME,
+  LEGACY_NEON_AUTH_COOKIE_NAMES,
   SESSION_TOKEN_COOKIE_NAME,
+  BETTER_AUTH_SESSION_TOKEN_COOKIE_NAMES,
 } from "@/lib/auth/session-cache-cookie";
 import { envAppOrigin } from "@/lib/seo/origin-env";
 
-/** Neon Auth / Better Auth session cookies we must drop after the user is closed. */
+/** Better Auth (and leftover Neon Auth) session cookies to drop after close. */
 export function isAuthSessionCookieName(name: string): boolean {
   const n = name.toLowerCase();
   return (
@@ -29,20 +30,21 @@ export function authSessionCookieNamesFromHeader(
 
 /**
  * Auth cookies to drop on sign-out. Includes whatever the browser sent, plus
- * the login cookie and the signed session cache, so a missing header entry
- * cannot leave the 4-hour cache in place.
+ * known Better Auth and legacy Neon Auth names so a missing header entry
+ * cannot leave a session in place.
  */
 export function authCookieNamesToExpire(cookieHeader: string | null): string[] {
   return [
     ...new Set([
       ...authSessionCookieNamesFromHeader(cookieHeader),
       SESSION_TOKEN_COOKIE_NAME,
-      SESSION_DATA_COOKIE_NAME,
+      ...BETTER_AUTH_SESSION_TOKEN_COOKIE_NAMES,
+      ...LEGACY_NEON_AUTH_COOKIE_NAMES,
     ]),
   ];
 }
 
-/** Options that overwrite Neon Auth cookies so the browser drops them. */
+/** Options that overwrite Auth cookies so the browser drops them. */
 export function expireAuthCookieOptions(name: string): {
   httpOnly: true;
   sameSite: "lax";
@@ -106,4 +108,3 @@ export function originMatchesRequestHost(
   if (appOrigin && parsed.origin === appOrigin) return true;
   return parsed.host === requestHost(request);
 }
-

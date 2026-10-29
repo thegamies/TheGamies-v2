@@ -13,9 +13,9 @@ import {
   tgaYears,
 } from "@thegamies/db";
 import {
-  removeNeonAuthDirectoryUser,
+  removeSelfHostedAuthUser,
   type NeonSql,
-} from "@/lib/auth/remove-neon-auth-user";
+} from "@/lib/auth/remove-self-hosted-auth-user";
 import {
   LOADTEST_COMMUNITY,
   LEGACY_LOADTEST_TGA_YEARS,
@@ -79,17 +79,30 @@ async function main() {
   for (const row of loadProfiles) {
     if (qaUsernames.has(row.username)) continue;
     await db.delete(profiles).where(eq(profiles.id, row.id));
-    await removeNeonAuthDirectoryUser(row.authUserId, { query });
+    await removeSelfHostedAuthUser(row.authUserId, { query });
   }
 
   for (let index = 1; index <= LOADTEST_WRITERS_MAX; index++) {
     const account = loadtestAccount(index);
     const result =
-      await query`SELECT id FROM neon_auth."user" WHERE lower(email) = lower(${account.email}) LIMIT 1`;
+      await query`SELECT id FROM auth_user WHERE lower(email) = lower(${account.email}) LIMIT 1`;
     const id = rowsOf(result)[0]?.id;
     if (typeof id === "string") {
-      await removeNeonAuthDirectoryUser(id, { query, email: account.email });
+      await removeSelfHostedAuthUser(id, { query, email: account.email });
     }
+  }
+
+  // Auth stress one-off sign-ups (`thegamies-qa-load-su-…@example.com`).
+  const signupUsers =
+    await query`SELECT id, email FROM auth_user WHERE email ILIKE 'thegamies-qa-load-su-%@example.com'`;
+  for (const row of rowsOf(signupUsers)) {
+    const id = row.id;
+    const email = row.email;
+    if (typeof id !== "string") continue;
+    await removeSelfHostedAuthUser(id, {
+      query,
+      email: typeof email === "string" ? email : undefined,
+    });
   }
   log("removed load-test accounts");
 

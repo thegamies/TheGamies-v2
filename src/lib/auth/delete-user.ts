@@ -1,8 +1,7 @@
 import { headers } from "next/headers";
 import { getAuth } from "@/lib/auth/server";
 import { SIGN_IN_CLOSE_FAILED } from "./account-delete-copy";
-import { deleteNeonAuthUserViaApi } from "./neon-auth-directory";
-import { removeNeonAuthDirectoryUser } from "./remove-neon-auth-user";
+import { removeSelfHostedAuthUser } from "./remove-self-hosted-auth-user";
 
 type DeleteUserResult = {
   error?: { message?: string } | null;
@@ -17,11 +16,13 @@ function passwordError(message: string): boolean {
 }
 
 function authSignInUrl(): URL | null {
-  const baseUrl = process.env.NEON_AUTH_BASE_URL?.trim();
-  if (!baseUrl) return null;
+  const base =
+    process.env.BETTER_AUTH_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!base) return null;
   return new URL(
-    "sign-in/email",
-    baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`,
+    "/api/auth/sign-in/email",
+    base.endsWith("/") ? base : `${base}/`,
   );
 }
 
@@ -30,6 +31,7 @@ async function requestOrigin(): Promise<string> {
   return (
     headerStore.get("origin") ||
     headerStore.get("referer")?.split("/").slice(0, 3).join("/") ||
+    process.env.BETTER_AUTH_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     ""
   );
@@ -37,8 +39,8 @@ async function requestOrigin(): Promise<string> {
 
 /**
  * Check email + password without going through the SDK sign-in helper.
- * `auth.signIn.email` writes a new session cookie on the response but later
- * server calls still send the original Cookie header, so deleteUser would 401.
+ * `signIn.email` would rotate the session cookie; later server calls still
+ * send the original Cookie header, so deleteUser would 401.
  */
 export async function verifyAccountPassword(input: {
   email: string;
@@ -72,14 +74,8 @@ export async function verifyAccountPassword(input: {
 }
 
 /**
- * Close the Neon Auth user so the email can be reused.
- *
- * Neon documents three ways:
- * 1. SDK `auth.deleteUser()` (often a no-op while deleteUser is disabled)
- * 2. Console / API DELETE …/auth/users/{id} (what Auth → Users lists)
- * 3. SQL against `neon_auth` (database is the source of truth)
- *
- * We try all three and only succeed when the directory row is gone.
+ * Close the Auth user so the email can be reused.
+ * Tries Better Auth `deleteUser`, then SQL against `auth_*`.
  */
 export async function deleteAuthenticatedUser(input: {
   password: string;
@@ -102,13 +98,10 @@ export async function deleteAuthenticatedUser(input: {
     }
   }
 
-  const viaApi = await deleteNeonAuthUserViaApi(input.authUserId).catch(
-    () => false,
-  );
-  const viaSql = await removeNeonAuthDirectoryUser(input.authUserId, {
+  const viaSql = await removeSelfHostedAuthUser(input.authUserId, {
     email: input.email,
   }).catch(() => false);
 
-  if (viaApi || viaSql) return { ok: true };
+  if (viaSql) return { ok: true };
   return { error: SIGN_IN_CLOSE_FAILED };
 }

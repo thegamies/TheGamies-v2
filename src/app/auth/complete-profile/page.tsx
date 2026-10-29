@@ -16,9 +16,7 @@ import {
 } from "@/lib/auth/return-to";
 import { suggestAvailableUsername } from "@/lib/profile/service";
 import { suggestDisplayNameFromIdentity } from "@/lib/profile/username";
-import { neonAuthSessionVerifierFromSearch } from "@/lib/auth/neon-auth-session-verifier";
 import { CompleteProfileForm } from "./CompleteProfileForm";
-import { CompleteProfileSessionClient } from "./CompleteProfileSessionClient";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +31,6 @@ export default async function CompleteProfilePage({
   searchParams: Promise<{
     next?: string;
     intent?: string;
-    neon_auth_session_verifier?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -42,14 +39,6 @@ export default async function CompleteProfilePage({
     params.next || parsePostAuthNextCookie(cookieStore.get(POST_AUTH_NEXT_COOKIE)?.value),
     params.intent,
   );
-
-  if (neonAuthSessionVerifierFromSearch(params.neon_auth_session_verifier)) {
-    return (
-      <main className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-[var(--gutter)] py-12">
-        <CompleteProfileSessionClient next={next} />
-      </main>
-    );
-  }
 
   const signInHref = buildSignInHref({ next });
   const auth = getAuthOrNull();

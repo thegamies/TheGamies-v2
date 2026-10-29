@@ -74,6 +74,65 @@ export async function refreshLoadSessionCookie(
   }
 }
 
+export type MaintainLoadSessionResult =
+  | { action: "skip" }
+  | { action: "refreshed"; ms: number }
+  | { action: "refresh-failed"; ms: number };
+
+/**
+ * Touch the session via `GET /api/auth/get-session` when the keepalive window
+ * has elapsed (or `force`). Callers re-sign-in on `refresh-failed`.
+ */
+export async function maintainLoadSessionCookie(
+  slot: LoadCookieSlot,
+  appUrl: string,
+  now: number,
+  force = false,
+  fetchImpl: typeof fetch = fetch,
+): Promise<MaintainLoadSessionResult> {
+  if (
+    !force &&
+    slot.cookie &&
+    slot.refreshedAt > 0 &&
+    now - slot.refreshedAt < SESSION_KEEPALIVE_INTERVAL_MS
+  ) {
+    return { action: "skip" };
+  }
+  if (!slot.cookie) {
+    return { action: "refresh-failed", ms: 0 };
+  }
+  if (slot.inflight) {
+    await slot.inflight;
+    if (
+      slot.cookie &&
+      slot.refreshedAt > 0 &&
+      Date.now() - slot.refreshedAt < SESSION_KEEPALIVE_INTERVAL_MS
+    ) {
+      return { action: "skip" };
+    }
+  }
+
+  let result: MaintainLoadSessionResult = { action: "refresh-failed", ms: 0 };
+  slot.inflight = (async () => {
+    const t0 = Date.now();
+    const next = await refreshLoadSessionCookie(appUrl, slot.cookie, fetchImpl);
+    const ms = Date.now() - t0;
+    if (next) {
+      slot.cookie = next;
+      slot.refreshedAt = Date.now();
+      result = { action: "refreshed", ms };
+      return;
+    }
+    result = { action: "refresh-failed", ms };
+  })();
+  try {
+    await slot.inflight;
+  } finally {
+    slot.inflight = null;
+  }
+  return result;
+}
+
 export async function ensureLoadSessionCookie(
   slot: LoadCookieSlot,
   appUrl: string,
@@ -81,27 +140,9 @@ export async function ensureLoadSessionCookie(
   force: boolean,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (
-    !force &&
-    slot.refreshedAt > 0 &&
-    now - slot.refreshedAt < SESSION_KEEPALIVE_INTERVAL_MS
-  ) {
-    return;
-  }
-  if (slot.inflight) {
-    await slot.inflight;
-    return;
-  }
-  slot.inflight = (async () => {
-    const next = await refreshLoadSessionCookie(appUrl, slot.cookie, fetchImpl);
-    if (next) {
-      slot.cookie = next;
-      slot.refreshedAt = Date.now();
-    }
-  })();
-  try {
-    await slot.inflight;
-  } finally {
-    slot.inflight = null;
-  }
+  await maintainLoadSessionCookie(slot, appUrl, now, force, fetchImpl);
+}
+
+export function emptyLoadCookieSlot(cookie = ""): LoadCookieSlot {
+  return { cookie, refreshedAt: cookie ? Date.now() : 0, inflight: null };
 }

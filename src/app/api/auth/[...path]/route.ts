@@ -11,15 +11,15 @@ import {
 
 async function notConfigured() {
   return NextResponse.json(
-    { error: "Neon Auth is not configured" },
+    { error: "Auth is not configured" },
     { status: 503 },
   );
 }
 
 /**
- * Neon emails `/reset-password/:token`. A GET through the Auth handler
- * spends the token before the form can POST. Send the unused token to
- * the in-app reset page instead.
+ * Better Auth may email `/api/auth/reset-password/:token`. A GET through the
+ * Auth handler spends the token before the form can POST. Send the unused
+ * token to the in-app reset page instead.
  */
 function unusedResetPasswordRedirect(request: Request, path: string[]) {
   if (path[0] !== "reset-password") return null;
@@ -44,17 +44,14 @@ export async function GET(
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
   return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
-    auth.handler().GET(request, context),
+    auth.handler().GET(request),
   );
 }
 
-export async function POST(
-  request: Request,
-  context: { params: Promise<{ path: string[] }> },
-) {
+export async function POST(request: Request) {
   const auth = getAuthOrNull();
   if (!auth) return notConfigured();
   return withAuthClientIp(clientIpFromHeaders(request.headers), () =>
-    auth.handler().POST(request, context),
+    auth.handler().POST(request),
   );
 }

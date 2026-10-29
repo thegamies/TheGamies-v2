@@ -8,6 +8,7 @@ import {
   standingStripListClass,
 } from "@/components/communities/StandingGameCard";
 import { StandingStrip } from "@/components/communities/StandingStrip";
+import Link from "@/lib/next-link";
 
 vi.mock("next/image", () => ({
   default: ({
@@ -89,7 +90,7 @@ describe("StandingStrip", () => {
   it("drags an overflowing strip with the mouse and still allows a click", () => {
     render(
       <StandingStrip label="Best Story ranked">
-        <a href="/games/alpha">Alpha</a>
+        <Link href="/games/alpha">Alpha</Link>
       </StandingStrip>,
     );
     const scroller = screen
@@ -154,7 +155,7 @@ describe("StandingStrip", () => {
   it("shows an edge only on the side that still has covers", () => {
     render(
       <StandingStrip label="Best Story ranked">
-        <a href="/games/alpha">Alpha</a>
+        <Link href="/games/alpha">Alpha</Link>
       </StandingStrip>,
     );
     const region = screen.getByLabelText("Best Story ranked");

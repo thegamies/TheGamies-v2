@@ -1,9 +1,7 @@
 import { neon } from "@neondatabase/serverless";
+import type { NeonSql } from "./neon-sql";
 
-export type NeonSql = (
-  strings: TemplateStringsArray,
-  ...values: unknown[]
-) => Promise<unknown>;
+export type { NeonSql };
 
 function rowsOf(result: unknown): unknown[] {
   if (Array.isArray(result)) return result;
@@ -44,54 +42,34 @@ function defaultQuery(): NeonSql {
   return neon(databaseUrl) as unknown as NeonSql;
 }
 
-async function authUserExists(
-  authUserId: string,
-  query: NeonSql,
-): Promise<boolean> {
-  const user = await optional(
-    () => query`SELECT id FROM neon_auth."user" WHERE id = ${authUserId}`,
-  );
-  const sync = await optional(
-    () => query`SELECT id FROM neon_auth.users_sync WHERE id = ${authUserId}`,
-  );
-  return hasRow(user) || hasRow(sync);
-}
-
 /**
- * Remove a Managed Better Auth user from this branch’s `neon_auth` schema.
- * Neon documents the database as the source of truth for users/sessions.
- * https://neon.com/docs/auth/authentication-flow
+ * Remove a Better Auth user from `auth_*` tables so the email can be used again.
  */
-export async function removeNeonAuthDirectoryUser(
+export async function removeSelfHostedAuthUser(
   authUserId: string,
   options?: { query?: NeonSql; email?: string },
 ): Promise<boolean> {
   if (!authUserId.trim()) return false;
 
   const query = options?.query ?? defaultQuery();
-  const email = options?.email;
+  const email = options?.email?.trim();
 
   await optional(
-    () => query`DELETE FROM neon_auth.session WHERE "userId" = ${authUserId}`,
+    () => query`DELETE FROM auth_session WHERE "userId" = ${authUserId}`,
   );
   await optional(
-    () => query`DELETE FROM neon_auth.account WHERE "userId" = ${authUserId}`,
-  );
-  await optional(
-    () => query`DELETE FROM neon_auth.member WHERE "userId" = ${authUserId}`,
+    () => query`DELETE FROM auth_account WHERE "userId" = ${authUserId}`,
   );
   if (email) {
     await optional(
       () =>
-        query`DELETE FROM neon_auth.verification WHERE identifier = ${email}`,
+        query`DELETE FROM auth_verification WHERE identifier = ${email}`,
     );
   }
-  await optional(
-    () => query`DELETE FROM neon_auth.users_sync WHERE id = ${authUserId}`,
-  );
-  await optional(
-    () => query`DELETE FROM neon_auth."user" WHERE id = ${authUserId}`,
-  );
+  await optional(() => query`DELETE FROM auth_user WHERE id = ${authUserId}`);
 
-  return !(await authUserExists(authUserId, query));
+  const remaining = await optional(
+    () => query`SELECT id FROM auth_user WHERE id = ${authUserId}`,
+  );
+  return !hasRow(remaining);
 }

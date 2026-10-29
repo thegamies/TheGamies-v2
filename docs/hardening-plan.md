@@ -37,8 +37,8 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - Run `gh auth login` on the dev machine so the agent can read run results.
 - **Config + guards** (`src/lib/qa/staging-fixtures.ts`): QA identities, community defs, and `resolveQaTarget` — refuses unless `QA_TARGET=staging`, `QA_STAGING_URL` is https and not a production host (`thegamies.gg`, `www.thegamies.gg`, the `thegamies-v2` Worker), and `QA_ACCOUNT_PASSWORD` passes the app's password rules. The CI job only ever receives `STAGING_*` secrets. Errors never echo secret values.
 - **Fixture script** (`scripts/qa/ensure-staging-fixtures.ts`, `pnpm qa:fixtures`) — idempotent, safe to rerun:
-  - **Accounts:** `gamies_qa_host`, `gamies_qa_member`, `gamies_qa_outsider` on `thegamies-qa-*@example.com`. Created through staging's `/api/auth/sign-up/email`, marked verified with `markNeonAuthEmailVerified`. If sign-in with `QA_ACCOUNT_PASSWORD` fails (secret rotated), the auth user is removed (`removeNeonAuthDirectoryUser`) and recreated; the profile is re-pointed to the new auth id.
-  - **No mail:** the Neon Auth email webhook skips reserved undeliverable domains (`example.com`, `.test`, `.invalid`, …) — `isUndeliverableEmailAddress` in `src/lib/email/send.ts`.
+  - **Accounts:** `gamies_qa_host`, `gamies_qa_member`, `gamies_qa_outsider` on `thegamies-qa-*@example.com`. Created through staging's `/api/auth/sign-up/email`, marked verified with `markAuthEmailVerified`. If sign-in with `QA_ACCOUNT_PASSWORD` fails (secret rotated), the auth user is removed (`removeSelfHostedAuthUser`) and recreated; the profile is re-pointed to the new auth id.
+  - **No mail:** Auth send skips reserved undeliverable domains (`example.com`, `.test`, `.invalid`, …) — `isUndeliverableEmailAddress` in `src/lib/email/send.ts`.
   - **Profiles:** `ensureProfileForAuthUser`, then set private so QA accounts stay out of people search.
   - **Communities:** `gamies_qa_private` (private; host + member) and `gamies_qa_showcase` (public, joins closed; host only) via `createCommunity` + `updateCommunityDirectoryFlags`. Outsider is never a member. Fails loudly if a slug belongs to a non-QA account.
   - **Results:** when the year is not yet published, `seedCommunityEditionBallots` (8 seed ballots) then `publishEditionForSeed`. Writes `e2e/.auth/fixtures.json` (year, slugs, one enabled category id per community) for the specs.
@@ -46,7 +46,7 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
   - `playwright.staging.config.ts`: `baseURL` = `QA_STAGING_URL`, no `webServer`, test dir `e2e/staging/`. Local `playwright.config.ts` ignores `staging/**`.
   - Global setup signs in each QA account via `POST /api/auth/sign-in/email` (the same endpoint the sign-in form uses) and saves cookies to `e2e/.auth/*.json` (gitignored).
   - `pnpm test:staging`. Specs are **read-only** (GET pages and APIs, no writes). Current specs use API contexts only, so CI skips the browser download; add `playwright install chromium` when a spec needs a page.
-- **CI:** `qa` job in `.github/workflows/staging.yml`, `needs: [cloudflare, auth_email]` (Auth domain must be registered before sign-up), env from `STAGING_DATABASE_URL`, `STAGING_CF_APP_URL` (falls back to the deploy URL), `QA_ACCOUNT_PASSWORD`. Skips cleanly when the password secret is missing. Uploads `playwright-report-staging`; result row in the staging summary.
+- **CI:** `qa` job in `.github/workflows/staging.yml`, `needs: [cloudflare]`, env from `STAGING_DATABASE_URL`, `STAGING_CF_APP_URL` (falls back to the deploy URL), `QA_ACCOUNT_PASSWORD`. Skips cleanly when the password secret is missing. Uploads `playwright-report-staging`; result row in the staging summary.
 - **First specs (covers step 2), 19 tests:** each signed-in viewer's session is recognized; standings / categories / comparison APIs → 404 for signed out + outsider on `gamies_qa_private`, 200 for member + host, 200 for everyone on `gamies_qa_showcase`; edition page shows the private view exactly when access is denied (the page answers 200 either way).
 - **Later steps add specs here:** step 3 (redirect after sign-in), step 4 (account delete origin), step 6 (headers present, sign-in still works under CSP), step 7 (account page props, private metadata).
 - **Out of scope:** Google sign-in (needs a real Google login — stays a manual check).
@@ -74,28 +74,26 @@ Every step ships with tests in the same commit (see `docs/engineering.md`). Run 
 
 ### [x] 5. Webhook and worker hardening
 
-- **Body caps:** reject > ~256KB with 413 before buffering — `workers/igdb-webhooks/src/index.ts` and `src/app/api/webhooks/neon-auth-email/route.ts` (check `Content-Length`, then count bytes while reading).
+- **Body caps:** reject oversized bodies with 413 before buffering on the IGDB webhooks Worker (`workers/igdb-webhooks/src/index.ts` — check `Content-Length`, then count bytes while reading). *(Neon Auth email webhook route removed with Managed Auth cutover.)*
 - **Redact IGDB registration:** register/delete responses return only `id, entity, method, url, active` (same shape as the overview endpoint) — never `secret` / `api_key`.
 - **Generic 500s:** worker and `src/app/api/admin/sync/route.ts` return a fixed message; log details server-side.
-- **Neon timestamp skew:** `src/lib/email/neon-webhook.ts` — also reject timestamps more than ~60s in the future.
 - **Email links:** `src/lib/email/templates.ts` `ctaButton` — allow `https:` only.
 - **Admin proxy ids:** validate `id` / `webhookId` path segments (`[A-Za-z0-9-]+`) before building worker URLs.
-- **Tests:** `neon-webhook.test.ts` (future timestamp), worker tests for 413 + redacted registration, template test for non-https href.
-- **As built (2026-10-07):**
-  - Shared `readTextWithLimit` + `toPublicWebhookRegistration` live in `@thegamies/igdb` (the worker has no test runner). Cap: 256KB on the Neon email webhook (checked before signature work).
+- **Tests:** worker tests for 413 + redacted registration, template test for non-https href.
+- **As built (2026-10-07; Auth webhook pieces retired 2026-10-28):**
+  - Shared `readTextWithLimit` + `toPublicWebhookRegistration` live in `@thegamies/igdb` (the worker has no test runner).
   - **IGDB intake: no size cap, by decision — an IGDB delivery must never fail for size** (a refused delivery leaves that record stale, and repeated failures can get the webhook deactivated). The secret check before reading the body is the guard. Real payloads: median ~3.6KB, largest seen ~24KB (Call of Duty: Black Ops III; Nintendo for companies).
   - Cloudflare Queues caps messages at 128KB. Envelopes that would not fit (`fitsInQueueMessage`, 16KB headroom) skip the queue and are processed live — even when delivery is closed — and log `igdb-webhooks-oversized` with size, entity, and id. With no database binding the worker answers 503 so IGDB retries.
   - Generic 500 only on the IGDB intake (`/igdb`); admin-only worker routes and `/api/admin/sync` keep detailed errors for the operator.
-  - Neon JWKS cached 10 minutes; an unknown `kid` refetches at most once a minute (rotation still works, forged requests can't force a fetch each time).
-  - Email link check lives in `buildAuthEmail` (`isSafeEmailHref`): https, or http on loopback; anything else builds no email.
+  - Email link check uses `isSafeEmailHref`: https, or http on loopback; anything else is refused. Auth mail is sent from Better Auth hooks via Worker `EMAIL` (no Managed Auth webhook / JWKS).
   - Admin proxy ids: webhook id digits only, event id UUID — checked in the app route and again in the worker.
-  - Staging spec `e2e/staging/webhook-limits.spec.ts`: 300KB POST → 413; small unsigned → 401.
+  - Staging spec `e2e/staging/webhook-limits.spec.ts`: oversized IGDB POST → 413; small unsigned → 401.
   - **Optional follow-up:** rotate `IGDB_WEBHOOK_SECRET` and re-register slots — registration responses carried it to the admin browser before this step.
 
 ### [x] 6. Security headers
 
 - **Change:** `headers()` in `next.config.ts`: `X-Frame-Options: DENY` (or CSP `frame-ancestors 'none'`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Strict-Transport-Security`, `Permissions-Policy`.
-- **CSP:** ship as `Content-Security-Policy-Report-Only` first; allowlist Neon Auth, Google sign-in, GA, AdSense, IGDB/R2 images. Enforce in a follow-up once preview is clean.
+- **CSP:** ship as `Content-Security-Policy-Report-Only` first; allowlist Google sign-in, GA, AdSense, IGDB/R2 images (Auth is same-origin `/api/auth`). Enforce in a follow-up once preview is clean.
 - **Decision needed:** enforce CSP in this PR or report-only first (recommended: report-only).
 - **Preview check:** sign in (email + Google), ads, analytics, image upload, OG previews; browser console has no blocked resources.
 - **Decided 2026-10-07 — minimal version:** `src/lib/security-headers.ts`, applied to every path in `next.config.ts`:

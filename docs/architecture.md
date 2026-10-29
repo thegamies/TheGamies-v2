@@ -2,11 +2,12 @@
 
 ## Overview
 
-One coherent Next.js application, deployable to **Cloudflare Workers** (OpenNext). Neon provides Postgres and Auth. IGDB ingestion runs as a separate TypeScript worker, not inside normal web requests.
+One coherent Next.js application, deployable to **Cloudflare Workers** (OpenNext). Neon provides Postgres. Auth is self-hosted Better Auth in the Worker (`auth_*` tables). IGDB ingestion runs as a separate TypeScript worker, not inside normal web requests.
 
 ```text
-Browser → Cloudflare Workers (OpenNext) → Neon (Postgres + Auth)
-                              └→ RLS: future (Auth JWT → DB role); today app-layer session/ownership
+Browser → Cloudflare Workers (OpenNext) → Neon Postgres
+                └→ Better Auth in-Worker (`/api/auth`, auth_* tables)
+                └→ RLS: future (Auth JWT → DB role); today app-layer session/ownership
 
 Separate: IGDB ingestion (`packages/igdb` CLI + `/admin/sync`) → Neon catalog tables
          IGDB webhooks Worker (`workers/igdb-webhooks` + Cloudflare Queue) → batched catalog writes
@@ -22,7 +23,7 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 | Styles | Tailwind + design tokens |
 | Host | **Cloudflare Workers (OpenNext)** |
 | DB | Neon Postgres (server `DATABASE_URL` owner role; **no RLS policies yet**) |
-| Auth | Neon Auth (Managed Better Auth); profiles in app `profiles` table. Account deletion closes the auth user via SDK `deleteUser`, the Neon Auth Users API, and `neon_auth` SQL (SDK delete is often a no-op). The UI posts JSON to `/api/account/delete` (not a Server Action): after Auth close, OpenNext crashes if Next re-renders `/account` or `redirect()`s. |
+| Auth | Self-hosted Better Auth in the OpenNext Worker (`auth_*` tables); profiles in app `profiles` table. Account deletion closes the auth user via Better Auth `deleteUser` + `auth_*` SQL. The UI posts JSON to `/api/account/delete` (not a Server Action): after Auth close, OpenNext crashes if Next re-renders `/account` or `redirect()`s. |
 | Access control | **App-layer** session + ownership until Auth JWT → DB role for RLS is defined |
 | Catalog | IGDB via separate worker + queued Cloudflare webhooks |
 | Validation | Zod |
@@ -36,20 +37,17 @@ Product logic stays host-agnostic. Host-specific code lives only in thin adapter
 
 ## Auth session
 
-The browser talks only to this origin. Sign-in, sign-up, email confirmation, the Google session claim, and later session reads go to `/api/auth` on `thegamies.gg`. The Worker (`auth.handler()` in `src/app/api/auth/[...path]/route.ts`) calls Neon Auth at `NEON_AUTH_BASE_URL` and writes `Set-Cookie` on the response for this host.
+The browser talks only to this origin. Sign-in, sign-up, email confirmation, Google OAuth callback, and session reads go to `/api/auth` on `thegamies.gg`. Better Auth runs **in the Worker** (`auth.handler()` in `src/app/api/auth/[...path]/route.ts`) against `auth_*` tables and writes `Set-Cookie` on the response for this host. There is no outbound Neon Managed Auth hop.
 
-Two cookies matter:
+Session cookie (HTTPS):
 
 | Cookie | Role |
 |---|---|
-| `__Secure-neon-auth.session_token` | Login session |
-| `__Secure-neon-auth.local.session_data` | Signed cache. A fresh one skips Neon on navigation for up to four hours (`SESSION_DATA_TTL_SEC`) |
+| `__Secure-better-auth.session_token` | Login session (non-`__Secure-` name on local HTTP) |
 
-They are `HttpOnly`, `Secure`, `Path=/`, and `SameSite=Lax`. The `__Secure-` prefix makes them host-only: no `Domain`, so they belong to the exact host that set them and travel only over HTTPS. On a later visit the browser attaches them as the `Cookie` header. The site does not fetch them.
+Cookies are `HttpOnly`, `Secure` (on HTTPS), `Path=/`, and `SameSite=Lax`. The `__Secure-` prefix makes them host-only: no `Domain`, so they belong to the exact host that set them and travel only over HTTPS. Sign-out also expires legacy `__Secure-neon-auth.*` names left from the Managed Auth cutover.
 
-A 429 is Neon Auth answering that Worker call. This app has no sign-in rate limit of its own. The Auth SDK does not copy the visitor address, so `src/lib/auth/auth-client-ip.ts` replaces `x-forwarded-for` with one value, Cloudflare’s `cf-connecting-ip`, and only on fetches to the Auth base URL. Neon has not documented which key the managed limiter uses. Current Better Auth trusts `x-forwarded-for` when that header holds a single address. A comma-separated list is ignored unless Better Auth is configured with `trustedProxies`. With no resolvable address, Better Auth uses one shared bucket per path. If Neon’s edge appends the Worker’s address before the limiter runs, our single value becomes a list and every visitor can share that bucket. Nothing in this repo can see that hop. The signal is a 429 that lands on more than one visitor at once.
-
-Keep the Auth call on the Worker. Neon’s host cannot store a cookie for `thegamies.gg`: the browser keeps `Set-Cookie` for the host that sent it. Trusted domains only allow redirects and CSRF origins. `cookies.domain` applies when our response sets the cookie, which is what the `/api/auth` proxy is for. A handoff that reads a token from Neon’s JSON and posts it here would put the session token in page JavaScript, and later session checks would still leave from the Worker.
+Visitor IP for Auth comes from Cloudflare’s `cf-connecting-ip` (`src/lib/auth/auth-client-ip.ts`). Keep Auth on this origin so `Set-Cookie` lands on `thegamies.gg`. Detail: [self-hosted-better-auth-spike.md](./self-hosted-better-auth-spike.md).
 
 ## Boundaries
 
