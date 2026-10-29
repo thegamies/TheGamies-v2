@@ -9,10 +9,13 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
   type RefObject,
 } from "react";
 import { createPortal } from "react-dom";
+
+const subscribeNoop = () => () => {};
 import {
   DndContext,
   closestCenter,
@@ -289,7 +292,11 @@ export function ListEditor({
   const [leavePrompt, setLeavePrompt] = useState<"done" | "share" | null>(
     null,
   );
-  const [portalReady, setPortalReady] = useState(false);
+  const portalReady = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false,
+  );
 
   const yearNum = Number(year) || currentYear;
   const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
@@ -630,10 +637,6 @@ export function ListEditor({
       window.removeEventListener("keydown", onKey);
     };
   }, [settingsOpen, shareMenuOpen]);
-
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
 
   // Freeze the page behind the mobile search sheet (same pattern as Dialog).
   useEffect(() => {
