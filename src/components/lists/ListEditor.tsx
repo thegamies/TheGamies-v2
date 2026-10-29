@@ -12,6 +12,7 @@ import {
   useTransition,
   type RefObject,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   closestCenter,
@@ -288,6 +289,7 @@ export function ListEditor({
   const [leavePrompt, setLeavePrompt] = useState<"done" | "share" | null>(
     null,
   );
+  const [portalReady, setPortalReady] = useState(false);
 
   const yearNum = Number(year) || currentYear;
   const rankFormat: ExportRankFormat = showSuffix ? "ordinal" : "number";
@@ -628,6 +630,25 @@ export function ListEditor({
       window.removeEventListener("keydown", onKey);
     };
   }, [settingsOpen, shareMenuOpen]);
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  // Freeze the page behind the mobile search sheet (same pattern as Dialog).
+  useEffect(() => {
+    if (!panelOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setPanelOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [panelOpen]);
 
   function changeListFormat(next: ListFormat) {
     setListFormat(next);
@@ -1328,46 +1349,54 @@ export function ListEditor({
       </div>
       )}
 
-      {editorView === "goty" && panelOpen ? (
-        <aside className="fixed inset-x-0 top-0 z-40 flex flex-col bg-paper lg:hidden bottom-[calc(3.5rem+var(--site-ad-bar,0px))]">
-          <div className="flex items-center justify-between border-b border-line px-3 py-3">
-            <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-ink">
-              Search games
-            </p>
-            <button
-              type="button"
-              onClick={() => setPanelOpen(false)}
-              aria-label="Close"
-              className="p-1 text-muted transition-colors hover:text-ink"
+      {portalReady && editorView === "goty" && panelOpen
+        ? createPortal(
+            <aside
+              role="dialog"
+              aria-modal="true"
+              aria-label="Search games"
+              data-testid="list-search-sheet"
+              className="fixed inset-0 z-[60] flex flex-col bg-paper lg:hidden"
             >
-              ✕
-            </button>
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3">
-            <SearchGamesPanelBody
-              searchRef={searchRef}
-              query={query}
-              onQueryChange={setQuery}
-              isFull={isFull}
-              fullMessage={`Lists can hold at most ${LIST_MAX_ITEMS} games.`}
-              searching={searchPending}
-              visibleResults={visibleHits}
-              resultsEmpty={hits.length === 0}
-              onAdd={addGame}
-            />
-          </div>
-        </aside>
-      ) : null}
+              <div className="flex items-center justify-between border-b border-line px-3 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+                <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-ink">
+                  Search games
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(false)}
+                  aria-label="Close"
+                  className="p-1 text-muted transition-colors hover:text-ink"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                <SearchGamesPanelBody
+                  searchRef={searchRef}
+                  query={query}
+                  onQueryChange={setQuery}
+                  isFull={isFull}
+                  fullMessage={`Lists can hold at most ${LIST_MAX_ITEMS} games.`}
+                  searching={searchPending}
+                  visibleResults={visibleHits}
+                  resultsEmpty={hits.length === 0}
+                  onAdd={addGame}
+                  layout="sheet"
+                />
+              </div>
+            </aside>,
+            document.body,
+          )
+        : null}
 
-      {editorView === "goty" ? (
-      <nav className="fixed inset-x-0 z-50 flex h-14 border-t border-line bg-panel lg:hidden bottom-[var(--site-ad-bar,0px)]">
+      {editorView === "goty" && !panelOpen ? (
+      <nav className="fixed inset-x-0 z-50 flex min-h-14 border-t border-line bg-panel lg:hidden bottom-[var(--site-ad-bar,0px)] pb-[env(safe-area-inset-bottom)]">
         <button
           type="button"
-          onClick={() => setPanelOpen((open) => !open)}
-          aria-pressed={panelOpen}
-          className={`flex-1 px-4 text-xs font-extrabold uppercase tracking-[0.16em] transition-colors ${
-            panelOpen ? "text-accent" : "text-muted"
-          }`}
+          onClick={() => setPanelOpen(true)}
+          aria-pressed={false}
+          className="flex-1 px-4 text-xs font-extrabold uppercase tracking-[0.16em] text-muted transition-colors"
         >
           Search games
         </button>
@@ -1450,13 +1479,14 @@ export function ListEditor({
         />
       ) : null}
 
-      {signedIn && dirty ? (
+      {signedIn && dirty && !panelOpen ? (
         <PinnedSaveBar
           className={`fixed inset-x-0 z-40 ${
             editorView === "goty"
-              ? "bottom-[calc(3.5rem+var(--site-ad-bar,0px))] lg:bottom-[var(--site-ad-bar,0px)]"
+              ? "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+var(--site-ad-bar,0px))] lg:bottom-[var(--site-ad-bar,0px)]"
               : "bottom-[var(--site-ad-bar,0px)]"
           }`}
+          safeArea={editorView !== "goty"}
           message="Unsaved changes"
         >
           <Button
@@ -1486,6 +1516,7 @@ function SearchGamesPanelBody({
   visibleResults,
   resultsEmpty,
   onAdd,
+  layout = "sidebar",
 }: {
   searchRef: RefObject<HTMLInputElement | null>;
   query: string;
@@ -1496,21 +1527,34 @@ function SearchGamesPanelBody({
   visibleResults: GameSearchHit[];
   resultsEmpty: boolean;
   onAdd: (game: GameSearchHit) => void;
+  /** Full-height sheet on mobile; capped sidebar on desktop. */
+  layout?: "sidebar" | "sheet";
 }) {
+  const sheet = layout === "sheet";
   return (
-    <div className="flex flex-col gap-3">
+    <div
+      className={
+        sheet ? "flex min-h-0 flex-1 flex-col gap-3" : "flex flex-col gap-3"
+      }
+    >
       <input
         ref={searchRef}
         value={query}
         onChange={(e) => onQueryChange(e.target.value)}
         placeholder="Search games…"
         aria-label="Search games"
-        className="min-w-0 w-full border border-line bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)]"
+        className="min-w-0 w-full shrink-0 border border-line bg-panel px-3 py-2 text-sm text-ink outline-none transition-colors duration-[var(--motion-fast)] focus:border-accent rounded-[var(--radius-control)]"
       />
       {isFull ? (
         <p className="shrink-0 text-xs text-accent">{fullMessage}</p>
       ) : null}
-      <div className="max-h-[32rem] overflow-y-auto border border-line bg-panel p-2">
+      <div
+        className={
+          sheet
+            ? "min-h-0 flex-1 overflow-y-auto overscroll-contain border border-line bg-panel p-2"
+            : "max-h-[32rem] overflow-y-auto border border-line bg-panel p-2"
+        }
+      >
         {searching ? (
           <p className="px-2 py-4 text-sm text-muted">Searching…</p>
         ) : visibleResults.length === 0 ? (
