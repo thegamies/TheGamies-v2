@@ -88,22 +88,17 @@ import {
 import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
-import {
-  emptyLoadCookieSlot,
-  maintainLoadSessionCookie,
-  type LoadCookieSlot,
-} from "@/lib/request-cost/load-session";
 
 type WriterSlot = { list: WriterListState };
 
-async function resignTrafficSession(input: {
-  slot: LoadCookieSlot;
+/** Sign in once; server refreshes cookies on later traffic responses. */
+async function signInTrafficCookie(input: {
   appUrl: string;
   email: string;
   password: string;
   samples: LoadSample[];
   group: string;
-}): Promise<boolean> {
+}): Promise<string | null> {
   const t0 = Date.now();
   const signed = await signInEmailCookie(
     { appUrl: input.appUrl },
@@ -117,51 +112,7 @@ async function resignTrafficSession(input: {
     ok: signed.ok,
     at: Date.now(),
   });
-  if (!signed.ok) return false;
-  input.slot.cookie = signed.cookie;
-  input.slot.refreshedAt = Date.now();
-  return true;
-}
-
-async function keepTrafficSession(input: {
-  slot: LoadCookieSlot;
-  appUrl: string;
-  email: string;
-  password: string;
-  samples: LoadSample[];
-  group: string;
-  force?: boolean;
-}): Promise<boolean> {
-  if (!input.slot.cookie) {
-    return resignTrafficSession(input);
-  }
-  const result = await maintainLoadSessionCookie(
-    input.slot,
-    input.appUrl,
-    Date.now(),
-    input.force === true,
-  );
-  if (result.action === "skip") return true;
-  if (result.action === "refreshed") {
-    input.samples.push({
-      group: input.group,
-      step: "auth-get-session",
-      status: 200,
-      ms: result.ms,
-      ok: true,
-      at: Date.now(),
-    });
-    return true;
-  }
-  input.samples.push({
-    group: input.group,
-    step: "auth-get-session",
-    status: 401,
-    ms: result.ms,
-    ok: false,
-    at: Date.now(),
-  });
-  return resignTrafficSession(input);
+  return signed.ok ? signed.cookie : null;
 }
 
 function stampUtc(d: Date): string {
@@ -525,45 +476,25 @@ async function runScenario(input: {
     input.vusRead,
     Math.floor(input.vusRead * LOADTEST_SIGNED_IN_READ_FRACTION),
   );
-  const authTarget = { appUrl: input.appUrl };
 
   const readers = Array.from({ length: input.vusRead }, async (_, i) => {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
     if (delay > 0) await sleep(delay);
 
-    const account =
-      i < signedInReaders && input.fixtures.writerCount > 0
-        ? loadtestAccount((i % input.fixtures.writerCount) + 1)
-        : null;
-    const session = emptyLoadCookieSlot();
-    let signedIn = false;
-    if (account) {
-      signedIn = await keepTrafficSession({
-        slot: session,
-        appUrl: input.appUrl,
-        email: account.email,
-        password: input.password,
-        samples,
-        group: "read",
-        force: true,
-      });
-    }
-
-    while (Date.now() < end) {
-      if (signedIn && account) {
-        signedIn = await keepTrafficSession({
-          slot: session,
+    let cookie = "";
+    if (i < signedInReaders && input.fixtures.writerCount > 0) {
+      const account = loadtestAccount((i % input.fixtures.writerCount) + 1);
+      cookie =
+        (await signInTrafficCookie({
           appUrl: input.appUrl,
           email: account.email,
           password: input.password,
           samples,
           group: "read",
-        });
-        if (!signedIn) {
-          session.cookie = "";
-          session.refreshedAt = 0;
-        }
-      }
+        })) ?? "";
+    }
+
+    while (Date.now() < end) {
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
       );
@@ -587,11 +518,10 @@ async function runScenario(input: {
           "x-cost-journey": journey,
           "x-cost-step": path,
         };
-        if (session.cookie) headers.cookie = session.cookie;
+        if (cookie) headers.cookie = cookie;
         const res = await fetch(`${input.appUrl}${path}`, { headers });
-        if (session.cookie) {
-          session.cookie = mergeAuthCookies(session.cookie, res);
-        }
+        // Absorb server-refreshed session cookies from the real response.
+        if (cookie) cookie = mergeAuthCookies(cookie, res);
         await res.arrayBuffer().catch(() => null);
         samples.push({
           group: item.group,
@@ -626,20 +556,15 @@ async function runScenario(input: {
     if (delay > 0) await sleep(delay);
 
     const account = loadtestAccount(i + 1);
-    const session = emptyLoadCookieSlot();
-    if (
-      !(await keepTrafficSession({
-        slot: session,
+    let cookie =
+      (await signInTrafficCookie({
         appUrl: input.appUrl,
         email: account.email,
         password: input.password,
         samples,
         group: "write",
-        force: true,
-      }))
-    ) {
-      return;
-    }
+      })) ?? "";
+    if (!cookie) return;
 
     const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
@@ -647,7 +572,7 @@ async function runScenario(input: {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          cookie: session.cookie,
+          cookie,
           "x-cost-journey": journey,
           "x-cost-step": step,
         },
@@ -656,23 +581,24 @@ async function runScenario(input: {
 
     const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
       let res = await postWrite(op, body, step);
+      // Dead session only — not a keepalive ping. Server refresh is Set-Cookie
+      // on successful getSession inside the loadtest route / page render.
       if (res.status === 401) {
-        const alive = await keepTrafficSession({
-          slot: session,
+        const next = await signInTrafficCookie({
           appUrl: input.appUrl,
           email: account.email,
           password: input.password,
           samples,
           group: "write",
-          force: true,
         });
-        if (!alive) {
+        if (!next) {
           const text = await res.text().catch(() => "");
           return { res, text };
         }
+        cookie = next;
         res = await postWrite(op, body, step);
       }
-      session.cookie = mergeAuthCookies(session.cookie, res);
+      cookie = mergeAuthCookies(cookie, res);
       const text = await res.text().catch(() => "");
       return { res, text };
     };
@@ -691,18 +617,6 @@ async function runScenario(input: {
     };
 
     while (Date.now() < end) {
-      if (
-        !(await keepTrafficSession({
-          slot: session,
-          appUrl: input.appUrl,
-          email: account.email,
-          password: input.password,
-          samples,
-          group: "write",
-        }))
-      ) {
-        break;
-      }
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? writesLocked : writesOpen,
       );
