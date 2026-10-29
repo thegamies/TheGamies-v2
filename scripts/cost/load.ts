@@ -88,8 +88,81 @@ import {
 import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
+import {
+  emptyLoadCookieSlot,
+  maintainLoadSessionCookie,
+  type LoadCookieSlot,
+} from "@/lib/request-cost/load-session";
 
 type WriterSlot = { list: WriterListState };
+
+async function resignTrafficSession(input: {
+  slot: LoadCookieSlot;
+  appUrl: string;
+  email: string;
+  password: string;
+  samples: LoadSample[];
+  group: string;
+}): Promise<boolean> {
+  const t0 = Date.now();
+  const signed = await signInEmailCookie(
+    { appUrl: input.appUrl },
+    { email: input.email, password: input.password },
+  );
+  input.samples.push({
+    group: input.group,
+    step: "auth-signin",
+    status: signed.ok ? 200 : signed.status,
+    ms: Date.now() - t0,
+    ok: signed.ok,
+    at: Date.now(),
+  });
+  if (!signed.ok) return false;
+  input.slot.cookie = signed.cookie;
+  input.slot.refreshedAt = Date.now();
+  return true;
+}
+
+async function keepTrafficSession(input: {
+  slot: LoadCookieSlot;
+  appUrl: string;
+  email: string;
+  password: string;
+  samples: LoadSample[];
+  group: string;
+  force?: boolean;
+}): Promise<boolean> {
+  if (!input.slot.cookie) {
+    return resignTrafficSession(input);
+  }
+  const result = await maintainLoadSessionCookie(
+    input.slot,
+    input.appUrl,
+    Date.now(),
+    input.force === true,
+  );
+  if (result.action === "skip") return true;
+  if (result.action === "refreshed") {
+    input.samples.push({
+      group: input.group,
+      step: "auth-get-session",
+      status: 200,
+      ms: result.ms,
+      ok: true,
+      at: Date.now(),
+    });
+    return true;
+  }
+  input.samples.push({
+    group: input.group,
+    step: "auth-get-session",
+    status: 401,
+    ms: result.ms,
+    ok: false,
+    at: Date.now(),
+  });
+  return resignTrafficSession(input);
+}
 
 function stampUtc(d: Date): string {
   return d.toISOString().replace(/[:.]/g, "-");
@@ -458,30 +531,39 @@ async function runScenario(input: {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
     if (delay > 0) await sleep(delay);
 
-    let cookie = "";
-    if (i < signedInReaders && input.fixtures.writerCount > 0) {
-      const account = loadtestAccount(
-        (i % input.fixtures.writerCount) + 1,
-      );
-      const signed = await signInEmailCookie(authTarget, {
+    const account =
+      i < signedInReaders && input.fixtures.writerCount > 0
+        ? loadtestAccount((i % input.fixtures.writerCount) + 1)
+        : null;
+    const session = emptyLoadCookieSlot();
+    let signedIn = false;
+    if (account) {
+      signedIn = await keepTrafficSession({
+        slot: session,
+        appUrl: input.appUrl,
         email: account.email,
         password: input.password,
+        samples,
+        group: "read",
+        force: true,
       });
-      if (signed.ok) {
-        cookie = signed.cookie;
-      } else {
-        samples.push({
-          group: "read",
-          step: "auth-signin",
-          status: signed.status,
-          ms: 0,
-          ok: false,
-          at: Date.now(),
-        });
-      }
     }
 
     while (Date.now() < end) {
+      if (signedIn && account) {
+        signedIn = await keepTrafficSession({
+          slot: session,
+          appUrl: input.appUrl,
+          email: account.email,
+          password: input.password,
+          samples,
+          group: "read",
+        });
+        if (!signedIn) {
+          session.cookie = "";
+          session.refreshedAt = 0;
+        }
+      }
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
       );
@@ -505,9 +587,11 @@ async function runScenario(input: {
           "x-cost-journey": journey,
           "x-cost-step": path,
         };
-        if (cookie) headers.cookie = cookie;
+        if (session.cookie) headers.cookie = session.cookie;
         const res = await fetch(`${input.appUrl}${path}`, { headers });
-        if (cookie) cookie = mergeAuthCookies(cookie, res);
+        if (session.cookie) {
+          session.cookie = mergeAuthCookies(session.cookie, res);
+        }
         await res.arrayBuffer().catch(() => null);
         samples.push({
           group: item.group,
@@ -542,22 +626,20 @@ async function runScenario(input: {
     if (delay > 0) await sleep(delay);
 
     const account = loadtestAccount(i + 1);
-    const signed = await signInEmailCookie(authTarget, {
-      email: account.email,
-      password: input.password,
-    });
-    if (!signed.ok) {
-      samples.push({
+    const session = emptyLoadCookieSlot();
+    if (
+      !(await keepTrafficSession({
+        slot: session,
+        appUrl: input.appUrl,
+        email: account.email,
+        password: input.password,
+        samples,
         group: "write",
-        step: "auth-signin",
-        status: signed.status,
-        ms: 0,
-        ok: false,
-        at: Date.now(),
-      });
+        force: true,
+      }))
+    ) {
       return;
     }
-    let cookie = signed.cookie;
 
     const postWrite = (op: LoadWriteOp, body: unknown, step: string) =>
       fetch(`${input.appUrl}/api/qa/loadtest`, {
@@ -565,7 +647,7 @@ async function runScenario(input: {
         headers: {
           accept: "application/json",
           "content-type": "application/json",
-          cookie,
+          cookie: session.cookie,
           "x-cost-journey": journey,
           "x-cost-step": step,
         },
@@ -573,8 +655,24 @@ async function runScenario(input: {
       });
 
     const postOnce = async (op: LoadWriteOp, body: unknown, step: string) => {
-      const res = await postWrite(op, body, step);
-      cookie = mergeAuthCookies(cookie, res);
+      let res = await postWrite(op, body, step);
+      if (res.status === 401) {
+        const alive = await keepTrafficSession({
+          slot: session,
+          appUrl: input.appUrl,
+          email: account.email,
+          password: input.password,
+          samples,
+          group: "write",
+          force: true,
+        });
+        if (!alive) {
+          const text = await res.text().catch(() => "");
+          return { res, text };
+        }
+        res = await postWrite(op, body, step);
+      }
+      session.cookie = mergeAuthCookies(session.cookie, res);
       const text = await res.text().catch(() => "");
       return { res, text };
     };
@@ -593,6 +691,18 @@ async function runScenario(input: {
     };
 
     while (Date.now() < end) {
+      if (
+        !(await keepTrafficSession({
+          slot: session,
+          appUrl: input.appUrl,
+          email: account.email,
+          password: input.password,
+          samples,
+          group: "write",
+        }))
+      ) {
+        break;
+      }
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? writesLocked : writesOpen,
       );
