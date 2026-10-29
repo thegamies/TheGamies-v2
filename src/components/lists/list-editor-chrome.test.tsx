@@ -2,7 +2,14 @@
 
 import type { ReactNode } from "react";
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { searchGamesForList } from "@/lib/lists/search-games-client";
 import { ListDragHandle } from "./ListDragHandle";
@@ -57,6 +64,7 @@ vi.stubGlobal("ResizeObserver", ResizeObserverStub);
 
 afterEach(() => {
   cleanup();
+  document.body.style.overflow = "";
   window.history.replaceState({}, "", "/");
 });
 
@@ -298,5 +306,76 @@ describe("ListEditor chrome", () => {
     expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "List" }));
     expect(screen.getByLabelText("List size: 10. Tap to pick.")).toBeTruthy();
+  });
+
+  it("locks body scroll while the mobile search sheet is open", () => {
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Search games" }));
+    const sheet = screen.getByTestId("list-search-sheet");
+    expect(sheet).toBeTruthy();
+    expect(sheet.parentElement).toBe(document.body);
+    expect(document.body.style.overflow).toBe("hidden");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByTestId("list-search-sheet")).toBeNull();
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("puts Search and Save in one mobile dock after adding a game", async () => {
+    vi.mocked(searchGamesForList).mockResolvedValue([
+      {
+        id: "g1",
+        igdbId: 1,
+        slug: "hades-ii",
+        title: "Hades II",
+        year: 2026,
+        coverUrl: null,
+      },
+    ]);
+    render(
+      <ListEditor
+        signedIn
+        listType="goty"
+        initialTitle="2026 Game of the Year"
+        initialYear={2026}
+        initialItems={[]}
+      />,
+    );
+
+    const dock = screen.getByTestId("list-mobile-dock");
+    expect(within(dock).getByRole("button", { name: "Search games" })).toBeTruthy();
+    expect(within(dock).queryByTestId("unsaved-changes")).toBeNull();
+
+    fireEvent.click(within(dock).getByRole("button", { name: "Search games" }));
+    const sheet = screen.getByTestId("list-search-sheet");
+    const input = within(sheet).getByRole("textbox", { name: "Search games" });
+    fireEvent.change(input, { target: { value: "hades" } });
+    await waitFor(() => {
+      expect(within(sheet).getByTitle("Hades II")).toBeTruthy();
+    });
+
+    expect(screen.queryByTestId("list-mobile-dock")).toBeNull();
+    expect(screen.queryByTestId("unsaved-changes")).toBeNull();
+
+    fireEvent.click(within(sheet).getByTitle("Hades II"));
+    expect(screen.queryByTestId("list-search-sheet")).toBeNull();
+
+    const dockAfter = screen.getByTestId("list-mobile-dock");
+    expect(dockAfter.parentElement).toBe(document.body);
+    expect(
+      within(dockAfter).getByRole("button", { name: "Search games" }),
+    ).toBeTruthy();
+    expect(within(dockAfter).getByText("Unsaved changes")).toBeTruthy();
+    expect(within(dockAfter).getByTestId("unsaved-changes")).toBeTruthy();
+    expect(dockAfter.className).toMatch(/bottom-\[var\(--site-ad-bar/);
   });
 });
