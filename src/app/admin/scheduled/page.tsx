@@ -24,7 +24,7 @@ export default async function AdminScheduledPage() {
         Scheduled jobs
       </h1>
       <p className="mt-3 max-w-2xl text-muted">
-        Cloudflare background jobs. This does not change Vercel’s schedule.
+        Pause or resume Cloudflare Cron Triggers for this environment.
       </p>
       <div className="mt-10">
         <AdminScheduledClient

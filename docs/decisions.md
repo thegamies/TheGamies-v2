@@ -9,6 +9,7 @@ Record product and architecture decisions here. Do not invent answers to open it
 | 2026-08-09 | New repository | `thegamies/thegamies-v2` (same GitHub org); old repo is archive/reference |
 | 2026-08-09 | Hosting | Dual-host: Vercel + Cloudflare Workers (OpenNext) |
 | 2026-08-30 | Hosting | **Drop Vercel.** Cloudflare Workers (OpenNext) only. Previews = Neon branch + one Worker URL. Production/staging = Workers; no `vercel.json`. Edition freeze cron = Cloudflare Worker Cron only. |
+| 2026-10-29 | Hosting | **Deleted** the leftover Vercel project / GitHub integration (`the-gamies/thegamies`). No more Vercel deploy status on commits. Hosting remains Cloudflare Workers only. |
 | 2026-08-10 | Staging on develop | Push to `develop` deploys lasting staging: Vercel + Cloudflare Worker `thegamies-v2-develop` *(Vercel half dropped 2026-08-30)* |
 | 2026-08-10 | Secrets management | **Doppler** for local (`dev` / `dev_personal`). **GitHub Actions secrets** for deploy — manually imported; CI pushes them to hosts on staging & preview deploys (no Doppler service token / Teams). *(Hosts = Cloudflare only as of 2026-08-30.)* |
 | 2026-08-09 | Database + Auth | Neon Postgres (branching for previews) + **self-hosted Better Auth** in the OpenNext Worker (`auth_*`). *(Originally Neon Managed Auth; cut over 2026-10-28.)* |
