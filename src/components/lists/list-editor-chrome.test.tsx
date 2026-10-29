@@ -330,7 +330,7 @@ describe("ListEditor chrome", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
-  it("hides the unsaved bar while searching and pins it above mobile chrome after", async () => {
+  it("puts Search and Save in one mobile dock after adding a game", async () => {
     vi.mocked(searchGamesForList).mockResolvedValue([
       {
         id: "g1",
@@ -351,7 +351,11 @@ describe("ListEditor chrome", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Search games" }));
+    const dock = screen.getByTestId("list-mobile-dock");
+    expect(within(dock).getByRole("button", { name: "Search games" })).toBeTruthy();
+    expect(within(dock).queryByTestId("unsaved-changes")).toBeNull();
+
+    fireEvent.click(within(dock).getByRole("button", { name: "Search games" }));
     const sheet = screen.getByTestId("list-search-sheet");
     const input = within(sheet).getByRole("textbox", { name: "Search games" });
     fireEvent.change(input, { target: { value: "hades" } });
@@ -359,15 +363,19 @@ describe("ListEditor chrome", () => {
       expect(within(sheet).getByTitle("Hades II")).toBeTruthy();
     });
 
+    expect(screen.queryByTestId("list-mobile-dock")).toBeNull();
     expect(screen.queryByTestId("unsaved-changes")).toBeNull();
 
     fireEvent.click(within(sheet).getByTitle("Hades II"));
     expect(screen.queryByTestId("list-search-sheet")).toBeNull();
 
-    const save = screen.getByTestId("unsaved-changes");
-    expect(save).toBeTruthy();
-    const bar = save.closest("div.fixed");
-    expect(bar?.className ?? "").toMatch(/bottom-\[calc\(3\.5rem/);
-    expect(bar?.className ?? "").toMatch(/safe-area-inset-bottom/);
+    const dockAfter = screen.getByTestId("list-mobile-dock");
+    expect(dockAfter.parentElement).toBe(document.body);
+    expect(
+      within(dockAfter).getByRole("button", { name: "Search games" }),
+    ).toBeTruthy();
+    expect(within(dockAfter).getByText("Unsaved changes")).toBeTruthy();
+    expect(within(dockAfter).getByTestId("unsaved-changes")).toBeTruthy();
+    expect(dockAfter.className).toMatch(/bottom-\[var\(--site-ad-bar/);
   });
 });

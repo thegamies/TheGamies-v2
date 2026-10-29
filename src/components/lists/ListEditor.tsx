@@ -939,11 +939,13 @@ export function ListEditor({
   return (
     <div
       className={`space-y-6 ${
-        signedIn && dirty
-          ? editorView === "goty"
-            ? "pb-36 lg:pb-24"
-            : "pb-24"
-          : "pb-20 lg:pb-0"
+        editorView === "goty"
+          ? signedIn && dirty
+            ? "pb-24"
+            : "pb-20 lg:pb-0"
+          : signedIn && dirty
+            ? "pb-24"
+            : ""
       }`}
     >
       <div
@@ -1393,18 +1395,47 @@ export function ListEditor({
           )
         : null}
 
-      {editorView === "goty" && !panelOpen ? (
-      <nav className="fixed inset-x-0 z-50 flex min-h-14 border-t border-line bg-panel lg:hidden bottom-[var(--site-ad-bar,0px)] pb-[env(safe-area-inset-bottom)]">
-        <button
-          type="button"
-          onClick={() => setPanelOpen(true)}
-          aria-pressed={false}
-          className="flex-1 px-4 text-xs font-extrabold uppercase tracking-[0.16em] text-muted transition-colors"
-        >
-          Search games
-        </button>
-      </nav>
-      ) : null}
+      {portalReady && editorView === "goty" && !panelOpen
+        ? createPortal(
+            <nav
+              data-testid="list-mobile-dock"
+              aria-label="List tools"
+              className="fixed inset-x-0 z-50 border-t border-line bg-panel lg:hidden bottom-[var(--site-ad-bar,0px)] pb-[env(safe-area-inset-bottom)]"
+            >
+              <div className="mx-auto flex min-h-14 max-w-[var(--page-max)] items-center gap-3 px-[var(--gutter)]">
+                <button
+                  type="button"
+                  onClick={() => setPanelOpen(true)}
+                  className={`py-3 text-xs font-extrabold uppercase tracking-[0.16em] text-muted transition-colors hover:text-ink ${
+                    signedIn && dirty ? "shrink-0" : "flex-1 text-center"
+                  }`}
+                >
+                  Search games
+                </button>
+                {signedIn && dirty ? (
+                  <>
+                    <p
+                      className="min-w-0 flex-1 truncate text-sm text-muted"
+                      role="status"
+                    >
+                      Unsaved changes
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={save}
+                      disabled={pending}
+                      data-testid="unsaved-changes"
+                    >
+                      {pending ? "Saving…" : "Save"}
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            </nav>,
+            document.body,
+          )
+        : null}
 
       <ListExportDialog
         open={exportOpen}
@@ -1484,12 +1515,9 @@ export function ListEditor({
 
       {signedIn && dirty && !panelOpen ? (
         <PinnedSaveBar
-          className={`fixed inset-x-0 z-40 ${
-            editorView === "goty"
-              ? "bottom-[calc(3.5rem+env(safe-area-inset-bottom)+var(--site-ad-bar,0px))] lg:bottom-[var(--site-ad-bar,0px)]"
-              : "bottom-[var(--site-ad-bar,0px)]"
+          className={`fixed inset-x-0 z-40 bottom-[var(--site-ad-bar,0px)] ${
+            editorView === "goty" ? "hidden lg:block" : ""
           }`}
-          safeArea={editorView !== "goty"}
           message="Unsaved changes"
         >
           <Button
@@ -1497,7 +1525,9 @@ export function ListEditor({
             size="sm"
             onClick={save}
             disabled={pending}
-            data-testid="unsaved-changes"
+            data-testid={
+              editorView === "goty" ? "unsaved-changes-desktop" : "unsaved-changes"
+            }
           >
             {pending ? "Saving…" : "Save"}
           </Button>
