@@ -165,6 +165,11 @@ function GotyRankedBillboard({
   );
 }
 
+/**
+ * Per-rank chapters: `#n` sits above each strip (outside overflow / edge fade).
+ * Strips share scroll via HorizontalScrollGroup — visible peers only while
+ * flinging; everyone catches up when the gesture settles.
+ */
 function GotyComparisonSections({
   matrix,
   slug,

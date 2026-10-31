@@ -126,4 +126,65 @@ describe("EditionResultsOverview comparison", () => {
     expect(cover?.getAttribute("srcset") ?? "").not.toContain("w=3840");
     expect(screen.getByText("Community")).toBeTruthy();
   });
+
+  it("keeps rank titles outside each comparison strip", () => {
+    render(
+      <EditionResultsOverview
+        slug="eric"
+        year={2026}
+        layout="comparison"
+        topTen={[]}
+        matrix={{
+          showYou: false,
+          hasGames: true,
+          voiceColumns: [],
+          rows: [
+            {
+              rank: 1,
+              you: null,
+              community: [
+                {
+                  gameId: "g1",
+                  slug: "hades-ii",
+                  title: "Hades II",
+                  coverUrl: null,
+                },
+              ],
+              voices: [],
+              voiceGames: {},
+            },
+            {
+              rank: 2,
+              you: null,
+              community: [
+                {
+                  gameId: "g2",
+                  slug: "clair",
+                  title: "Clair Obscur",
+                  coverUrl: null,
+                },
+              ],
+              voices: [],
+              voiceGames: {},
+            },
+          ],
+        }}
+        gotyTotal={2}
+        standingsHref="/communities/eric/edition/2026?view=standings"
+        categoryPodiums={[]}
+        categoryComparison={emptyMatrix}
+        youBallotHref={null}
+      />,
+    );
+
+    expect(screen.getByText("#1")).toBeTruthy();
+    expect(screen.getByText("#2")).toBeTruthy();
+    // One strip per rank; `#n` is a sibling above the overflow (not under the fade).
+    expect(document.querySelectorAll("[data-hscroll-body]")).toHaveLength(2);
+    expect(screen.getAllByText("Community")).toHaveLength(2);
+    const rank = screen.getByText("#1");
+    expect(rank.closest("[data-hscroll-body]")).toBeNull();
+    expect(screen.getByRole("link", { name: /Hades II/ })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Clair Obscur/ })).toBeTruthy();
+  });
 });
