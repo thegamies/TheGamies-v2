@@ -1,24 +1,29 @@
 /** @vitest-environment jsdom */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { TgaPickemHowItWorks } from "./TgaPickemHowItWorks";
+import {
+  TGA_PICKEM_HOW_IT_WORKS,
+  TgaPickemHowItWorks,
+} from "./TgaPickemHowItWorks";
 
 afterEach(() => {
   cleanup();
+  document.body.style.overflow = "";
 });
 
 describe("TgaPickemHowItWorks", () => {
-  it("keeps the rules blurb short", () => {
+  it("opens the rules in a dialog from a How it works button", () => {
     render(<TgaPickemHowItWorks />);
     expect(
-      screen.getByText(/Predict the winner of every award/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/Earn 1 point for each correct pick/i),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/World Premiere prediction decides the winner/i),
-    ).toBeTruthy();
+      screen.queryByText(/Predict the winner of every award/i),
+    ).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "How it works" }));
+
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText(TGA_PICKEM_HOW_IT_WORKS)).toBeTruthy();
+    expect(TGA_PICKEM_HOW_IT_WORKS.includes("—")).toBe(false);
   });
 });

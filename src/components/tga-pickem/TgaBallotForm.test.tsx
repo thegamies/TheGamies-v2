@@ -85,14 +85,12 @@ describe("TgaBallotForm", () => {
       />,
     );
 
-    expect(
-      screen.getByText(/Predict the winner of every award/i),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "How it works" })).toBeTruthy();
     expect(screen.getByText("1 of 2")).toBeTruthy();
     expect(screen.getByText("Tiebreaker needed")).toBeTruthy();
     expect(
       screen.getByText(
-        /Tiebreaker — guess how many world premieres there will be/i,
+        /Tiebreaker\. Guess how many world premieres there will be/i,
       ),
     ).toBeTruthy();
     expect(
@@ -112,7 +110,7 @@ describe("TgaBallotForm", () => {
     ).toBeEnabled();
   });
 
-  it("hides the how-it-works blurb after picks lock", () => {
+  it("hides How it works after picks lock", () => {
     render(
       <TgaBallotForm
         categories={categories}
@@ -123,7 +121,7 @@ describe("TgaBallotForm", () => {
     );
 
     expect(
-      screen.queryByText(/Predict the winner of every award/i),
+      screen.queryByRole("button", { name: "How it works" }),
     ).toBeNull();
   });
 });

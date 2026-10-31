@@ -9,7 +9,7 @@ export function TgaBallotComingSoon({
 }) {
   const copy = tgaPromoCopy(year);
   return (
-    <div className="mt-6 space-y-2">
+    <div className="mt-6 space-y-3">
       <p className="max-w-xl text-sm text-muted">
         <span className="text-ink">{copy.accent}</span> {copy.rest}
       </p>

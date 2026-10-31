@@ -139,17 +139,22 @@ export function TgaBallotForm({
     guessNumber >= 0 &&
     guessNumber <= 200;
   const progressMessage = (
-    <>
+    <span className="flex min-w-0 flex-col gap-0.5">
       <span>
-        {pickCount} of {categoryTotal}
+        <span className="whitespace-nowrap">
+          {pickCount} of {categoryTotal}
+        </span>
+        <span className="mx-1.5 text-line" aria-hidden>
+          ·
+        </span>
+        <span className="whitespace-nowrap">
+          {tiebreakerFilled ? "Tiebreaker set" : "Tiebreaker needed"}
+        </span>
       </span>
-      <span className="mx-2 text-line" aria-hidden>
-        ·
-      </span>
-      <span>
-        {tiebreakerFilled ? "Tiebreaker set" : "Tiebreaker needed"}
-      </span>
-    </>
+      {dirty ? (
+        <span className="whitespace-nowrap">Unsaved changes</span>
+      ) : null}
+    </span>
   );
   const hasExistingPicks =
     Object.keys(picks).length > 0 || guess !== "";
@@ -186,7 +191,7 @@ export function TgaBallotForm({
 
   return (
     <div className={`mt-6 ${canPick ? "pb-24" : ""}`}>
-      {!locked ? <TgaPickemHowItWorks className="mb-4 mt-0" /> : null}
+      {!locked ? <TgaPickemHowItWorks className="mb-5 mt-0" /> : null}
       <div className="space-y-12">
       {signInHref ? (
         <p className="max-w-xl text-muted">
@@ -292,7 +297,7 @@ export function TgaBallotForm({
       <label className="block max-w-md text-sm">
         <span className="text-muted">World Premieres</span>
         <span className="mt-1 block text-sm text-muted">
-          Tiebreaker — guess how many world premieres there will be.
+          Tiebreaker. Guess how many world premieres there will be.
         </span>
         <input
           type="number"
@@ -311,23 +316,11 @@ export function TgaBallotForm({
       ) : null}
       </div>
       {canPick ? (
-        <PinnedSaveBar
-          message={
-            message ? (
-              <span className="text-accent">{message}</span>
-            ) : dirty ? (
-              <>
-                {progressMessage}
-                <span className="mx-2 text-line" aria-hidden>
-                  ·
-                </span>
-                <span>Unsaved changes</span>
-              </>
-            ) : (
-              progressMessage
-            )
-          }
-        >
+        <PinnedSaveBar message={message ? (
+          <span className="text-accent">{message}</span>
+        ) : (
+          progressMessage
+        )}>
           <Button
             type="button"
             disabled={pending || !dirty}

@@ -34,7 +34,7 @@ On but not promoted: URL works (soft launch / archive).
 
 Picks lock at **show start**. The nominee ballot is hidden while the year is scheduled (coming soon) or still a draft. It appears when picks open, then stays after lock for review and scoring. Admin calls winners in the show room. Each call recounts ballot masks into the existing score rows, then leaderboards page those rows. The public and community ballots mark the winner plus Correct / Incorrect on your pick after picks lock. While picks are open, Standings lists who has a sheet (names only). Places, points, and opening a sheet wait until picks lock. After lock, Standings is a sticky-header table with **Name**, **Points**, and **World Premier Off** columns. Called winners stay hidden and Standings does not show places or points until then.
 
-While picks are soon or open, Your ballot shows a short how-it-works blurb (predict each award; 1 point per correct pick; World Premiere guess breaks ties). It disappears after lock. While picks are open, the ballot sticky bar shows pick progress (`N of M`), whether the World Premieres tiebreaker is set, and Save. The World Premieres field explains that it is the tiebreaker guess for how many world premieres there will be.
+While picks are soon or open, Your ballot has a **How it works** control that opens a short rules dialog (predict each award; 1 point per correct pick; World Premiere guess breaks ties). It disappears after lock. While picks are open, the ballot sticky bar shows pick progress (`N of M`), whether the World Premieres tiebreaker is set, and Save on a second line when dirty. The World Premieres field explains that it is the tiebreaker guess for how many world premieres there will be.
 
 ## Scoring
 
