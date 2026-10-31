@@ -765,7 +765,7 @@ html.has-site-ad {
   align-items: center;
   min-height: 142px;
   gap: 18px;
-  padding: 18px 22px 18px 30px;
+  padding: 22px 22px 20px 30px;
   color: inherit;
   text-decoration: none;
 }
@@ -785,7 +785,7 @@ html.has-site-ad {
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.16em;
-  line-height: 1;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -796,9 +796,10 @@ html.has-site-ad {
   font-size: 31px;
   font-weight: 800;
   letter-spacing: -0.035em;
-  line-height: 0.96;
+  line-height: 1.08;
   text-transform: uppercase;
   text-wrap: pretty;
+  overflow: visible;
 }
 
 .promo-banner__headline {
@@ -829,7 +830,6 @@ html.has-site-ad {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
   height: 38px;
   padding: 0 15px;
   border: 1px solid var(--accent);
@@ -852,38 +852,28 @@ html.has-site-ad {
 }
 
 .promo-banner__year {
-  display: flex;
+  display: block;
   width: 100%;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.promo-banner__year-desktop,
-.promo-banner__year-mobile {
   color: transparent;
   font-family: var(--font-bebas), Impact, sans-serif;
   font-size: 112px;
   font-weight: 400;
   letter-spacing: -0.045em;
-  line-height: 0.75;
+  line-height: 0.9;
+  text-align: center;
   user-select: none;
   white-space: nowrap;
+  pointer-events: none;
   -webkit-text-stroke: 1.5px var(--accent);
-}
-
-.promo-banner__year-mobile {
-  display: none;
 }
 
 @media (max-width: 980px) {
   .promo-banner__aside {
-    width: 175px;
+    width: 168px;
   }
 
-  .promo-banner__year-desktop {
-    font-size: 92px;
+  .promo-banner__year {
+    font-size: 84px;
   }
 }
 
@@ -892,7 +882,7 @@ html.has-site-ad {
     min-height: 0;
     align-items: start;
     gap: 12px;
-    padding: 17px 14px 16px 18px;
+    padding: 18px 14px 16px 18px;
   }
 
   .promo-banner__kicker {
@@ -901,7 +891,8 @@ html.has-site-ad {
   }
 
   .promo-banner__eyebrow {
-    font-size: 25px;
+    font-size: 24px;
+    line-height: 1.1;
   }
 
   .promo-banner__headline {
@@ -912,7 +903,7 @@ html.has-site-ad {
   }
 
   .promo-banner__aside {
-    width: 88px;
+    width: 108px;
     gap: 8px;
     padding-top: 2px;
   }
@@ -921,7 +912,7 @@ html.has-site-ad {
     width: 100%;
     height: auto;
     min-height: 28px;
-    padding: 6px 4px;
+    padding: 6px 6px;
     font-size: 9px;
     letter-spacing: 0.01em;
     white-space: normal;
@@ -930,31 +921,17 @@ html.has-site-ad {
   }
 
   .promo-banner__year {
-    opacity: 0.72;
-  }
-
-  .promo-banner__year-desktop {
-    display: none;
-  }
-
-  .promo-banner__year-mobile {
-    display: block;
-    font-size: 52px;
-    letter-spacing: -0.055em;
-    line-height: 0.82;
-    text-align: center;
-    white-space: normal;
+    font-size: 42px;
+    letter-spacing: -0.04em;
+    line-height: 0.95;
+    opacity: 0.78;
     -webkit-text-stroke-width: 1px;
   }
 }
 
 @media (max-width: 390px) {
-  .promo-banner__copy {
-    padding-right: 0;
-  }
-
   .promo-banner__eyebrow {
-    font-size: 23px;
+    font-size: 22px;
   }
 
   .promo-banner__headline {
@@ -962,15 +939,15 @@ html.has-site-ad {
   }
 
   .promo-banner__aside {
-    width: 78px;
+    width: 96px;
   }
 
-  .promo-banner__year-mobile {
-    font-size: 46px;
+  .promo-banner__year {
+    font-size: 38px;
   }
 
   .promo-banner__cta {
     font-size: 8.5px;
-    padding: 5px 3px;
+    padding: 5px 4px;
   }
 }

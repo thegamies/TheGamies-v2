@@ -9,12 +9,6 @@ export type PromoBannerProps = PromoBannerCopy & {
   kind?: PromoBannerKind;
 };
 
-function yearHalves(year: number): { lead: string; tail: string } {
-  const raw = String(year);
-  if (raw.length < 4) return { lead: raw, tail: "" };
-  return { lead: raw.slice(0, 2), tail: raw.slice(2) };
-}
-
 export function PromoBanner({
   year,
   href,
@@ -25,7 +19,6 @@ export function PromoBanner({
   cta,
 }: PromoBannerProps) {
   const title = kind === "event" ? editionPromoTitle(year) : tgaPromoTitle(year);
-  const halves = yearHalves(year);
   const label = `${title}. ${accent} ${rest} ${cta}`;
 
   return (
@@ -41,20 +34,9 @@ export function PromoBanner({
 
         <div className="promo-banner__aside">
           <div className="promo-banner__year" aria-hidden>
-            <span className="promo-banner__year-desktop">{year}</span>
-            <span className="promo-banner__year-mobile">
-              {halves.lead}
-              {halves.tail ? (
-                <>
-                  <br />
-                  {halves.tail}
-                </>
-              ) : null}
-            </span>
+            {year}
           </div>
-          <span className="promo-banner__cta">
-            {cta} <span aria-hidden>→</span>
-          </span>
+          <span className="promo-banner__cta">{cta}</span>
         </div>
       </Link>
     </section>

@@ -50,8 +50,12 @@ describe("PromoBanner", () => {
     expect(link).toHaveClass("promo-banner__hit");
     expect(container.querySelector(".promo-banner__brush")).toBeNull();
     expect(container.querySelector(".promo-banner__meta")).toBeNull();
-    expect(
-      screen.getByText(/Make your picks/i).closest(".promo-banner__aside"),
-    ).not.toBeNull();
+    expect(container.querySelector(".promo-banner__year")?.textContent).toBe(
+      "2025",
+    );
+    expect(screen.getByText("Make your picks").textContent).toBe(
+      "Make your picks",
+    );
+    expect(screen.queryByText("→")).toBeNull();
   });
 });
