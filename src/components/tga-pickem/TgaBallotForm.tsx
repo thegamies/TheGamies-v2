@@ -215,11 +215,11 @@ export function TgaBallotForm({
       ) : null}
       {categories.map((category) => (
         <section key={category.id}>
-          <h2 className="font-display text-2xl tracking-wide text-ink">
+          <h2 className="sticky top-0 z-10 -mx-[var(--gutter)] border-b border-line bg-paper px-[var(--gutter)] py-3 font-display text-2xl tracking-wide text-ink">
             {category.label}
           </h2>
           {category.description ? (
-            <p className="mt-1 text-sm text-muted">{category.description}</p>
+            <p className="mt-3 text-sm text-muted">{category.description}</p>
           ) : null}
           <ul className={`mt-4 ${tgaNomineeGridClass}`}>
             {category.nominees.map((nominee) => {

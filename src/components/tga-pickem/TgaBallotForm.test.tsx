@@ -86,6 +86,9 @@ describe("TgaBallotForm", () => {
     );
 
     expect(screen.getByRole("button", { name: "How it works" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Game of the Year" })).toHaveClass(
+      "sticky",
+    );
     expect(screen.getByText("1 of 2")).toBeTruthy();
     expect(screen.getByText("Tiebreaker needed")).toBeTruthy();
     expect(
