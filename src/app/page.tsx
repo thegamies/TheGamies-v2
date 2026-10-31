@@ -54,6 +54,16 @@ export default async function HomePage() {
     <main className="mx-auto w-full max-w-[var(--page-max)] flex-1 px-[var(--gutter)] pb-6 pt-0 sm:pb-8">
       <SiteAds />
       <HomeBigPictureBanner games={bigPictureGames} />
+      {tgaBand ? (
+        <section className="border-b border-line pt-5 sm:pt-6 pb-6 sm:pb-8">
+          <PromoBanner
+            kind="tga"
+            year={tgaBand.year}
+            href={`/the-game-awards/${tgaBand.year}`}
+            {...tgaPromoCopy(tgaBand)}
+          />
+        </section>
+      ) : null}
       {featuredYear ? (
         <section className="pt-5 sm:pt-6 pb-4 sm:pb-6">
           <YearTopFiveSections
@@ -77,16 +87,6 @@ export default async function HomePage() {
         />
       )}
       {signedIn ? null : <HomeCommunitiesIntro />}
-      {tgaBand ? (
-        <section className="border-b border-line py-6 sm:py-8">
-          <PromoBanner
-            kind="tga"
-            year={tgaBand.year}
-            href={`/the-game-awards/${tgaBand.year}`}
-            {...tgaPromoCopy(tgaBand)}
-          />
-        </section>
-      ) : null}
 
       <section className="pt-2 sm:pt-4">
         <HomeCoverStrip

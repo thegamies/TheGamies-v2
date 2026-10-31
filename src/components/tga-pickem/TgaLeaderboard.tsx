@@ -2,6 +2,9 @@ import Link from "@/lib/next-link";
 import { PersonIdentity } from "@/components/profile/PersonIdentity";
 import type { TgaLeaderboardRow } from "@/lib/tga-pickem/scores";
 
+const rowGridClass =
+  "grid grid-cols-[minmax(0,1fr)_3.25rem_minmax(4.75rem,6.5rem)] items-center gap-x-2 sm:grid-cols-[minmax(0,1fr)_4.5rem_9rem] sm:gap-x-4";
+
 export function TgaLeaderboard({
   rows,
   page,
@@ -27,14 +30,23 @@ export function TgaLeaderboard({
 
   return (
     <div className="mt-6">
-      <ol className="divide-y divide-line border-y border-line">
+      <div
+        className={`${rowGridClass} sticky top-0 z-10 border-y border-line bg-paper py-3 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted`}
+        role="row"
+      >
+        <span role="columnheader">Name</span>
+        <span className="text-right" role="columnheader">
+          Points
+        </span>
+        <span className="text-right leading-tight" role="columnheader">
+          World Premier Off
+        </span>
+      </div>
+      <ol className="divide-y divide-line border-b border-line">
         {rows.map((row) => (
-          <li
-            key={row.profileId}
-            className="flex flex-wrap items-center justify-between gap-3 py-3"
-          >
+          <li key={row.profileId} className={`${rowGridClass} py-3`}>
             <div className="flex min-w-0 items-center gap-3">
-              <span className="font-display text-2xl tracking-wide text-ink">
+              <span className="w-7 shrink-0 font-display text-2xl tracking-wide text-ink tabular-nums">
                 {row.place}
               </span>
               <PersonIdentity
@@ -50,9 +62,11 @@ export function TgaLeaderboard({
                 subtitle={null}
               />
             </div>
-            <p className="text-sm text-muted">
-              {row.points} {row.points === 1 ? "point" : "points"}
-              {row.wpDelta != null ? ` · ${row.wpDelta} WP off` : ""}
+            <p className="text-right text-sm tabular-nums text-ink">
+              {row.points}
+            </p>
+            <p className="text-right text-sm tabular-nums text-muted">
+              {row.wpDelta != null ? row.wpDelta : "—"}
             </p>
           </li>
         ))}

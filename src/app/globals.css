@@ -735,13 +735,7 @@ html.has-site-ad {
 .promo-banner {
   position: relative;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  min-height: 142px;
-  height: auto;
   overflow: hidden;
-  padding: 0 245px 0 0;
   border: 1px solid var(--line);
   background:
     radial-gradient(circle at 18% 30%, rgb(255 255 255 / 3%), transparent 28%),
@@ -763,14 +757,26 @@ html.has-site-ad {
   );
 }
 
-.promo-banner > * {
+.promo-banner__hit {
   position: relative;
   z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  min-height: 142px;
+  gap: 18px;
+  padding: 18px 22px 18px 30px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.promo-banner__hit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .promo-banner__copy {
   min-width: 0;
-  padding: 20px 22px 20px 30px;
 }
 
 .promo-banner__kicker {
@@ -809,24 +815,14 @@ html.has-site-ad {
   color: var(--accent);
 }
 
-.promo-banner__brush {
-  width: 72px;
-  height: 5px;
-  margin-top: 10px;
-  background: var(--accent);
-  clip-path: polygon(0 42%, 100% 0, 94% 74%, 10% 100%);
-}
-
-.promo-banner__meta {
-  position: absolute;
-  top: 0;
-  right: 265px;
-  bottom: 0;
-  z-index: 2;
+.promo-banner__aside {
   display: flex;
+  width: 215px;
+  flex-direction: column;
   align-items: center;
-  gap: 18px;
-  padding: 0;
+  justify-content: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .promo-banner__cta {
@@ -849,19 +845,15 @@ html.has-site-ad {
     color var(--motion-fast) var(--ease-standard);
 }
 
-.promo-banner__cta:hover {
+.promo-banner__hit:hover .promo-banner__cta,
+.promo-banner__hit:focus-visible .promo-banner__cta {
   background: var(--accent);
   color: #0a0a0a;
 }
 
 .promo-banner__year {
-  position: absolute;
-  top: 0;
-  right: 22px;
-  bottom: 0;
-  z-index: 0;
   display: flex;
-  width: 215px;
+  width: 100%;
   align-items: center;
   justify-content: center;
   overflow: hidden;
@@ -876,7 +868,6 @@ html.has-site-ad {
   font-weight: 400;
   letter-spacing: -0.045em;
   line-height: 0.75;
-  transform: translateY(8px);
   user-select: none;
   white-space: nowrap;
   -webkit-text-stroke: 1.5px var(--accent);
@@ -887,17 +878,8 @@ html.has-site-ad {
 }
 
 @media (max-width: 980px) {
-  .promo-banner {
-    padding-right: 190px;
-  }
-
-  .promo-banner__meta {
-    right: 200px;
-  }
-
-  .promo-banner__year {
+  .promo-banner__aside {
     width: 175px;
-    right: 18px;
   }
 
   .promo-banner__year-desktop {
@@ -906,19 +888,11 @@ html.has-site-ad {
 }
 
 @media (max-width: 700px) {
-  .promo-banner {
-    display: grid;
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 46px;
-    min-height: 184px;
-    height: auto;
-    padding-right: 0;
-  }
-
-  .promo-banner__copy {
-    grid-column: 1;
-    grid-row: 1;
-    padding: 17px 78px 12px 18px;
+  .promo-banner__hit {
+    min-height: 0;
+    align-items: start;
+    gap: 12px;
+    padding: 17px 14px 16px 18px;
   }
 
   .promo-banner__kicker {
@@ -937,36 +911,26 @@ html.has-site-ad {
     line-height: 1.25;
   }
 
-  .promo-banner__brush {
-    width: 130px;
-    height: 4px;
-    margin-top: 8px;
-  }
-
-  .promo-banner__meta {
-    position: static;
-    grid-column: 1;
-    grid-row: 2;
-    justify-content: flex-end;
-    gap: 10px;
-    padding: 0 14px 0 18px;
-    border-top: 1px solid var(--line);
-    background: rgb(0 0 0 / 18%);
+  .promo-banner__aside {
+    width: 88px;
+    gap: 8px;
+    padding-top: 2px;
   }
 
   .promo-banner__cta {
-    height: 30px;
-    padding: 0 10px;
-    font-size: 10px;
+    width: 100%;
+    height: auto;
+    min-height: 28px;
+    padding: 6px 4px;
+    font-size: 9px;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.15;
   }
 
   .promo-banner__year {
-    top: 15px;
-    right: 14px;
-    bottom: auto;
-    width: 78px;
-    height: 118px;
-    opacity: 0.64;
+    opacity: 0.72;
   }
 
   .promo-banner__year-desktop {
@@ -975,8 +939,7 @@ html.has-site-ad {
 
   .promo-banner__year-mobile {
     display: block;
-    transform: none;
-    font-size: 54px;
+    font-size: 52px;
     letter-spacing: -0.055em;
     line-height: 0.82;
     text-align: center;
@@ -986,12 +949,8 @@ html.has-site-ad {
 }
 
 @media (max-width: 390px) {
-  .promo-banner {
-    min-height: 178px;
-  }
-
   .promo-banner__copy {
-    padding-right: 76px;
+    padding-right: 0;
   }
 
   .promo-banner__eyebrow {
@@ -1002,13 +961,16 @@ html.has-site-ad {
     font-size: 10.5px;
   }
 
-  .promo-banner__year {
-    right: 10px;
-    width: 68px;
-    opacity: 0.56;
+  .promo-banner__aside {
+    width: 78px;
   }
 
   .promo-banner__year-mobile {
-    font-size: 49px;
+    font-size: 46px;
+  }
+
+  .promo-banner__cta {
+    font-size: 8.5px;
+    padding: 5px 3px;
   }
 }

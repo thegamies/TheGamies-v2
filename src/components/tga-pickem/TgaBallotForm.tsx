@@ -126,6 +126,30 @@ export function TgaBallotForm({
   const dirty =
     guess !== savedGuess || JSON.stringify(picks) !== JSON.stringify(savedPicks);
   const canPick = !locked && !signInHref && !readOnly;
+  const pickCount = categories.reduce(
+    (count, category) => count + (picks[category.id] ? 1 : 0),
+    0,
+  );
+  const categoryTotal = categories.length;
+  const guessNumber = Number(guess);
+  const tiebreakerFilled =
+    guess !== "" &&
+    Number.isInteger(guessNumber) &&
+    guessNumber >= 0 &&
+    guessNumber <= 200;
+  const progressMessage = (
+    <>
+      <span>
+        {pickCount} of {categoryTotal}
+      </span>
+      <span className="mx-2 text-line" aria-hidden>
+        ·
+      </span>
+      <span>
+        {tiebreakerFilled ? "Tiebreaker set" : "Tiebreaker needed"}
+      </span>
+    </>
+  );
   const hasExistingPicks =
     Object.keys(picks).length > 0 || guess !== "";
 
@@ -160,7 +184,7 @@ export function TgaBallotForm({
   }
 
   return (
-    <div className="mt-10 space-y-12">
+    <div className={`mt-10 space-y-12 ${canPick ? "pb-24" : ""}`}>
       {signInHref ? (
         <p className="max-w-xl text-muted">
           <Link href={signInHref} className="font-semibold text-accent" rel="nofollow">
@@ -262,13 +286,16 @@ export function TgaBallotForm({
           </ul>
         </section>
       ))}
-      <label className="block max-w-xs text-sm">
+      <label className="block max-w-md text-sm">
         <span className="text-muted">World Premieres</span>
+        <span className="mt-1 block text-sm text-muted">
+          Tiebreaker — guess how many world premieres there will be.
+        </span>
         <input
           type="number"
           min={0}
           max={200}
-          className={`${fieldInputClass} mt-1`}
+          className={`${fieldInputClass} mt-2 max-w-xs`}
           value={guess}
           disabled={!canPick}
           onChange={(event) => setGuess(event.target.value)}
@@ -279,11 +306,27 @@ export function TgaBallotForm({
           {message}
         </p>
       ) : null}
-      {canPick && dirty ? (
-        <PinnedSaveBar>
+      {canPick ? (
+        <PinnedSaveBar
+          message={
+            message ? (
+              <span className="text-accent">{message}</span>
+            ) : dirty ? (
+              <>
+                {progressMessage}
+                <span className="mx-2 text-line" aria-hidden>
+                  ·
+                </span>
+                <span>Unsaved changes</span>
+              </>
+            ) : (
+              progressMessage
+            )
+          }
+        >
           <Button
             type="button"
-            disabled={pending}
+            disabled={pending || !dirty}
             onClick={() =>
               startTransition(async () => {
                 setMessage(null);

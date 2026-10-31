@@ -26,36 +26,37 @@ export function PromoBanner({
 }: PromoBannerProps) {
   const title = kind === "event" ? editionPromoTitle(year) : tgaPromoTitle(year);
   const halves = yearHalves(year);
+  const label = `${title}. ${accent} ${rest} ${cta}`;
 
   return (
     <section className="promo-banner" aria-label={title}>
-      <div className="promo-banner__copy">
-        {kicker ? <p className="promo-banner__kicker">{kicker}</p> : null}
-        <p className="promo-banner__eyebrow text-pretty">{title}</p>
-        <p className="promo-banner__headline text-pretty">
-          <span className="promo-banner__accent">{accent}</span> {rest}
-        </p>
-        <div className="promo-banner__brush" aria-hidden />
-      </div>
+      <Link href={href} className="promo-banner__hit" aria-label={label}>
+        <div className="promo-banner__copy">
+          {kicker ? <p className="promo-banner__kicker">{kicker}</p> : null}
+          <p className="promo-banner__eyebrow text-pretty">{title}</p>
+          <p className="promo-banner__headline text-pretty">
+            <span className="promo-banner__accent">{accent}</span> {rest}
+          </p>
+        </div>
 
-      <div className="promo-banner__meta">
-        <Link href={href} className="promo-banner__cta">
-          {cta} <span aria-hidden>→</span>
-        </Link>
-      </div>
-
-      <div className="promo-banner__year" aria-hidden>
-        <span className="promo-banner__year-desktop">{year}</span>
-        <span className="promo-banner__year-mobile">
-          {halves.lead}
-          {halves.tail ? (
-            <>
-              <br />
-              {halves.tail}
-            </>
-          ) : null}
-        </span>
-      </div>
+        <div className="promo-banner__aside">
+          <div className="promo-banner__year" aria-hidden>
+            <span className="promo-banner__year-desktop">{year}</span>
+            <span className="promo-banner__year-mobile">
+              {halves.lead}
+              {halves.tail ? (
+                <>
+                  <br />
+                  {halves.tail}
+                </>
+              ) : null}
+            </span>
+          </div>
+          <span className="promo-banner__cta">
+            {cta} <span aria-hidden>→</span>
+          </span>
+        </div>
+      </Link>
     </section>
   );
 }
