@@ -211,18 +211,10 @@ function GotyComparisonSections({
     <HorizontalScroll className="mt-4" label="Game of the Year comparison">
       {/*
         One overflow-x + one table for every rank — native pan, no scrollLeft
-        sync, shared column widths. Rank chapters are full-width label rows.
+        sync, shared column widths. Each rank keeps its own column names
+        (You / Community / Hosts / hosts), same as the old per-strip thead.
       */}
       <table className={tableClass} style={tableStyle}>
-        <thead>
-          <GotyComparisonColumnHeaders
-            showYou={matrix.showYou}
-            voiceColumns={matrix.voiceColumns}
-            slug={slug}
-            year={year}
-            youBallotHref={youBallotHref}
-          />
-        </thead>
         {rows.map((row, index) => (
           <tbody key={row.rank}>
             <tr>
@@ -230,7 +222,7 @@ function GotyComparisonSections({
                 colSpan={columnCount}
                 className={
                   index === 0
-                    ? "p-0 pt-2"
+                    ? "p-0"
                     : "border-t border-line p-0 pt-5 sm:pt-6"
                 }
               >
@@ -243,6 +235,13 @@ function GotyComparisonSections({
                 </div>
               </td>
             </tr>
+            <GotyComparisonColumnHeaders
+              showYou={matrix.showYou}
+              voiceColumns={matrix.voiceColumns}
+              slug={slug}
+              year={year}
+              youBallotHref={youBallotHref}
+            />
             <GotyComparisonRankRow
               row={row}
               showYou={matrix.showYou}

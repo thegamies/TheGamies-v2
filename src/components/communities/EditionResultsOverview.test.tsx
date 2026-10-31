@@ -180,6 +180,8 @@ describe("EditionResultsOverview comparison", () => {
     expect(screen.getByText("#1")).toBeTruthy();
     expect(screen.getByText("#2")).toBeTruthy();
     expect(document.querySelectorAll("[data-hscroll-body]")).toHaveLength(1);
+    // Column names repeat on every rank chapter (not only the first).
+    expect(screen.getAllByText("Community")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Hades II/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Clair Obscur/ })).toBeTruthy();
   });
