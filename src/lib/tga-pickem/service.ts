@@ -115,6 +115,36 @@ export async function listTgaYears(db: Db = getDb()): Promise<TgaYearPublic[]> {
   return Promise.all(rows.map((row) => withYearPublic(row, db)));
 }
 
+/** Light site-year rows for community opt-in / overview create (no slate checks). */
+export async function listTgaYearsForCommunityOptIn(
+  db: Db = getDb(),
+  now: Date = new Date(),
+): Promise<
+  {
+    year: number;
+    enabled: boolean;
+    promoted: boolean;
+    status: TgaStatus;
+  }[]
+> {
+  const rows = await db
+    .select({
+      year: tgaYears.year,
+      enabled: tgaYears.enabled,
+      promoted: tgaYears.promoted,
+      opensAt: tgaYears.opensAt,
+      showStartsAt: tgaYears.showStartsAt,
+    })
+    .from(tgaYears)
+    .orderBy(desc(tgaYears.year));
+  return rows.map((row) => ({
+    year: row.year,
+    enabled: row.enabled,
+    promoted: row.promoted,
+    status: computeTgaStatus(row, now),
+  }));
+}
+
 export async function getTgaYear(
   year: number,
   db: Db = getDb(),

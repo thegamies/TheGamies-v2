@@ -25,6 +25,7 @@ import {
   importSiteSheetToCommunity,
   saveCommunitySheet,
   saveSiteSheet,
+  siteSheetHasContent,
 } from "@/lib/tga-pickem/sheets";
 
 type MemberAuth =
@@ -75,6 +76,10 @@ export async function createCommunityTgaYearAction(
   const result = await createCommunityTgaYear(auth.communityId, year);
   if ("error" in result) return { error: result.error };
   revalidateCommunityTga(slug, year);
+  const dest = String(formData.get("dest") ?? "settings");
+  if (dest === "ballot") {
+    redirect(`/communities/${slug}/the-game-awards/${year}`);
+  }
   redirect(
     tgaYearHref(`/communities/${slug}/the-game-awards/${year}`, {
       view: "settings",
@@ -119,8 +124,7 @@ export async function saveCommunityTgaSheetAction(
   );
   if ("error" in result) return result;
   const site = await getSiteSheet(auth.profileId, year);
-  const promptGlobal =
-    site.worldPremieresGuess == null && Object.keys(site.picks).length === 0;
+  const promptGlobal = !siteSheetHasContent(site);
   revalidatePath(`/communities/${slug}/the-game-awards`);
   revalidatePath(`/communities/${slug}/the-game-awards/${year}`);
   return { ok: true as const, promptGlobal };

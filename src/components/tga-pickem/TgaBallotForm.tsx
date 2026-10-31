@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import Link from "@/lib/next-link";
 import { useRouter } from "next/navigation";
 import { tgaNomineeGridClass } from "@/components/tga-pickem/tgaNomineeGrid";
+import { TgaPickemHowItWorks } from "@/components/tga-pickem/TgaPickemHowItWorks";
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
 import { fieldInputClass } from "@/components/ui/controls";
@@ -126,6 +127,35 @@ export function TgaBallotForm({
   const dirty =
     guess !== savedGuess || JSON.stringify(picks) !== JSON.stringify(savedPicks);
   const canPick = !locked && !signInHref && !readOnly;
+  const pickCount = categories.reduce(
+    (count, category) => count + (picks[category.id] ? 1 : 0),
+    0,
+  );
+  const categoryTotal = categories.length;
+  const guessNumber = Number(guess);
+  const tiebreakerFilled =
+    guess !== "" &&
+    Number.isInteger(guessNumber) &&
+    guessNumber >= 0 &&
+    guessNumber <= 200;
+  const progressMessage = (
+    <span className="flex min-w-0 flex-col gap-0.5">
+      <span>
+        <span className="whitespace-nowrap">
+          {pickCount} of {categoryTotal}
+        </span>
+        <span className="mx-1.5 text-line" aria-hidden>
+          ·
+        </span>
+        <span className="whitespace-nowrap">
+          {tiebreakerFilled ? "Tiebreaker set" : "Tiebreaker needed"}
+        </span>
+      </span>
+      {dirty ? (
+        <span className="whitespace-nowrap">Unsaved changes</span>
+      ) : null}
+    </span>
+  );
   const hasExistingPicks =
     Object.keys(picks).length > 0 || guess !== "";
 
@@ -160,7 +190,24 @@ export function TgaBallotForm({
   }
 
   return (
-    <div className="mt-10 space-y-12">
+    <div className={`mt-6 ${canPick ? "pb-24" : ""}`}>
+      {!locked ? (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <TgaPickemHowItWorks className="mt-0" />
+          {onImport && canPick ? (
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              disabled={pending}
+              onClick={requestImport}
+            >
+              {importLabel ?? "Import from the global sheet"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+      <div className="space-y-12">
       {signInHref ? (
         <p className="max-w-xl text-muted">
           <Link href={signInHref} className="font-semibold text-accent" rel="nofollow">
@@ -169,25 +216,13 @@ export function TgaBallotForm({
           to make your picks.
         </p>
       ) : null}
-      {onImport && canPick ? (
-        <div>
-          <Button
-            type="button"
-            variant="bordered"
-            disabled={pending}
-            onClick={requestImport}
-          >
-            {importLabel ?? "Import from the global sheet"}
-          </Button>
-        </div>
-      ) : null}
       {categories.map((category) => (
         <section key={category.id}>
-          <h2 className="font-display text-2xl tracking-wide text-ink">
+          <h2 className="sticky top-0 z-10 -mx-[var(--gutter)] border-b border-line bg-paper px-[var(--gutter)] py-3 font-display text-2xl tracking-wide text-ink">
             {category.label}
           </h2>
           {category.description ? (
-            <p className="mt-1 text-sm text-muted">{category.description}</p>
+            <p className="mt-3 text-sm text-muted">{category.description}</p>
           ) : null}
           <ul className={`mt-4 ${tgaNomineeGridClass}`}>
             {category.nominees.map((nominee) => {
@@ -262,13 +297,16 @@ export function TgaBallotForm({
           </ul>
         </section>
       ))}
-      <label className="block max-w-xs text-sm">
+      <label className="block max-w-md text-sm">
         <span className="text-muted">World Premieres</span>
+        <span className="mt-1 block text-sm text-muted">
+          Tiebreaker. Guess how many world premieres there will be.
+        </span>
         <input
           type="number"
           min={0}
           max={200}
-          className={`${fieldInputClass} mt-1`}
+          className={`${fieldInputClass} mt-2 max-w-xs`}
           value={guess}
           disabled={!canPick}
           onChange={(event) => setGuess(event.target.value)}
@@ -279,11 +317,16 @@ export function TgaBallotForm({
           {message}
         </p>
       ) : null}
-      {canPick && dirty ? (
-        <PinnedSaveBar>
+      </div>
+      {canPick ? (
+        <PinnedSaveBar message={message ? (
+          <span className="text-accent">{message}</span>
+        ) : (
+          progressMessage
+        )}>
           <Button
             type="button"
-            disabled={pending}
+            disabled={pending || !dirty}
             onClick={() =>
               startTransition(async () => {
                 setMessage(null);

@@ -443,9 +443,9 @@ export default function DesignSystemPage() {
 
       <Section title="Promo banner">
         <p className="mb-6 max-w-2xl text-sm text-muted">
-          Shared home Pick’em band and community Events promo. Status copy
-          changes; the year stays a watermark. Mobile keeps a banner, not a
-          stacked card.
+          Shared home Pick’em band and community Events promo. The whole banner
+          is one link; status copy changes; the CTA sits under the year
+          watermark on every size.
         </p>
         <div className="grid gap-3">
           <PromoBanner

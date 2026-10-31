@@ -177,6 +177,38 @@ export async function listCommunityTgaEntrants(
   };
 }
 
+export function siteSheetHasContent(sheet: TgaSheetView): boolean {
+  return (
+    sheet.worldPremieresGuess != null || Object.keys(sheet.picks).length > 0
+  );
+}
+
+/** True when the person already has a saved global Pick’em sheet for that year. */
+export async function hasImportableSiteTgaSheet(
+  profileId: string,
+  year: number,
+  db: Db = getDb(),
+): Promise<boolean> {
+  const [sheet] = await db
+    .select({
+      worldPremieresGuess: tgaSiteSheets.worldPremieresGuess,
+      ballotMask: tgaSiteSheets.ballotMask,
+    })
+    .from(tgaSiteSheets)
+    .where(
+      and(eq(tgaSiteSheets.profileId, profileId), eq(tgaSiteSheets.year, year)),
+    )
+    .limit(1);
+  if (!sheet) return false;
+  if (sheet.worldPremieresGuess != null) return true;
+  const mask = sheet.ballotMask;
+  if (!mask) return false;
+  for (const byte of mask) {
+    if (byte !== 0) return true;
+  }
+  return false;
+}
+
 export async function getSiteSheet(
   profileId: string,
   year: number,
@@ -489,7 +521,7 @@ export async function importSiteSheetToCommunity(
   | { error: string }
 > {
   const site = await getSiteSheet(profileId, year, db);
-  if (site.worldPremieresGuess == null && Object.keys(site.picks).length === 0) {
+  if (!siteSheetHasContent(site)) {
     return { error: "You do not have a global pick sheet yet." };
   }
   const worldPremieresGuess = site.worldPremieresGuess ?? 0;
