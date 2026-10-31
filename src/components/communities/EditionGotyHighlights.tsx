@@ -13,7 +13,7 @@ import {
   StandingGameCard,
   standingCmpCellRankClass,
 } from "@/components/communities/StandingGameCard";
-import { HorizontalScroll, HorizontalScrollGroup } from "@/components/ui/HorizontalScroll";
+import { HorizontalScroll } from "@/components/ui/HorizontalScroll";
 import type {
   EditionBallotMatrix,
   EditionBallotMatrixRow,
@@ -66,81 +66,79 @@ function MatrixStandingCell({
   return <CompactTieStack games={games} />;
 }
 
-function GotyComparisonStrip({
-  row,
+function GotyComparisonColumnHeaders({
   showYou,
   voiceColumns,
   slug,
   year,
   youBallotHref,
 }: {
-  row: EditionBallotMatrixRow;
   showYou: boolean;
   voiceColumns: MatrixVoiceColumn[];
   slug: string;
   year: number;
   youBallotHref: string | null;
 }) {
-  const columnCount = comparisonColumnCount(showYou, voiceColumns.length);
-
   return (
-    <HorizontalScroll className="mt-2" label={`#${row.rank} comparison`}>
-      <table
-        className={comparisonStripTableClass(columnCount)}
-        style={comparisonStripTableStyle(columnCount)}
-      >
-        <thead>
-          <tr className="border-b border-line text-left">
-            {showYou ? (
-              <th scope="col" className={standingCmpCellRankClass}>
-                <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
-              </th>
-            ) : null}
-            <th scope="col" className={standingCmpCellRankClass}>
-              <ComparisonStripHeader>Community</ComparisonStripHeader>
-            </th>
-            <th scope="col" className={standingCmpCellRankClass}>
-              <ComparisonStripHeader>Hosts</ComparisonStripHeader>
-            </th>
-            {voiceColumns.map((v) => (
-              <th key={v.profileId} scope="col" className={standingCmpCellRankClass}>
-                <ComparisonStripHeader
-                  title={`@${v.username}`}
-                  href={editionVoterBallotHref(slug, year, v.username)}
-                  person={{
-                    displayName: v.displayName,
-                    username: v.username,
-                    avatarUrl: v.avatarUrl,
-                  }}
-                >
-                  {v.displayName}
-                </ComparisonStripHeader>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          <tr className="align-top">
-            {showYou ? (
-              <td className={standingCmpCellRankClass}>
-                <MatrixCardCell game={row.you} />
-              </td>
-            ) : null}
-            <td className={standingCmpCellRankClass}>
-              <MatrixStandingCell games={row.community} />
-            </td>
-            <td className={standingCmpCellRankClass}>
-              <MatrixStandingCell games={row.voices} />
-            </td>
-            {voiceColumns.map((v) => (
-              <td key={v.profileId} className={standingCmpCellRankClass}>
-                <MatrixCardCell game={row.voiceGames[v.profileId] ?? null} />
-              </td>
-            ))}
-          </tr>
-        </tbody>
-      </table>
-    </HorizontalScroll>
+    <tr className="border-b border-line text-left">
+      {showYou ? (
+        <th scope="col" className={standingCmpCellRankClass}>
+          <ComparisonStripHeader href={youBallotHref}>You</ComparisonStripHeader>
+        </th>
+      ) : null}
+      <th scope="col" className={standingCmpCellRankClass}>
+        <ComparisonStripHeader>Community</ComparisonStripHeader>
+      </th>
+      <th scope="col" className={standingCmpCellRankClass}>
+        <ComparisonStripHeader>Hosts</ComparisonStripHeader>
+      </th>
+      {voiceColumns.map((v) => (
+        <th key={v.profileId} scope="col" className={standingCmpCellRankClass}>
+          <ComparisonStripHeader
+            title={`@${v.username}`}
+            href={editionVoterBallotHref(slug, year, v.username)}
+            person={{
+              displayName: v.displayName,
+              username: v.username,
+              avatarUrl: v.avatarUrl,
+            }}
+          >
+            {v.displayName}
+          </ComparisonStripHeader>
+        </th>
+      ))}
+    </tr>
+  );
+}
+
+function GotyComparisonRankRow({
+  row,
+  showYou,
+  voiceColumns,
+}: {
+  row: EditionBallotMatrixRow;
+  showYou: boolean;
+  voiceColumns: MatrixVoiceColumn[];
+}) {
+  return (
+    <tr className="align-top">
+      {showYou ? (
+        <td className={standingCmpCellRankClass}>
+          <MatrixCardCell game={row.you} />
+        </td>
+      ) : null}
+      <td className={standingCmpCellRankClass}>
+        <MatrixStandingCell games={row.community} />
+      </td>
+      <td className={standingCmpCellRankClass}>
+        <MatrixStandingCell games={row.voices} />
+      </td>
+      {voiceColumns.map((v) => (
+        <td key={v.profileId} className={standingCmpCellRankClass}>
+          <MatrixCardCell game={row.voiceGames[v.profileId] ?? null} />
+        </td>
+      ))}
+    </tr>
   );
 }
 
@@ -165,6 +163,10 @@ function GotyRankedBillboard({
   );
 }
 
+/**
+ * One horizontal scrollport for every rank — columns stay aligned with native
+ * touch pan (no per-row scroll sync).
+ */
 function GotyComparisonSections({
   matrix,
   slug,
@@ -198,31 +200,58 @@ function GotyComparisonSections({
     );
   }
 
+  const columnCount = comparisonColumnCount(
+    matrix.showYou,
+    matrix.voiceColumns.length,
+  );
+  const tableClass = comparisonStripTableClass(columnCount);
+  const tableStyle = comparisonStripTableStyle(columnCount);
+
   return (
-    <HorizontalScrollGroup groupId={`goty-comparison:${slug}:${year}`}>
-      <div className="mt-4">
+    <HorizontalScroll className="mt-4" label="Game of the Year comparison">
+      {/*
+        One overflow-x + one table for every rank — native pan, no scrollLeft
+        sync, shared column widths. Rank chapters are full-width label rows.
+      */}
+      <table className={tableClass} style={tableStyle}>
+        <thead>
+          <GotyComparisonColumnHeaders
+            showYou={matrix.showYou}
+            voiceColumns={matrix.voiceColumns}
+            slug={slug}
+            year={year}
+            youBallotHref={youBallotHref}
+          />
+        </thead>
         {rows.map((row, index) => (
-          <article
-            key={row.rank}
-            className={index === 0 ? undefined : "mt-5 sm:mt-6"}
-          >
-            <CategoryChapterHeader
-              label={`#${row.rank}`}
-              showRule={index > 0}
-              compact
-            />
-            <GotyComparisonStrip
+          <tbody key={row.rank}>
+            <tr>
+              <td
+                colSpan={columnCount}
+                className={
+                  index === 0
+                    ? "p-0 pt-2"
+                    : "border-t border-line p-0 pt-5 sm:pt-6"
+                }
+              >
+                <div className="sticky left-0 z-[1] w-max max-w-[min(100%,20rem)] bg-paper pr-3">
+                  <CategoryChapterHeader
+                    label={`#${row.rank}`}
+                    showRule={false}
+                    compact
+                  />
+                </div>
+              </td>
+            </tr>
+            <GotyComparisonRankRow
               row={row}
               showYou={matrix.showYou}
               voiceColumns={matrix.voiceColumns}
-              slug={slug}
-              year={year}
-              youBallotHref={youBallotHref}
             />
-          </article>
+          </tbody>
         ))}
-      </div>
-    </HorizontalScrollGroup>
+      </table>
+    </HorizontalScroll>
   );
 }
 
