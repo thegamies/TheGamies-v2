@@ -81,8 +81,110 @@ describe("HorizontalScrollGroup", () => {
     a!.scrollLeft = 120;
     fireEvent.scroll(a!);
 
-    expect(b!.scrollLeft).toBe(120);
-    expect(c!.scrollLeft).toBe(120);
+    // Grouped strips do not broadcast from scroll events (pointer/wheel drive).
+    expect(b!.scrollLeft).toBe(0);
+    expect(c!.scrollLeft).toBe(0);
+  });
+
+  it("locksteps every strip on the same pointer move (no peer lag)", () => {
+    render(
+      <HorizontalScrollGroup groupId="test-lockstep">
+        <HorizontalScroll label="row a">
+          <div>A</div>
+        </HorizontalScroll>
+        <HorizontalScroll label="row b">
+          <div>B</div>
+        </HorizontalScroll>
+        <HorizontalScroll label="row c">
+          <div>C</div>
+        </HorizontalScroll>
+      </HorizontalScrollGroup>,
+    );
+
+    const [a, b, c] = bodies();
+    mockOverflow(a!, 800, 200);
+    mockOverflow(b!, 800, 200);
+    mockOverflow(c!, 800, 200);
+    a!.setPointerCapture = () => {};
+    a!.releasePointerCapture = () => {};
+
+    fireEvent.pointerDown(a!, {
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+      clientX: 200,
+      clientY: 40,
+    });
+    fireEvent.pointerMove(a!, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 140,
+      clientY: 42,
+    });
+
+    expect(a!.scrollLeft).toBe(60);
+    expect(b!.scrollLeft).toBe(60);
+    expect(c!.scrollLeft).toBe(60);
+
+    fireEvent.pointerMove(a!, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 170,
+      clientY: 42,
+    });
+    expect(a!.scrollLeft).toBe(30);
+    expect(b!.scrollLeft).toBe(30);
+    expect(c!.scrollLeft).toBe(30);
+  });
+
+  it("does not start a horizontal pan when the gesture is vertical", () => {
+    render(
+      <HorizontalScrollGroup groupId="test-vertical">
+        <HorizontalScroll label="row a">
+          <div>A</div>
+        </HorizontalScroll>
+        <HorizontalScroll label="row b">
+          <div>B</div>
+        </HorizontalScroll>
+      </HorizontalScrollGroup>,
+    );
+
+    const [a, b] = bodies();
+    mockOverflow(a!, 800, 200);
+    mockOverflow(b!, 800, 200);
+
+    fireEvent.pointerDown(a!, {
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+      clientX: 100,
+      clientY: 40,
+    });
+    fireEvent.pointerMove(a!, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 102,
+      clientY: 80,
+    });
+
+    expect(a!.scrollLeft).toBe(0);
+    expect(b!.scrollLeft).toBe(0);
+  });
+
+  it("uses overflow-x-hidden and touch-pan-y when grouped", () => {
+    render(
+      <HorizontalScrollGroup groupId="test-chrome">
+        <HorizontalScroll label="row a">
+          <div>A</div>
+        </HorizontalScroll>
+      </HorizontalScrollGroup>,
+    );
+
+    const body = bodies()[0]!;
+    expect(body.dataset.hscrollGrouped).toBe("true");
+    expect(body.className).toContain("overflow-x-hidden");
+    expect(body.className).toContain("touch-pan-y");
+    expect(body.className).toContain("overscroll-x-none");
   });
 
   it("does not let peer scroll events rebroadcast back to the driver", () => {
@@ -100,82 +202,28 @@ describe("HorizontalScrollGroup", () => {
     const [driver, peer] = bodies();
     mockOverflow(driver!, 800, 200);
     mockOverflow(peer!, 800, 200);
+    driver!.setPointerCapture = () => {};
+    driver!.releasePointerCapture = () => {};
 
-    driver!.scrollLeft = 80;
-    fireEvent.scroll(driver!);
+    fireEvent.pointerDown(driver!, {
+      pointerId: 1,
+      pointerType: "touch",
+      button: 0,
+      clientX: 200,
+      clientY: 10,
+    });
+    fireEvent.pointerMove(driver!, {
+      pointerId: 1,
+      pointerType: "touch",
+      clientX: 120,
+      clientY: 10,
+    });
     expect(peer!.scrollLeft).toBe(80);
     expect(isScrollSyncPeer("test-no-echo", peer!)).toBe(true);
 
-    // Simulate a late mobile scroll event from the programmatic write, with a
-    // slightly different left (inertia / subpixel). Must not yank the driver.
     peer!.scrollLeft = 95;
     fireEvent.scroll(peer!);
     expect(driver!.scrollLeft).toBe(80);
-    expect(isScrollSyncPeer("test-no-echo", peer!)).toBe(true);
-  });
-
-  it("stays locked when the driver reverses direction", () => {
-    render(
-      <HorizontalScrollGroup groupId="test-wiggle">
-        <HorizontalScroll label="driver">
-          <div>D</div>
-        </HorizontalScroll>
-        <HorizontalScroll label="peer">
-          <div>P</div>
-        </HorizontalScroll>
-      </HorizontalScrollGroup>,
-    );
-
-    const [driver, peer] = bodies();
-    mockOverflow(driver!, 800, 200);
-    mockOverflow(peer!, 800, 200);
-
-    driver!.scrollLeft = 40;
-    fireEvent.scroll(driver!);
-    expect(peer!.scrollLeft).toBe(40);
-
-    driver!.scrollLeft = 120;
-    fireEvent.scroll(driver!);
-    expect(peer!.scrollLeft).toBe(120);
-
-    driver!.scrollLeft = 30;
-    fireEvent.scroll(driver!);
-    expect(peer!.scrollLeft).toBe(30);
-  });
-
-  it("lets another strip take over after the first gesture settles", async () => {
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    try {
-      render(
-        <HorizontalScrollGroup groupId="test-takeover">
-          <HorizontalScroll label="first">
-            <div>A</div>
-          </HorizontalScroll>
-          <HorizontalScroll label="second">
-            <div>B</div>
-          </HorizontalScroll>
-        </HorizontalScrollGroup>,
-      );
-
-      const [a, b] = bodies();
-      mockOverflow(a!, 800, 200);
-      mockOverflow(b!, 800, 200);
-
-      a!.scrollLeft = 50;
-      fireEvent.scroll(a!);
-      expect(b!.scrollLeft).toBe(50);
-      expect(isScrollSyncPeer("test-takeover", b!)).toBe(true);
-
-      vi.advanceTimersByTime(200);
-      await Promise.resolve();
-      expect(isScrollSyncPeer("test-takeover", b!)).toBe(false);
-
-      b!.scrollLeft = 90;
-      fireEvent.scroll(b!);
-      expect(a!.scrollLeft).toBe(90);
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it("updates edge fades on the driver without toggling React arrow state", () => {
@@ -200,7 +248,7 @@ describe("HorizontalScrollGroup", () => {
     expect(host.dataset.canRight).toBeUndefined();
   });
 
-  it("disables horizontal rubber-band overscroll on the viewport", () => {
+  it("keeps native overflow-x on ungrouped strips", () => {
     render(
       <HorizontalScroll label="solo">
         <div>Wide</div>
@@ -208,6 +256,7 @@ describe("HorizontalScrollGroup", () => {
     );
 
     const body = bodies()[0]!;
-    expect(body.className).toContain("overscroll-x-none");
+    expect(body.className).toContain("overflow-x-auto");
+    expect(body.dataset.hscrollGrouped).toBeUndefined();
   });
 });

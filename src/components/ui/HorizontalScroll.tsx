@@ -40,8 +40,8 @@ type ScrollSyncGroup = {
   /** Last agreed horizontal position for the group. */
   sharedLeft: number;
   /**
-   * Peers currently receiving programmatic `scrollLeft` writes. Stays set for
-   * the whole gesture so their scroll events cannot rebroadcast or take over.
+   * Members receiving programmatic `scrollLeft` writes. Stays set for the whole
+   * gesture so scroll events cannot rebroadcast or fight the pointer driver.
    */
   muted: Set<HTMLElement>;
 };
@@ -53,9 +53,9 @@ const HorizontalScrollGroupContext = createContext<string | null>(null);
  * Sibling `HorizontalScroll` strips share one horizontal position.
  * Used for GOTY Comparison so #1–#10 stay on the same columns.
  *
- * Sync is instant (no rAF lag, no smooth/`scrollTo` easing on peers) so a
- * wiggle stays locked. Peers never rebroadcast. Rubber-band overscroll is
- * disabled on the viewport so edge bounce cannot desync columns.
+ * Grouped strips are pointer/wheel-driven in lockstep (same `scrollLeft` in the
+ * same move frame). Native touch/trackpad scroll is disabled on the group so
+ * peers never lag a compositor frame behind the finger.
  */
 export function HorizontalScrollGroup({
   groupId,
@@ -122,7 +122,6 @@ function settleDriver(group: ScrollSyncGroup, source: HTMLElement) {
   if (group.driver !== source) return;
   group.driver = null;
   for (const el of group.members) {
-    if (el === source) continue;
     setMemberScrollLeft(group, el, group.sharedLeft);
   }
   // Drop mutes after any late programmatic scroll events have flushed.
@@ -142,21 +141,33 @@ function refreshDriver(group: ScrollSyncGroup, source: HTMLElement) {
   }, DRIVER_SETTLE_MS);
 }
 
+/**
+ * Set every strip in the group to the same left in this turn — including the
+ * source — so a wiggle cannot leave peers a frame behind.
+ */
+function applyGroupScrollLeft(
+  id: string,
+  left: number,
+  source: HTMLElement,
+) {
+  const group = scrollSyncGroups.get(id);
+  if (!group) return;
+
+  refreshDriver(group, source);
+  const next = Math.max(0, left);
+  group.sharedLeft = next;
+
+  for (const el of group.members) {
+    setMemberScrollLeft(group, el, next);
+  }
+}
+
 function broadcastScrollSync(id: string, source: HTMLElement) {
   const group = scrollSyncGroups.get(id);
   if (!group) return;
-  // Programmatic peer scrolls never drive. A real gesture on any strip can
-  // take over immediately (important when wiggling across ranks).
+  // Programmatic writes never drive. Fallback for non-pointer scroll sources.
   if (group.muted.has(source)) return;
-
-  refreshDriver(group, source);
-  const left = source.scrollLeft;
-  group.sharedLeft = left;
-
-  for (const el of group.members) {
-    if (el === source) continue;
-    setMemberScrollLeft(group, el, left);
-  }
+  applyGroupScrollLeft(id, source.scrollLeft, source);
 }
 
 /** Test helper — clear module sync state between cases. */
@@ -176,18 +187,19 @@ function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
   else delete host.dataset.canRight;
 }
 
+function clampScrollLeft(el: HTMLElement, left: number) {
+  const max = Math.max(0, el.scrollWidth - el.clientWidth);
+  return Math.max(0, Math.min(max, left));
+}
+
 /**
  * Horizontal strip for matrices / pick rows.
  *
- * Pan: drag (after a small move so links still click), prev/next when overflow
- * exists. Touch/trackpad use native scroll (including horizontal gestures).
- * Vertical wheel always scrolls the page — never remapped. Scrollbars stay
- * hidden; edge fades mark overflow. `overflow-y` is hidden so a 1px-tall
- * mismatch cannot create a nested vertical scrollport. Horizontal rubber-band
- * overscroll is off so grouped strips cannot bounce out of sync at the edges.
- *
- * Grouped strips: only non-muted (user-driven) strips broadcast; peers get an
- * instant matching `scrollLeft` and stay muted until the gesture settles.
+ * Ungrouped: mouse/pen drag; touch/trackpad use native overflow scroll.
+ * Grouped (GOTY Comparison): pointer + wheel drive every strip in lockstep in
+ * the same frame — native horizontal pan is off (`overflow-x-hidden` +
+ * `touch-action: pan-y`) so peers cannot lag behind compositor scrolling.
+ * Vertical page scroll stays native. Rubber-band overscroll is off.
  */
 export function HorizontalScroll({
   children,
@@ -203,13 +215,16 @@ export function HorizontalScroll({
   const drag = useRef<{
     pointerId: number;
     startX: number;
+    startY: number;
     startScroll: number;
-    dragging: boolean;
+    /** null = axis not chosen yet; true = horizontal pan; false = abandoned. */
+    horizontal: boolean | null;
   } | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
   const [dragging, setDragging] = useState(false);
   const syncGroupId = useContext(HorizontalScrollGroupContext);
+  const grouped = syncGroupId != null;
 
   const syncChrome = useCallback(
     (opts?: { allowBroadcast?: boolean }) => {
@@ -247,11 +262,12 @@ export function HorizontalScroll({
       : undefined;
 
     const onScroll = () => {
-      // Peers still mirror sticky headers + edge fades locally; they must not
-      // rebroadcast (that fights momentum scroll on phones).
       const peer =
         syncGroupId != null && isScrollSyncPeer(syncGroupId, body);
-      syncChrome({ allowBroadcast: !peer });
+      // Grouped strips are pointer/wheel-driven; scroll is only chrome update.
+      syncChrome({
+        allowBroadcast: !peer && !grouped,
+      });
     };
 
     const onScrollEnd = () => {
@@ -263,9 +279,24 @@ export function HorizontalScroll({
       settleDriver(group, body);
     };
 
-    syncChrome();
+    const onWheel = (e: WheelEvent) => {
+      if (!syncGroupId) return;
+      // Keep vertical page scroll; only lockstep on dominant horizontal deltas.
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      if (body.scrollWidth <= body.clientWidth + 2) return;
+      e.preventDefault();
+      const next = clampScrollLeft(body, body.scrollLeft + e.deltaX);
+      applyGroupScrollLeft(syncGroupId, next, body);
+      if (headerRef.current) headerRef.current.scrollLeft = next;
+      updateEdgeDataset(edgeHostRef.current, body);
+    };
+
+    syncChrome({ allowBroadcast: false });
     body.addEventListener("scroll", onScroll, { passive: true });
     body.addEventListener("scrollend", onScrollEnd, { passive: true });
+    if (grouped) {
+      body.addEventListener("wheel", onWheel, { passive: false });
+    }
     const ro = new ResizeObserver(() => {
       syncChrome({ allowBroadcast: false });
     });
@@ -274,10 +305,11 @@ export function HorizontalScroll({
     return () => {
       body.removeEventListener("scroll", onScroll);
       body.removeEventListener("scrollend", onScrollEnd);
+      if (grouped) body.removeEventListener("wheel", onWheel);
       ro.disconnect();
       leaveGroup?.();
     };
-  }, [syncChrome, children, stickyHeader, syncGroupId]);
+  }, [syncChrome, children, stickyHeader, syncGroupId, grouped]);
 
   function scrollByPage(direction: -1 | 1) {
     const el = bodyRef.current;
@@ -294,22 +326,35 @@ export function HorizontalScroll({
       Math.min(maxScroll, el.scrollLeft + direction * amount),
     );
 
+    if (syncGroupId) {
+      applyGroupScrollLeft(syncGroupId, next, el);
+      if (headerRef.current) headerRef.current.scrollLeft = next;
+      updateEdgeDataset(edgeHostRef.current, el);
+      return;
+    }
+
     el.scrollTo({ left: next, behavior: "smooth" });
     if (headerRef.current) headerRef.current.scrollLeft = next;
     syncChrome();
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
-    if (e.pointerType !== "mouse" && e.pointerType !== "pen") return;
     if (e.button !== 0) return;
+    // Ungrouped: mouse/pen drag only — touch keeps native overflow scroll.
+    if (!grouped && e.pointerType !== "mouse" && e.pointerType !== "pen") {
+      return;
+    }
     const el = bodyRef.current;
     if (!el || el.scrollWidth <= el.clientWidth + 2) return;
 
     drag.current = {
       pointerId: e.pointerId,
       startX: e.clientX,
-      startScroll: el.scrollLeft,
-      dragging: false,
+      startY: e.clientY,
+      startScroll: grouped
+        ? (scrollSyncGroups.get(syncGroupId!)?.sharedLeft ?? el.scrollLeft)
+        : el.scrollLeft,
+      horizontal: null,
     };
   }
 
@@ -319,19 +364,30 @@ export function HorizontalScroll({
     if (!state || !el || e.pointerId !== state.pointerId) return;
 
     const dx = e.clientX - state.startX;
-    if (!state.dragging) {
-      if (Math.abs(dx) < DRAG_THRESHOLD_PX) return;
-      state.dragging = true;
+    const dy = e.clientY - state.startY;
+
+    if (state.horizontal === null) {
+      if (Math.max(Math.abs(dx), Math.abs(dy)) < DRAG_THRESHOLD_PX) return;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        // Vertical intent — abandon so the page can scroll.
+        drag.current = null;
+        return;
+      }
+      state.horizontal = true;
       setDragging(true);
       el.setPointerCapture(e.pointerId);
     }
 
-    el.scrollLeft = state.startScroll - dx;
-    if (headerRef.current) headerRef.current.scrollLeft = el.scrollLeft;
-    // Keep grouped peers locked during desktop drag (scroll events can lag).
-    if (syncGroupId && !isScrollSyncPeer(syncGroupId, el)) {
-      broadcastScrollSync(syncGroupId, el);
+    if (!state.horizontal) return;
+
+    const next = clampScrollLeft(el, state.startScroll - dx);
+    if (syncGroupId) {
+      applyGroupScrollLeft(syncGroupId, next, el);
+    } else {
+      el.scrollLeft = next;
     }
+    if (headerRef.current) headerRef.current.scrollLeft = next;
+    updateEdgeDataset(edgeHostRef.current, el);
     e.preventDefault();
   }
 
@@ -340,7 +396,7 @@ export function HorizontalScroll({
     const el = bodyRef.current;
     if (!state || e.pointerId !== state.pointerId) return;
 
-    if (state.dragging) {
+    if (state.horizontal) {
       const suppress = (ev: Event) => {
         ev.preventDefault();
         ev.stopPropagation();
@@ -360,17 +416,22 @@ export function HorizontalScroll({
 
     drag.current = null;
     setDragging(false);
-    syncChrome();
+    syncChrome({ allowBroadcast: false });
   }
 
   const showControls = showArrowControls && (canLeft || canRight);
   const overflowClass = /overflow-/.test(viewportClassName)
     ? ""
-    : "overflow-x-auto overflow-y-hidden";
+    : grouped
+      ? // Programmatic scrollLeft only — native pan would paint this strip first.
+        "overflow-x-hidden overflow-y-hidden"
+      : "overflow-x-auto overflow-y-hidden";
 
-  // overscroll-x-none: no rubber-band bounce (that desyncs grouped peers at edges).
-  const viewportChrome = `scrollbar-none overscroll-x-none ${overflowClass} [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${
-    showControls ? "cursor-grab [&_a]:cursor-grab" : ""
+  // overscroll-x-none: no rubber-band. touch-pan-y: page can still scroll vertically.
+  const viewportChrome = `scrollbar-none overscroll-x-none ${
+    grouped ? "touch-pan-y" : ""
+  } ${overflowClass} [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${
+    showControls || grouped ? "cursor-grab [&_a]:cursor-grab" : ""
   } ${dragging ? "cursor-grabbing select-none [&_*]:cursor-grabbing" : ""}`;
 
   return (
@@ -431,6 +492,7 @@ export function HorizontalScroll({
         <div
           ref={bodyRef}
           data-hscroll-body=""
+          data-hscroll-grouped={grouped ? "true" : undefined}
           className={`${viewportChrome} w-full min-w-0 ${viewportClassName}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
