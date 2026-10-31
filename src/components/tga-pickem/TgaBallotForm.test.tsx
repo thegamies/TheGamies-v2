@@ -85,6 +85,9 @@ describe("TgaBallotForm", () => {
       />,
     );
 
+    expect(
+      screen.getByText(/Call each award\. One point per correct pick\./i),
+    ).toBeTruthy();
     expect(screen.getByText("1 of 2")).toBeTruthy();
     expect(screen.getByText("Tiebreaker needed")).toBeTruthy();
     expect(
@@ -107,5 +110,20 @@ describe("TgaBallotForm", () => {
     expect(
       screen.getByRole("button", { name: "Save picks" }),
     ).toBeEnabled();
+  });
+
+  it("hides the how-it-works blurb after picks lock", () => {
+    render(
+      <TgaBallotForm
+        categories={categories}
+        initialPicks={{ "cat-1": "nom-1" }}
+        initialGuess={4}
+        locked
+      />,
+    );
+
+    expect(
+      screen.queryByText(/Call each award\. One point per correct pick\./i),
+    ).toBeNull();
   });
 });

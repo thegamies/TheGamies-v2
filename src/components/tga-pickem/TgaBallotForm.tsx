@@ -4,6 +4,7 @@ import { useState, useTransition, type ReactNode } from "react";
 import Link from "@/lib/next-link";
 import { useRouter } from "next/navigation";
 import { tgaNomineeGridClass } from "@/components/tga-pickem/tgaNomineeGrid";
+import { TgaPickemHowItWorks } from "@/components/tga-pickem/TgaPickemHowItWorks";
 import { Button } from "@/components/ui/Button";
 import { GameCover } from "@/components/ui/GameCover";
 import { fieldInputClass } from "@/components/ui/controls";
@@ -185,6 +186,7 @@ export function TgaBallotForm({
 
   return (
     <div className={`mt-10 space-y-12 ${canPick ? "pb-24" : ""}`}>
+      {!locked ? <TgaPickemHowItWorks className="mt-0" /> : null}
       {signInHref ? (
         <p className="max-w-xl text-muted">
           <Link href={signInHref} className="font-semibold text-accent" rel="nofollow">

@@ -20,6 +20,9 @@ describe("TgaBallotComingSoon", () => {
       />,
     );
     expect(screen.getByText("Picks soon.")).toBeTruthy();
+    expect(
+      screen.getByText(/Call each award\. One point per correct pick\./i),
+    ).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });
 });
