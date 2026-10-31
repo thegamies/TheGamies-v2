@@ -17,16 +17,15 @@ export function TgaPickemHowItWorks({
 
   return (
     <>
-      <div className={className}>
-        <Button
-          type="button"
-          variant="bordered"
-          size="sm"
-          onClick={() => setOpen(true)}
-        >
-          How it works
-        </Button>
-      </div>
+      <Button
+        type="button"
+        variant="bordered"
+        size="sm"
+        className={className}
+        onClick={() => setOpen(true)}
+      >
+        How it works
+      </Button>
       <Dialog
         open={open}
         title="How it works"

@@ -93,6 +93,7 @@ describe("TgaBallotForm", () => {
     expect(howItWorks).toBeTruthy();
     expect(importButton).toBeTruthy();
     expect(howItWorks.parentElement).toBe(importButton.parentElement);
+    expect(howItWorks.parentElement?.className).toContain("flex");
     expect(howItWorks.className).toContain("text-xs");
     expect(importButton.className).toContain("text-xs");
     expect(screen.getByRole("heading", { name: "Game of the Year" })).toHaveClass(
