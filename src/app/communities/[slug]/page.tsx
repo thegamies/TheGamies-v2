@@ -8,6 +8,7 @@ import {
 import { CommunityEventsOverview } from "@/components/communities/CommunityEventsOverview";
 import { CommunityHeader } from "@/components/communities/CommunityHeader";
 import { CommunityJoinPublicForm } from "@/components/communities/CommunityJoinPublicForm";
+import { CommunityOverviewCreateTga } from "@/components/communities/CommunityOverviewCreateTga";
 import { CommunityPrivateView } from "@/components/communities/CommunityPrivateView";
 import { SectionRule } from "@/components/ui/SectionRule";
 import { canManageCommunity, leaveBlockedReason } from "@/lib/communities/rules";
@@ -28,7 +29,12 @@ import {
   isCommunityPublic,
 } from "@/lib/communities/schema";
 import { getCommunityBySlug } from "@/lib/communities/service";
-import { getCommunityTgaPromoYear } from "@/lib/tga-pickem/service";
+import { pickCommunityOverviewTgaCreateYear } from "@/lib/tga-pickem/promo";
+import {
+  getCommunityTgaPromoYear,
+  listCommunityTgaYears,
+  listTgaYearsForCommunityOptIn,
+} from "@/lib/tga-pickem/service";
 import { ogImagePath } from "@/lib/seo/og-path";
 import { publicPageMetadata } from "@/lib/seo/site";
 import { MembershipActions } from "./MembershipActions";
@@ -121,7 +127,22 @@ export default async function CommunityHomePage({
     ? await getCommunityTgaPromoYear(community.id).catch(() => null)
     : null;
   const tgaEnabled = Boolean(tgaPromo);
+  let overviewCreateTgaYear: number | null = null;
+  if (canManage && showBoards) {
+    const [siteYears, existing] = await Promise.all([
+      listTgaYearsForCommunityOptIn().catch(() => []),
+      listCommunityTgaYears(community.id).catch(() => []),
+    ]);
+    overviewCreateTgaYear =
+      pickCommunityOverviewTgaCreateYear(
+        siteYears,
+        existing.map((row) => row.year),
+      )?.year ?? null;
+  }
+  const showOverviewCreateTga = overviewCreateTgaYear != null;
   const showOverviewPromos = overviewEditions.length > 0 || Boolean(tgaPromo);
+  const showOverviewTop =
+    showOverviewCreateTga || showOverviewPromos || showCreateEvent;
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -177,8 +198,14 @@ export default async function CommunityHomePage({
         </section>
       ) : (
         <>
-          {showOverviewPromos || showCreateEvent ? (
-            <div className="mt-10">
+          {showOverviewTop ? (
+            <div className="mt-10 space-y-10">
+              {showOverviewCreateTga && overviewCreateTgaYear != null ? (
+                <CommunityOverviewCreateTga
+                  slug={community.slug}
+                  year={overviewCreateTgaYear}
+                />
+              ) : null}
               {showOverviewPromos ? (
                 <CommunityEventsOverview
                   slug={community.slug}
@@ -187,7 +214,7 @@ export default async function CommunityHomePage({
                 />
               ) : null}
               {showCreateEvent ? (
-                <section className={showOverviewPromos ? "mt-10" : ""}>
+                <section>
                   <h2 className="font-display text-3xl tracking-wide text-ink">
                     {EDITION_PUBLIC_LABEL}
                   </h2>
@@ -207,13 +234,9 @@ export default async function CommunityHomePage({
             </div>
           ) : null}
 
-          {showOverviewPromos || showCreateEvent ? (
-            <SectionRule className="mt-10 mb-8" />
-          ) : null}
+          {showOverviewTop ? <SectionRule className="mt-10 mb-8" /> : null}
 
-          <section
-            className={showOverviewPromos || showCreateEvent ? "" : "mt-10"}
-          >
+          <section className={showOverviewTop ? "" : "mt-10"}>
             <h2 className="font-display text-3xl tracking-wide text-ink">
               About
             </h2>

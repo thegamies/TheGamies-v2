@@ -46,6 +46,32 @@ export function pickCommunityTgaSettingsYear<
   return pickCommunityTgaPromoYear(communityTgaCreateYears(rows, existingYears));
 }
 
+/**
+ * Overview host CTA: one creatable year only.
+ * Prefer the calendar year, else an open year, else promoted / newest.
+ */
+export function pickCommunityOverviewTgaCreateYear<
+  T extends {
+    year: number;
+    promoted: boolean;
+    enabled: boolean;
+    status: TgaStatus;
+  },
+>(
+  rows: T[],
+  existingYears: number[] = [],
+  now: Date = new Date(),
+): T | null {
+  const available = communityTgaCreateYears(rows, existingYears);
+  if (available.length === 0) return null;
+  const currentYear = now.getUTCFullYear();
+  const current = available.find((row) => row.year === currentYear);
+  if (current) return current;
+  const open = available.filter((row) => row.status === "open");
+  if (open.length > 0) return pickCommunityTgaPromoYear(open);
+  return pickCommunityTgaPromoYear(available);
+}
+
 export function communityTgaSettingsEmptyReason(
   rows: { enabled: boolean; status: TgaStatus }[],
 ): "none" | "locked" {

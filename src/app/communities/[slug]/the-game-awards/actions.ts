@@ -75,6 +75,10 @@ export async function createCommunityTgaYearAction(
   const result = await createCommunityTgaYear(auth.communityId, year);
   if ("error" in result) return { error: result.error };
   revalidateCommunityTga(slug, year);
+  const dest = String(formData.get("dest") ?? "settings");
+  if (dest === "ballot") {
+    redirect(`/communities/${slug}/the-game-awards/${year}`);
+  }
   redirect(
     tgaYearHref(`/communities/${slug}/the-game-awards/${year}`, {
       view: "settings",

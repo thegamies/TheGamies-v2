@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   communityTgaSettingsEmptyReason,
+  pickCommunityOverviewTgaCreateYear,
   pickCommunityTgaPromoYear,
   pickCommunityTgaSettingsYear,
   tgaPromoCopy,
@@ -99,6 +100,63 @@ describe("tgaPromoCopy", () => {
     expect(
       communityTgaSettingsEmptyReason([{ enabled: false, status: "off" }]),
     ).toBe("none");
+  });
+
+  it("prefers the calendar year for the overview create CTA", () => {
+    expect(
+      pickCommunityOverviewTgaCreateYear(
+        [
+          {
+            year: 2027,
+            promoted: true,
+            enabled: true,
+            status: "open" as const,
+          },
+          {
+            year: 2026,
+            promoted: false,
+            enabled: true,
+            status: "scheduled" as const,
+          },
+        ],
+        [],
+        new Date("2026-06-01T00:00:00.000Z"),
+      )?.year,
+    ).toBe(2026);
+    expect(
+      pickCommunityOverviewTgaCreateYear(
+        [
+          {
+            year: 2027,
+            promoted: false,
+            enabled: true,
+            status: "open" as const,
+          },
+          {
+            year: 2025,
+            promoted: true,
+            enabled: true,
+            status: "scheduled" as const,
+          },
+        ],
+        [],
+        new Date("2026-06-01T00:00:00.000Z"),
+      )?.year,
+    ).toBe(2027);
+    expect(
+      pickCommunityOverviewTgaCreateYear(
+        [
+          {
+            year: 2026,
+            promoted: true,
+            enabled: true,
+            status: "open" as const,
+          },
+        ],
+        [2026],
+        new Date("2026-06-01T00:00:00.000Z"),
+      ),
+    ).toBeNull();
   });
 
   it("falls back when the year is off", () => {
