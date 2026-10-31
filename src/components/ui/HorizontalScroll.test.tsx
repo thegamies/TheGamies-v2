@@ -7,7 +7,6 @@ import {
   HorizontalScrollGroup,
   isScrollSyncPeer,
   resetScrollSyncGroupsForTests,
-  setScrollSyncVisibilityForTests,
 } from "./HorizontalScroll";
 
 class ResizeObserverStub {
@@ -15,18 +14,8 @@ class ResizeObserverStub {
   disconnect() {}
 }
 
-class IntersectionObserverStub {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-  takeRecords() {
-    return [];
-  }
-}
-
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-  vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
 });
 
 beforeEach(() => {
@@ -43,7 +32,6 @@ afterEach(() => {
   resetScrollSyncGroupsForTests();
   vi.unstubAllGlobals();
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
-  vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
 });
 
 function mockOverflow(el: HTMLElement, scrollWidth: number, clientWidth: number) {
@@ -69,7 +57,7 @@ function bodies() {
 }
 
 describe("HorizontalScrollGroup", () => {
-  it("mirrors scrollLeft from the driver strip to peers", () => {
+  it("mirrors scrollLeft from the driver strip to peers immediately", () => {
     render(
       <HorizontalScrollGroup groupId="test-sync">
         <HorizontalScroll label="row a">
@@ -126,6 +114,70 @@ describe("HorizontalScrollGroup", () => {
     expect(isScrollSyncPeer("test-no-echo", peer!)).toBe(true);
   });
 
+  it("stays locked when the driver reverses direction", () => {
+    render(
+      <HorizontalScrollGroup groupId="test-wiggle">
+        <HorizontalScroll label="driver">
+          <div>D</div>
+        </HorizontalScroll>
+        <HorizontalScroll label="peer">
+          <div>P</div>
+        </HorizontalScroll>
+      </HorizontalScrollGroup>,
+    );
+
+    const [driver, peer] = bodies();
+    mockOverflow(driver!, 800, 200);
+    mockOverflow(peer!, 800, 200);
+
+    driver!.scrollLeft = 40;
+    fireEvent.scroll(driver!);
+    expect(peer!.scrollLeft).toBe(40);
+
+    driver!.scrollLeft = 120;
+    fireEvent.scroll(driver!);
+    expect(peer!.scrollLeft).toBe(120);
+
+    driver!.scrollLeft = 30;
+    fireEvent.scroll(driver!);
+    expect(peer!.scrollLeft).toBe(30);
+  });
+
+  it("lets another strip take over after the first gesture settles", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      render(
+        <HorizontalScrollGroup groupId="test-takeover">
+          <HorizontalScroll label="first">
+            <div>A</div>
+          </HorizontalScroll>
+          <HorizontalScroll label="second">
+            <div>B</div>
+          </HorizontalScroll>
+        </HorizontalScrollGroup>,
+      );
+
+      const [a, b] = bodies();
+      mockOverflow(a!, 800, 200);
+      mockOverflow(b!, 800, 200);
+
+      a!.scrollLeft = 50;
+      fireEvent.scroll(a!);
+      expect(b!.scrollLeft).toBe(50);
+      expect(isScrollSyncPeer("test-takeover", b!)).toBe(true);
+
+      vi.advanceTimersByTime(200);
+      await Promise.resolve();
+      expect(isScrollSyncPeer("test-takeover", b!)).toBe(false);
+
+      b!.scrollLeft = 90;
+      fireEvent.scroll(b!);
+      expect(a!.scrollLeft).toBe(90);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("updates edge fades on the driver without toggling React arrow state", () => {
     render(
       <HorizontalScroll label="solo">
@@ -148,88 +200,14 @@ describe("HorizontalScrollGroup", () => {
     expect(host.dataset.canRight).toBeUndefined();
   });
 
-  it("batches multiple scroll events into one peer write per frame", () => {
-    let frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      frames.push(cb);
-      return frames.length;
-    });
-
+  it("disables horizontal rubber-band overscroll on the viewport", () => {
     render(
-      <HorizontalScrollGroup groupId="test-batch">
-        <HorizontalScroll label="driver">
-          <div>D</div>
-        </HorizontalScroll>
-        <HorizontalScroll label="peer">
-          <div>P</div>
-        </HorizontalScroll>
-      </HorizontalScrollGroup>,
+      <HorizontalScroll label="solo">
+        <div>Wide</div>
+      </HorizontalScroll>,
     );
 
-    const [driver, peer] = bodies();
-    mockOverflow(driver!, 800, 200);
-    mockOverflow(peer!, 800, 200);
-
-    const leftWrites: number[] = [];
-    Object.defineProperty(peer!, "scrollLeft", {
-      configurable: true,
-      get() {
-        return (this as { _left?: number })._left ?? 0;
-      },
-      set(v: number) {
-        (this as { _left?: number })._left = v;
-        leftWrites.push(v);
-      },
-    });
-
-    driver!.scrollLeft = 10;
-    fireEvent.scroll(driver!);
-    driver!.scrollLeft = 20;
-    fireEvent.scroll(driver!);
-    driver!.scrollLeft = 40;
-    fireEvent.scroll(driver!);
-
-    expect(leftWrites).toEqual([]);
-    expect(frames).toHaveLength(1);
-
-    frames[0]!(0);
-    expect(leftWrites).toEqual([40]);
-  });
-
-  it("skips off-screen peers while flinging, then syncs them on settle", () => {
-    // Keep rAF immediate (from beforeEach); only fake the settle timeout.
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    try {
-      render(
-        <HorizontalScrollGroup groupId="test-visible">
-          <HorizontalScroll label="driver">
-            <div>D</div>
-          </HorizontalScroll>
-          <HorizontalScroll label="on-screen">
-            <div>V</div>
-          </HorizontalScroll>
-          <HorizontalScroll label="off-screen">
-            <div>H</div>
-          </HorizontalScroll>
-        </HorizontalScrollGroup>,
-      );
-
-      const [driver, visible, hidden] = bodies();
-      mockOverflow(driver!, 800, 200);
-      mockOverflow(visible!, 800, 200);
-      mockOverflow(hidden!, 800, 200);
-      setScrollSyncVisibilityForTests("test-visible", hidden!, false);
-
-      driver!.scrollLeft = 90;
-      fireEvent.scroll(driver!);
-
-      expect(visible!.scrollLeft).toBe(90);
-      expect(hidden!.scrollLeft).toBe(0);
-
-      vi.advanceTimersByTime(200);
-      expect(hidden!.scrollLeft).toBe(90);
-    } finally {
-      vi.useRealTimers();
-    }
+    const body = bodies()[0]!;
+    expect(body.className).toContain("overscroll-x-none");
   });
 });

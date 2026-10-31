@@ -29,29 +29,21 @@ type HorizontalScrollProps = {
 };
 
 const DRAG_THRESHOLD_PX = 6;
-/** Keep the finger-driven strip as driver until scroll events pause. */
+/** Keep peers muted / driver marked until scroll events pause. */
 const DRIVER_SETTLE_MS = 160;
 
 type ScrollSyncGroup = {
   members: Set<HTMLElement>;
-  /** User-driven strip; peers must not rebroadcast while this is set. */
+  /** User-driven strip; cleared when the gesture settles. */
   driver: HTMLElement | null;
   settleTimer: ReturnType<typeof setTimeout> | null;
-  /** True while a peer-apply frame is queued (boolean so sync rAF cannot stick). */
-  frameScheduled: boolean;
-  raf: number | null;
-  pendingLeft: number | null;
-  pendingSource: HTMLElement | null;
   /** Last agreed horizontal position for the group. */
   sharedLeft: number;
   /**
-   * Viewport visibility per strip. Missing = treat as visible (safe default
-   * before IntersectionObserver runs / in tests without IO).
+   * Peers currently receiving programmatic `scrollLeft` writes. Stays set for
+   * the whole gesture so their scroll events cannot rebroadcast or take over.
    */
-  visibility: WeakMap<HTMLElement, boolean>;
-  io: IntersectionObserver | null;
-  /** Peers receiving a programmatic `scrollLeft` write this frame. */
-  muted: WeakSet<HTMLElement>;
+  muted: Set<HTMLElement>;
 };
 
 const scrollSyncGroups = new Map<string, ScrollSyncGroup>();
@@ -60,8 +52,10 @@ const HorizontalScrollGroupContext = createContext<string | null>(null);
 /**
  * Sibling `HorizontalScroll` strips share one horizontal position.
  * Used for GOTY Comparison so #1–#10 stay on the same columns.
- * While flinging, only viewport-visible peers get `scrollLeft` writes;
- * off-screen strips catch up when the gesture settles.
+ *
+ * Sync is instant (no rAF lag, no smooth/`scrollTo` easing on peers) so a
+ * wiggle stays locked. Peers never rebroadcast. Rubber-band overscroll is
+ * disabled on the viewport so edge bounce cannot desync columns.
  */
 export function HorizontalScrollGroup({
   groupId,
@@ -77,27 +71,6 @@ export function HorizontalScrollGroup({
   );
 }
 
-function ensureVisibilityObserver(group: ScrollSyncGroup) {
-  if (group.io || typeof IntersectionObserver === "undefined") return;
-  group.io = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        const el = entry.target as HTMLElement;
-        group.visibility.set(el, entry.isIntersecting);
-        if (
-          entry.isIntersecting &&
-          el !== group.driver &&
-          el.scrollLeft !== group.sharedLeft
-        ) {
-          setMemberScrollLeft(group, el, group.sharedLeft);
-        }
-      }
-    },
-    // Prefetch a little above/below so the next rank is ready as you scroll.
-    { root: null, rootMargin: "120px 0px", threshold: 0 },
-  );
-}
-
 function setMemberScrollLeft(
   group: ScrollSyncGroup,
   el: HTMLElement,
@@ -105,17 +78,8 @@ function setMemberScrollLeft(
 ) {
   if (el.scrollLeft === left) return;
   group.muted.add(el);
+  // Instant jump — never smooth. Peers must match the finger, not ease toward it.
   el.scrollLeft = left;
-  // Programmatic scroll events often fire after this stack (esp. mobile).
-  queueMicrotask(() => {
-    requestAnimationFrame(() => {
-      group.muted.delete(el);
-    });
-  });
-}
-
-function isMemberVisible(group: ScrollSyncGroup, el: HTMLElement): boolean {
-  return group.visibility.get(el) !== false;
 }
 
 function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
@@ -125,36 +89,23 @@ function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
       members: new Set(),
       driver: null,
       settleTimer: null,
-      frameScheduled: false,
-      raf: null,
-      pendingLeft: null,
-      pendingSource: null,
       sharedLeft: 0,
-      visibility: new WeakMap(),
-      io: null,
-      muted: new WeakSet(),
+      muted: new Set(),
     };
     scrollSyncGroups.set(id, group);
   }
-  ensureVisibilityObserver(group);
   group.members.add(el);
-  group.visibility.set(el, true);
-  group.io?.observe(el);
   if (el.scrollLeft !== group.sharedLeft) {
     setMemberScrollLeft(group, el, group.sharedLeft);
   }
   return () => {
     const cur = scrollSyncGroups.get(id);
     if (!cur) return;
-    cur.io?.unobserve(el);
     cur.members.delete(el);
+    cur.muted.delete(el);
     if (cur.driver === el) cur.driver = null;
-    if (cur.pendingSource === el) cur.pendingSource = null;
     if (cur.members.size === 0) {
       if (cur.settleTimer) clearTimeout(cur.settleTimer);
-      if (cur.raf != null) cancelAnimationFrame(cur.raf);
-      cur.frameScheduled = false;
-      cur.io?.disconnect();
       scrollSyncGroups.delete(id);
     }
   };
@@ -164,19 +115,22 @@ function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
 export function isScrollSyncPeer(id: string, el: HTMLElement): boolean {
   const group = scrollSyncGroups.get(id);
   if (!group) return false;
-  if (group.muted.has(el)) return true;
-  if (group.driver && group.driver !== el) return true;
-  return false;
+  return group.muted.has(el);
 }
 
 function settleDriver(group: ScrollSyncGroup, source: HTMLElement) {
   if (group.driver !== source) return;
   group.driver = null;
-  // Off-screen peers skipped during the fling catch up to the final left.
   for (const el of group.members) {
     if (el === source) continue;
     setMemberScrollLeft(group, el, group.sharedLeft);
   }
+  // Drop mutes after any late programmatic scroll events have flushed.
+  queueMicrotask(() => {
+    requestAnimationFrame(() => {
+      group.muted.clear();
+    });
+  });
 }
 
 function refreshDriver(group: ScrollSyncGroup, source: HTMLElement) {
@@ -188,59 +142,29 @@ function refreshDriver(group: ScrollSyncGroup, source: HTMLElement) {
   }, DRIVER_SETTLE_MS);
 }
 
-function applyPendingScroll(group: ScrollSyncGroup) {
-  group.frameScheduled = false;
-  group.raf = null;
-  const left = group.pendingLeft;
-  const source = group.pendingSource;
-  group.pendingLeft = null;
-  group.pendingSource = null;
-  if (left == null || !source) return;
-
-  group.sharedLeft = left;
-  for (const el of group.members) {
-    if (el === source || el.scrollLeft === left) continue;
-    // Skip off-screen strips during the fling — settle syncs them later.
-    if (!isMemberVisible(group, el)) continue;
-    setMemberScrollLeft(group, el, left);
-  }
-}
-
 function broadcastScrollSync(id: string, source: HTMLElement) {
   const group = scrollSyncGroups.get(id);
   if (!group) return;
-  // Peer / muted strips never become the driver.
+  // Programmatic peer scrolls never drive. A real gesture on any strip can
+  // take over immediately (important when wiggling across ranks).
   if (group.muted.has(source)) return;
-  if (group.driver && group.driver !== source) return;
 
   refreshDriver(group, source);
-  group.pendingLeft = source.scrollLeft;
-  group.pendingSource = source;
-  if (group.frameScheduled) return;
-  group.frameScheduled = true;
-  group.raf = requestAnimationFrame(() => applyPendingScroll(group));
+  const left = source.scrollLeft;
+  group.sharedLeft = left;
+
+  for (const el of group.members) {
+    if (el === source) continue;
+    setMemberScrollLeft(group, el, left);
+  }
 }
 
 /** Test helper — clear module sync state between cases. */
 export function resetScrollSyncGroupsForTests() {
   for (const group of scrollSyncGroups.values()) {
     if (group.settleTimer) clearTimeout(group.settleTimer);
-    if (group.raf != null) cancelAnimationFrame(group.raf);
-    group.frameScheduled = false;
-    group.io?.disconnect();
   }
   scrollSyncGroups.clear();
-}
-
-/** Test helper — mark a strip off-screen for visible-only sync. */
-export function setScrollSyncVisibilityForTests(
-  id: string,
-  el: HTMLElement,
-  visible: boolean,
-) {
-  const group = scrollSyncGroups.get(id);
-  if (!group) return;
-  group.visibility.set(el, visible);
 }
 
 function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
@@ -259,11 +183,11 @@ function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
  * exists. Touch/trackpad use native scroll (including horizontal gestures).
  * Vertical wheel always scrolls the page — never remapped. Scrollbars stay
  * hidden; edge fades mark overflow. `overflow-y` is hidden so a 1px-tall
- * mismatch cannot create a nested vertical scrollport.
+ * mismatch cannot create a nested vertical scrollport. Horizontal rubber-band
+ * overscroll is off so grouped strips cannot bounce out of sync at the edges.
  *
- * Grouped strips: only the user-driven strip broadcasts `scrollLeft`. Visible
- * peers apply that position and must not rebroadcast; off-screen peers catch
- * up when the gesture settles (avoids mobile fling thrash).
+ * Grouped strips: only non-muted (user-driven) strips broadcast; peers get an
+ * instant matching `scrollLeft` and stay muted until the gesture settles.
  */
 export function HorizontalScroll({
   children,
@@ -404,6 +328,10 @@ export function HorizontalScroll({
 
     el.scrollLeft = state.startScroll - dx;
     if (headerRef.current) headerRef.current.scrollLeft = el.scrollLeft;
+    // Keep grouped peers locked during desktop drag (scroll events can lag).
+    if (syncGroupId && !isScrollSyncPeer(syncGroupId, el)) {
+      broadcastScrollSync(syncGroupId, el);
+    }
     e.preventDefault();
   }
 
@@ -440,7 +368,8 @@ export function HorizontalScroll({
     ? ""
     : "overflow-x-auto overflow-y-hidden";
 
-  const viewportChrome = `scrollbar-none ${overflowClass} [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${
+  // overscroll-x-none: no rubber-band bounce (that desyncs grouped peers at edges).
+  const viewportChrome = `scrollbar-none overscroll-x-none ${overflowClass} [&_a]:[-webkit-user-drag:none] [&_img]:[-webkit-user-drag:none] ${
     showControls ? "cursor-grab [&_a]:cursor-grab" : ""
   } ${dragging ? "cursor-grabbing select-none [&_*]:cursor-grabbing" : ""}`;
 
@@ -476,7 +405,7 @@ export function HorizontalScroll({
           <div
             ref={headerRef}
             // Mirror body scroll; links stay clickable (container ignores pan).
-            className="scrollbar-none w-full min-w-0 overflow-x-auto overflow-y-hidden pointer-events-none [&_a]:pointer-events-auto"
+            className="scrollbar-none overscroll-x-none w-full min-w-0 overflow-x-auto overflow-y-hidden pointer-events-none [&_a]:pointer-events-auto"
           >
             {stickyHeader}
           </div>

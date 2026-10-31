@@ -147,7 +147,7 @@ Gallery **Rank · votes · title** lets you compare score layouts on `StandingGa
 - Desktop: drag-to-pan (click still works after a short move); optional prev/next via `showArrowControls` (off by default)
 - Do **not** remap vertical wheel to horizontal
 - Optional `stickyHeader` mirrors body scroll (one-way); no nested vertical scrollport
-- Optional `HorizontalScrollGroup` keeps sibling strips on the same `scrollLeft` (GOTY Comparison rank rows). Driver-only broadcast; visible peers only while flinging; off-screen peers sync on settle
+- Optional `HorizontalScrollGroup` keeps sibling strips on the same `scrollLeft` (GOTY Comparison rank rows). User-driven strip broadcasts; peers jump instantly (no easing / rAF lag) and stay muted until settle. Viewports use `overscroll-x-none` so edge rubber-band cannot desync columns
 
 ## Bespoke identity components
 
