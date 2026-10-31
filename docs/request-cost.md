@@ -160,10 +160,10 @@ pnpm cost:load -- --scenario=pickem --duration=10m --vus-read=20 --writers=50
 pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=50
 # teardown: pnpm qa:loadtest:purge
 
-# Optional: 1000 public scale communities × 1000 is_seed users (no Auth accounts),
-# each user a member with a complete 2025 community Pick’em sheet (~1M sheets).
-# Staging only. Purge with pnpm qa:pickem-scale -- --purge
-pnpm qa:pickem-scale -- --year 2025 --communities 1000 --users 1000
+# Optional: scale communities sharing Better Auth users (signed-in Pick’em +
+# open GOTY editions with ballots). Default 50×50. Staging only.
+# Purge with pnpm qa:pickem-scale -- --purge
+pnpm qa:pickem-scale -- --year 2025 --communities 50 --users 50
 ```
 
 #### Auth stress — home run checklist
