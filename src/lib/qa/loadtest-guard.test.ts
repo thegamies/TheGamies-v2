@@ -155,6 +155,27 @@ describe("resolveLoadtestWriteActor", () => {
     expect(result).toEqual({ status: 401, error: "Unauthorized." });
   });
 
+  it("resolves a scale Auth session without the secret", async () => {
+    const getSession = vi.fn().mockResolvedValue({
+      user: { id: "auth-scale", email: "thegamies-qa-scale-001@example.com" },
+    });
+    auth.getAuthOrNull.mockReturnValue({ $ba: { api: { getSession } } });
+    profiles.getProfileByAuthUserId.mockResolvedValue({
+      id: "p-scale",
+      username: "gamies_qa_scale_001",
+    });
+
+    const result = await resolveLoadtestWriteActor(
+      req(staging, { cookie: "better-auth.session_token=abc" }),
+      { LOADTEST_SECRET: "" },
+    );
+    expect(result).toEqual({
+      ok: true,
+      profileId: "p-scale",
+      mode: "session",
+    });
+  });
+
   it("falls back to Bearer secret + writer header", async () => {
     profiles.getProfileByUsername.mockResolvedValue({ id: "p-secret" });
     const result = await resolveLoadtestWriteActor(

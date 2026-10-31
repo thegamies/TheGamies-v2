@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 import { parseOwnedUsername } from "@/lib/profile/username";
 import { slugifyCommunityName } from "@/lib/communities/schema";
 import {
+  assertScaleFixturesSafe,
+  isPickemScaleCommunitySlug,
+  isPickemScaleEmail,
+  isPickemScaleUsername,
   PICKEM_SCALE_COMMUNITIES_MAX,
   PICKEM_SCALE_DEFAULT_COMMUNITIES,
   PICKEM_SCALE_DEFAULT_USERS,
@@ -12,6 +16,7 @@ import {
   pickemScaleCommunityName,
   pickemScaleCommunitySlug,
   pickemScaleSheetCount,
+  pickScaleCommunity,
   parsePickemScaleCommunities,
   parsePickemScaleCount,
   parsePickemScaleUsers,
@@ -81,5 +86,42 @@ describe("pickem scale nominee rank", () => {
 describe("pickemScaleSheetCount", () => {
   it("is communities times shared users", () => {
     expect(pickemScaleSheetCount(50, 50)).toBe(2_500);
+  });
+});
+
+describe("scale fixture guards", () => {
+  it("recognizes scale emails, usernames, and community slugs", () => {
+    expect(isPickemScaleEmail("thegamies-qa-scale-001@example.com")).toBe(true);
+    expect(isPickemScaleEmail("thegamies-qa-load-001@example.com")).toBe(false);
+    expect(isPickemScaleUsername("gamies_qa_scale_001")).toBe(true);
+    expect(isPickemScaleCommunitySlug("seed_pem_0001")).toBe(true);
+    expect(isPickemScaleCommunitySlug("gamies_qa_load")).toBe(false);
+  });
+
+  it("requires seed_pem communities and a valid user pool", () => {
+    expect(
+      assertScaleFixturesSafe({
+        communities: [{ slug: "seed_pem_0001", id: "c1", categoryId: "cat" }],
+        userCount: 50,
+      }),
+    ).toBeNull();
+    expect(
+      assertScaleFixturesSafe({
+        communities: [{ slug: "gamies_qa_load", id: "c1", categoryId: "cat" }],
+        userCount: 50,
+      }),
+    ).toMatch(/seed_pem_/);
+    expect(
+      assertScaleFixturesSafe({ communities: [], userCount: 50 }),
+    ).toMatch(/at least one/);
+  });
+
+  it("picks a community from the pool", () => {
+    const pool = [
+      { slug: "seed_pem_0001", id: "c1", categoryId: "a" },
+      { slug: "seed_pem_0002", id: "c2", categoryId: "b" },
+    ];
+    expect(pickScaleCommunity(pool, () => 0).slug).toBe("seed_pem_0001");
+    expect(pickScaleCommunity(pool, () => 0.99).slug).toBe("seed_pem_0002");
   });
 });

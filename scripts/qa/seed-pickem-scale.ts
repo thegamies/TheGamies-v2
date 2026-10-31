@@ -1,8 +1,11 @@
 /**
  * Staging-only: Better Auth scale users (signed-in), public scale communities,
  * complete community Pick’em sheets, and open GOTY editions with ballots.
- * Default 50 communities × 50 shared Auth users.
+ * Default 50 communities × 50 shared Auth users. Writes fixtures for
+ * `pnpm cost:load -- --scenario=scale`.
  */
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { neon } from "@neondatabase/serverless";
 import { createDb } from "@thegamies/db";
 import type { NeonSql } from "@/lib/auth/neon-sql";
@@ -10,6 +13,7 @@ import {
   PICKEM_SCALE_DEFAULT_COMMUNITIES,
   PICKEM_SCALE_DEFAULT_USERS,
   PICKEM_SCALE_DEFAULT_YEAR,
+  PICKEM_SCALE_FIXTURES_DIR,
   parsePickemScaleCommunities,
   parsePickemScaleUsers,
 } from "@/lib/qa/pickem-scale";
@@ -73,8 +77,10 @@ async function main() {
 
   const db = createDb(target.databaseUrl);
   const query = neon(target.databaseUrl) as unknown as NeonSql;
+  const outDir = path.resolve(PICKEM_SCALE_FIXTURES_DIR);
   if (args.purge) {
     const removed = await purgePickemScale(db, query);
+    await rm(outDir, { recursive: true, force: true });
     log(
       `removed ${removed.communities} communities, ${removed.profiles} profiles, ${removed.authUsers} auth users`,
     );
@@ -96,9 +102,16 @@ async function main() {
     db,
     log,
   );
+  await mkdir(outDir, { recursive: true });
+  await writeFile(
+    path.join(outDir, "fixtures.json"),
+    JSON.stringify(result.fixtures, null, 2),
+  );
+  await rm(path.join(outDir, "cookies.json"), { force: true });
   log(
     `done: ${result.communities} communities, ${result.users} users, ${result.sheets} sheets, ${result.editionBallots} edition ballots, ${result.editionHosts} hosts`,
   );
+  log(`wrote ${path.relative(process.cwd(), outDir)}`);
 }
 
 main().catch((error: unknown) => {

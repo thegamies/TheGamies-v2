@@ -164,6 +164,8 @@ pnpm cost:load -- --scenario=auth --duration=10m --vus-read=20 --writers=50
 # open GOTY editions with ballots). Default 50×50. Staging only.
 # Purge with pnpm qa:pickem-scale -- --purge
 pnpm qa:pickem-scale -- --year 2025 --communities 50 --users 50
+# Traffic against those communities (not in --all; run alone):
+pnpm cost:load -- --scenario=scale --duration=10m --vus-read=20 --writers=20
 ```
 
 #### Auth stress — home run checklist

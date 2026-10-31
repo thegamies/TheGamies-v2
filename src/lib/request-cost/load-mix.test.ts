@@ -18,6 +18,7 @@ import {
   pickLoadtestUsername,
   pickWeighted,
   siteGotyCategoryPath,
+  withScaleCommunitySlug,
 } from "./load-mix";
 
 const urls = {
@@ -157,6 +158,30 @@ describe("buildLoadWrites", () => {
       buildLoadWrites("editions", "open").some((item) => item.op === "ballot"),
     ).toBe(true);
   });
+
+  it("writes both pickem and ballots while scale is open", () => {
+    const ops = buildLoadWrites("scale", "open").map((item) => item.op);
+    expect(ops).toContain("pickem");
+    expect(ops).toContain("ballot");
+    expect(buildLoadWrites("scale", "locked").map((item) => item.op)).not.toContain(
+      "pickem",
+    );
+  });
+});
+
+describe("scale mix", () => {
+  it("rotates community Pick’em and open editions across seed_pem slugs", () => {
+    const open = buildLoadGets("scale", urls, "open");
+    expect(open.some((item) => item.pickScaleCommunity)).toBe(true);
+    expect(
+      open.some(
+        (item) =>
+          item.group === "edition" &&
+          item.path.includes(`/communities/${LOADTEST_COMMUNITY.slug}/edition/`),
+      ),
+    ).toBe(true);
+    expect(open.some((item) => item.path.includes("view=reveal"))).toBe(false);
+  });
 });
 
 describe("pickemPhaseAt", () => {
@@ -164,6 +189,18 @@ describe("pickemPhaseAt", () => {
     expect(pickemPhaseAt(0, 90_000)).toBe("open");
     expect(pickemPhaseAt(44_999, 90_000)).toBe("open");
     expect(pickemPhaseAt(45_000, 90_000)).toBe("locked");
+  });
+});
+
+describe("withScaleCommunitySlug", () => {
+  it("swaps only the community path segment", () => {
+    expect(
+      withScaleCommunitySlug(
+        "/communities/seed_pem_0001/edition/2025",
+        "seed_pem_0001",
+        "seed_pem_0042",
+      ),
+    ).toBe("/communities/seed_pem_0042/edition/2025");
   });
 });
 

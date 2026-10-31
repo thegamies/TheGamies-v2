@@ -38,10 +38,11 @@ export const LOADTEST_SCENARIOS = [
   "general",
   "pickem",
   "editions",
+  "scale",
   "auth",
 ] as const;
 
-/** Traffic-cost scenarios for `--all` (excludes Auth stress). */
+/** Traffic-cost scenarios for `--all` (excludes Auth stress and scale). */
 export const LOADTEST_TRAFFIC_SCENARIOS = [
   "general",
   "pickem",

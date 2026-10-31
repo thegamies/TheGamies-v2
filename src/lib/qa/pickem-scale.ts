@@ -1,4 +1,9 @@
-import { LOADTEST_EMAIL_DOMAIN, LOADTEST_TGA_YEAR } from "@/lib/qa/loadtest";
+import {
+  LOADTEST_EMAIL_DOMAIN,
+  LOADTEST_TGA_YEAR,
+  type LoadtestGame,
+  type LoadtestTgaSlateCategory,
+} from "@/lib/qa/loadtest";
 
 /**
  * Staging scale fixtures: many public communities sharing a pool of real
@@ -11,6 +16,8 @@ export const PICKEM_SCALE_LEGACY_USERNAME_PREFIX = "seedpmu";
 
 export const PICKEM_SCALE_USERNAME_PREFIX = "gamies_qa_scale_";
 export const PICKEM_SCALE_EMAIL_LOCAL_PREFIX = "thegamies-qa-scale-";
+/** Written by `qa:pickem-scale`, read by `cost:load --scenario=scale`. */
+export const PICKEM_SCALE_FIXTURES_DIR = "e2e/.auth/scale";
 
 /** Shared Auth pool size (sign-up cost). */
 export const PICKEM_SCALE_USERS_MAX = 50;
@@ -101,4 +108,76 @@ function parseBoundedCount(
 
 export function pickemScaleSheetCount(communities: number, users: number): number {
   return communities * users;
+}
+
+export function isPickemScaleEmail(email: string): boolean {
+  return new RegExp(
+    `^${PICKEM_SCALE_EMAIL_LOCAL_PREFIX}\\d{3}@${LOADTEST_EMAIL_DOMAIN}$`,
+    "i",
+  ).test(email.trim());
+}
+
+export function isPickemScaleUsername(username: string): boolean {
+  return new RegExp(`^${PICKEM_SCALE_USERNAME_PREFIX}\\d{3}$`).test(
+    username.trim().toLowerCase(),
+  );
+}
+
+export function isPickemScaleCommunitySlug(slug: string): boolean {
+  return new RegExp(`^${PICKEM_SCALE_SLUG_PREFIX}\\d{4}$`).test(
+    slug.trim().toLowerCase(),
+  );
+}
+
+export type ScaleFixturesCommunity = {
+  slug: string;
+  id: string;
+  categoryId: string;
+};
+
+/** Fixture file for the scale cost:load scenario. */
+export type ScaleFixturesFile = {
+  year: number;
+  communities: ScaleFixturesCommunity[];
+  userCount: number;
+  tgaYear: number;
+  tgaSlate: LoadtestTgaSlateCategory[];
+  tgaPicks: Record<string, string>;
+  game: { id: string; slug: string; igdbId: number };
+  games?: LoadtestGame[];
+  ballotGames?: LoadtestGame[];
+  ballotItems: Array<{ gameId: string; rank: number }>;
+};
+
+export function assertScaleFixturesSafe(
+  fixtures: Pick<ScaleFixturesFile, "communities" | "userCount">,
+): string | null {
+  if (!Array.isArray(fixtures.communities) || fixtures.communities.length < 1) {
+    return "Scale fixtures need at least one community.";
+  }
+  for (const row of fixtures.communities) {
+    if (!isPickemScaleCommunitySlug(row.slug)) {
+      return "Scale fixtures must use seed_pem_* community slugs.";
+    }
+  }
+  if (
+    !Number.isInteger(fixtures.userCount) ||
+    fixtures.userCount < 1 ||
+    fixtures.userCount > PICKEM_SCALE_USERS_MAX
+  ) {
+    return `Scale fixtures userCount must be 1–${PICKEM_SCALE_USERS_MAX}.`;
+  }
+  return null;
+}
+
+export function pickScaleCommunity(
+  communities: ScaleFixturesCommunity[],
+  random: () => number = Math.random,
+): ScaleFixturesCommunity {
+  if (communities.length === 0) {
+    throw new Error("Scale community pool is empty.");
+  }
+  return communities[
+    Math.min(communities.length - 1, Math.floor(random() * communities.length))
+  ]!;
 }

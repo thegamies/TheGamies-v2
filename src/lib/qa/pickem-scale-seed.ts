@@ -1,14 +1,21 @@
-import { and, asc, eq, like, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, lte, or, sql } from "drizzle-orm";
 import {
   communities,
   communityEditions,
   communityMembers,
   createDb,
+  games,
   profiles,
   type Db,
 } from "@thegamies/db";
 import type { NeonSql } from "@/lib/auth/neon-sql";
 import { removeSelfHostedAuthUser } from "@/lib/auth/remove-self-hosted-auth-user";
+import {
+  listEditionEnabledCategoryIds,
+  seedEditionCategories,
+} from "@/lib/communities/edition-categories";
+import { computeEditionStatus } from "@/lib/communities/edition-status";
+import { getEditionByCommunityYear } from "@/lib/communities/editions";
 import { generateInviteCode } from "@/lib/communities/invite-code";
 import { seedEditionBallotsForProfiles } from "@/lib/communities/seed-community";
 import { insertInChunks } from "@/lib/db/insert-chunks";
@@ -18,7 +25,9 @@ import {
   type AuthAppTarget,
 } from "@/lib/qa/auth-http";
 import {
+  completeLoadtestTgaPicks,
   loadtestEditionOpenSchedule,
+  type LoadtestGame,
 } from "@/lib/qa/loadtest";
 import {
   PICKEM_SCALE_BALLOT_LIST_SIZE,
@@ -32,10 +41,9 @@ import {
   pickemScaleAccount,
   pickemScaleCommunityName,
   pickemScaleCommunitySlug,
+  type ScaleFixturesCommunity,
+  type ScaleFixturesFile,
 } from "@/lib/qa/pickem-scale";
-import { computeEditionStatus } from "@/lib/communities/edition-status";
-import { getEditionByCommunityYear } from "@/lib/communities/editions";
-import { seedEditionCategories } from "@/lib/communities/edition-categories";
 import { recountCommunityPickCounts } from "@/lib/tga-pickem/sheets";
 import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
 
@@ -61,7 +69,36 @@ export type SeedPickemScaleResult = {
   sheets: number;
   editionBallots: number;
   editionHosts: number;
+  fixtures: ScaleFixturesFile;
 };
+
+async function pickReleasedGames(
+  db: Db,
+  input: { year?: number; limit: number },
+): Promise<LoadtestGame[]> {
+  const now = new Date();
+  const filters = [
+    isNull(games.igdbRemovedAt),
+    eq(games.isAdult, false),
+    isNull(games.versionParentIgdbId),
+    lte(games.firstReleaseDate, now),
+  ];
+  if (input.year != null) filters.push(eq(games.year, input.year));
+  const rows = await db
+    .select({
+      id: games.id,
+      slug: games.slug,
+      igdbId: games.igdbId,
+    })
+    .from(games)
+    .where(and(...filters))
+    .orderBy(desc(games.popularity), asc(games.title))
+    .limit(input.limit);
+  return rows.map((row, i) => ({
+    ...row,
+    band: i < Math.ceil(rows.length * 0.8) ? "popular" : "unpopular",
+  }));
+}
 
 function rowsOf(result: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(result)) return result;
@@ -262,6 +299,7 @@ export async function seedPickemScale(
     sql`, `,
   );
 
+  const fixtureCommunities: ScaleFixturesCommunity[] = [];
   let editionBallots = 0;
   let editionHosts = 0;
   let done = 0;
@@ -386,6 +424,18 @@ export async function seedPickemScale(
       throw new Error(`${community.slug}: ${seeded.error}`);
     }
     await repairOpenEdition(db, { communityId: community.id, year });
+    const open = await getEditionByCommunityYear(community.id, year, db);
+    const [categoryId] = open
+      ? await listEditionEnabledCategoryIds(open.id, db)
+      : [];
+    if (!categoryId) {
+      throw new Error(`${community.slug}: open edition has no categories`);
+    }
+    fixtureCommunities.push({
+      slug: community.slug,
+      id: community.id,
+      categoryId,
+    });
     editionBallots +=
       seeded.createdBallots + seeded.updatedBallots + seeded.skipped;
     editionHosts = Math.max(editionHosts, seeded.voicesSet);
@@ -398,6 +448,33 @@ export async function seedPickemScale(
 
   await recountCommunityPickCounts(year, db);
 
+  const ballot = await listTgaBallot(year, db);
+  const tgaSlate = ballot.map((category) => ({
+    id: category.id,
+    nomineeIds: category.nominees.map((nominee) => nominee.id),
+  }));
+  const catalogGames = await pickReleasedGames(db, { limit: 40 });
+  const ballotGames = await pickReleasedGames(db, { year, limit: 25 });
+  const game = ballotGames[0] ?? catalogGames[0];
+  if (!game) {
+    throw new Error("Need released catalog games for scale load fixtures.");
+  }
+  const fixtures: ScaleFixturesFile = {
+    year,
+    communities: fixtureCommunities,
+    userCount,
+    tgaYear: year,
+    tgaSlate,
+    tgaPicks: completeLoadtestTgaPicks(tgaSlate, 0),
+    game: { id: game.id, slug: game.slug, igdbId: game.igdbId },
+    games: catalogGames.length > 0 ? catalogGames : ballotGames,
+    ballotGames,
+    ballotItems: ballotGames.slice(0, 3).map((row, i) => ({
+      gameId: row.id,
+      rank: i + 1,
+    })),
+  };
+
   return {
     year,
     users: userCount,
@@ -405,6 +482,7 @@ export async function seedPickemScale(
     sheets: communityCount * userCount,
     editionBallots,
     editionHosts,
+    fixtures,
   };
 }
 
