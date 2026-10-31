@@ -11,6 +11,7 @@ import {
   loadtestBodyTooLarge,
   resolveLoadtestWriteActor,
 } from "@/lib/qa/loadtest-guard";
+import { isPickemScaleCommunitySlug } from "@/lib/qa/pickem-scale";
 import { QA_COMMUNITIES } from "@/lib/qa/staging-fixtures";
 
 export const runtime = "nodejs";
@@ -63,8 +64,11 @@ function refuseSlug(slug: string): string | null {
   if (normalized === QA_COMMUNITIES.showcase.slug) {
     return "Refusing the QA showcase community.";
   }
-  if (normalized !== LOADTEST_COMMUNITY.slug) {
-    return "Refusing a community that is not the load-test community.";
+  if (
+    normalized !== LOADTEST_COMMUNITY.slug &&
+    !isPickemScaleCommunitySlug(normalized)
+  ) {
+    return "Refusing a community that is not a load-test or scale fixture.";
   }
   return null;
 }

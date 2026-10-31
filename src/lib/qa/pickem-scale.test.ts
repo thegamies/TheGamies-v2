@@ -2,53 +2,76 @@ import { describe, expect, it } from "vitest";
 import { parseOwnedUsername } from "@/lib/profile/username";
 import { slugifyCommunityName } from "@/lib/communities/schema";
 import {
-  PICKEM_SCALE_MAX,
+  assertScaleFixturesSafe,
+  isPickemScaleCommunitySlug,
+  isPickemScaleEmail,
+  isPickemScaleUsername,
+  PICKEM_SCALE_COMMUNITIES_MAX,
+  PICKEM_SCALE_DEFAULT_COMMUNITIES,
+  PICKEM_SCALE_DEFAULT_USERS,
+  PICKEM_SCALE_EDITION_HOSTS,
   PICKEM_SCALE_NOMINEE_RANK,
-  pickemScaleAuthBounds,
-  pickemScaleAuthUserId,
+  PICKEM_SCALE_USERS_MAX,
+  pickemScaleAccount,
   pickemScaleCommunityName,
   pickemScaleCommunitySlug,
-  pickemScaleDisplayName,
   pickemScaleSheetCount,
-  pickemScaleUsername,
+  pickScaleCommunity,
+  parsePickemScaleCommunities,
   parsePickemScaleCount,
+  parsePickemScaleUsers,
 } from "./pickem-scale";
 
 describe("pickem scale identities", () => {
-  it("uses seed auth ids and valid public handles", () => {
-    expect(pickemScaleAuthUserId(1)).toBe("seed:pickemscale:0001");
-    expect(pickemScaleAuthUserId(1000)).toBe("seed:pickemscale:1000");
-    expect(parseOwnedUsername(pickemScaleUsername(1))).toEqual({
-      username: "seedpmu0001",
+  it("uses Better Auth emails and valid public handles", () => {
+    expect(pickemScaleAccount(1)).toEqual({
+      index: 1,
+      email: "thegamies-qa-scale-001@example.com",
+      username: "gamies_qa_scale_001",
+      displayName: "QA Scale 001",
     });
-    expect(parseOwnedUsername(pickemScaleUsername(1000))).toEqual({
-      username: "seedpmu1000",
+    expect(pickemScaleAccount(50).email).toBe(
+      "thegamies-qa-scale-050@example.com",
+    );
+    expect(parseOwnedUsername(pickemScaleAccount(1).username)).toEqual({
+      username: "gamies_qa_scale_001",
     });
-    expect(pickemScaleDisplayName(7)).toBe("Pickem Scale 0007");
+    expect(parseOwnedUsername(pickemScaleAccount(50).username)).toEqual({
+      username: "gamies_qa_scale_050",
+    });
+  });
+
+  it("rejects accounts outside the Auth pool", () => {
+    expect(() => pickemScaleAccount(0)).toThrow(/1–50/);
+    expect(() => pickemScaleAccount(51)).toThrow(/1–50/);
   });
 
   it("keeps community slugs in the reserved scale prefix", () => {
     expect(pickemScaleCommunitySlug(1)).toBe("seed_pem_0001");
     expect(slugifyCommunityName(pickemScaleCommunityName(1))).toBe(
-      "pickem_scale_0001",
+      "qa_scale_0001",
     );
-    expect(pickemScaleCommunitySlug(1000).length).toBeLessThanOrEqual(32);
-  });
-
-  it("orders auth ids so BETWEEN covers the first N users", () => {
-    const bounds = pickemScaleAuthBounds(1000);
-    expect(bounds.first < bounds.last).toBe(true);
-    expect(pickemScaleAuthUserId(2) > bounds.first).toBe(true);
-    expect(pickemScaleAuthUserId(1000) <= bounds.last).toBe(true);
+    expect(pickemScaleCommunitySlug(100).length).toBeLessThanOrEqual(32);
   });
 });
 
-describe("parsePickemScaleCount", () => {
-  it("caps at 1000", () => {
-    expect(parsePickemScaleCount(1, "Users")).toBe(1);
-    expect(parsePickemScaleCount(1000, "Users")).toBe(PICKEM_SCALE_MAX);
-    expect(parsePickemScaleCount(0, "Users")).toHaveProperty("error");
-    expect(parsePickemScaleCount(1001, "Communities")).toHaveProperty("error");
+describe("parsePickemScale counts", () => {
+  it("defaults to 50 Auth users and 50 communities", () => {
+    expect(PICKEM_SCALE_DEFAULT_USERS).toBe(50);
+    expect(PICKEM_SCALE_DEFAULT_COMMUNITIES).toBe(50);
+    expect(PICKEM_SCALE_USERS_MAX).toBe(50);
+    expect(PICKEM_SCALE_COMMUNITIES_MAX).toBe(100);
+    expect(PICKEM_SCALE_EDITION_HOSTS).toBe(3);
+  });
+
+  it("caps users at 50 and communities at 100", () => {
+    expect(parsePickemScaleUsers(1)).toBe(1);
+    expect(parsePickemScaleUsers(50)).toBe(PICKEM_SCALE_USERS_MAX);
+    expect(parsePickemScaleUsers(51)).toHaveProperty("error");
+    expect(parsePickemScaleCommunities(100)).toBe(PICKEM_SCALE_COMMUNITIES_MAX);
+    expect(parsePickemScaleCommunities(101)).toHaveProperty("error");
+    expect(parsePickemScaleCount(50, "Users")).toBe(50);
+    expect(parsePickemScaleCount(100, "Communities")).toBe(100);
   });
 });
 
@@ -62,6 +85,43 @@ describe("pickem scale nominee rank", () => {
 
 describe("pickemScaleSheetCount", () => {
   it("is communities times shared users", () => {
-    expect(pickemScaleSheetCount(1000, 1000)).toBe(1_000_000);
+    expect(pickemScaleSheetCount(50, 50)).toBe(2_500);
+  });
+});
+
+describe("scale fixture guards", () => {
+  it("recognizes scale emails, usernames, and community slugs", () => {
+    expect(isPickemScaleEmail("thegamies-qa-scale-001@example.com")).toBe(true);
+    expect(isPickemScaleEmail("thegamies-qa-load-001@example.com")).toBe(false);
+    expect(isPickemScaleUsername("gamies_qa_scale_001")).toBe(true);
+    expect(isPickemScaleCommunitySlug("seed_pem_0001")).toBe(true);
+    expect(isPickemScaleCommunitySlug("gamies_qa_load")).toBe(false);
+  });
+
+  it("requires seed_pem communities and a valid user pool", () => {
+    expect(
+      assertScaleFixturesSafe({
+        communities: [{ slug: "seed_pem_0001", id: "c1", categoryId: "cat" }],
+        userCount: 50,
+      }),
+    ).toBeNull();
+    expect(
+      assertScaleFixturesSafe({
+        communities: [{ slug: "gamies_qa_load", id: "c1", categoryId: "cat" }],
+        userCount: 50,
+      }),
+    ).toMatch(/seed_pem_/);
+    expect(
+      assertScaleFixturesSafe({ communities: [], userCount: 50 }),
+    ).toMatch(/at least one/);
+  });
+
+  it("picks a community from the pool", () => {
+    const pool = [
+      { slug: "seed_pem_0001", id: "c1", categoryId: "a" },
+      { slug: "seed_pem_0002", id: "c2", categoryId: "b" },
+    ];
+    expect(pickScaleCommunity(pool, () => 0).slug).toBe("seed_pem_0001");
+    expect(pickScaleCommunity(pool, () => 0.99).slug).toBe("seed_pem_0002");
   });
 });

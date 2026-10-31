@@ -41,6 +41,11 @@ export type LoadGetItem = {
   pickProfile?: boolean;
   /** Resolve a planted share list at random from `fixtures.lists`. */
   pickShare?: boolean;
+  /**
+   * Replace the community slug in `path` with a random scale `seed_pem_*`
+   * community at request time.
+   */
+  pickScaleCommunity?: boolean;
 };
 
 export type LoadWriteOp =
@@ -227,13 +232,24 @@ export function pickemPhaseAt(
   return elapsedMs / durationMs >= fraction ? "locked" : "open";
 }
 
-function pickemGets(year: number, phase: LoadPickemPhase): LoadGetItem[] {
+function pickemGets(
+  year: number,
+  phase: LoadPickemPhase,
+  communitySlug = LOADTEST_COMMUNITY.slug,
+  pickScaleCommunity = false,
+): LoadGetItem[] {
   const base = `/the-game-awards/${year}`;
-  const community = `/communities/${LOADTEST_COMMUNITY.slug}/the-game-awards/${year}`;
+  const community = `/communities/${communitySlug}/the-game-awards/${year}`;
   if (phase === "open") {
     return [
       { group: "pickem", method: "GET", path: base, weight: 6 },
-      { group: "pickem", method: "GET", path: community, weight: 3 },
+      {
+        group: "pickem",
+        method: "GET",
+        path: community,
+        weight: 3,
+        pickScaleCommunity,
+      },
       {
         group: "pickem",
         method: "GET",
@@ -245,6 +261,7 @@ function pickemGets(year: number, phase: LoadPickemPhase): LoadGetItem[] {
         method: "GET",
         path: tgaYearHref(community, { view: "standings" }),
         weight: 1,
+        pickScaleCommunity,
       },
     ];
   }
@@ -260,24 +277,30 @@ function pickemGets(year: number, phase: LoadPickemPhase): LoadGetItem[] {
       method: "GET",
       path: tgaYearHref(community, { view: "standings" }),
       weight: 4,
+      pickScaleCommunity,
     },
     {
       group: "pickem",
       method: "GET",
       path: tgaYearHref(community, { view: "standings", mode: "voices" }),
       weight: 2,
+      pickScaleCommunity,
     },
     { group: "pickem", method: "GET", path: base, weight: 1 },
   ];
 }
 
-function editionFillingGets(urls: LoadMixUrls): LoadGetItem[] {
+function editionFillingGets(
+  urls: LoadMixUrls,
+  pickScaleCommunity = false,
+): LoadGetItem[] {
   return [
     {
       group: "edition",
       method: "GET",
       path: `/communities/${urls.communitySlug}/edition/${urls.fillingYear}`,
       weight: 6,
+      pickScaleCommunity,
     },
   ];
 }
@@ -361,6 +384,18 @@ export function buildLoadGets(
         ? editionResultsGets(urls)
         : editionFillingGets(urls)),
     );
+  } else if (scenario === "scale") {
+    // Multi-community Pick’em + open editions. Editions stay open (no
+    // mass-publish). Pick’em still flips site standings at halfway.
+    items.push(
+      ...pickemGets(
+        loadtestTgaYearFromFixtures(urls),
+        pickemPhase,
+        urls.communitySlug,
+        true,
+      ),
+      ...editionFillingGets(urls, true),
+    );
   }
   return items;
 }
@@ -370,13 +405,30 @@ export function buildLoadWrites(
   pickemPhase: LoadPickemPhase = "open",
 ): LoadWriteItem[] {
   const items = [...generalWrites()];
-  if (scenario === "pickem" && pickemPhase === "open") {
+  if (
+    (scenario === "pickem" || scenario === "scale") &&
+    pickemPhase === "open"
+  ) {
     items.push({ group: "write", method: "POST", op: "pickem", weight: 4 });
   }
-  if (scenario === "editions" && pickemPhase === "open") {
+  if (
+    (scenario === "editions" || scenario === "scale") &&
+    pickemPhase === "open"
+  ) {
     items.push({ group: "write", method: "POST", op: "ballot", weight: 4 });
   }
   return items;
+}
+
+/** Swap the community slug segment for a random scale community. */
+export function withScaleCommunitySlug(
+  pathName: string,
+  fromSlug: string,
+  toSlug: string,
+): string {
+  return pathName.split(`/communities/${fromSlug}/`).join(
+    `/communities/${toSlug}/`,
+  );
 }
 
 export function buildLoadMix(

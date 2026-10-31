@@ -23,6 +23,7 @@ import {
   pickLoadtestUsername,
   pickWeighted,
   siteGotyCategoryPath,
+  withScaleCommunitySlug,
   type LoadPickemPhase,
   type LoadWriteOp,
 } from "@/lib/request-cost/load-mix";
@@ -85,9 +86,45 @@ import {
   repairLoadtestTgaYear,
   restoreLoadtestTgaSchedule,
 } from "@/lib/qa/loadtest-repair";
+import {
+  assertScaleFixturesSafe,
+  PICKEM_SCALE_FIXTURES_DIR,
+  pickemScaleAccount,
+  pickScaleCommunity,
+  type ScaleFixturesCommunity,
+  type ScaleFixturesFile,
+} from "@/lib/qa/pickem-scale";
 import { publishEditionForSeed } from "@/lib/communities/seed-community";
 import { getTgaYear } from "@/lib/tga-pickem/service";
 import { resolveQaTarget } from "@/lib/qa/staging-fixtures";
+
+function scaleToLoadFixtures(scale: ScaleFixturesFile): LoadtestFixturesFile {
+  const first = scale.communities[0];
+  if (!first) throw new Error("Scale fixtures need at least one community.");
+  return {
+    communitySlug: first.slug,
+    communityId: first.id,
+    fillingYear: scale.year,
+    resultsYear: scale.year,
+    resultsCategoryId: first.categoryId,
+    tgaYear: scale.tgaYear,
+    tgaSlate: scale.tgaSlate,
+    tgaPicks: scale.tgaPicks,
+    game: scale.game,
+    games: scale.games,
+    ballotGames: scale.ballotGames,
+    ballotItems: scale.ballotItems,
+    writerCount: scale.userCount,
+  };
+}
+
+function trafficAccount(
+  scenario: LoadtestScenario,
+  index: number,
+): { email: string; username: string } {
+  if (scenario === "scale") return pickemScaleAccount(index);
+  return loadtestAccount(index);
+}
 
 type WriterSlot = { list: WriterListState };
 
@@ -133,6 +170,7 @@ function writeBody(
   op: LoadWriteOp,
   fixtures: LoadtestFixturesFile,
   writerIndex = 0,
+  communitySlug = fixtures.communitySlug,
 ): unknown {
   if (isListWriteOp(op)) {
     throw new Error(`List writes use listWriteJsonBody, not writeBody (${op}).`);
@@ -153,7 +191,7 @@ function writeBody(
     ).map((game, rank) => ({ gameId: game.id, rank: rank + 1 }));
     return {
       op,
-      slug: fixtures.communitySlug,
+      slug: communitySlug,
       year: fixtures.fillingYear,
       items: items.length > 0 ? items : fixtures.ballotItems,
       categoryVotes: [],
@@ -162,7 +200,7 @@ function writeBody(
   }
   return {
     op: "pickem",
-    slug: fixtures.communitySlug,
+    slug: communitySlug,
     year: loadtestTgaYearFromFixtures(fixtures),
     worldPremieresGuess: writerIndex % 21,
     picks: completeLoadtestTgaPicks(
@@ -423,6 +461,8 @@ async function runScenario(input: {
   vusRead: number;
   writers: number;
   fixtures: LoadtestFixturesFile;
+  /** When set, ballot/pickem GETs and writes rotate across these communities. */
+  scaleCommunities?: ScaleFixturesCommunity[];
   tag: string;
   skipRepair: boolean;
 }): Promise<string> {
@@ -456,7 +496,10 @@ async function runScenario(input: {
   const lockAt = started.getTime() + input.durationMs * LOADTEST_PICKEM_LOCK_FRACTION;
 
   let restoreSchedule: { opensAt: Date; showStartsAt: Date } | null = null;
-  if (input.scenario === "pickem" && !input.skipRepair) {
+  if (
+    (input.scenario === "pickem" || input.scenario === "scale") &&
+    !input.skipRepair
+  ) {
     const db = createDb(input.databaseUrl);
     const current = await getTgaYear(LOADTEST_TGA_YEAR, db);
     if (current?.opensAt && current.showStartsAt) {
@@ -476,6 +519,7 @@ async function runScenario(input: {
     input.vusRead,
     Math.floor(input.vusRead * LOADTEST_SIGNED_IN_READ_FRACTION),
   );
+  const scaleCommunities = input.scaleCommunities ?? [];
 
   const readers = Array.from({ length: input.vusRead }, async (_, i) => {
     const delay = loadVuStartOffsetMs(i, input.vusRead, rampMs);
@@ -483,7 +527,10 @@ async function runScenario(input: {
 
     let cookie = "";
     if (i < signedInReaders && input.fixtures.writerCount > 0) {
-      const account = loadtestAccount((i % input.fixtures.writerCount) + 1);
+      const account = trafficAccount(
+        input.scenario,
+        (i % input.fixtures.writerCount) + 1,
+      );
       cookie =
         (await signInTrafficCookie({
           appUrl: input.appUrl,
@@ -498,19 +545,36 @@ async function runScenario(input: {
       const item = pickWeighted(
         pickemPhaseRef.phase === "locked" ? getsLocked : getsOpen,
       );
-      const path = item.pickSearch
+      let path = item.pickSearch
         ? loadGamesSearchPath(item.pickSearch, input.fixtures)
         : item.pickGame
           ? `/games/${encodeURIComponent(pickLoadtestGame(loadtestWriteGames(input.fixtures)).slug)}`
           : item.pickCategory
             ? siteGotyCategoryPath(pickLoadtestGotyCategory())
             : item.pickProfile
-              ? `/u/${pickLoadtestUsername(input.fixtures.writerCount)}`
+              ? `/u/${
+                  input.scenario === "scale"
+                    ? trafficAccount(
+                        "scale",
+                        1 +
+                          Math.floor(
+                            Math.random() * input.fixtures.writerCount,
+                          ),
+                      ).username
+                    : pickLoadtestUsername(input.fixtures.writerCount)
+                }`
               : item.pickShare
                 ? loadShareListPath(
                     pickLoadtestShareList(input.fixtures.lists ?? []),
                   )
                 : item.path;
+      if (item.pickScaleCommunity && scaleCommunities.length > 0) {
+        path = withScaleCommunitySlug(
+          path,
+          input.fixtures.communitySlug,
+          pickScaleCommunity(scaleCommunities).slug,
+        );
+      }
       const t0 = Date.now();
       try {
         const headers: Record<string, string> = {
@@ -555,7 +619,7 @@ async function runScenario(input: {
     const delay = loadVuStartOffsetMs(i, input.writers, rampMs);
     if (delay > 0) await sleep(delay);
 
-    const account = loadtestAccount(i + 1);
+    const account = trafficAccount(input.scenario, i + 1);
     let cookie =
       (await signInTrafficCookie({
         appUrl: input.appUrl,
@@ -635,11 +699,15 @@ async function runScenario(input: {
         const listDraft = isListWriteOp(item.op)
           ? listDraftForOp(item.op, input.fixtures, slot.list, Math.random, games)
           : null;
+        const writeSlug =
+          scaleCommunities.length > 0
+            ? pickScaleCommunity(scaleCommunities).slug
+            : input.fixtures.communitySlug;
         const body = isListWriteOp(item.op)
           ? listDraft
             ? listWriteJsonBody(item.op, listDraft)
             : null
-          : writeBody(item.op, input.fixtures, i);
+          : writeBody(item.op, input.fixtures, i, writeSlug);
         if (!body) continue;
         const recorded =
           item.op === "list-delete" && listDraft
@@ -675,7 +743,13 @@ async function runScenario(input: {
   });
 
   const lockPhase = (async () => {
-    if (input.scenario !== "pickem" && input.scenario !== "editions") return;
+    if (
+      input.scenario !== "pickem" &&
+      input.scenario !== "editions" &&
+      input.scenario !== "scale"
+    ) {
+      return;
+    }
     const wait = lockAt - Date.now();
     if (wait > 0) await sleep(wait);
     if (input.scenario === "editions") {
@@ -690,6 +764,7 @@ async function runScenario(input: {
       pickemPhaseRef.phase = "locked";
       return;
     }
+    // pickem + scale: lock site TGA; scale editions stay open (no mass publish).
     pickemPhaseRef.phase = "locked";
     if (input.skipRepair) return;
     await repairLoadtestTgaYear(createDb(input.databaseUrl), {
@@ -752,6 +827,54 @@ async function main() {
   const args = parseLoadArgs(process.argv.slice(2));
   if ("error" in args) throw new Error(args.error);
 
+  const hasScale = args.scenarios.includes("scale");
+  const hasOther = args.scenarios.some((s) => s !== "scale");
+  if (hasScale && hasOther) {
+    throw new Error(
+      "Run --scenario=scale alone (uses e2e/.auth/scale fixtures).",
+    );
+  }
+
+  const skipRepair = process.env.COST_LOAD_SKIP_REPAIR === "1";
+  if (skipRepair) {
+    console.log("cost-load: skipping phase repair");
+  }
+  const tag = process.env.COST_RUN_TAG?.trim() || `load-${Date.now()}`;
+
+  if (hasScale) {
+    const scale = await readJson<ScaleFixturesFile>(
+      path.join(path.resolve(PICKEM_SCALE_FIXTURES_DIR), "fixtures.json"),
+    );
+    const unsafe = assertScaleFixturesSafe(scale);
+    if (unsafe) throw new Error(unsafe);
+    if (args.writers > scale.userCount) {
+      throw new Error(
+        `Need ${args.writers} scale users; run pnpm qa:pickem-scale -- --users ${args.writers}`,
+      );
+    }
+    if (args.writers > 0 && scale.userCount < 1) {
+      throw new Error(
+        "Need scale Auth users; run pnpm qa:pickem-scale",
+      );
+    }
+    const fixtures = scaleToLoadFixtures(scale);
+    await runScenario({
+      scenario: "scale",
+      appUrl: target.appUrl,
+      databaseUrl: target.databaseUrl,
+      password: target.password,
+      durationMs: args.durationMs,
+      rampMs: args.rampMs,
+      vusRead: args.vusRead,
+      writers: args.writers,
+      fixtures,
+      scaleCommunities: scale.communities,
+      tag,
+      skipRepair,
+    });
+    return;
+  }
+
   const fixtureDir = path.resolve("e2e/.auth/loadtest");
   const fixtures = await readJson<LoadtestFixturesFile>(
     path.join(fixtureDir, "fixtures.json"),
@@ -774,13 +897,9 @@ async function main() {
     );
   }
 
-  const skipRepair = process.env.COST_LOAD_SKIP_REPAIR === "1";
-  if (skipRepair) {
-    console.log("cost-load: skipping phase repair");
-  } else if (args.scenarios.some((s) => s !== "auth")) {
+  if (!skipRepair && args.scenarios.some((s) => s !== "auth")) {
     await repairPhases(fixtures, target.databaseUrl);
   }
-  const tag = process.env.COST_RUN_TAG?.trim() || `load-${Date.now()}`;
 
   for (const scenario of args.scenarios) {
     await runScenario({

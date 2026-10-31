@@ -1,38 +1,65 @@
-import { asc, like, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, like, lte, or, sql } from "drizzle-orm";
 import {
   communities,
+  communityEditions,
+  communityMembers,
   createDb,
+  games,
   profiles,
   type Db,
 } from "@thegamies/db";
-import { generateInviteCode } from "@/lib/communities/invite-code";
-import { insertInChunks } from "@/lib/db/insert-chunks";
-import { seedProfileCreateFields } from "@/lib/seed-accounts";
-import { recountCommunityPickCounts } from "@/lib/tga-pickem/sheets";
-import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
+import type { NeonSql } from "@/lib/auth/neon-sql";
+import { removeSelfHostedAuthUser } from "@/lib/auth/remove-self-hosted-auth-user";
 import {
-  PICKEM_SCALE_AUTH_PREFIX,
+  listEditionEnabledCategoryIds,
+  seedEditionCategories,
+} from "@/lib/communities/edition-categories";
+import { computeEditionStatus } from "@/lib/communities/edition-status";
+import { getEditionByCommunityYear } from "@/lib/communities/editions";
+import { generateInviteCode } from "@/lib/communities/invite-code";
+import { seedEditionBallotsForProfiles } from "@/lib/communities/seed-community";
+import { insertInChunks } from "@/lib/db/insert-chunks";
+import { ensureProfileForAuthUser } from "@/lib/profile/service";
+import {
+  ensureVerifiedAuthUser,
+  type AuthAppTarget,
+} from "@/lib/qa/auth-http";
+import {
+  completeLoadtestTgaPicks,
+  loadtestEditionOpenSchedule,
+  type LoadtestGame,
+} from "@/lib/qa/loadtest";
+import {
+  PICKEM_SCALE_BALLOT_LIST_SIZE,
+  PICKEM_SCALE_EDITION_HOSTS,
+  PICKEM_SCALE_LEGACY_AUTH_PREFIX,
+  PICKEM_SCALE_LEGACY_USERNAME_PREFIX,
   PICKEM_SCALE_NOMINEE_RANK,
   PICKEM_SCALE_SLUG_PREFIX,
-  pickemScaleAuthBounds,
-  pickemScaleAuthUserId,
+  PICKEM_SCALE_USERNAME_PREFIX,
+  PICKEM_SCALE_USERS_MAX,
+  pickemScaleAccount,
   pickemScaleCommunityName,
   pickemScaleCommunitySlug,
-  pickemScaleDisplayName,
-  pickemScaleUsername,
+  type ScaleFixturesCommunity,
+  type ScaleFixturesFile,
 } from "@/lib/qa/pickem-scale";
+import { recountCommunityPickCounts } from "@/lib/tga-pickem/sheets";
+import { getTgaYear, listTgaBallot } from "@/lib/tga-pickem/service";
 
 function getDb(db?: Db): Db {
   return db ?? createDb();
 }
 
-const PROFILE_CHUNK = 100;
 const COMMUNITY_CHUNK = 50;
 
 export type SeedPickemScaleInput = {
   year: number;
   communities: number;
   users: number;
+  target: AuthAppTarget;
+  password: string;
+  query: NeonSql;
 };
 
 export type SeedPickemScaleResult = {
@@ -40,7 +67,44 @@ export type SeedPickemScaleResult = {
   users: number;
   communities: number;
   sheets: number;
+  editionBallots: number;
+  editionHosts: number;
+  fixtures: ScaleFixturesFile;
 };
+
+async function pickReleasedGames(
+  db: Db,
+  input: { year?: number; limit: number },
+): Promise<LoadtestGame[]> {
+  const now = new Date();
+  const filters = [
+    isNull(games.igdbRemovedAt),
+    eq(games.isAdult, false),
+    isNull(games.versionParentIgdbId),
+    lte(games.firstReleaseDate, now),
+  ];
+  if (input.year != null) filters.push(eq(games.year, input.year));
+  const rows = await db
+    .select({
+      id: games.id,
+      slug: games.slug,
+      igdbId: games.igdbId,
+    })
+    .from(games)
+    .where(and(...filters))
+    .orderBy(desc(games.popularity), asc(games.title))
+    .limit(input.limit);
+  return rows.map((row, i) => ({
+    ...row,
+    band: i < Math.ceil(rows.length * 0.8) ? "popular" : "unpopular",
+  }));
+}
+
+function rowsOf(result: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(result)) return result;
+  const rows = (result as { rows?: unknown })?.rows;
+  return Array.isArray(rows) ? rows : [];
+}
 
 async function ensureYearSlate(
   year: number,
@@ -60,27 +124,50 @@ async function ensureYearSlate(
   return { officialWp: current.worldPremieresOfficial ?? null };
 }
 
-async function ensureProfiles(users: number, db: Db): Promise<void> {
-  const wanted = Array.from({ length: users }, (_, i) => {
-    const index = i + 1;
-    return {
-      authUserId: pickemScaleAuthUserId(index),
-      username: pickemScaleUsername(index),
-      displayName: pickemScaleDisplayName(index),
-      bio: "Synthetic Pick’em scale member.",
-      visibility: "public" as const,
-      ...seedProfileCreateFields(),
-    };
+async function ensureScaleProfile(
+  db: Db,
+  index: number,
+  authUserId: string,
+): Promise<string> {
+  const account = pickemScaleAccount(index);
+  const [byUsername] = await db
+    .select({ id: profiles.id, authUserId: profiles.authUserId })
+    .from(profiles)
+    .where(eq(profiles.username, account.username))
+    .limit(1);
+
+  if (byUsername && byUsername.authUserId !== authUserId) {
+    await db
+      .update(profiles)
+      .set({
+        authUserId,
+        visibility: "public",
+        updatedAt: new Date(),
+      })
+      .where(eq(profiles.id, byUsername.id));
+    return byUsername.id;
+  }
+  if (byUsername) {
+    await db
+      .update(profiles)
+      .set({ visibility: "public", updatedAt: new Date() })
+      .where(eq(profiles.id, byUsername.id));
+    return byUsername.id;
+  }
+
+  const ensured = await ensureProfileForAuthUser({
+    authUserId,
+    username: account.username,
+    displayName: account.displayName,
   });
-  await insertInChunks(
-    wanted,
-    (chunk) =>
-      db
-        .insert(profiles)
-        .values(chunk)
-        .onConflictDoNothing({ target: profiles.authUserId }),
-    PROFILE_CHUNK,
-  );
+  if ("error" in ensured) {
+    throw new Error(`${account.username}: ${ensured.error}`);
+  }
+  await db
+    .update(profiles)
+    .set({ visibility: "public", updatedAt: new Date() })
+    .where(eq(profiles.id, ensured.profile.id));
+  return ensured.profile.id;
 }
 
 async function ensureCommunities(
@@ -93,7 +180,8 @@ async function ensureCommunities(
     return {
       slug: pickemScaleCommunitySlug(index),
       name: pickemScaleCommunityName(index),
-      description: "Synthetic Pick’em scale fixture. Not a real community.",
+      description:
+        "Synthetic scale fixture for Pick’em and editions. Not a real community.",
       visibility: "public" as const,
       joinsClosed: true,
       createdByProfileId,
@@ -108,13 +196,54 @@ async function ensureCommunities(
           target: communities.slug,
         });
       } catch {
-        await db.insert(communities).values(
-          chunk.map((row) => ({ ...row, inviteCode: generateInviteCode() })),
-        ).onConflictDoNothing({ target: communities.slug });
+        await db
+          .insert(communities)
+          .values(
+            chunk.map((row) => ({ ...row, inviteCode: generateInviteCode() })),
+          )
+          .onConflictDoNothing({ target: communities.slug });
       }
     },
     COMMUNITY_CHUNK,
   );
+}
+
+async function repairOpenEdition(
+  db: Db,
+  input: { communityId: string; year: number; now?: Date },
+): Promise<void> {
+  const now = input.now ?? new Date();
+  const edition = await getEditionByCommunityYear(
+    input.communityId,
+    input.year,
+    db,
+  );
+  if (!edition) throw new Error(`Open edition ${input.year} is missing`);
+  await seedEditionCategories(edition.id, db);
+  const schedule = loadtestEditionOpenSchedule(now);
+  await db
+    .update(communityEditions)
+    .set({
+      opensAt: schedule.opensAt,
+      closesAt: schedule.closesAt,
+      publishesAt: schedule.publishesAt,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(communityEditions.id, edition.id),
+        eq(communityEditions.communityId, input.communityId),
+      ),
+    );
+  const refreshed = await getEditionByCommunityYear(
+    input.communityId,
+    input.year,
+    db,
+  );
+  const status = refreshed ? computeEditionStatus(refreshed, now) : "missing";
+  if (status !== "open") {
+    throw new Error(`Open edition ${input.year}: expected open, got ${status}`);
+  }
 }
 
 export async function seedPickemScale(
@@ -128,17 +257,24 @@ export async function seedPickemScale(
   const { officialWp } = await ensureYearSlate(year, db);
   onProgress(`TGA ${year} slate ready`);
 
-  await ensureProfiles(userCount, db);
-  const [owner] = await db
-    .select({ id: profiles.id, authUserId: profiles.authUserId })
-    .from(profiles)
-    .where(like(profiles.authUserId, `${PICKEM_SCALE_AUTH_PREFIX}%`))
-    .orderBy(asc(profiles.authUserId))
-    .limit(1);
-  if (!owner) throw new Error("Scale profiles were not created.");
-  onProgress(`${userCount} seed profiles ready`);
+  const profileIds: string[] = [];
+  for (let index = 1; index <= userCount; index++) {
+    const account = pickemScaleAccount(index);
+    const authUserId = await ensureVerifiedAuthUser({
+      target: input.target,
+      query: input.query,
+      email: account.email,
+      password: input.password,
+      name: account.displayName,
+      log: onProgress,
+    });
+    profileIds.push(await ensureScaleProfile(db, index, authUserId));
+  }
+  const ownerId = profileIds[0];
+  if (!ownerId) throw new Error("Scale profiles were not created.");
+  onProgress(`${userCount} Better Auth accounts ready`);
 
-  await ensureCommunities(communityCount, owner.id, db);
+  await ensureCommunities(communityCount, ownerId, db);
   const scaleCommunities = await db
     .select({ id: communities.id, slug: communities.slug })
     .from(communities)
@@ -148,7 +284,9 @@ export async function seedPickemScale(
       pickemScaleCommunitySlug(i + 1),
     ),
   );
-  const rows = scaleCommunities.filter((row) => wantedSlugs.has(row.slug));
+  const rows = scaleCommunities
+    .filter((row) => wantedSlugs.has(row.slug))
+    .sort((a, b) => a.slug.localeCompare(b.slug));
   if (rows.length !== communityCount) {
     throw new Error(
       `Expected ${communityCount} scale communities, found ${rows.length}.`,
@@ -156,9 +294,14 @@ export async function seedPickemScale(
   }
   onProgress(`${communityCount} communities ready`);
 
-  const bounds = pickemScaleAuthBounds(userCount);
-  const firstAuth = pickemScaleAuthUserId(1);
+  const profileIdListSql = sql.join(
+    profileIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  );
 
+  const fixtureCommunities: ScaleFixturesCommunity[] = [];
+  let editionBallots = 0;
+  let editionHosts = 0;
   let done = 0;
   for (const community of rows) {
     await db.execute(sql`
@@ -166,20 +309,35 @@ export async function seedPickemScale(
       values (${community.id}::uuid, ${year})
       on conflict do nothing
     `);
-    await db.execute(sql`
-      insert into community_members (community_id, profile_id, role, joined_at)
-      select
-        ${community.id}::uuid,
-        p.id,
-        case when p.auth_user_id = ${firstAuth} then 'admin' else 'member' end,
-        now()
-      from profiles p
-      where p.is_seed = true
-        and p.deleted_at is null
-        and p.auth_user_id >= ${bounds.first}
-        and p.auth_user_id <= ${bounds.last}
-      on conflict do nothing
-    `);
+
+    await db
+      .insert(communityMembers)
+      .values({
+        communityId: community.id,
+        profileId: ownerId,
+        role: "admin",
+      })
+      .onConflictDoUpdate({
+        target: [communityMembers.communityId, communityMembers.profileId],
+        set: { role: "admin" },
+      });
+    const memberIds = profileIds.slice(1);
+    if (memberIds.length > 0) {
+      await db
+        .insert(communityMembers)
+        .values(
+          memberIds.map((profileId) => ({
+            communityId: community.id,
+            profileId,
+            role: "member" as const,
+          })),
+        )
+        .onConflictDoUpdate({
+          target: [communityMembers.communityId, communityMembers.profileId],
+          set: { role: "member" },
+        });
+    }
+
     await db.execute(sql`
       insert into tga_community_sheets (
         community_id, profile_id, year, world_premieres_guess, ballot_mask, updated_at
@@ -209,15 +367,14 @@ export async function seedPickemScale(
         ),
         now()
       from profiles p
-      where p.is_seed = true
+      where p.id in (${profileIdListSql})
         and p.deleted_at is null
-        and p.auth_user_id >= ${bounds.first}
-        and p.auth_user_id <= ${bounds.last}
       on conflict (community_id, profile_id, year) do update
       set
         ballot_mask = excluded.ballot_mask,
         updated_at = now()
     `);
+
     await db.execute(sql`
       insert into tga_community_scores (
         community_id, year, profile_id, points, wp_delta, updated_at
@@ -251,36 +408,141 @@ export async function seedPickemScale(
         place = null,
         updated_at = now()
     `);
+
+    const seeded = await seedEditionBallotsForProfiles(
+      {
+        communityId: community.id,
+        year,
+        profileIds,
+        voiceCount: PICKEM_SCALE_EDITION_HOSTS,
+        listSize: PICKEM_SCALE_BALLOT_LIST_SIZE,
+        reseed: false,
+      },
+      db,
+    );
+    if ("error" in seeded) {
+      throw new Error(`${community.slug}: ${seeded.error}`);
+    }
+    await repairOpenEdition(db, { communityId: community.id, year });
+    const open = await getEditionByCommunityYear(community.id, year, db);
+    const [categoryId] = open
+      ? await listEditionEnabledCategoryIds(open.id, db)
+      : [];
+    if (!categoryId) {
+      throw new Error(`${community.slug}: open edition has no categories`);
+    }
+    fixtureCommunities.push({
+      slug: community.slug,
+      id: community.id,
+      categoryId,
+    });
+    editionBallots +=
+      seeded.createdBallots + seeded.updatedBallots + seeded.skipped;
+    editionHosts = Math.max(editionHosts, seeded.voicesSet);
+
     done += 1;
-    if (done % 25 === 0 || done === rows.length) {
+    if (done % 10 === 0 || done === rows.length) {
       onProgress(`community ${done}/${rows.length}`);
     }
   }
 
   await recountCommunityPickCounts(year, db);
 
+  const ballot = await listTgaBallot(year, db);
+  const tgaSlate = ballot.map((category) => ({
+    id: category.id,
+    nomineeIds: category.nominees.map((nominee) => nominee.id),
+  }));
+  const catalogGames = await pickReleasedGames(db, { limit: 40 });
+  const ballotGames = await pickReleasedGames(db, { year, limit: 25 });
+  const game = ballotGames[0] ?? catalogGames[0];
+  if (!game) {
+    throw new Error("Need released catalog games for scale load fixtures.");
+  }
+  const fixtures: ScaleFixturesFile = {
+    year,
+    communities: fixtureCommunities,
+    userCount,
+    tgaYear: year,
+    tgaSlate,
+    tgaPicks: completeLoadtestTgaPicks(tgaSlate, 0),
+    game: { id: game.id, slug: game.slug, igdbId: game.igdbId },
+    games: catalogGames.length > 0 ? catalogGames : ballotGames,
+    ballotGames,
+    ballotItems: ballotGames.slice(0, 3).map((row, i) => ({
+      gameId: row.id,
+      rank: i + 1,
+    })),
+  };
+
   return {
     year,
     users: userCount,
     communities: communityCount,
     sheets: communityCount * userCount,
+    editionBallots,
+    editionHosts,
+    fixtures,
   };
 }
 
-export async function purgePickemScale(db: Db = getDb()): Promise<{
+export async function purgePickemScale(
+  db: Db = getDb(),
+  query?: NeonSql,
+): Promise<{
   communities: number;
   profiles: number;
+  authUsers: number;
 }> {
   const deletedCommunities = await db
     .delete(communities)
     .where(like(communities.slug, `${PICKEM_SCALE_SLUG_PREFIX}%`))
     .returning({ id: communities.id });
-  const deletedProfiles = await db
-    .delete(profiles)
-    .where(like(profiles.authUserId, `${PICKEM_SCALE_AUTH_PREFIX}%`))
-    .returning({ id: profiles.id });
+
+  const scaleProfiles = await db
+    .select({
+      id: profiles.id,
+      authUserId: profiles.authUserId,
+      username: profiles.username,
+    })
+    .from(profiles)
+    .where(
+      or(
+        like(profiles.username, `${PICKEM_SCALE_USERNAME_PREFIX}%`),
+        like(profiles.username, `${PICKEM_SCALE_LEGACY_USERNAME_PREFIX}%`),
+        like(profiles.authUserId, `${PICKEM_SCALE_LEGACY_AUTH_PREFIX}%`),
+      ),
+    )
+    .orderBy(asc(profiles.username));
+
+  let authUsers = 0;
+  for (const row of scaleProfiles) {
+    await db.delete(profiles).where(eq(profiles.id, row.id));
+    if (query) {
+      const removed = await removeSelfHostedAuthUser(row.authUserId, { query });
+      if (removed) authUsers += 1;
+    }
+  }
+
+  if (query) {
+    for (let index = 1; index <= PICKEM_SCALE_USERS_MAX; index++) {
+      const account = pickemScaleAccount(index);
+      const result =
+        await query`SELECT id FROM auth_user WHERE lower(email) = lower(${account.email}) LIMIT 1`;
+      const id = rowsOf(result)[0]?.id;
+      if (typeof id === "string") {
+        const removed = await removeSelfHostedAuthUser(id, {
+          query,
+          email: account.email,
+        });
+        if (removed) authUsers += 1;
+      }
+    }
+  }
+
   return {
     communities: deletedCommunities.length,
-    profiles: deletedProfiles.length,
+    profiles: scaleProfiles.length,
+    authUsers,
   };
 }

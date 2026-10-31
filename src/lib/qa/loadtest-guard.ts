@@ -8,6 +8,10 @@ import {
   loadtestAccount,
   parseLoadtestWriterHeader,
 } from "@/lib/qa/loadtest";
+import {
+  isPickemScaleEmail,
+  isPickemScaleUsername,
+} from "@/lib/qa/pickem-scale";
 import { isProductionAppHost } from "@/lib/qa/staging-fixtures";
 
 const MAX_BODY_BYTES = 32 * 1024;
@@ -66,6 +70,14 @@ export function authorizeLoadtestRequest(
   return { ok: true };
 }
 
+function isLoadOrScaleEmail(email: string): boolean {
+  return isLoadtestEmail(email) || isPickemScaleEmail(email);
+}
+
+function isLoadOrScaleUsername(username: string): boolean {
+  return isLoadtestUsername(username) || isPickemScaleUsername(username);
+}
+
 async function sessionLoadtestUser(
   request: Request,
 ): Promise<{ id: string; email: string } | null> {
@@ -77,7 +89,7 @@ async function sessionLoadtestUser(
     });
     const user = session?.user;
     if (!user?.id || typeof user.email !== "string") return null;
-    if (!isLoadtestEmail(user.email)) return null;
+    if (!isLoadOrScaleEmail(user.email)) return null;
     return { id: user.id, email: user.email };
   } catch {
     return null;
@@ -104,7 +116,7 @@ export async function resolveLoadtestWriteActor(
   const sessionUser = await sessionLoadtestUser(request);
   if (sessionUser) {
     const profile = await getProfileByAuthUserId(sessionUser.id).catch(() => null);
-    if (!profile || !isLoadtestUsername(profile.username)) {
+    if (!profile || !isLoadOrScaleUsername(profile.username)) {
       return { status: 401, error: "Profile required." };
     }
     return { ok: true, profileId: profile.id, mode: "session" };

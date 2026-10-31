@@ -194,7 +194,7 @@ export type SeedCommunityEditionResult = {
  * Ensure an edition row exists and is publicly visible for QA.
  * Draft / incomplete schedules get an open voting window.
  */
-async function ensureEditionForSeed(
+export async function ensureEditionForSeed(
   communityId: string,
   year: number,
   db: Db,
@@ -808,6 +808,270 @@ export async function seedCommunityEditionBallots(
     nextIndex: endIndex + 1,
     resultsRefreshed,
     unmatchedTitles: demoCatalog?.unmatched ?? [],
+  };
+}
+
+/**
+ * Write GOTY + category ballots for existing community members (real Auth
+ * profiles). Does not create seed:community accounts.
+ */
+export async function seedEditionBallotsForProfiles(
+  input: {
+    communityId: string;
+    year: number;
+    profileIds: string[];
+    voiceCount?: number;
+    listSize?: number;
+    ratingBias?: number;
+    poolSize?: number;
+    reseed?: boolean;
+  },
+  db: Db = getDb(),
+): Promise<
+  | {
+      editionId: string;
+      editionStatus: string;
+      createdBallots: number;
+      updatedBallots: number;
+      skipped: number;
+      voicesSet: number;
+      gamePoolSize: number;
+    }
+  | { error: string }
+> {
+  const year = Math.floor(input.year);
+  const profileIds = [...new Set(input.profileIds.filter(Boolean))];
+  const voiceCount = Math.max(0, Math.floor(input.voiceCount ?? 0));
+  const listSize = Math.min(100, Math.max(1, Math.floor(input.listSize ?? 10)));
+  const ratingBias = Math.max(
+    -100,
+    Math.min(100, Math.floor(input.ratingBias ?? 40)),
+  );
+  const poolSize = Math.min(
+    2000,
+    Math.max(50, Math.floor(input.poolSize ?? 500)),
+  );
+  const reseed = input.reseed !== false;
+
+  if (!Number.isFinite(year) || year < 1970 || year > 2100) {
+    return { error: "Pick a valid year." };
+  }
+  if (profileIds.length === 0) {
+    return { error: "Need at least one profile." };
+  }
+
+  const [community] = await db
+    .select({ id: communities.id })
+    .from(communities)
+    .where(eq(communities.id, input.communityId))
+    .limit(1);
+  if (!community) return { error: "Community not found." };
+
+  const edition = await ensureEditionForSeed(community.id, year, db);
+  await seedEditionCategories(edition.id, db);
+  await ensureAwardCategories(db);
+  const categories = await listActiveAwardCategories(db);
+  if (categories.length === 0) {
+    return { error: "No active award categories found." };
+  }
+
+  const pool = await loadSeedGamePool(year, poolSize, db);
+  if (pool.length === 0) {
+    return {
+      error: `Need released ${year} games in the catalog to seed ballots.`,
+    };
+  }
+  const effectiveListSize = Math.min(listSize, pool.length);
+
+  const existingMembers = await db
+    .select({ profileId: communityMembers.profileId })
+    .from(communityMembers)
+    .where(
+      and(
+        eq(communityMembers.communityId, community.id),
+        inArray(communityMembers.profileId, profileIds),
+      ),
+    );
+  const memberSet = new Set(existingMembers.map((m) => m.profileId));
+  const missingMembers = profileIds.filter((id) => !memberSet.has(id));
+  if (missingMembers.length > 0) {
+    await db
+      .insert(communityMembers)
+      .values(
+        missingMembers.map((profileId) => ({
+          communityId: community.id,
+          profileId,
+          role: "member" as const,
+        })),
+      )
+      .onConflictDoNothing();
+  }
+
+  const voiceProfiles = profileIds.slice(0, voiceCount);
+  let voicesSet = 0;
+  if (voiceProfiles.length > 0) {
+    const designatedAt = new Date();
+    await db
+      .insert(communityEditionVoices)
+      .values(
+        voiceProfiles.map((profileId) => ({
+          editionId: edition.id,
+          profileId,
+          designatedAt,
+          designatedByProfileId: null,
+        })),
+      )
+      .onConflictDoNothing();
+    await db
+      .insert(communityHosts)
+      .values(
+        voiceProfiles.map((profileId) => ({
+          communityId: community.id,
+          profileId,
+          promotedAt: designatedAt,
+          promotedByProfileId: null,
+          retiredAt: null,
+          retiredByProfileId: null,
+        })),
+      )
+      .onConflictDoUpdate({
+        target: [communityHosts.communityId, communityHosts.profileId],
+        set: {
+          retiredAt: null,
+          retiredByProfileId: null,
+        },
+      });
+    voicesSet = voiceProfiles.length;
+  }
+
+  const existingBallots = await db
+    .select({
+      id: communityEditionBallots.id,
+      profileId: communityEditionBallots.profileId,
+    })
+    .from(communityEditionBallots)
+    .where(
+      and(
+        eq(communityEditionBallots.editionId, edition.id),
+        inArray(communityEditionBallots.profileId, profileIds),
+      ),
+    );
+  const ballotByProfile = new Map(
+    existingBallots.map((b) => [b.profileId, b.id]),
+  );
+
+  const now = new Date();
+  const toWrite: { profileId: string; ballotId?: string }[] = [];
+  let skipped = 0;
+  for (const profileId of profileIds) {
+    const existingId = ballotByProfile.get(profileId);
+    if (existingId && !reseed) {
+      skipped += 1;
+      continue;
+    }
+    toWrite.push({ profileId, ballotId: existingId });
+  }
+
+  const reseedIds = toWrite
+    .map((row) => row.ballotId)
+    .filter((id): id is string => Boolean(id));
+  if (reseedIds.length > 0) {
+    await db
+      .delete(communityEditionBallotItems)
+      .where(inArray(communityEditionBallotItems.ballotId, reseedIds));
+    await db
+      .delete(communityEditionBallotCategoryVotes)
+      .where(inArray(communityEditionBallotCategoryVotes.ballotId, reseedIds));
+    await db
+      .update(communityEditionBallots)
+      .set({ updatedAt: now })
+      .where(inArray(communityEditionBallots.id, reseedIds));
+  }
+  const updatedBallots = reseedIds.length;
+
+  const toCreate = toWrite.filter((row) => !row.ballotId);
+  if (toCreate.length > 0) {
+    const created = await db
+      .insert(communityEditionBallots)
+      .values(
+        toCreate.map((row) => ({
+          editionId: edition.id,
+          profileId: row.profileId,
+          submittedAt: now,
+          updatedAt: now,
+        })),
+      )
+      .returning({
+        id: communityEditionBallots.id,
+        profileId: communityEditionBallots.profileId,
+      });
+    for (const ballot of created) {
+      ballotByProfile.set(ballot.profileId, ballot.id);
+    }
+  }
+  const createdBallots = toCreate.length;
+
+  const itemRows: {
+    ballotId: string;
+    gameId: string;
+    rank: number;
+    blurb: null;
+  }[] = [];
+  const categoryVoteRows: {
+    ballotId: string;
+    categoryId: string;
+    gameId: string;
+  }[] = [];
+
+  for (const row of toWrite) {
+    const ballotId = row.ballotId ?? ballotByProfile.get(row.profileId);
+    if (!ballotId) continue;
+    const picked = weightedSample(pool, effectiveListSize, (g) =>
+      weightForRatedGame(g, ratingBias),
+    );
+    for (let rankIndex = 0; rankIndex < picked.length; rankIndex += 1) {
+      const game = picked[rankIndex]!;
+      itemRows.push({
+        ballotId,
+        gameId: game.id,
+        rank: rankIndex + 1,
+        blurb: null,
+      });
+    }
+    if (categories.length > 0 && picked.length > 0) {
+      for (const vote of buildSeedCategoryVotes(categories, picked)) {
+        categoryVoteRows.push({
+          ballotId,
+          categoryId: vote.categoryId,
+          gameId: vote.gameId,
+        });
+      }
+    }
+  }
+
+  if (itemRows.length > 0) {
+    await insertInChunks(
+      itemRows,
+      (chunk) => db.insert(communityEditionBallotItems).values(chunk),
+      SEED_COMMUNITY_INSERT_CHUNK,
+    );
+  }
+  if (categoryVoteRows.length > 0) {
+    await insertInChunks(
+      categoryVoteRows,
+      (chunk) => db.insert(communityEditionBallotCategoryVotes).values(chunk),
+      SEED_COMMUNITY_INSERT_CHUNK,
+    );
+  }
+
+  return {
+    editionId: edition.id,
+    editionStatus: edition.status,
+    createdBallots,
+    updatedBallots,
+    skipped,
+    voicesSet,
+    gamePoolSize: pool.length,
   };
 }
 

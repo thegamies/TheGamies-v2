@@ -126,6 +126,20 @@ describe("POST /api/qa/loadtest", () => {
     expect(saves.upsertEditionBallot).not.toHaveBeenCalled();
   });
 
+  it("allows ballot writes on a scale community slug", async () => {
+    saves.upsertEditionBallot.mockResolvedValue({ ok: true });
+    const res = await POST(
+      req(staging, {
+        op: "ballot",
+        slug: "seed_pem_0001",
+        year: 2025,
+        items: [{ gameId: "g1", rank: 1 }],
+      }),
+    );
+    expect(res.status).toBe(200);
+    expect(saves.upsertEditionBallot).toHaveBeenCalled();
+  });
+
   it("creates a list and returns publicId for a session actor", async () => {
     saves.saveOwnedListFromClientDraft.mockResolvedValue({
       list: { publicId: "lst_load" },

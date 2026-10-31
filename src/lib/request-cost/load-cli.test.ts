@@ -47,6 +47,15 @@ describe("parseLoadArgs", () => {
     expect(all.scenarios).not.toContain("auth");
   });
 
+  it("accepts scale without putting it in --all", () => {
+    expect(parseLoadArgs(["--scenario", "scale"])).toMatchObject({
+      scenarios: ["scale"],
+    });
+    const all = parseLoadArgs(["--all"]);
+    if ("error" in all) throw new Error(all.error);
+    expect(all.scenarios).not.toContain("scale");
+  });
+
   it("refuses unknown scenarios and over-cap writers", () => {
     expect(parseLoadArgs(["--scenario", "prod"])).toHaveProperty("error");
     expect(parseLoadArgs(["--writers", "101"])).toHaveProperty("error");

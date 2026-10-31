@@ -1,13 +1,21 @@
 /**
- * Staging-only: seed is_seed profiles (no Neon Auth), public Pick’em
- * communities, memberships, and complete community sheets.
- * Default 1000 communities × 1000 shared users (1M sheets).
+ * Staging-only: Better Auth scale users (signed-in), public scale communities,
+ * complete community Pick’em sheets, and open GOTY editions with ballots.
+ * Default 50 communities × 50 shared Auth users. Writes fixtures for
+ * `pnpm cost:load -- --scenario=scale`.
  */
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { neon } from "@neondatabase/serverless";
 import { createDb } from "@thegamies/db";
+import type { NeonSql } from "@/lib/auth/neon-sql";
 import {
+  PICKEM_SCALE_DEFAULT_COMMUNITIES,
+  PICKEM_SCALE_DEFAULT_USERS,
   PICKEM_SCALE_DEFAULT_YEAR,
-  PICKEM_SCALE_MAX,
-  parsePickemScaleCount,
+  PICKEM_SCALE_FIXTURES_DIR,
+  parsePickemScaleCommunities,
+  parsePickemScaleUsers,
 } from "@/lib/qa/pickem-scale";
 import {
   purgePickemScale,
@@ -27,8 +35,8 @@ function parseArgs(argv: string[]): {
 } | { error: string } {
   let purge = false;
   let year = PICKEM_SCALE_DEFAULT_YEAR;
-  let communities = PICKEM_SCALE_MAX;
-  let users = PICKEM_SCALE_MAX;
+  let communities = PICKEM_SCALE_DEFAULT_COMMUNITIES;
+  let users = PICKEM_SCALE_DEFAULT_USERS;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     const next = argv[i + 1];
@@ -47,14 +55,14 @@ function parseArgs(argv: string[]): {
           return { error: "Year must be a calendar year." };
         }
         year = n;
-      } else {
-        const parsed = parsePickemScaleCount(
-          next,
-          arg === "--communities" ? "Communities" : "Users",
-        );
+      } else if (arg === "--communities") {
+        const parsed = parsePickemScaleCommunities(next);
         if (typeof parsed !== "number") return parsed;
-        if (arg === "--communities") communities = parsed;
-        else users = parsed;
+        communities = parsed;
+      } else {
+        const parsed = parsePickemScaleUsers(next);
+        if (typeof parsed !== "number") return parsed;
+        users = parsed;
       }
     }
   }
@@ -68,19 +76,42 @@ async function main() {
   if ("error" in args) throw new Error(args.error);
 
   const db = createDb(target.databaseUrl);
+  const query = neon(target.databaseUrl) as unknown as NeonSql;
+  const outDir = path.resolve(PICKEM_SCALE_FIXTURES_DIR);
   if (args.purge) {
-    const removed = await purgePickemScale(db);
-    log(`removed ${removed.communities} communities, ${removed.profiles} profiles`);
+    const removed = await purgePickemScale(db, query);
+    await rm(outDir, { recursive: true, force: true });
+    log(
+      `removed ${removed.communities} communities, ${removed.profiles} profiles, ${removed.authUsers} auth users`,
+    );
     return;
   }
 
   log(
-    `year ${args.year}, ${args.communities} communities × ${args.users} seed users (no auth)`,
+    `year ${args.year}, ${args.communities} communities × ${args.users} Better Auth users (Pick’em + editions)`,
   );
-  const result = await seedPickemScale(args, db, log);
+  const result = await seedPickemScale(
+    {
+      year: args.year,
+      communities: args.communities,
+      users: args.users,
+      target: { appUrl: target.appUrl },
+      password: target.password,
+      query,
+    },
+    db,
+    log,
+  );
+  await mkdir(outDir, { recursive: true });
+  await writeFile(
+    path.join(outDir, "fixtures.json"),
+    JSON.stringify(result.fixtures, null, 2),
+  );
+  await rm(path.join(outDir, "cookies.json"), { force: true });
   log(
-    `done: ${result.communities} communities, ${result.users} users, ${result.sheets} sheets`,
+    `done: ${result.communities} communities, ${result.users} users, ${result.sheets} sheets, ${result.editionBallots} edition ballots, ${result.editionHosts} hosts`,
   );
+  log(`wrote ${path.relative(process.cwd(), outDir)}`);
 }
 
 main().catch((error: unknown) => {
