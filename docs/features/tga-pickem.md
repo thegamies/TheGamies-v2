@@ -48,7 +48,7 @@ A winner call, or setting the official World Premieres count, recounts that year
 
 ## Community
 
-Same official slate and winners. Separate sheets. Import from the global sheet (warns before replacing picks already on the community ballot). After a complete community save, if they have no site sheet yet, prompt to copy that entry to the global game and open it. Opens when the community creates that year and the site year is On with picks open. Closes at the same show start. On **public + joins closed** communities, guests see the same ballot slate (read-only) and Standings; locked sheets stay readable. Regular public and private interiors stay members-only.
+Same official slate and winners. Separate sheets. Import from the global sheet only when the member already has a site sheet for that year (warns before replacing picks already on the community ballot). After a complete community save, if they have no site sheet yet, prompt to copy that entry to the global game and open it. Opens when the community creates that year and the site year is On with picks open. Closes at the same show start. On **public + joins closed** communities, guests see the same ballot slate (read-only) and Standings; locked sheets stay readable. Regular public and private interiors stay members-only.
 
 Community Settings lists created years (including locked). **Create** only offers a site-On year that has not locked (promoted first, else newest). Community Overview shows hosts one create CTA when a creatable year remains (calendar year first, else an open year, else promoted/newest); create opens that community ballot. Delete is on Pick’em **Settings** (`?view=settings`); type the year to confirm. Delete removes that community’s sheets, standings, and Host snapshot.
 

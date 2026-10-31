@@ -25,6 +25,7 @@ import {
   importSiteSheetToCommunity,
   saveCommunitySheet,
   saveSiteSheet,
+  siteSheetHasContent,
 } from "@/lib/tga-pickem/sheets";
 
 type MemberAuth =
@@ -123,8 +124,7 @@ export async function saveCommunityTgaSheetAction(
   );
   if ("error" in result) return result;
   const site = await getSiteSheet(auth.profileId, year);
-  const promptGlobal =
-    site.worldPremieresGuess == null && Object.keys(site.picks).length === 0;
+  const promptGlobal = !siteSheetHasContent(site);
   revalidatePath(`/communities/${slug}/the-game-awards`);
   revalidatePath(`/communities/${slug}/the-game-awards/${year}`);
   return { ok: true as const, promptGlobal };

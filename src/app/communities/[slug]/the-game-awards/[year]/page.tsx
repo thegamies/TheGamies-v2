@@ -34,7 +34,11 @@ import {
   maskTgaBallotWinners,
 } from "@/lib/tga-pickem/service";
 import { listTgaCommunityHostRoster } from "@/lib/tga-pickem/community-hosts";
-import { getCommunitySheet, listCommunityTgaEntrants } from "@/lib/tga-pickem/sheets";
+import {
+  getCommunitySheet,
+  hasImportableSiteTgaSheet,
+  listCommunityTgaEntrants,
+} from "@/lib/tga-pickem/sheets";
 import { TGA_STANDINGS_OPEN_COPY } from "@/lib/tga-pickem/labels";
 import { picksAreOpen, revealTgaWinners, tgaBallotVisible, tgaStatusLabel } from "@/lib/tga-pickem/status";
 import {
@@ -148,38 +152,42 @@ export default async function CommunityTgaYearPage({
       ? await getProfileByUsername(sheetUsername)
       : null;
   if (view === "sheet" && reveal && !sheetOwner) notFound();
-  const [ballot, board, turnout, sheet, standing, yearHosts] = await Promise.all([
-    (view === "sheet" && reveal) || (view === "ballot" && showBallot)
-      ? listTgaBallot(year)
-      : Promise.resolve([]),
-    view === "standings" && reveal
-      ? listCommunityLeaderboard(
-          community.id,
-          year,
-          Number.isInteger(page) ? page : 1,
-          { hostsOnly: boardMode === "voices" },
-        )
-      : Promise.resolve(null),
-    view === "standings" && !reveal
-      ? listCommunityTgaEntrants(
-          community.id,
-          year,
-          Number.isInteger(page) ? page : 1,
-          { hostsOnly: boardMode === "voices" },
-        )
-      : Promise.resolve(null),
-    view === "ballot" && showBallot && profile
-      ? getCommunitySheet(community.id, profile.id, year)
-      : view === "sheet" && sheetOwner
-        ? getCommunitySheet(community.id, sheetOwner.id, year)
-        : Promise.resolve({ picks: {}, worldPremieresGuess: null }),
-    view === "ballot" && reveal && profile
-      ? getCommunityViewerStanding(community.id, year, profile.id)
-      : Promise.resolve(null),
-    view === "settings"
-      ? listTgaCommunityHostRoster(community.id, year).catch(() => [])
-      : Promise.resolve([]),
-  ]);
+  const [ballot, board, turnout, sheet, standing, yearHosts, canImportGlobal] =
+    await Promise.all([
+      (view === "sheet" && reveal) || (view === "ballot" && showBallot)
+        ? listTgaBallot(year)
+        : Promise.resolve([]),
+      view === "standings" && reveal
+        ? listCommunityLeaderboard(
+            community.id,
+            year,
+            Number.isInteger(page) ? page : 1,
+            { hostsOnly: boardMode === "voices" },
+          )
+        : Promise.resolve(null),
+      view === "standings" && !reveal
+        ? listCommunityTgaEntrants(
+            community.id,
+            year,
+            Number.isInteger(page) ? page : 1,
+            { hostsOnly: boardMode === "voices" },
+          )
+        : Promise.resolve(null),
+      view === "ballot" && showBallot && profile
+        ? getCommunitySheet(community.id, profile.id, year)
+        : view === "sheet" && sheetOwner
+          ? getCommunitySheet(community.id, sheetOwner.id, year)
+          : Promise.resolve({ picks: {}, worldPremieresGuess: null }),
+      view === "ballot" && reveal && profile
+        ? getCommunityViewerStanding(community.id, year, profile.id)
+        : Promise.resolve(null),
+      view === "settings"
+        ? listTgaCommunityHostRoster(community.id, year).catch(() => [])
+        : Promise.resolve([]),
+      view === "ballot" && showBallot && open && isMember && profile
+        ? hasImportableSiteTgaSheet(profile.id, year)
+        : Promise.resolve(false),
+    ]);
 
   return (
     <main className="mx-auto w-full max-w-[var(--page-max)] px-[var(--gutter)] pt-0 pb-10">
@@ -300,9 +308,11 @@ export default async function CommunityTgaYearPage({
                   ? saveCommunityTgaSheetAction.bind(null, slug, year)
                   : undefined
               }
-              importLabel={isMember ? "Import from the global sheet" : undefined}
+              importLabel={
+                canImportGlobal ? "Import from the global sheet" : undefined
+              }
               onImport={
-                isMember
+                canImportGlobal
                   ? importSiteTgaSheetAction.bind(null, slug, year)
                   : undefined
               }
