@@ -70,7 +70,7 @@ Pages are **N games**, not N distinct ranks. Pager copy stays “51–100 of N g
 
 ## GOTY comparison
 
-Results GOTY Comparison uses parallel top-10 data as **per-rank chapters** inside **one** horizontal scrollport (native pan; no per-row `scrollLeft` sync). You / Community / Hosts / Host columns share one table so widths stay aligned. Community and Hosts each load every freeze row with **displayed rank ≤ 10** (full ties at the cutoff), not the first N board-order places. Community and Hosts ties (equal points) follow the event’s numbering (competition skip or dense). Tied games share one slot as a compact rotating stack. No Board / span layout picker.
+Results GOTY Comparison uses parallel top-10 data as **per-rank chapters**. Rank titles sit above each strip (outside overflow / edge fade). Strips share horizontal scroll via `HorizontalScrollGroup`: only the user-driven strip broadcasts; visible peers apply `scrollLeft` (no peer rebroadcast); off-screen peers catch up when the gesture settles. Community and Hosts each load every freeze row with **displayed rank ≤ 10** (full ties at the cutoff), not the first N board-order places. Community and Hosts ties (equal points) follow the event’s numbering (competition skip or dense). Tied games share one slot as a compact rotating stack. No Board / span layout picker.
 
 Tie stacks fit one card footprint (overlapping covers, auto-rotate + click to cycle). You and individual Host columns stay single ballot ranks.
 

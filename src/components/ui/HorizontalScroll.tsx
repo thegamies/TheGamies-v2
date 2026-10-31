@@ -42,6 +42,14 @@ type ScrollSyncGroup = {
   raf: number | null;
   pendingLeft: number | null;
   pendingSource: HTMLElement | null;
+  /** Last agreed horizontal position for the group. */
+  sharedLeft: number;
+  /**
+   * Viewport visibility per strip. Missing = treat as visible (safe default
+   * before IntersectionObserver runs / in tests without IO).
+   */
+  visibility: WeakMap<HTMLElement, boolean>;
+  io: IntersectionObserver | null;
   /** Peers receiving a programmatic `scrollLeft` write this frame. */
   muted: WeakSet<HTMLElement>;
 };
@@ -52,6 +60,8 @@ const HorizontalScrollGroupContext = createContext<string | null>(null);
 /**
  * Sibling `HorizontalScroll` strips share one horizontal position.
  * Used for GOTY Comparison so #1–#10 stay on the same columns.
+ * While flinging, only viewport-visible peers get `scrollLeft` writes;
+ * off-screen strips catch up when the gesture settles.
  */
 export function HorizontalScrollGroup({
   groupId,
@@ -67,6 +77,47 @@ export function HorizontalScrollGroup({
   );
 }
 
+function ensureVisibilityObserver(group: ScrollSyncGroup) {
+  if (group.io || typeof IntersectionObserver === "undefined") return;
+  group.io = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        const el = entry.target as HTMLElement;
+        group.visibility.set(el, entry.isIntersecting);
+        if (
+          entry.isIntersecting &&
+          el !== group.driver &&
+          el.scrollLeft !== group.sharedLeft
+        ) {
+          setMemberScrollLeft(group, el, group.sharedLeft);
+        }
+      }
+    },
+    // Prefetch a little above/below so the next rank is ready as you scroll.
+    { root: null, rootMargin: "120px 0px", threshold: 0 },
+  );
+}
+
+function setMemberScrollLeft(
+  group: ScrollSyncGroup,
+  el: HTMLElement,
+  left: number,
+) {
+  if (el.scrollLeft === left) return;
+  group.muted.add(el);
+  el.scrollLeft = left;
+  // Programmatic scroll events often fire after this stack (esp. mobile).
+  queueMicrotask(() => {
+    requestAnimationFrame(() => {
+      group.muted.delete(el);
+    });
+  });
+}
+
+function isMemberVisible(group: ScrollSyncGroup, el: HTMLElement): boolean {
+  return group.visibility.get(el) !== false;
+}
+
 function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
   let group = scrollSyncGroups.get(id);
   if (!group) {
@@ -78,24 +129,24 @@ function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
       raf: null,
       pendingLeft: null,
       pendingSource: null,
+      sharedLeft: 0,
+      visibility: new WeakMap(),
+      io: null,
       muted: new WeakSet(),
     };
     scrollSyncGroups.set(id, group);
   }
-  const peer = group.members.values().next().value as HTMLElement | undefined;
+  ensureVisibilityObserver(group);
   group.members.add(el);
-  if (peer && peer.scrollLeft !== el.scrollLeft) {
-    group.muted.add(el);
-    el.scrollLeft = peer.scrollLeft;
-    queueMicrotask(() => {
-      requestAnimationFrame(() => {
-        group?.muted.delete(el);
-      });
-    });
+  group.visibility.set(el, true);
+  group.io?.observe(el);
+  if (el.scrollLeft !== group.sharedLeft) {
+    setMemberScrollLeft(group, el, group.sharedLeft);
   }
   return () => {
     const cur = scrollSyncGroups.get(id);
     if (!cur) return;
+    cur.io?.unobserve(el);
     cur.members.delete(el);
     if (cur.driver === el) cur.driver = null;
     if (cur.pendingSource === el) cur.pendingSource = null;
@@ -103,6 +154,7 @@ function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
       if (cur.settleTimer) clearTimeout(cur.settleTimer);
       if (cur.raf != null) cancelAnimationFrame(cur.raf);
       cur.frameScheduled = false;
+      cur.io?.disconnect();
       scrollSyncGroups.delete(id);
     }
   };
@@ -117,12 +169,22 @@ export function isScrollSyncPeer(id: string, el: HTMLElement): boolean {
   return false;
 }
 
+function settleDriver(group: ScrollSyncGroup, source: HTMLElement) {
+  if (group.driver !== source) return;
+  group.driver = null;
+  // Off-screen peers skipped during the fling catch up to the final left.
+  for (const el of group.members) {
+    if (el === source) continue;
+    setMemberScrollLeft(group, el, group.sharedLeft);
+  }
+}
+
 function refreshDriver(group: ScrollSyncGroup, source: HTMLElement) {
   group.driver = source;
   if (group.settleTimer) clearTimeout(group.settleTimer);
   group.settleTimer = setTimeout(() => {
-    if (group.driver === source) group.driver = null;
     group.settleTimer = null;
+    settleDriver(group, source);
   }, DRIVER_SETTLE_MS);
 }
 
@@ -135,16 +197,12 @@ function applyPendingScroll(group: ScrollSyncGroup) {
   group.pendingSource = null;
   if (left == null || !source) return;
 
+  group.sharedLeft = left;
   for (const el of group.members) {
     if (el === source || el.scrollLeft === left) continue;
-    group.muted.add(el);
-    el.scrollLeft = left;
-    // Programmatic scroll events often fire after this stack (esp. mobile).
-    queueMicrotask(() => {
-      requestAnimationFrame(() => {
-        group.muted.delete(el);
-      });
-    });
+    // Skip off-screen strips during the fling — settle syncs them later.
+    if (!isMemberVisible(group, el)) continue;
+    setMemberScrollLeft(group, el, left);
   }
 }
 
@@ -169,8 +227,20 @@ export function resetScrollSyncGroupsForTests() {
     if (group.settleTimer) clearTimeout(group.settleTimer);
     if (group.raf != null) cancelAnimationFrame(group.raf);
     group.frameScheduled = false;
+    group.io?.disconnect();
   }
   scrollSyncGroups.clear();
+}
+
+/** Test helper — mark a strip off-screen for visible-only sync. */
+export function setScrollSyncVisibilityForTests(
+  id: string,
+  el: HTMLElement,
+  visible: boolean,
+) {
+  const group = scrollSyncGroups.get(id);
+  if (!group) return;
+  group.visibility.set(el, visible);
 }
 
 function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
@@ -191,8 +261,9 @@ function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
  * hidden; edge fades mark overflow. `overflow-y` is hidden so a 1px-tall
  * mismatch cannot create a nested vertical scrollport.
  *
- * Grouped strips: only the user-driven strip broadcasts `scrollLeft`. Peers
- * apply that position and must not rebroadcast (avoids mobile fling thrash).
+ * Grouped strips: only the user-driven strip broadcasts `scrollLeft`. Visible
+ * peers apply that position and must not rebroadcast; off-screen peers catch
+ * up when the gesture settles (avoids mobile fling thrash).
  */
 export function HorizontalScroll({
   children,
@@ -265,7 +336,7 @@ export function HorizontalScroll({
       if (!group || group.driver !== body) return;
       if (group.settleTimer) clearTimeout(group.settleTimer);
       group.settleTimer = null;
-      group.driver = null;
+      settleDriver(group, body);
     };
 
     syncChrome();

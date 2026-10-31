@@ -127,7 +127,7 @@ describe("EditionResultsOverview comparison", () => {
     expect(screen.getByText("Community")).toBeTruthy();
   });
 
-  it("uses one horizontal scrollport for every GOTY comparison rank", () => {
+  it("keeps rank titles outside each comparison strip", () => {
     render(
       <EditionResultsOverview
         slug="eric"
@@ -179,9 +179,11 @@ describe("EditionResultsOverview comparison", () => {
 
     expect(screen.getByText("#1")).toBeTruthy();
     expect(screen.getByText("#2")).toBeTruthy();
-    expect(document.querySelectorAll("[data-hscroll-body]")).toHaveLength(1);
-    // Column names repeat on every rank chapter (not only the first).
+    // One strip per rank; `#n` is a sibling above the overflow (not under the fade).
+    expect(document.querySelectorAll("[data-hscroll-body]")).toHaveLength(2);
     expect(screen.getAllByText("Community")).toHaveLength(2);
+    const rank = screen.getByText("#1");
+    expect(rank.closest("[data-hscroll-body]")).toBeNull();
     expect(screen.getByRole("link", { name: /Hades II/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Clair Obscur/ })).toBeTruthy();
   });

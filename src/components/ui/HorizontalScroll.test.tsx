@@ -7,6 +7,7 @@ import {
   HorizontalScrollGroup,
   isScrollSyncPeer,
   resetScrollSyncGroupsForTests,
+  setScrollSyncVisibilityForTests,
 } from "./HorizontalScroll";
 
 class ResizeObserverStub {
@@ -14,8 +15,18 @@ class ResizeObserverStub {
   disconnect() {}
 }
 
+class IntersectionObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  takeRecords() {
+    return [];
+  }
+}
+
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+  vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
 });
 
 beforeEach(() => {
@@ -32,6 +43,7 @@ afterEach(() => {
   resetScrollSyncGroupsForTests();
   vi.unstubAllGlobals();
   vi.stubGlobal("ResizeObserver", ResizeObserverStub);
+  vi.stubGlobal("IntersectionObserver", IntersectionObserverStub);
 });
 
 function mockOverflow(el: HTMLElement, scrollWidth: number, clientWidth: number) {
@@ -182,5 +194,42 @@ describe("HorizontalScrollGroup", () => {
 
     frames[0]!(0);
     expect(leftWrites).toEqual([40]);
+  });
+
+  it("skips off-screen peers while flinging, then syncs them on settle", () => {
+    // Keep rAF immediate (from beforeEach); only fake the settle timeout.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      render(
+        <HorizontalScrollGroup groupId="test-visible">
+          <HorizontalScroll label="driver">
+            <div>D</div>
+          </HorizontalScroll>
+          <HorizontalScroll label="on-screen">
+            <div>V</div>
+          </HorizontalScroll>
+          <HorizontalScroll label="off-screen">
+            <div>H</div>
+          </HorizontalScroll>
+        </HorizontalScrollGroup>,
+      );
+
+      const [driver, visible, hidden] = bodies();
+      mockOverflow(driver!, 800, 200);
+      mockOverflow(visible!, 800, 200);
+      mockOverflow(hidden!, 800, 200);
+      setScrollSyncVisibilityForTests("test-visible", hidden!, false);
+
+      driver!.scrollLeft = 90;
+      fireEvent.scroll(driver!);
+
+      expect(visible!.scrollLeft).toBe(90);
+      expect(hidden!.scrollLeft).toBe(0);
+
+      vi.advanceTimersByTime(200);
+      expect(hidden!.scrollLeft).toBe(90);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
