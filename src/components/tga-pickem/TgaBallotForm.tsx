@@ -191,7 +191,22 @@ export function TgaBallotForm({
 
   return (
     <div className={`mt-6 ${canPick ? "pb-24" : ""}`}>
-      {!locked ? <TgaPickemHowItWorks className="mb-5 mt-0" /> : null}
+      {!locked ? (
+        <div className="mb-5 flex flex-wrap items-center gap-2">
+          <TgaPickemHowItWorks className="mt-0" />
+          {onImport && canPick ? (
+            <Button
+              type="button"
+              variant="bordered"
+              size="sm"
+              disabled={pending}
+              onClick={requestImport}
+            >
+              {importLabel ?? "Import from the global sheet"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="space-y-12">
       {signInHref ? (
         <p className="max-w-xl text-muted">
@@ -200,18 +215,6 @@ export function TgaBallotForm({
           </Link>{" "}
           to make your picks.
         </p>
-      ) : null}
-      {onImport && canPick ? (
-        <div>
-          <Button
-            type="button"
-            variant="bordered"
-            disabled={pending}
-            onClick={requestImport}
-          >
-            {importLabel ?? "Import from the global sheet"}
-          </Button>
-        </div>
       ) : null}
       {categories.map((category) => (
         <section key={category.id}>

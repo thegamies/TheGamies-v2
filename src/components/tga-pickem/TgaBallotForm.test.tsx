@@ -82,10 +82,19 @@ describe("TgaBallotForm", () => {
         initialGuess={null}
         locked={false}
         onSave={async () => ({ ok: true })}
+        onImport={async () => ({ ok: true })}
       />,
     );
 
-    expect(screen.getByRole("button", { name: "How it works" })).toBeTruthy();
+    const howItWorks = screen.getByRole("button", { name: "How it works" });
+    const importButton = screen.getByRole("button", {
+      name: "Import from the global sheet",
+    });
+    expect(howItWorks).toBeTruthy();
+    expect(importButton).toBeTruthy();
+    expect(howItWorks.parentElement).toBe(importButton.parentElement);
+    expect(howItWorks.className).toContain("text-xs");
+    expect(importButton.className).toContain("text-xs");
     expect(screen.getByRole("heading", { name: "Game of the Year" })).toHaveClass(
       "sticky",
     );

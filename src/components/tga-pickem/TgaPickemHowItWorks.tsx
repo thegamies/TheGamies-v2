@@ -16,15 +16,17 @@ export function TgaPickemHowItWorks({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className={className}>
-      <Button
-        type="button"
-        variant="bordered"
-        size="sm"
-        onClick={() => setOpen(true)}
-      >
-        How it works
-      </Button>
+    <>
+      <div className={className}>
+        <Button
+          type="button"
+          variant="bordered"
+          size="sm"
+          onClick={() => setOpen(true)}
+        >
+          How it works
+        </Button>
+      </div>
       <Dialog
         open={open}
         title="How it works"
@@ -33,6 +35,6 @@ export function TgaPickemHowItWorks({
       >
         <p className="mt-3 text-sm text-muted">{TGA_PICKEM_HOW_IT_WORKS}</p>
       </Dialog>
-    </div>
+    </>
   );
 }
