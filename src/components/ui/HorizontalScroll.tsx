@@ -29,10 +29,21 @@ type HorizontalScrollProps = {
 };
 
 const DRAG_THRESHOLD_PX = 6;
+/** Keep the finger-driven strip as driver until scroll events pause. */
+const DRIVER_SETTLE_MS = 160;
 
 type ScrollSyncGroup = {
   members: Set<HTMLElement>;
-  applying: boolean;
+  /** User-driven strip; peers must not rebroadcast while this is set. */
+  driver: HTMLElement | null;
+  settleTimer: ReturnType<typeof setTimeout> | null;
+  /** True while a peer-apply frame is queued (boolean so sync rAF cannot stick). */
+  frameScheduled: boolean;
+  raf: number | null;
+  pendingLeft: number | null;
+  pendingSource: HTMLElement | null;
+  /** Peers receiving a programmatic `scrollLeft` write this frame. */
+  muted: WeakSet<HTMLElement>;
 };
 
 const scrollSyncGroups = new Map<string, ScrollSyncGroup>();
@@ -59,36 +70,116 @@ export function HorizontalScrollGroup({
 function joinScrollSyncGroup(id: string, el: HTMLElement): () => void {
   let group = scrollSyncGroups.get(id);
   if (!group) {
-    group = { members: new Set(), applying: false };
+    group = {
+      members: new Set(),
+      driver: null,
+      settleTimer: null,
+      frameScheduled: false,
+      raf: null,
+      pendingLeft: null,
+      pendingSource: null,
+      muted: new WeakSet(),
+    };
     scrollSyncGroups.set(id, group);
   }
   const peer = group.members.values().next().value as HTMLElement | undefined;
   group.members.add(el);
   if (peer && peer.scrollLeft !== el.scrollLeft) {
+    group.muted.add(el);
     el.scrollLeft = peer.scrollLeft;
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        group?.muted.delete(el);
+      });
+    });
   }
   return () => {
     const cur = scrollSyncGroups.get(id);
     if (!cur) return;
     cur.members.delete(el);
-    if (cur.members.size === 0) scrollSyncGroups.delete(id);
+    if (cur.driver === el) cur.driver = null;
+    if (cur.pendingSource === el) cur.pendingSource = null;
+    if (cur.members.size === 0) {
+      if (cur.settleTimer) clearTimeout(cur.settleTimer);
+      if (cur.raf != null) cancelAnimationFrame(cur.raf);
+      cur.frameScheduled = false;
+      scrollSyncGroups.delete(id);
+    }
   };
+}
+
+/** True when this strip’s scroll is from sync, not the user. */
+export function isScrollSyncPeer(id: string, el: HTMLElement): boolean {
+  const group = scrollSyncGroups.get(id);
+  if (!group) return false;
+  if (group.muted.has(el)) return true;
+  if (group.driver && group.driver !== el) return true;
+  return false;
+}
+
+function refreshDriver(group: ScrollSyncGroup, source: HTMLElement) {
+  group.driver = source;
+  if (group.settleTimer) clearTimeout(group.settleTimer);
+  group.settleTimer = setTimeout(() => {
+    if (group.driver === source) group.driver = null;
+    group.settleTimer = null;
+  }, DRIVER_SETTLE_MS);
+}
+
+function applyPendingScroll(group: ScrollSyncGroup) {
+  group.frameScheduled = false;
+  group.raf = null;
+  const left = group.pendingLeft;
+  const source = group.pendingSource;
+  group.pendingLeft = null;
+  group.pendingSource = null;
+  if (left == null || !source) return;
+
+  for (const el of group.members) {
+    if (el === source || el.scrollLeft === left) continue;
+    group.muted.add(el);
+    el.scrollLeft = left;
+    // Programmatic scroll events often fire after this stack (esp. mobile).
+    queueMicrotask(() => {
+      requestAnimationFrame(() => {
+        group.muted.delete(el);
+      });
+    });
+  }
 }
 
 function broadcastScrollSync(id: string, source: HTMLElement) {
   const group = scrollSyncGroups.get(id);
-  if (!group || group.applying) return;
-  group.applying = true;
-  try {
-    const left = source.scrollLeft;
-    for (const el of group.members) {
-      if (el !== source && el.scrollLeft !== left) {
-        el.scrollLeft = left;
-      }
-    }
-  } finally {
-    group.applying = false;
+  if (!group) return;
+  // Peer / muted strips never become the driver.
+  if (group.muted.has(source)) return;
+  if (group.driver && group.driver !== source) return;
+
+  refreshDriver(group, source);
+  group.pendingLeft = source.scrollLeft;
+  group.pendingSource = source;
+  if (group.frameScheduled) return;
+  group.frameScheduled = true;
+  group.raf = requestAnimationFrame(() => applyPendingScroll(group));
+}
+
+/** Test helper — clear module sync state between cases. */
+export function resetScrollSyncGroupsForTests() {
+  for (const group of scrollSyncGroups.values()) {
+    if (group.settleTimer) clearTimeout(group.settleTimer);
+    if (group.raf != null) cancelAnimationFrame(group.raf);
+    group.frameScheduled = false;
   }
+  scrollSyncGroups.clear();
+}
+
+function updateEdgeDataset(host: HTMLElement | null, body: HTMLElement) {
+  if (!host) return;
+  const max = body.scrollWidth - body.clientWidth;
+  if (body.scrollLeft > 2) host.dataset.canLeft = "true";
+  else delete host.dataset.canLeft;
+  if (max > 2 && body.scrollLeft < max - 2) host.dataset.canRight = "true";
+  else delete host.dataset.canRight;
 }
 
 /**
@@ -99,6 +190,9 @@ function broadcastScrollSync(id: string, source: HTMLElement) {
  * Vertical wheel always scrolls the page — never remapped. Scrollbars stay
  * hidden; edge fades mark overflow. `overflow-y` is hidden so a 1px-tall
  * mismatch cannot create a nested vertical scrollport.
+ *
+ * Grouped strips: only the user-driven strip broadcasts `scrollLeft`. Peers
+ * apply that position and must not rebroadcast (avoids mobile fling thrash).
  */
 export function HorizontalScroll({
   children,
@@ -110,6 +204,7 @@ export function HorizontalScroll({
 }: HorizontalScrollProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const edgeHostRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{
     pointerId: number;
     startX: number;
@@ -121,17 +216,32 @@ export function HorizontalScroll({
   const [dragging, setDragging] = useState(false);
   const syncGroupId = useContext(HorizontalScrollGroupContext);
 
-  const syncHeaderToBody = useCallback(() => {
-    const body = bodyRef.current;
-    const header = headerRef.current;
-    if (!body) return;
-    if (header && header.scrollLeft !== body.scrollLeft) {
-      header.scrollLeft = body.scrollLeft;
-    }
-    const max = body.scrollWidth - body.clientWidth;
-    setCanLeft(body.scrollLeft > 2);
-    setCanRight(max > 2 && body.scrollLeft < max - 2);
-  }, []);
+  const syncChrome = useCallback(
+    (opts?: { allowBroadcast?: boolean }) => {
+      const body = bodyRef.current;
+      if (!body) return;
+      const header = headerRef.current;
+      if (header && header.scrollLeft !== body.scrollLeft) {
+        header.scrollLeft = body.scrollLeft;
+      }
+      updateEdgeDataset(edgeHostRef.current, body);
+
+      if (showArrowControls) {
+        const max = body.scrollWidth - body.clientWidth;
+        setCanLeft(body.scrollLeft > 2);
+        setCanRight(max > 2 && body.scrollLeft < max - 2);
+      }
+
+      if (
+        opts?.allowBroadcast !== false &&
+        syncGroupId &&
+        !isScrollSyncPeer(syncGroupId, body)
+      ) {
+        broadcastScrollSync(syncGroupId, body);
+      }
+    },
+    [showArrowControls, syncGroupId],
+  );
 
   useEffect(() => {
     const body = bodyRef.current;
@@ -142,21 +252,37 @@ export function HorizontalScroll({
       : undefined;
 
     const onScroll = () => {
-      syncHeaderToBody();
-      if (syncGroupId) broadcastScrollSync(syncGroupId, body);
+      // Peers still mirror sticky headers + edge fades locally; they must not
+      // rebroadcast (that fights momentum scroll on phones).
+      const peer =
+        syncGroupId != null && isScrollSyncPeer(syncGroupId, body);
+      syncChrome({ allowBroadcast: !peer });
     };
 
-    onScroll();
+    const onScrollEnd = () => {
+      if (!syncGroupId) return;
+      const group = scrollSyncGroups.get(syncGroupId);
+      if (!group || group.driver !== body) return;
+      if (group.settleTimer) clearTimeout(group.settleTimer);
+      group.settleTimer = null;
+      group.driver = null;
+    };
+
+    syncChrome();
     body.addEventListener("scroll", onScroll, { passive: true });
-    const ro = new ResizeObserver(onScroll);
+    body.addEventListener("scrollend", onScrollEnd, { passive: true });
+    const ro = new ResizeObserver(() => {
+      syncChrome({ allowBroadcast: false });
+    });
     ro.observe(body);
 
     return () => {
       body.removeEventListener("scroll", onScroll);
+      body.removeEventListener("scrollend", onScrollEnd);
       ro.disconnect();
       leaveGroup?.();
     };
-  }, [syncHeaderToBody, children, stickyHeader, syncGroupId]);
+  }, [syncChrome, children, stickyHeader, syncGroupId]);
 
   function scrollByPage(direction: -1 | 1) {
     const el = bodyRef.current;
@@ -175,7 +301,7 @@ export function HorizontalScroll({
 
     el.scrollTo({ left: next, behavior: "smooth" });
     if (headerRef.current) headerRef.current.scrollLeft = next;
-    syncHeaderToBody();
+    syncChrome();
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
@@ -235,7 +361,7 @@ export function HorizontalScroll({
 
     drag.current = null;
     setDragging(false);
-    syncHeaderToBody();
+    syncChrome();
   }
 
   const showControls = showArrowControls && (canLeft || canRight);
@@ -286,25 +412,25 @@ export function HorizontalScroll({
         </div>
       ) : null}
 
-      <div className="relative w-full min-w-0">
-        {canLeft ? (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-paper to-transparent"
-          >
-            <span className="absolute inset-y-0 left-0 w-px bg-accent/40" />
-          </div>
-        ) : null}
-        {canRight ? (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-paper to-transparent"
-          >
-            <span className="absolute inset-y-0 right-0 w-px bg-accent/40" />
-          </div>
-        ) : null}
+      <div
+        ref={edgeHostRef}
+        className="group/hscroll relative w-full min-w-0"
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-6 bg-gradient-to-r from-paper to-transparent opacity-0 group-data-[can-left=true]/hscroll:opacity-100"
+        >
+          <span className="absolute inset-y-0 left-0 w-px bg-accent/40" />
+        </div>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-6 bg-gradient-to-l from-paper to-transparent opacity-0 group-data-[can-right=true]/hscroll:opacity-100"
+        >
+          <span className="absolute inset-y-0 right-0 w-px bg-accent/40" />
+        </div>
         <div
           ref={bodyRef}
+          data-hscroll-body=""
           className={`${viewportChrome} w-full min-w-0 ${viewportClassName}`}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
