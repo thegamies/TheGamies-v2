@@ -21,7 +21,7 @@ describe("TgaBallotComingSoon", () => {
     );
     expect(screen.getByText("Picks soon.")).toBeTruthy();
     expect(
-      screen.getByText(/Call each award\. One point per correct pick\./i),
+      screen.getByText(/Predict the winner of every award/i),
     ).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
   });

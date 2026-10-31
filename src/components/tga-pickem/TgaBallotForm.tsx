@@ -185,8 +185,9 @@ export function TgaBallotForm({
   }
 
   return (
-    <div className={`mt-10 space-y-12 ${canPick ? "pb-24" : ""}`}>
-      {!locked ? <TgaPickemHowItWorks className="mt-0" /> : null}
+    <div className={`mt-6 ${canPick ? "pb-24" : ""}`}>
+      {!locked ? <TgaPickemHowItWorks className="mb-4 mt-0" /> : null}
+      <div className="space-y-12">
       {signInHref ? (
         <p className="max-w-xl text-muted">
           <Link href={signInHref} className="font-semibold text-accent" rel="nofollow">
@@ -308,6 +309,7 @@ export function TgaBallotForm({
           {message}
         </p>
       ) : null}
+      </div>
       {canPick ? (
         <PinnedSaveBar
           message={

@@ -86,7 +86,7 @@ describe("TgaBallotForm", () => {
     );
 
     expect(
-      screen.getByText(/Call each award\. One point per correct pick\./i),
+      screen.getByText(/Predict the winner of every award/i),
     ).toBeTruthy();
     expect(screen.getByText("1 of 2")).toBeTruthy();
     expect(screen.getByText("Tiebreaker needed")).toBeTruthy();
@@ -123,7 +123,7 @@ describe("TgaBallotForm", () => {
     );
 
     expect(
-      screen.queryByText(/Call each award\. One point per correct pick\./i),
+      screen.queryByText(/Predict the winner of every award/i),
     ).toBeNull();
   });
 });
